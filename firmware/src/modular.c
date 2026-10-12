@@ -61,6 +61,8 @@ static int m1_slot_info(uint32_t slot, char *name, uint32_t *len);
 #ifdef M1_BENCH
 #include "bench.c"
 #endif
+#define UI_POOL __attribute__((section(".pool")))
 #include "ui.c"
 #include "arp_ui.c"
+#include "glo_ui.c"
 #include "main.c"

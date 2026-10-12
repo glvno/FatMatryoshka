@@ -87,11 +87,11 @@ Benchmark (`firmware/src/bench.c`, numbers in docs/ARCHITECTURE.md): no FPU, flo
 
 ## Polyphony (host-tested, golden 45 patches pass; not flashed)
 
-- `Patch.voices` (1..8, absent = mono), binary header byte 3 (was reserved 0; firmware reads 0 as 1, the patch version stays 6 so older firmware plays such patches mono). `voiceSplit` (patch.ts) = the per-voice set, `voicesOf`, `VOICE_PORTS`, `SHARED_TYPES`; the rules are in docs/ARCHITECTURE.md "Polyphony". Toolbar `<select id="voices">` in main.ts, `×N` badge on per-voice cards (editor.ts), `deviceBudget` / `DEVICE` in patchbin.ts (the toolbar goes red and the status line says so when the FM-1 would refuse the patch).
+- `Patch.voices` (1..8, absent = mono), binary header byte 3 (was reserved 0; firmware reads 0 as 1, the patch version stays 6 so older firmware plays such patches mono). `voiceSplit` (patch.ts) = the per-voice set, `voicesOf`, `VOICE_PORTS`, `SHARED_TYPES`; the rules are in docs/ARCHITECTURE.md "Polyphony". The control is a `voices` row on the Main card (`Editor.voicesRow`), `×N` badge on per-voice cards (editor.ts), `deviceBudget` / `DEVICE` in patchbin.ts (the row shows the buffer count, goes red, and main.ts puts it in the status line when the FM-1 would refuse the patch). Device: GLO button = `PAGE_GLO` 4 (`glo_ui.c`, `glo_view_draw`), K1 -> `voices_set` (main.c: header byte 3 of `m1_cur`, `eng_load`, rollback on error), `eng_voices()`, Main page title shows the count.
 - engine.ts: `Inst` per voice, `VoiceState` allocator (`noteOn` / `noteOff`), `voiceNotes()` / `nvoices` for tests. engine.c: `inst_t` in `inst_pool` (`.pool`, `ENG_MAX_INST` 128), `node_t` = `inst0, ninst`, `voice_t E.vc[]`, `cur_v`, `port_poly` / `buf_of`, `eng_voices()`. Module functions take `(const node_t *nd, inst_t *it, n)`. `MAX_SUM` 192, `MAX_SRC` 512. Load errors: -6 out of buffers / sources, -7 out of instances.
-- The engine's sample type is `esig_t` now (`sig_t` is a typedef in macOS `<signal.h>`; `tools/golden.sh` therefore runs on macOS with plain gcc/clang + node). `tools/ui_preview.sh` still needs Linux (`section(".pool")` attributes in ui.c).
+- The engine's sample type is `esig_t` now (`sig_t` is a typedef in macOS `<signal.h>`; `tools/golden.sh` therefore runs on macOS with plain gcc/clang + node). `tools/ui_preview.sh` runs on macOS too: ui.c's picture buffer uses `UI_POOL` (empty on the host, `.pool` in modular.c); the preview takes an optional 7th argument VOICES.
 - CPU per voice on the device: not measured. Memory added: `inst_pool` about 16 KB in the pool, `sum_src` 2 KB in .bss.
-- Not done: voice count on the LCD or settable on the device, INFO reply without `ENG_MAX_VOICES`, unison.
+- Not done: INFO reply without `ENG_MAX_VOICES`, unison. Button id 7 = GLO is from Felucca's panel table and unmeasured, like the other named buttons.
 
 ## Not verified — do not claim otherwise
 

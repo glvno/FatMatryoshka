@@ -15,7 +15,7 @@
 static uint32_t cur_preset;
 static int load_err;
 static const char *patch_label = "";
-static uint8_t page;                            /* 0: the selected module, 1..3: the arpeggiator pages MELODY, RHYTHM, CHAOS (arp_ui.c) */
+static uint8_t page;                            /* 0: the selected module, 1..3: the arpeggiator pages MELODY, RHYTHM, CHAOS (arp_ui.c), 4: GLO (glo_ui.c) */
 static uint32_t sel;                            /* the module the knobs act on (SELECT turns it) */
 static volatile uint8_t ui_dirty;               /* 1: the knob rows need a redraw, 2: the module changed too (title, picture) */
 static int32_t octave;                          /* the keys' octave shift, -3..3 (OCT- / OCT+) */
@@ -118,7 +118,10 @@ static uint32_t param_bar(const def_t *def, uint32_t j, int32_t q16, uint32_t wi
 #define TH_W 76u
 #define TH_H 198u
 #define LEFT_W 136u                     /* the left two thirds: text and bars from x = 12 */
-static uint16_t th_buf[TH_W * TH_H] __attribute__((section(".pool")));   /* byte swapped, as the LCD takes it */
+#ifndef UI_POOL
+#define UI_POOL                         /* the device build (modular.c) puts the picture buffer in the pool section */
+#endif
+static uint16_t th_buf[TH_W * TH_H] UI_POOL;   /* byte swapped, as the LCD takes it */
 
 static const uint16_t TYPE_COLOR[N_TYPES] = {
     [T_FM1] = 0x07E0, [T_OSC] = 0xFD20, [T_LFO] = 0xF81F, [T_NOISE] = 0xB596, [T_CONST] = 0xBDF7, [T_SCALE] = 0x867F,
@@ -412,6 +415,13 @@ static void module_draw(int full)
     d = &DEFS[type];
     if (full) {
         p = put(line, d->name);
+        if (type == T_FM1 && eng_voices() > 1) {        /* the panel: the patch's voice count after its name */
+            char num[8];
+            fmt_int(num, eng_voices());
+            p = put(p, "  ");
+            p = put(p, num);
+            p = put(p, " VOICES");
+        }
         pad(p, line, 15);
         text_mid(12, 30, line, C_ACC, C_BG);
         thumb_show();
@@ -480,10 +490,14 @@ static void module_draw(int full)
 }
 
 static void arp_view_draw(uint32_t page, int full);
+static void glo_view_draw(int full);            /* glo_ui.c: the GLO page (voices) */
+#define PAGE_GLO 4u
 
 static void view_draw(int full)                 /* whichever page is showing */
 {
-    if (page)
+    if (page == PAGE_GLO)
+        glo_view_draw(full);
+    else if (page)
         arp_view_draw(page, full);
     else
         module_draw(full);

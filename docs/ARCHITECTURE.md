@@ -85,4 +85,6 @@ A patch carries `voices` (1..8, `MAX_VOICES`; the JSON field is absent for mono,
 
 **Golden vectors.** `web/scripts/golden.ts` adds `poly-pluck` (4 voices, two envelopes, shared delay, more notes than voices), `poly-shared` (3 voices, a shared LFO into every voice's filter `p1`, shared noise through a per-voice VCA, velocity on `p1`, key tracking, two cables into one per-voice input, shared reverb) and `poly-feedback` (2 voices, a feedback cable inside the voice and a shared delay fed back into every voice's mixer), with their own note events; the C engine agrees with the reference to about 0.1 % rms on all of them.
 
-Not done: the LCD does not show the voice count and the device has no control for it (it comes with the patch); the HELLO / INFO reply does not report `ENG_MAX_VOICES`; unison / detune.
+**Controls.** Editor: a `voices` row on the Main module's card (mono, 2..8) with the FM-1 buffer count next to it (red when the firmware would refuse the patch). Device: the GLO button (id 7) opens page 4 (`glo_ui.c`), K1 steps the voice count; `voices_set` in main.c writes header byte 3 of the current patch binary and reloads it with `eng_load` (module state restarts, held notes end); if the firmware has no room for that count the old one is reloaded and the bar says `NO ROOM FOR n`. SAVE stores the patch with the count. The Main module's page shows `MAIN  4 VOICES`. `tools/ui_preview.sh OUT PRESET MODULE OCTAVE PAGE STEP VOICES` previews both.
+
+Not done: the HELLO / INFO reply does not report `ENG_MAX_VOICES`; unison / detune.

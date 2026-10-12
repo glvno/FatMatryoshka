@@ -7,7 +7,7 @@ import { buildBankTab } from './bank';
 import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi } from './input';
 import { DEFS } from './modules';
-import { emptyPatch, MAX_VOICES, validatePatch, voicesOf, type Patch } from './patch';
+import { emptyPatch, validatePatch, voicesOf, type Patch } from './patch';
 import { PRESETS } from './presets';
 import { deviceBudget, DEVICE } from './patchbin';
 
@@ -116,7 +116,6 @@ presetSel.onchange = () => {
   if (v) editor.setPatch(v === '__empty' ? emptyPatch() : PRESETS[v]());
   presetSel.value = '';
   $<HTMLInputElement>('patch-name').value = editor.patch.name;
-  showVoices();
 };
 const nameInput = $<HTMLInputElement>('patch-name');
 nameInput.value = editor.patch.name;
@@ -124,26 +123,10 @@ nameInput.oninput = () => {
   editor.patch.name = nameInput.value;
   queueSave(editor.patch);
 };
-// voices: 1 = the mono engine as it was; more = the modules that hear pitch / gate / vel run once per voice (patch.ts voiceSplit)
-const voicesSel = $<HTMLSelectElement>('voices');
-voicesSel.append(...Array.from({ length: MAX_VOICES }, (_, i) => new Option(i === 0 ? 'Mono' : `${i + 1} voices`, String(i + 1))));
+/** the voice count is set on the Main module's card (editor.ts); here only the FM-1 budget warning */
 const showVoices = (): void => {
-  voicesSel.value = String(voicesOf(editor.patch));
   const b = deviceBudget(editor.patch);
-  voicesSel.classList.toggle('over', !b.fits);
-  voicesSel.title = `Voices: with more than one, every module that hears pitch, gate or vel runs once per voice; delay, reverb and output stay single and sum the voices.\nOn the FM-1 this patch takes ${b.buffers} of ${DEVICE.buffers} signal buffers and ${b.instances} of ${DEVICE.instances} module instances${b.fits ? '' : ': too many, the FM-1 will refuse it'}.`;
   if (!b.fits) status.textContent = `too big for the FM-1: ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} instances (fewer voices or modules)`;
-};
-showVoices();
-voicesSel.onchange = () => {
-  const n = Number(voicesSel.value);
-  if (n > 1) editor.patch.voices = n;
-  else delete editor.patch.voices;
-  editor.rebuild(); // the per-voice badges
-  showVoices();
-  host.setPatch(editor.patch);
-  queueSave(editor.patch);
-  if (live()) queueUpload();
 };
 const typeSel = $<HTMLSelectElement>('add-type');
 typeSel.append(...Object.values(DEFS).map((d) => new Option(d.label, d.type)));
@@ -191,7 +174,6 @@ $<HTMLInputElement>('load-file').onchange = async (e) => {
   try {
     editor.setPatch(validatePatch(JSON.parse(await f.text()), DEFS));
     nameInput.value = editor.patch.name;
-    showVoices();
   } catch (err) {
     status.textContent = `load failed: ${(err as Error).message}`;
   }

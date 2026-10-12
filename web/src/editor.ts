@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Patch editor: module cards on a canvas, SVG cables, drag-to-connect.
 import { DEFS } from './modules';
+import { deviceBudget, DEVICE } from './patchbin';
 import {
   addModule,
   fromUnit,
@@ -17,6 +18,7 @@ import {
   type ModuleInst,
   type Patch,
   type PortDef,
+  MAX_VOICES,
   voiceSplit,
   voicesOf,
 } from './patch';
@@ -174,9 +176,40 @@ export class Editor {
     }
     body.append(io);
     if (def.paramInputs) body.append(this.pins(m, def), this.matrix(m, def));
+    if (def.type === 'fm1') params.append(this.voicesRow());
     body.append(params);
     el.append(head, body);
     return el;
+  }
+
+  /** the patch's voice count, on the Main card: 1 is the mono engine, more runs every module that hears pitch / gate / vel once per voice */
+  private voicesRow(): HTMLElement {
+    const row = document.createElement('label');
+    row.className = 'param voices-row';
+    const name = document.createElement('span');
+    name.textContent = 'voices';
+    const val = document.createElement('output');
+    const sel = document.createElement('select');
+    sel.setAttribute('aria-label', 'Voices');
+    for (let n = 1; n <= MAX_VOICES; n++) sel.append(new Option(n === 1 ? 'mono' : String(n), String(n)));
+    const show = (): void => {
+      const n = voicesOf(this.patch);
+      const b = deviceBudget(this.patch);
+      sel.value = String(n);
+      val.textContent = n === 1 ? '' : b.fits ? `${b.buffers}/${DEVICE.buffers} buf` : 'too big for FM-1';
+      sel.classList.toggle('over', !b.fits);
+      row.title = `Voices. With more than one, every module that hears pitch, gate or vel (×N on its card) runs once per voice; delay, reverb and output stay single and sum the voices. On the FM-1 this patch takes ${b.buffers} of ${DEVICE.buffers} signal buffers and ${b.instances} of ${DEVICE.instances} module instances${b.fits ? '.' : ': too many, the FM-1 will refuse it.'}`;
+    };
+    show();
+    sel.onchange = () => {
+      const n = Number(sel.value);
+      if (n > 1) this.patch.voices = n;
+      else delete this.patch.voices;
+      this.rebuild(); // the ×N badges and this row
+      this.ev.onStructure(this.patch);
+    };
+    row.append(name, val, sel);
+    return row;
   }
 
   /** the two parameter inputs, each with an attenuverter (-1..1: scale and invert) */

@@ -267,7 +267,12 @@ static void knobs_poll(void)
     }
     if (page && st[0])                              /* SELECT: back to the module page */
         page_set(page);
-    if (page) {                                     /* K1..K4 of an arpeggiator page */
+    if (page == PAGE_GLO) {                         /* K1 of the GLO page: the voice count */
+        if (st[2])
+            voices_set(eng_voices() + st[2]);
+        if (!st[0])
+            return;
+    } else if (page) {                              /* K1..K4 of an arpeggiator page */
         for (k = 0; k < 4u; k++) {
             uint32_t fast = fm1_ms - last_ms[k] < 80u;
             if (st[2u + k]) {
@@ -361,6 +366,7 @@ static void keys_poll(void)                     /* the FM-1's 27 keys (bit 0 = F
 #define BTN_SEQ 11u
 #define BTN_PLAY 12u
 #define BTN_LFO 5u                  /* the request said "BTN 52": there is no id 52 (buttons are 0..13), 5 is LFO in Felucca's table */
+#define BTN_GLO 7u                  /* GLO: the patch settings page (voices), glo_ui.c */
 static void led_breath_key(uint32_t id, int on)     /* a button's LED breathes (the HAL's one shared speed, fm1_br_step) */
 {
     uint32_t p, r;
@@ -386,6 +392,46 @@ static void leds_arp(void)
     fm1_led_key(BTN_ARP, page == 1u);
     fm1_led_key(BTN_SEQ, page == 2u);
     fm1_led_key(BTN_LFO, page == 3u);
+    fm1_led_key(BTN_GLO, page == PAGE_GLO);
+}
+
+/* The voice count of the running patch (byte 3 of its binary): the GLO page's K1. The patch is reloaded with the new
+ * count (its module state restarts, held notes end). When the firmware has no room for it (signal buffers, instances)
+ * the old count comes back. SAVE then keeps it, as it is part of the stored patch. */
+static void voices_set(int32_t n)
+{
+    uint8_t old;
+    int rc;
+    char m[24], num[8], *q = m;
+    if (!m1_cur_len || m1_cur_len < 8u)
+        return;
+    n = n < 1 ? 1 : n > ENG_MAX_VOICES ? ENG_MAX_VOICES : n;
+    old = m1_cur[3];
+    if ((old ? old : 1u) == (uint32_t)n)
+        return;
+    m1_cur[3] = (uint8_t)n;
+    eng_run = 0;
+    rc = eng_load(m1_cur, m1_cur_len);
+    if (rc) {
+        m1_cur[3] = old;
+        rc = eng_load(m1_cur, m1_cur_len);
+    }
+    load_err = -rc;
+    eng_us_max = 0;
+    eng_run = rc == 0;
+    if (m1_cur[3] != (uint8_t)n) {
+        q = put(q, "NO ROOM FOR ");
+        fmt_int(num, n);
+        put(q, num);
+    } else if (n == 1) {
+        put(q, "MONO");
+    } else {
+        fmt_int(num, n);
+        q = put(q, num);
+        put(q, " VOICES");
+    }
+    ui_msg(m, 1500);
+    ui_dirty = 2;
 }
 
 static void page_set(uint32_t p)    /* the same button again goes back to the module page */
@@ -425,7 +471,7 @@ static void save_state(void)
 }
 
 /* The panel buttons (matrix ids as in Felucca's panel table; unknown ones are shown so they can be assigned):
- * OCT- 0, OCT+ 1: octave; SAVE 9: save the state. */
+ * OCT- 0, OCT+ 1: octave; SAVE 9: save the state; GLO 7: the voices page. */
 #define BTN_OCT_DOWN 0u
 #define BTN_OCT_UP 1u
 #define BTN_SAVE 9u
@@ -434,7 +480,6 @@ static void save_state(void)
 #define BTN_SEL 3u
 #define BTN_ENV 4u
 #define BTN_EDIT 6u
-#define BTN_GLO 7u
 #define BTN_REC 13u
 #define BTN_HOME 8u                     /* HOME: back to the module page, on the FM-1 panel module of the patch */
 
@@ -453,6 +498,7 @@ static void leds_avail(void)                        /* the page buttons glow dim
     led_glow(BTN_ARP);
     led_glow(BTN_SEQ);
     led_glow(BTN_LFO);
+    led_glow(BTN_GLO);
 }
 
 static void home_press(void)
@@ -499,6 +545,8 @@ static void buttons_poll(void)
         page_set(2);
     if (p & (1u << BTN_LFO))
         page_set(3);
+    if (p & (1u << BTN_GLO))
+        page_set(PAGE_GLO);
     if (p & (1u << BTN_PLAY))
         arp_toggle();
 }
