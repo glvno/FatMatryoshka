@@ -17,6 +17,8 @@ import {
   type ModuleInst,
   type Patch,
   type PortDef,
+  voiceSplit,
+  voicesOf,
 } from './patch';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -70,7 +72,8 @@ export class Editor {
   rebuild(): void {
     this.modulesEl.replaceChildren();
     this.ports.clear();
-    for (const m of this.patch.modules) this.modulesEl.append(this.card(m, DEFS[m.type]));
+    const poly = voiceSplit(this.patch);
+    for (const m of this.patch.modules) this.modulesEl.append(this.card(m, DEFS[m.type], poly.has(m.id)));
     this.sizeCanvas();
     requestAnimationFrame(() => this.drawCables());
   }
@@ -82,7 +85,7 @@ export class Editor {
     this.canvas.style.minHeight = `${h}px`;
   }
 
-  private card(m: ModuleInst, def: ModuleDef): HTMLElement {
+  private card(m: ModuleInst, def: ModuleDef, perVoice = false): HTMLElement {
     const el = document.createElement('div');
     el.className = 'module';
     el.style.left = `${m.x}px`;
@@ -93,6 +96,13 @@ export class Editor {
     head.className = 'mhead';
     const title = document.createElement('span');
     title.textContent = def.label;
+    if (perVoice) {
+      const badge = document.createElement('span');
+      badge.className = 'voices';
+      badge.textContent = `×${voicesOf(this.patch)}`;
+      badge.title = `runs once per voice (${voicesOf(this.patch)} voices)`;
+      title.append(' ', badge);
+    }
     const del = document.createElement('button');
     del.className = 'x';
     del.textContent = '×';

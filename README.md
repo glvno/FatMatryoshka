@@ -9,6 +9,10 @@ Modules have two parameter inputs: p1 and p2 with an attenuverter
 
 Then there's a matrix for to map p1 and p2 as well as k1-4 to some parameter of the module. p1 and p2 are global. k1-4 only when you're on that module (see later) 
 
+### Voices
+
+A patch is mono unless you pick a voice count (2..8) in the toolbar. Like on the Nord Modular you don't patch the voices yourself: every module that hears the Main module's pitch, gate or vel (through any chain of cables, p1 / p2 included) runs once per voice, marked `×4` on its card. Delay, reverb and output always run once and receive the sum of the voices; a module that hears no voice signal (a free-running LFO, a noise) runs once and feeds every voice. Notes take a free voice first, then the oldest sounding one. On the FM-1 each voice costs the CPU time of the per-voice modules, so 3 or 4 voices of a typical patch is the realistic range; the toolbar turns red when a patch needs more signal buffers than the firmware has.
+
 ## FM-1
 
 In addition to the modular synth engine, there's also some complex arpeggiator. 

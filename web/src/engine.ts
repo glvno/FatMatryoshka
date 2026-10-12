@@ -1,61 +1,121 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Block-based patch engine. Pure TypeScript with no DOM or Web Audio dependency, so it runs in
 // an AudioWorklet, in tests, and (as the reference) next to the firmware port.
+//
+// Polyphony: a patch has `voices` (1..MAX_VOICES). voiceSplit() in patch.ts says which modules run once per voice; those
+// have one instance (state, buffers, effective parameters) per voice. The others run once: a shared module reading a
+// per-voice output gets the sum over the voices, a per-voice module reading a shared output gets that one buffer. The
+// FM-1 panel is shared but its pitch / gate / vel outputs are per voice. With one voice this is exactly the mono engine.
 
 import { IMPLS, type Ctx, type ModuleImpl, type Voice } from './modules';
-import { defaultMap, modulate, processingOrder, SOURCES, type Cable, type Patch, type Source } from './patch';
+import { defaultMap, modulate, processingOrder, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Cable, type Patch, type Source } from './patch';
 
 export const BLOCK = 128;
+
+/** one running copy of a module: shared modules have one, per-voice modules one per voice */
+interface Inst {
+  state: unknown;
+  /** params after modulation, what the module reads */
+  eff: Record<string, number>;
+  inp: Record<string, Float32Array>;
+  out: Record<string, Float32Array>;
+}
 
 interface Node {
   id: number;
   type: string;
   impl: ModuleImpl;
-  state: unknown;
   params: Record<string, number>;
-  /** params after modulation, what the module reads */
-  eff: Record<string, number>;
   att: [number, number];
   map: Record<Source, string[]>;
-  inp: Record<string, Float32Array>;
-  out: Record<string, Float32Array>;
   connected: Record<string, boolean>;
   sources: { port: string; from: Node; fromPort: string }[];
+  /** runs once per voice */
+  poly: boolean;
+  inst: Inst[];
+  /** the FM-1 panel with several voices: its pitch / gate / vel, one buffer per voice */
+  vout: Record<string, Float32Array[]> | null;
 }
+
+/** a voice: what the panel outputs plus what the allocator needs */
+interface VoiceState extends Voice {
+  note: number;
+  /** a key holds it (gate up) */
+  on: boolean;
+  onStamp: number;
+  offStamp: number;
+  /** the voice was taken over while sounding: the next block's gate starts with one low sample so envelopes restart */
+  retrig: boolean;
+}
+
+const newVoice = (): VoiceState => ({ pitch: 0, gate: 0, velocity: 0, note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false });
 
 export class Engine {
   private nodes = new Map<number, Node>();
   private order: Node[] = [];
   private outputs: Node[] = [];
   private held: { note: number; vel: number }[] = [];
-  readonly voice: Voice = { pitch: 0, gate: 0, velocity: 0 };
+  private voices: VoiceState[] = [newVoice()];
+  private stamp = 0;
 
   constructor(readonly sampleRate: number) {}
 
-  /** Install a patch. Modules whose id and type are unchanged keep their running state. */
+  /** the number of voices of the loaded patch */
+  get nvoices(): number {
+    return this.voices.length;
+  }
+
+  /** the first voice (the voice, with a mono patch) */
+  get voice(): Voice {
+    return this.voices[0];
+  }
+
+  /** the notes the voices hold (for tests and displays): -1 = none, gate up or down */
+  voiceNotes(): { note: number; on: boolean }[] {
+    return this.voices.map((v) => ({ note: v.note, on: v.on }));
+  }
+
+  private newInst(impl: ModuleImpl): Inst {
+    return {
+      state: impl.init(this.sampleRate),
+      eff: {},
+      inp: Object.fromEntries(impl.def.inputs.map((p) => [p.name, new Float32Array(BLOCK)])),
+      out: Object.fromEntries(impl.def.outputs.map((p) => [p.name, new Float32Array(BLOCK)])),
+    };
+  }
+
+  /** Install a patch. Modules whose id, type and voice count are unchanged keep their running state. */
   load(patch: Patch): void {
+    const nv = voicesOf(patch);
+    const poly = voiceSplit(patch);
+    if (nv !== this.voices.length) {
+      this.voices = Array.from({ length: nv }, newVoice);
+      this.held = [];
+    }
     const next = new Map<number, Node>();
     for (const m of patch.modules) {
       const impl = IMPLS[m.type];
       if (!impl) throw new Error(`unknown module type "${m.type}"`);
+      const isPoly = poly.has(m.id);
+      const ninst = isPoly ? nv : 1;
+      const panelVoices = m.type === 'fm1' && nv > 1 ? nv : 0;
       const old = this.nodes.get(m.id);
-      const node: Node =
-        old && old.type === m.type
-          ? old
-          : {
-              id: m.id,
-              type: m.type,
-              impl,
-              state: impl.init(this.sampleRate),
-              params: {},
-              eff: {},
-              att: [1, 1],
-              map: defaultMap(impl.def),
-              inp: Object.fromEntries(impl.def.inputs.map((p) => [p.name, new Float32Array(BLOCK)])),
-              out: Object.fromEntries(impl.def.outputs.map((p) => [p.name, new Float32Array(BLOCK)])),
-              connected: {},
-              sources: [],
-            };
+      const keep = old && old.type === m.type && old.inst.length === ninst && (old.vout ? old.vout.pitch.length : 0) === panelVoices;
+      const node: Node = keep
+        ? old!
+        : {
+            id: m.id,
+            type: m.type,
+            impl,
+            params: {},
+            att: [1, 1],
+            map: defaultMap(impl.def),
+            connected: {},
+            sources: [],
+            poly: isPoly,
+            inst: Array.from({ length: ninst }, () => this.newInst(impl)),
+            vout: panelVoices ? Object.fromEntries([...VOICE_PORTS].map((p) => [p, Array.from({ length: panelVoices }, () => new Float32Array(BLOCK))])) : null,
+          };
       node.params = { ...m.params };
       node.att = m.att ? [m.att[0], m.att[1]] : [1, 1];
       node.map = Object.fromEntries(SOURCES.map((s) => [s, [...(m.map?.[s] ?? [])]])) as Record<Source, string[]>;
@@ -80,35 +140,46 @@ export class Engine {
     if (n) n.params[name] = value;
   }
 
-  /**
-   * A module whose output went NaN or infinite (a filter blown up by resonance and a hot input, a feedback loop) would keep
-   * poisoning everything after it, because its state never recovers: silence its outputs and restart its state.
-   */
-  private guard(node: Node, n: number): void {
-    for (const name in node.out) {
-      const o = node.out[name];
-      for (let i = 0; i < n; i++) {
-        if (Number.isFinite(o[i]) && o[i] < 1e6 && o[i] > -1e6) continue;
-        node.state = node.impl.init(this.sampleRate);
-        for (const k in node.out) node.out[k].fill(0, 0, n);
-        return;
-      }
-    }
-  }
-
   setAtt(id: number, index: number, value: number): void {
     const n = this.nodes.get(id);
     if (n && (index === 0 || index === 1)) n.att[index] = value;
   }
 
+  /** does this output differ per voice? */
+  private portIsPoly(from: Node, port: string): boolean {
+    return from.vout ? VOICE_PORTS.has(port) : from.poly;
+  }
+
+  /** the buffer of an output as voice `v` sees it */
+  private bufOf(from: Node, port: string, v: number): Float32Array {
+    if (from.vout && VOICE_PORTS.has(port)) return from.vout[port][v];
+    return from.inst[from.poly ? v : 0].out[port];
+  }
+
+  /**
+   * A module whose output went NaN or infinite (a filter blown up by resonance and a hot input, a feedback loop) would keep
+   * poisoning everything after it, because its state never recovers: silence its outputs and restart its state.
+   */
+  private guard(node: Node, inst: Inst, n: number): void {
+    for (const name in inst.out) {
+      const o = inst.out[name];
+      for (let i = 0; i < n; i++) {
+        if (Number.isFinite(o[i]) && o[i] < 1e6 && o[i] > -1e6) continue;
+        inst.state = node.impl.init(this.sampleRate);
+        for (const k in inst.out) inst.out[k].fill(0, 0, n);
+        return;
+      }
+    }
+  }
+
   /** Block-rate parameter modulation: the mean of p1 and p2 over the block, times their attenuverters, added to the parameters the matrix assigns them to. */
-  private applyCv(node: Node, n: number): void {
+  private applyCv(node: Node, inst: Inst, n: number): void {
     const pins: (number | null)[] = [null, null];
     if (node.impl.def.paramInputs)
       (['p1', 'p2'] as const).forEach((name, s) => {
         if (!node.connected[name]) return;
         let sum = 0;
-        for (let i = 0; i < n; i++) sum += node.inp[name][i];
+        for (let i = 0; i < n; i++) sum += inst.inp[name][i];
         pins[s] = (sum / n) * node.att[s];
       });
     for (const pd of node.impl.def.params) {
@@ -121,35 +192,99 @@ export class Engine {
           touched = true;
         }
       });
-      node.eff[pd.name] = touched ? modulate(pd, base, mod) : base;
+      inst.eff[pd.name] = touched ? modulate(pd, base, mod) : base;
     }
   }
 
   noteOn(note: number, velocity = 1): void {
-    this.held = this.held.filter((h) => h.note !== note);
-    this.held.push({ note, vel: velocity });
-    this.updateVoice(true);
+    if (this.voices.length === 1) {
+      this.held = this.held.filter((h) => h.note !== note);
+      this.held.push({ note, vel: velocity });
+      this.updateVoice();
+      return;
+    }
+    const vs = this.voices;
+    const stamp = ++this.stamp;
+    // the key is already down on a voice: that voice again. Else the voice that has been free the longest. Else the oldest.
+    let v = vs.findIndex((x) => x.on && x.note === note);
+    if (v < 0) for (let i = 0; i < vs.length; i++) if (!vs[i].on && (v < 0 || vs[i].offStamp < vs[v].offStamp)) v = i;
+    if (v < 0) {
+      v = 0;
+      for (let i = 1; i < vs.length; i++) if (vs[i].onStamp < vs[v].onStamp) v = i;
+    }
+    const x = vs[v];
+    if (x.on) x.retrig = true;
+    x.note = note;
+    x.pitch = (note - 60) / 12;
+    x.velocity = velocity;
+    x.gate = 1;
+    x.on = true;
+    x.onStamp = stamp;
   }
 
   noteOff(note: number): void {
-    this.held = this.held.filter((h) => h.note !== note);
-    this.updateVoice(false);
+    if (this.voices.length === 1) {
+      this.held = this.held.filter((h) => h.note !== note);
+      this.updateVoice();
+      return;
+    }
+    for (const x of this.voices)
+      if (x.on && x.note === note) {
+        x.on = false;
+        x.gate = 0;
+        x.offStamp = ++this.stamp;
+      }
   }
 
   allNotesOff(): void {
     this.held = [];
-    this.voice.gate = 0;
+    for (const x of this.voices) {
+      x.on = false;
+      x.gate = 0;
+      x.retrig = false;
+    }
   }
 
-  private updateVoice(retrigger: boolean): void {
+  /** mono: last note priority, legato (the gate stays up while any key is down) */
+  private updateVoice(): void {
     const top = this.held[this.held.length - 1];
+    const x = this.voices[0];
     if (top) {
-      this.voice.pitch = (top.note - 60) / 12;
-      this.voice.velocity = top.vel;
-      this.voice.gate = 1;
-      void retrigger;
+      x.pitch = (top.note - 60) / 12;
+      x.velocity = top.vel;
+      x.gate = 1;
+      x.note = top.note;
+      x.on = true;
     } else {
-      this.voice.gate = 0;
+      x.gate = 0;
+      x.on = false;
+    }
+  }
+
+  /** the inputs of one instance: zero, then every cable added (a shared module adds all voices of a per-voice output) */
+  private gather(node: Node, inst: Inst, v: number, n: number): void {
+    for (const name in inst.inp) inst.inp[name].fill(0, 0, n);
+    const nv = this.voices.length;
+    for (const s of node.sources) {
+      const dst = inst.inp[s.port];
+      if (!node.poly && this.portIsPoly(s.from, s.fromPort)) {
+        for (let k = 0; k < nv; k++) {
+          const src = this.bufOf(s.from, s.fromPort, k);
+          for (let i = 0; i < n; i++) dst[i] += src[i];
+        }
+      } else {
+        const src = this.bufOf(s.from, s.fromPort, v);
+        for (let i = 0; i < n; i++) dst[i] += src[i];
+      }
+    }
+  }
+
+  private run(node: Node, inst: Inst, voice: VoiceState, out: Record<string, Float32Array>, n: number): void {
+    const ctx: Ctx = { sr: this.sampleRate, n, inp: inst.inp, out, connected: node.connected, p: inst.eff, voice };
+    node.impl.process(ctx, inst.state);
+    if (node.type === 'fm1' && voice.retrig) {
+      out.gate[0] = 0; // one low sample: the envelopes of a stolen voice see a new gate
+      voice.retrig = false;
     }
   }
 
@@ -158,24 +293,40 @@ export class Engine {
     const total = left.length;
     left.fill(0);
     right.fill(0);
+    const vs = this.voices;
     for (let off = 0; off < total; off += BLOCK) {
       const n = Math.min(BLOCK, total - off);
       for (const node of this.order) {
-        for (const name in node.inp) node.inp[name].fill(0, 0, n);
-        for (const s of node.sources) {
-          const src = s.from.out[s.fromPort];
-          const dst = node.inp[s.port];
-          for (let i = 0; i < n; i++) dst[i] += src[i];
+        if (node.poly) {
+          for (let v = 0; v < vs.length; v++) {
+            const inst = node.inst[v];
+            this.gather(node, inst, v, n);
+            this.applyCv(node, inst, n);
+            this.run(node, inst, vs[v], inst.out, n);
+            this.guard(node, inst, n);
+          }
+        } else {
+          const inst = node.inst[0];
+          this.gather(node, inst, 0, n);
+          this.applyCv(node, inst, n);
+          if (node.vout) {
+            // the panel with several voices: the knobs once, pitch / gate / vel for every voice
+            for (let v = 0; v < vs.length; v++) {
+              const out = { ...inst.out };
+              for (const p of VOICE_PORTS) out[p] = node.vout[p][v];
+              this.run(node, inst, vs[v], out, n);
+            }
+          } else {
+            this.run(node, inst, vs[0], inst.out, n);
+          }
+          this.guard(node, inst, n);
         }
-        this.applyCv(node, n);
-        const ctx: Ctx = { sr: this.sampleRate, n, inp: node.inp, out: node.out, connected: node.connected, p: node.eff, voice: this.voice };
-        node.impl.process(ctx, node.state);
-        this.guard(node, n);
       }
       for (const o of this.outputs) {
-        const lvl = o.eff.level ?? 1;
-        const l = o.inp.l;
-        const r = o.connected.r ? o.inp.r : o.inp.l;
+        const inst = o.inst[0];
+        const lvl = inst.eff.level ?? 1;
+        const l = inst.inp.l;
+        const r = o.connected.r ? inst.inp.r : inst.inp.l;
         for (let i = 0; i < n; i++) {
           left[off + i] += l[i] * lvl;
           right[off + i] += r[i] * lvl;

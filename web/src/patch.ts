@@ -90,12 +90,52 @@ export interface Patch {
   name: string;
   modules: ModuleInst[];
   cables: Cable[];
+  /** number of voices, 1 (mono, the default) .. MAX_VOICES. See voiceSplit() for what a voice is. */
+  voices?: number;
 }
 
 export const MAX_MODULES = 32;
+export const MAX_VOICES = 8;
 
 export function emptyPatch(name = 'init'): Patch {
   return { version: 2, name, modules: [], cables: [] };
+}
+
+/** the voice count of a patch: a whole number 1..MAX_VOICES, 1 when missing */
+export function voicesOf(p: Pick<Patch, 'voices'>): number {
+  const v = Math.round(Number(p.voices));
+  return Number.isFinite(v) ? Math.max(1, Math.min(MAX_VOICES, v)) : 1;
+}
+
+/** the panel outputs that differ per voice; its knobs are the same for every voice */
+export const VOICE_PORTS = new Set(['pitch', 'gate', 'vel']);
+/** modules that always run once, however many voices: their inputs sum the voices (big state, or the end of the chain) */
+export const SHARED_TYPES = new Set(['delay', 'reverb', 'output']);
+
+/**
+ * Which modules run once per voice. With more than one voice the FM-1 panel's pitch, gate and vel are per voice, and so
+ * is every module that (through any chain of cables, p1 / p2 included) hears them, except the SHARED_TYPES. A cable from a
+ * per-voice output into a shared module carries the sum of the voices; a cable from a shared output into a per-voice
+ * module reaches every voice. With one voice nothing is per voice: that is the mono engine as it was.
+ */
+export function voiceSplit(p: Patch): Set<number> {
+  const poly = new Set<number>();
+  if (voicesOf(p) < 2) return poly;
+  const types = new Map(p.modules.map((m) => [m.id, m.type]));
+  const isPolyPort = (module: number, port: string): boolean =>
+    types.get(module) === 'fm1' ? VOICE_PORTS.has(port) : poly.has(module);
+  for (;;) {
+    let grew = false;
+    for (const c of p.cables) {
+      const t = types.get(c.to.module);
+      if (!t || SHARED_TYPES.has(t) || poly.has(c.to.module)) continue;
+      if (isPolyPort(c.from.module, c.from.port)) {
+        poly.add(c.to.module);
+        grew = true;
+      }
+    }
+    if (!grew) return poly;
+  }
 }
 
 export function nextId(p: Patch): number {
@@ -239,5 +279,7 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
     if (!defs[mt.type].inputs.some((i) => i.name === c.to.port)) throw new Error(`no input "${c.to.port}" on ${mt.type}`);
   }
   p.name = String(p.name ?? 'patch');
+  if (p.voices === undefined || p.voices === null) delete p.voices;
+  else p.voices = voicesOf(p);
   return p as Patch;
 }

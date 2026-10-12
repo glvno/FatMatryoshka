@@ -14,19 +14,42 @@ const SR = 44100;
 const OUT = new URL('../../build/golden/', import.meta.url);
 mkdirSync(OUT, { recursive: true });
 
-const EVENTS: [number, 'on' | 'off', number][] = [
+type Ev = [number, 'on' | 'off', number];
+const EVENTS: Ev[] = [
   [0, 'on', 60],
   [128 * 40, 'on', 67],
   [128 * 80, 'off', 67],
   [128 * 120, 'off', 60],
 ];
+/** a chord, two more notes than voices (stealing), staggered releases: for the polyphonic patches */
+const POLY_EVENTS: Ev[] = [
+  [0, 'on', 60],
+  [0, 'on', 64],
+  [128 * 10, 'on', 67],
+  [128 * 30, 'on', 72],
+  [128 * 45, 'on', 55],
+  [128 * 60, 'on', 59],
+  [128 * 70, 'off', 64],
+  [128 * 80, 'on', 76],
+  [128 * 100, 'off', 72],
+  [128 * 100, 'off', 67],
+  [128 * 110, 'off', 55],
+  [128 * 120, 'off', 59],
+  [128 * 120, 'off', 76],
+  [128 * 130, 'off', 60],
+];
 const END = 128 * 180;
 
 const tests: Record<string, Patch> = {};
+const events: Record<string, Ev[]> = {};
 for (const [n, p] of Object.entries(PRESETS)) tests[n] = p();
 
-const kit = (name: string, b: Build): void => {
+const kit = (name: string, b: Build, voices = 1): void => {
   tests[name] = make(name, b);
+  if (voices > 1) {
+    tests[name].voices = voices;
+    events[name] = POLY_EVENTS;
+  }
 };
 kit('waves', (add, wire) => {
   const kb = add('fm1', 0, 0);
@@ -162,6 +185,91 @@ kit('reverb', (add, wire) => {
   wire(rv, 'out', out, 'l');
 });
 
+// polyphony: osc -> filter (its own envelope on cv) -> vca (second envelope) per voice, one delay and the output shared
+kit(
+  'poly-pluck',
+  (add, wire) => {
+    const kb = add('fm1', 0, 0);
+    const osc = add('osc', 0, 0, { wave: 2, level: 0.5 });
+    const fenv = add('adsr', 0, 0, { a: 0.002, d: 0.15, s: 0.1, r: 0.1 });
+    const flt = add('filter', 0, 0, { cutoff: 300, res: 0.4, cvamt: 3 });
+    const aenv = add('adsr', 0, 0, { a: 0.003, d: 0.4, s: 0.3, r: 0.2 });
+    const vca = add('vca', 0, 0);
+    const dly = add('delay', 0, 0, { time: 120, fb: 0.4, mix: 0.3 });
+    const out = add('output', 0, 0, { level: 0.6 });
+    wire(kb, 'pitch', osc, 'pitch');
+    wire(kb, 'gate', fenv, 'gate');
+    wire(kb, 'gate', aenv, 'gate');
+    wire(osc, 'out', flt, 'in');
+    wire(fenv, 'env', flt, 'cv');
+    wire(flt, 'lp24', vca, 'in');
+    wire(aenv, 'env', vca, 'cv');
+    wire(vca, 'out', dly, 'in');
+    wire(dly, 'out', out, 'l');
+    wire(vca, 'out', out, 'r');
+  },
+  4,
+);
+// polyphony with shared sources: one LFO (into every voice's filter p1) and one noise (through a per-voice VCA, velocity on
+// its p1), a per-voice mixer with two cables into one input, the reverb and output shared; key tracking on the filter
+kit(
+  'poly-shared',
+  (add, wire) => {
+    const kb = add('fm1', 0, 0);
+    const osc = add('osc', 0, 0, { wave: 3, pw: 0.3, level: 0.4 });
+    const sub = add('osc', 0, 0, { wave: 1, coarse: -12, level: 0.3 });
+    const lfo = add('lfo', 0, 0, { wave: 0, rate: 2, depth: 0.4 });
+    const flt = add('filter', 0, 0, { cutoff: 600, res: 0.3, track: 1 }, { map: { p1: ['cutoff'] }, att: [0.5, 1] });
+    const env = add('adsr', 0, 0, { a: 0.005, d: 0.2, s: 0.5, r: 0.15 });
+    const nz = add('noise', 0, 0, { level: 0.3 });
+    const nvca = add('vca', 0, 0, { gain: 0.5 }, { map: { p1: ['gain'] } });
+    const mix = add('mixer', 0, 0, { l1: 0.7, l2: 0.5 });
+    const vca = add('vca', 0, 0);
+    const rv = add('reverb', 0, 0, { size: 0.6, damp: 0.4, mix: 0.3 });
+    const out = add('output', 0, 0, { level: 0.7 });
+    wire(kb, 'pitch', osc, 'pitch');
+    wire(kb, 'pitch', sub, 'pitch');
+    wire(kb, 'gate', env, 'gate');
+    wire(lfo, 'out', flt, 'p1');
+    wire(osc, 'out', flt, 'in');
+    wire(sub, 'out', flt, 'in');
+    wire(nz, 'out', nvca, 'in');
+    wire(env, 'env', nvca, 'cv');
+    wire(kb, 'vel', nvca, 'p1');
+    wire(flt, 'lp12', mix, 'in1');
+    wire(nvca, 'out', mix, 'in2');
+    wire(mix, 'out', vca, 'in');
+    wire(env, 'env', vca, 'cv');
+    wire(vca, 'out', rv, 'in');
+    wire(rv, 'out', out, 'l');
+    wire(rv, 'out', out, 'r');
+  },
+  3,
+);
+// a feedback cable inside a voice (the VCA back into the oscillator's phase) and a shared delay fed back into every voice's mixer
+kit(
+  'poly-feedback',
+  (add, wire) => {
+    const kb = add('fm1', 0, 0);
+    const osc = add('osc', 0, 0, { wave: 0, pm: 1.5, level: 0.6 });
+    const env = add('adsr', 0, 0, { a: 0.01, d: 0.3, s: 0.4, r: 0.2 });
+    const vca = add('vca', 0, 0, { gain: 0.6 });
+    const mix = add('mixer', 0, 0, { l1: 0.8, l2: 0.3 });
+    const dly = add('delay', 0, 0, { time: 90, fb: 0.3, mix: 1 });
+    const out = add('output', 0, 0, { level: 0.5 });
+    wire(kb, 'pitch', osc, 'pitch');
+    wire(kb, 'gate', env, 'gate');
+    wire(osc, 'out', vca, 'in');
+    wire(env, 'env', vca, 'cv');
+    wire(vca, 'out', osc, 'pm');
+    wire(vca, 'out', mix, 'in1');
+    wire(dly, 'out', mix, 'in2');
+    wire(mix, 'out', dly, 'in');
+    wire(mix, 'out', out, 'l');
+  },
+  2,
+);
+
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 for (const [name, patch] of Object.entries(tests)) {
   const e = new Engine(SR);
@@ -179,7 +287,8 @@ for (const [name, patch] of Object.entries(tests)) {
       pos = to;
     }
   };
-  for (const [fr, kind, note] of EVENTS) {
+  const evs = events[name] ?? EVENTS;
+  for (const [fr, kind, note] of evs) {
     seg(fr);
     if (kind === 'on') e.noteOn(note, 1);
     else e.noteOff(note);
@@ -193,7 +302,7 @@ for (const [name, patch] of Object.entries(tests)) {
   const f = slug(name);
   writeFileSync(new URL(`${f}.m1p`, OUT), encodePatch(patch));
   writeFileSync(new URL(`${f}.f32`, OUT), new Uint8Array(st.buffer));
-  writeFileSync(new URL(`${f}.ev`, OUT), EVENTS.map(([fr, k, n]) => (k === 'on' ? `${fr} on ${n} 127` : `${fr} off ${n}`)).join('\n') + `\n${END} end\n`);
+  writeFileSync(new URL(`${f}.ev`, OUT), evs.map(([fr, k, n]) => (k === 'on' ? `${fr} on ${n} 127` : `${fr} off ${n}`)).join('\n') + `\n${END} end\n`);
 }
 // protocol test input: upload of 303 Acid, then a cutoff change on its filter
 {

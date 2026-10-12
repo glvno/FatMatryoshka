@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import { DEFS } from './modules';
-import { encodePatch, MAX_CABLES, TYPE_ORDER } from './patchbin';
+import { deviceBudget, DEVICE, encodePatch, MAX_CABLES, TYPE_ORDER } from './patchbin';
 import { PRESETS } from './presets';
 
 describe('binary patch format', () => {
@@ -13,11 +13,31 @@ describe('binary patch format', () => {
       expect(b[0], name).toBe(0xa1);
       expect(b[1], name).toBe(6);
       expect(b[2], name).toBe(p.modules.length);
+      expect(b[3], name).toBe(1); // voices: the factory presets are mono
       expect(dv.getUint16(4, true), name).toBe(p.cables.length);
       const size = 8 + p.modules.reduce((s, m) => s + 1 + 4 * DEFS[m.type].params.length + (DEFS[m.type].paramInputs ? 14 : 0), 0) + 4 * p.cables.length;
       expect(b.length, name).toBe(size);
       expect(p.cables.length).toBeLessThanOrEqual(MAX_CABLES);
     }
+  });
+
+  it('counts what a patch costs on the device: every factory preset fits, and voices multiply the per-voice part', () => {
+    for (const [name, make] of Object.entries(PRESETS)) expect(deviceBudget(make()).fits, name).toBe(true);
+    const p = PRESETS['Subtractive saw']();
+    const mono = deviceBudget(p);
+    p.voices = 4;
+    const poly = deviceBudget(p);
+    expect(poly.instances).toBeGreaterThan(mono.instances);
+    expect(poly.buffers).toBeGreaterThan(mono.buffers);
+    expect(poly.fits).toBe(true);
+    p.voices = 8;
+    expect(deviceBudget(p).instances).toBeLessThanOrEqual(DEVICE.instances);
+  });
+
+  it('writes the voice count into the header', () => {
+    const p = PRESETS['Subtractive saw']();
+    p.voices = 4;
+    expect(encodePatch(p)[3]).toBe(4);
   });
 
   it('writes parameters as Q16.16 and cables as indices', () => {

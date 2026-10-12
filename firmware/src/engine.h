@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 morgulbrut */
 /* Fixed-point patch engine: the C port of web/src/engine.ts and modules.ts. Integer only (the FM-1 has no FPU).
- * Signals and parameters are Q16.16 (1.0 = 65536); the sample rate is ENG_SR. Mono voice, as the reference. */
+ * Signals and parameters are Q16.16 (1.0 = 65536); the sample rate is ENG_SR. 1..ENG_MAX_VOICES voices, as the reference. */
 #pragma once
 #include <stdint.h>
 
@@ -9,6 +9,7 @@
 #define ENG_BLOCK 128u
 #define ENG_ONE 65536
 #define ENG_PATCH_VERSION 6
+#define ENG_MAX_VOICES 8
 
 /* Install a patch from its binary form (web/src/patchbin.ts). 0 on success, negative on error (the engine is then
  * silent). Resets all module state. Never call while eng_render runs (stop the audio ISR's call first). */
@@ -34,6 +35,8 @@ int32_t eng_step_param(uint32_t module, uint32_t param, int32_t clicks, int32_t 
 int eng_param_is_log(uint32_t module, uint32_t param);
 /* index of the first module of a type (defs.h T_*), -1 if the patch has none */
 int eng_find(uint32_t type);
+/* the voice count of the loaded patch (header byte 3 of the binary; 1 = mono, the held-note stack as before), 0 if none */
+int eng_voices(void);
 void eng_note_on(uint32_t note, int32_t vel_q16);
 void eng_note_off(uint32_t note);
 void eng_all_notes_off(void);

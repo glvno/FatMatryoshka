@@ -10,7 +10,7 @@ Nord Modular–style patchable synth for the **M-VAVE FM-1**, with a browser app
 
 ## State (milestone 1 done, pushed)
 
-- `web/`: Vite + TS. `src/patch.ts` (data model, ordering, validation), `src/modules.ts` (12 module defs + DSP), `src/engine.ts` (block engine, mono), `src/worklet.ts` + `src/audio.ts` (AudioWorklet, bundled via `?worker&url`), `src/editor.ts` (DOM cards + SVG cables), `src/flasher.ts` (UI over Felucca's `src/flasher/fm1ota.js`, `fm1pkg.js`), `src/presets.ts`, `src/input.ts`.
+- `web/`: Vite + TS. `src/patch.ts` (data model, ordering, validation), `src/modules.ts` (12 module defs + DSP), `src/engine.ts` (block engine, 1..8 voices), `src/worklet.ts` + `src/audio.ts` (AudioWorklet, bundled via `?worker&url`), `src/editor.ts` (DOM cards + SVG cables), `src/flasher.ts` (UI over Felucca's `src/flasher/fm1ota.js`, `fm1pkg.js`), `src/presets.ts`, `src/input.ts`.
 - `npm test` (vitest, 10 tests), `npm run build`, `npm run dev` all pass. The built app was smoke-tested in headless Chromium: audio worklet produces sound on key down, silent after release, cable drag/remove works.
 - `firmware/hal`, `firmware/crt0.S`, `firmware/app.ld`, `tools/*` are copies from Felucca (`build.py` adapted, loader ID changed to `ota-FM-1_800`).
 
@@ -36,7 +36,7 @@ Benchmark (`firmware/src/bench.c`, numbers in docs/ARCHITECTURE.md): no FPU, flo
 
 ## Engine port (done on the host, not yet measured on device)
 
-- `firmware/src/engine.c` (+ `engine.h`, generated `defs.h`, `presets.h`, `dsp_tables.h`): fixed-point port of all 13 modules, mono, Q16.16. `tools/golden.sh` (inside `nix develop`) compares it with `web/src/engine.ts`: 11 patches pass (rms error <= 3 % of reference rms; smooth patches ~0.1 %).
+- `firmware/src/engine.c` (+ `engine.h`, generated `defs.h`, `presets.h`, `dsp_tables.h`): fixed-point port of all 13 modules, 1..8 voices, Q16.16. `tools/golden.sh` (inside `nix develop`) compares it with `web/src/engine.ts`: 11 patches pass (rms error <= 3 % of reference rms; smooth patches ~0.1 %).
 - Regenerate after changing `modules.ts` or `presets.ts`: `cd web && npm run export-defs` (defs.h, presets.h); tables: `python3 tools/gen_dsp_tables.py`. Binary patch format: `web/src/patchbin.ts` (type/port indices are append-only).
 - **Verified on the FM-1 (M1-0.2): sound is clean.** 303 Acid costs 11 % of the audio budget (peak 12 %, ISR time per 128-frame half incl. key scan and USB). The 27 keys play F3..G5 (`fm1_in.notes`), the MASTER pot is a software gain read via ADC (square law, `master_q12`); output samples are 24-bit in the LOW bits of each I2S word (Q16 << 6, -6 dBFS ceiling), not left-justified as the HAL comment suggests.
 - Device: audio ISR renders the engine; MIDI program change = factory patch, the CPU figure is no longer drawn (`eng_us_last`/`eng_us_max` remain).
@@ -85,9 +85,18 @@ Benchmark (`firmware/src/bench.c`, numbers in docs/ARCHITECTURE.md): no FPU, flo
 
 - One click installs the firmware bundled with the app: `tools/build.py` then `cd web && npm run firmware` copies `build/modular-1.fwsc` to `web/public/firmware/modular-1.fwsc` + `modular-1.json` (version, product, sha256; git-ignored). If the FM-1 is sitting in its update loader from an interrupted install, the same button finishes that write. "Return to stock" needs the official `FM-1.fwsc`; "Install another package" takes any `.fwsc` that carries the loader. The "combine the official V15 with an app.bin" step is gone (`buildFeluccaPackage` is no longer used by the UI).
 
+## Polyphony (host-tested, golden 45 patches pass; not flashed)
+
+- `Patch.voices` (1..8, absent = mono), binary header byte 3 (was reserved 0; firmware reads 0 as 1, the patch version stays 6 so older firmware plays such patches mono). `voiceSplit` (patch.ts) = the per-voice set, `voicesOf`, `VOICE_PORTS`, `SHARED_TYPES`; the rules are in docs/ARCHITECTURE.md "Polyphony". Toolbar `<select id="voices">` in main.ts, `×N` badge on per-voice cards (editor.ts), `deviceBudget` / `DEVICE` in patchbin.ts (the toolbar goes red and the status line says so when the FM-1 would refuse the patch).
+- engine.ts: `Inst` per voice, `VoiceState` allocator (`noteOn` / `noteOff`), `voiceNotes()` / `nvoices` for tests. engine.c: `inst_t` in `inst_pool` (`.pool`, `ENG_MAX_INST` 128), `node_t` = `inst0, ninst`, `voice_t E.vc[]`, `cur_v`, `port_poly` / `buf_of`, `eng_voices()`. Module functions take `(const node_t *nd, inst_t *it, n)`. `MAX_SUM` 192, `MAX_SRC` 512. Load errors: -6 out of buffers / sources, -7 out of instances.
+- The engine's sample type is `esig_t` now (`sig_t` is a typedef in macOS `<signal.h>`; `tools/golden.sh` therefore runs on macOS with plain gcc/clang + node). `tools/ui_preview.sh` still needs Linux (`section(".pool")` attributes in ui.c).
+- CPU per voice on the device: not measured. Memory added: `inst_pool` about 16 KB in the pool, `sum_src` 2 KB in .bss.
+- Not done: voice count on the LCD or settable on the device, INFO reply without `ENG_MAX_VOICES`, unison.
+
 ## Not verified — do not claim otherwise
 
 - The flash tab and installer have never run against a real FM-1 in this project.
+- Polyphony has only run on the host (vitest + golden); the firmware with it has not been built with the JieLi toolchain nor flashed.
 - FM-1 CPU clock, RAM and flash sizes are unknown. A single reverse-engineering write-up (not seen first-hand) names the chip JieLi AC791N / pi32v2. Memory map hints: `firmware/app.ld`, `tools/build.py` (app slot 0x8DFBC bytes).
 - Whether `buildFeluccaPackage` (patch an app.bin into the user's official V15) also swaps in the Felucca loader. Read `web/src/flasher/fm1pkg.js` `Package.setApp` before relying on it.
 - Product identity `FM-1_800` (`PRODUCT` in `web/src/flasher.ts` and `tools/build.py`) is a choice, not something the device mandated; it must match `FELUCCA_ID` in the firmware build.

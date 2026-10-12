@@ -40,7 +40,7 @@ Not done yet: the FM-1's buttons, a patch name on the device, reading a patch ba
 
 ## Open questions
 
-- Per-voice polyphony (the TS engine is mono).
+- ~~Per-voice polyphony~~ done, see below; the CPU cost per voice on the device is not measured yet.
 - ~~Fixed-point vs. float on pi32v2~~ settled by measurement, see below.
 - Patch binary format and flash layout (must not touch the loader or the boot-guard areas).
 
@@ -70,3 +70,19 @@ Conclusions: the core has no FPU (float links against `libcompiler-rt.a` soft fl
 - **Reverb module**: Freeverb-style, mono: four damped feedback combs in parallel into two allpasses; parameters size, damp, mix. State is int16 (Q13) in the pool (about 12 KB per instance, two per patch).
 - **Logarithmic parameters**: `ParamDef.log` (the filter cutoff): parameter inputs, the editor slider and the knobs move it in octaves, so a fraction of the range is a fraction of the octaves (`modulate` in `patch.ts`, `eng_step_param` and the log2 / exp2 tables in `engine.c`).
 - **Knobs in the factory presets** (plain `wire(kb, 'k1', module, 'p1')` lines at the end of each preset in `presets.ts`; the module's `add(...)` carries the base value, the matrix and the attenuverter, the panel's `add` the knob start positions): every preset routes K1..K4 from its FM-1 panel module to useful parameters. Rules: K1 is the filter cutoff when there is a filter, K4 the delay mix when there is a delay, K3 the reverb mix when there is a reverb. The panel knobs start at the position that leaves the preset's sound as designed (a test checks this and the rules).
+
+## Polyphony
+
+A patch carries `voices` (1..8, `MAX_VOICES`; the JSON field is absent for mono, byte 3 of the binary header, which was reserved and 0, now holds it: an older firmware plays such a patch mono, the new firmware reads 0 as 1). Nothing else in the patch changes: the voices are implicit, as on the Nord Modular.
+
+**Which modules are per voice** (`voiceSplit` in `web/src/patch.ts`, the same loop in `eng_load`): with more than one voice the FM-1 panel's `pitch`, `gate` and `vel` outputs are per voice (its `k1..k4` are not), and every module reached from them through cables (`p1` / `p2` included) is per voice, except `delay`, `reverb` and `output`, which always run once. A cable from a per-voice output into a shared module carries the **sum of the voices**; a cable from a shared output into a per-voice module reaches every voice. A module nothing per-voice reaches (a free LFO, a noise, a constant) runs once. With one voice nothing is per voice and both engines behave exactly as before (the tests compare the renders).
+
+**Engines.** `engine.ts`: a node has one `Inst` (state, buffers, effective parameters) per voice if per voice, else one; the panel is shared but keeps per-voice `pitch` / `gate` / `vel` buffers (`vout`). `engine.c`: the same split with `inst_t` records in `inst_pool` (in the pool section, `ENG_MAX_INST` 128); a node is `inst0, ninst`, the panel has `nv` instances whose knob outputs share one buffer. Rendering walks the processing order once and runs each node's instances in turn; a shared instance that reads a per-voice output has one summing source per voice. The filter's key tracking follows the pitch of the instance's voice (voice 0 on a shared filter). Both engines: `voices` 1 keeps the held-note stack with last-note priority and legato.
+
+**Voice allocation** (identical in both): a note goes to the voice already holding that key, else to the free voice that has been free the longest, else to the oldest sounding voice. A voice taken over while sounding (`retrig`) outputs one low gate sample at the start of the next block, so its envelopes restart (the ADSR retriggers from its current level). Note off drops the gate of the voice holding that note; nothing is recovered when a stolen note's key is still held.
+
+**Limits on the device.** Signal buffers: 160 (`ENG_NBUF`), one per connected output and instance plus one per summed input; instances 128; `eng_load` returns -6 / -7 when a patch does not fit, which the editor reports as a refused patch. `deviceBudget` in `web/src/patchbin.ts` counts the same way and the toolbar shows it (red when too big). A typical voice (osc, filter, two envelopes, VCA) takes about 7 buffers and 5 instances, so 8 voices of such a patch fit. CPU: a voice costs the per-voice modules' time; 303 Acid uses 11 % of the audio budget mono, so expect 3 or 4 voices of a patch of that size before the budget is gone. Not measured on the device yet.
+
+**Golden vectors.** `web/scripts/golden.ts` adds `poly-pluck` (4 voices, two envelopes, shared delay, more notes than voices), `poly-shared` (3 voices, a shared LFO into every voice's filter `p1`, shared noise through a per-voice VCA, velocity on `p1`, key tracking, two cables into one per-voice input, shared reverb) and `poly-feedback` (2 voices, a feedback cable inside the voice and a shared delay fed back into every voice's mixer), with their own note events; the C engine agrees with the reference to about 0.1 % rms on all of them.
+
+Not done: the LCD does not show the voice count and the device has no control for it (it comes with the patch); the HELLO / INFO reply does not report `ENG_MAX_VOICES`; unison / detune.
