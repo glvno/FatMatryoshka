@@ -1056,17 +1056,35 @@ const delay: ModuleImpl<DelayState> = {
 };
 
 /**
- * A small Freeverb-style reverb (mono): four lowpass-damped feedback combs in parallel into two series allpasses.
- * size sets the comb feedback (0.70 .. 0.98), damp the lowpass in the feedback, mix the wet share.
+ * Reverb: an eight-line feedback delay network (FDN) with a Householder feedback matrix, a one-pole damping filter and a
+ * decay gain in every line, two input diffusion allpasses, a pre-delay and a slow modulation of two of the lines (a
+ * chorus of the tail that breaks up the metallic ring of fixed lines). Line lengths at 44.1 kHz (primes, 7.5..25 ms):
+ * RV_LINE; the per-line gain g = 10^(-3 L / (T sr)) makes every line decay 60 dB in T = 0.2 x 2^(5 size) seconds
+ * (0.2 .. 6.4 s). Input: x -> pre-delay -> two allpasses (g 0.5) -> x RV_GIN into every line; the feedback is
+ * f_i = t_i - (sum of t) / 4 (Householder, lossless) with t_i = damped and decayed line output; wet = (sum of the raw
+ * line outputs) x RV_GOUT. Lines 0 and 1 are read with a fractional delay that swings by mod x RV_MOD samples at
+ * RV_MOD_HZ (sine, linear interpolation). Mono, shared per patch like the delay; the firmware keeps the same lines as
+ * int16 (Q13) in one 16 KB block per instance.
  */
-const RV_COMB = [1116, 1188, 1277, 1356]; // delay lengths at 44.1 kHz
-const RV_AP = [556, 441];
+export const RV_LINE = [331, 439, 547, 661, 773, 881, 991, 1117];
+export const RV_DIFF = [223, 347];
+/** the pre-delay line: 40 ms at 44.1 kHz (the `pre` parameter's range) */
+export const RV_PRE = 1764;
+export const RV_PRE_MS = 40;
+const RV_GIN = 0.125;
+const RV_GOUT = 0.5;
+const RV_MOD = 6;
+const RV_MOD_HZ = [0.5, 0.83];
 interface ReverbState {
-  comb: Float32Array[];
-  ci: number[];
-  lp: number[];
+  pre: Float32Array;
+  pi: number;
   ap: Float32Array[];
   ai: number[];
+  line: Float32Array[];
+  li: number[];
+  lp: number[];
+  /** the two modulation LFOs, in turns */
+  ph: number[];
 }
 
 const reverb: ModuleImpl<ReverbState> = {
@@ -1075,37 +1093,86 @@ const reverb: ModuleImpl<ReverbState> = {
     label: 'Reverb',
     inputs: [audio('in')],
     outputs: [audio('out')],
-    params: [param('size', 0, 1, 0.5, { step: 0.01 }), param('damp', 0, 1, 0.4, { step: 0.01 }), param('mix', 0, 1, 0.3, { step: 0.01 })],
+    params: [
+      param('size', 0, 1, 0.5, { step: 0.01 }),
+      param('damp', 0, 1, 0.4, { step: 0.01 }),
+      param('mix', 0, 1, 0.3, { step: 0.01 }),
+      param('pre', 0, RV_PRE_MS, 0, { unit: 'ms', step: 0.5 }),
+      param('mod', 0, 1, 0.3, { step: 0.01 }),
+    ],
   },
   init: (sr) => {
-    const len = (n: number): number => Math.max(1, Math.round((n * sr) / 44100));
-    return { comb: RV_COMB.map((n) => new Float32Array(len(n))), ci: [0, 0, 0, 0], lp: [0, 0, 0, 0], ap: RV_AP.map((n) => new Float32Array(len(n))), ai: [0, 0] };
+    const len = (n: number): number => Math.max(4, Math.round((n * sr) / 44100));
+    return {
+      pre: new Float32Array(len(RV_PRE)),
+      pi: 0,
+      ap: RV_DIFF.map((n) => new Float32Array(len(n))),
+      ai: [0, 0],
+      line: RV_LINE.map((n) => new Float32Array(len(n))),
+      li: RV_LINE.map(() => 0),
+      lp: RV_LINE.map(() => 0),
+      ph: [0, 0],
+    };
   },
   process(c, s) {
-    const fb = 0.7 + 0.28 * (c.p.size ?? 0.5);
-    const d1 = (c.p.damp ?? 0.4) * 0.4;
+    const T = 0.2 * Math.pow(2, 5 * (c.p.size ?? 0.5));
+    const g = s.line.map((b) => Math.pow(2, (-9.965784 * b.length) / (T * c.sr))); // 10^(-3 L / (T sr))
+    const d = (c.p.damp ?? 0.4) * 0.8;
     const mix = c.p.mix ?? 0.3;
+    const dpre = Math.min(s.pre.length - 1, Math.round(((c.p.pre ?? 0) / 1000) * c.sr));
+    const depth = (c.p.mod ?? 0) * RV_MOD;
+    const inc = RV_MOD_HZ.map((f) => f / c.sr);
+    const t = new Array<number>(8);
     for (let i = 0; i < c.n; i++) {
       const x = c.inp.in[i];
-      const g = x * 0.0625;
-      let sum = 0;
-      for (let k = 0; k < 4; k++) {
-        const buf = s.comb[k];
-        const o = buf[s.ci[k]];
-        s.lp[k] = o * (1 - d1) + s.lp[k] * d1;
-        buf[s.ci[k]] = g + s.lp[k] * fb;
-        if (++s.ci[k] === buf.length) s.ci[k] = 0;
-        sum += o;
+      // pre-delay
+      let u = x;
+      if (dpre > 0) {
+        const rp = s.pi - dpre + s.pre.length;
+        u = s.pre[rp % s.pre.length];
       }
+      s.pre[s.pi] = x;
+      if (++s.pi === s.pre.length) s.pi = 0;
+      // input diffusion
       for (let k = 0; k < 2; k++) {
         const buf = s.ap[k];
         const bo = buf[s.ai[k]];
-        const y = bo - sum;
-        buf[s.ai[k]] = sum + bo * 0.5;
+        const y = bo - u;
+        buf[s.ai[k]] = u + bo * 0.5;
         if (++s.ai[k] === buf.length) s.ai[k] = 0;
-        sum = y;
+        u = y;
       }
-      c.out.out[i] = x * (1 - mix) + sum * mix;
+      u *= RV_GIN;
+      // the lines: read (lines 0 and 1 at a modulated fractional delay), damp, decay, mix, write
+      let wet = 0, sum = 0;
+      for (let k = 0; k < 8; k++) {
+        const buf = s.line[k];
+        const w = s.li[k];
+        let o: number;
+        if (k < 2 && depth > 0) {
+          const dl = buf.length - 2 - depth * (0.5 + 0.5 * Math.sin(2 * Math.PI * s.ph[k]));
+          const di = Math.floor(dl);
+          const fr = dl - di;
+          const a = buf[(w - di + buf.length) % buf.length];
+          const b = buf[(w - di - 1 + buf.length) % buf.length];
+          o = a + (b - a) * fr;
+        } else o = buf[w];
+        wet += o;
+        s.lp[k] = o * (1 - d) + s.lp[k] * d;
+        t[k] = s.lp[k] * g[k];
+        sum += t[k];
+      }
+      sum *= 0.25;
+      for (let k = 0; k < 8; k++) {
+        const buf = s.line[k];
+        buf[s.li[k]] = u + t[k] - sum;
+        if (++s.li[k] === buf.length) s.li[k] = 0;
+      }
+      for (let k = 0; k < 2; k++) {
+        s.ph[k] += inc[k];
+        if (s.ph[k] >= 1) s.ph[k] -= 1;
+      }
+      c.out.out[i] = x * (1 - mix) + wet * RV_GOUT * mix;
     }
   },
 };

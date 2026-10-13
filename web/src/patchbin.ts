@@ -75,7 +75,7 @@ export function encodePatch(p: Patch): Uint8Array {
 }
 
 /** the FM-1's pools (firmware/src/engine.c, the one-voice build: ENG_NBUF, ENG_MAX_INST, ENG_MAX_POLY); the four-voice
- * build (-DENG_VOICES=4) has 124 buffers and 92 instances shared by its four patches */
+ * build (-DENG_VOICES=4) has 108 buffers and 92 instances shared by its four patches */
 export const DEVICE = { buffers: 255, instances: 128, voices: 8 } as const;
 
 /**

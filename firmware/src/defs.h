@@ -229,9 +229,11 @@ enum {
 #define REVERB_P_SIZE 0
 #define REVERB_P_DAMP 1
 #define REVERB_P_MIX 2
+#define REVERB_P_PRE 3
+#define REVERB_P_MOD 4
 #define REVERB_NIN 3
 #define REVERB_NOUT 1
-#define REVERB_NPAR 3
+#define REVERB_NPAR 5
 #define REVERB_CVBASE 1
 
 /* output: Output */
@@ -740,14 +742,14 @@ static const char *const DELAY_CH3[] = {"FREE", "SYNC", 0};
 static const char *const DELAY_CH4[] = {"OFF", "ON", 0};
 static const char *const *const DELAY_CH[] = {0, 0, 0, DELAY_CH3, DELAY_CH4};
 static const char *const REVERB_INNAMES[] = {"IN", "P1", "P2"};
-static const int32_t REVERB_MIN[] = {0, 0, 0};
-static const int32_t REVERB_MAX[] = {65536, 65536, 65536};
-static const int32_t REVERB_DEF[] = {32768, 26214, 19661};
-static const int32_t REVERB_INC[] = {655, 655, 655};
-static const char *const REVERB_PN[] = {"SIZE", "DAMP", "MIX"};
-static const uint8_t REVERB_LOG[] = {0, 0, 0};
-static const char *const REVERB_UNIT[] = {"", "", ""};
-static const char *const *const REVERB_CH[] = {0, 0, 0};
+static const int32_t REVERB_MIN[] = {0, 0, 0, 0, 0};
+static const int32_t REVERB_MAX[] = {65536, 65536, 65536, 2621440, 65536};
+static const int32_t REVERB_DEF[] = {32768, 26214, 19661, 0, 19661};
+static const int32_t REVERB_INC[] = {655, 655, 655, 32768, 655};
+static const char *const REVERB_PN[] = {"SIZE", "DAMP", "MIX", "PRE", "MOD"};
+static const uint8_t REVERB_LOG[] = {0, 0, 0, 0, 0};
+static const char *const REVERB_UNIT[] = {"", "", "", "MS", ""};
+static const char *const *const REVERB_CH[] = {0, 0, 0, 0, 0};
 static const char *const OUTPUT_INNAMES[] = {"L", "R"};
 static const int32_t OUTPUT_MIN[] = {0};
 static const int32_t OUTPUT_MAX[] = {65536};

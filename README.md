@@ -106,6 +106,10 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - **Compressor** is an envelope follower and compressor in one: `env` outputs the follower (a control: an oscillator's loudness as a CV, a sidechain pump from a kick into a VCA), `out` the signal compressed above `thresh` by `ratio` with `attack`, `release` and makeup `gain`. The `side` input is the sidechain; without it the detector listens to `in`.
 
+## Reverb
+
+- The **Reverb** is an eight-line feedback network (dense from the first reflections on, no metallic ring thanks to a slow modulation of two of its lines). `size` is the decay: 0.2 s at 0 to 6.4 s at 1 (60 dB), `damp` rolls off the highs in the tail, `pre` holds the tail back by up to 40 ms so the attack stays clear, `mod` is the chorusing of the tail (0 for a static, perfectly repeatable tail), `mix` the wet share. One per patch, like the Delay. Old patches keep their size / damp / mix and get the new tail.
+
 ## Filter: notch, peak, allpass
 
 - The **Filter** has three more outputs after `mix`: `notch` (a null at the cutoff, the rest passes: the opposite of `bp`), `peak` (flat, with a resonant bump at the cutoff set by `res`: a parametric boost) and `ap` (allpass: everything passes, the phase turns through 360° around the cutoff; summed with `in` it is a phaser stage, modulated and summed with the dry signal a one-stage phaser). They come from the same two integrators, so they cost nothing extra when unused.

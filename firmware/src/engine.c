@@ -35,7 +35,7 @@
 #define ENG_NGRAIN 1                /* granular lines (a shared module): 1 s of int16 plus the grain records, 88 KB */
 #else
 #define ENG_MAX_INST 92             /* module instances, all voices: a shared module has one, a per-note module one per note */
-#define ENG_NBUF 124u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
+#define ENG_NBUF 108u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
 #define ENG_NDELAY 4                /* delay lines, all voices (one each when every voice has a delay) */
 #define ENG_NREV 2                  /* reverb memories, all voices */
 #define ENG_NSTRING 6               /* string lines, all voices (a per-note module: one per note) */
@@ -45,7 +45,7 @@
 #define GRAIN_LEN 44100u            /* GRAIN_SECONDS x ENG_SR */
 #define GRAIN_MAX 8
 #define GRAIN_SPRAY (ENG_SR / 4u)   /* spray scatters a grain's start by up to this many samples (0.25 s) */
-#define RV_LEN 5934u                /* the four combs (1116 1188 1277 1356) and two allpasses (556 441), int16 Q13 */
+#define RV_LEN 8074u                /* the eight FDN lines (5740), two input allpasses (570) and the 40 ms pre-delay (1764), int16 Q13 */
 #define DELAY_LEN 23000u            /* 521 ms (the reference engine, web/src/modules.ts, has the same length; ping-pong halves it) */
 #define STR_LEN 1104u               /* ceil(ENG_SR / 40) + 1: the lowest string is 40 Hz, as the reference */
 #define CH_LEN 927u                 /* ceil(ENG_SR * 0.021): 12 ms +- 8 ms of sweep */
@@ -238,7 +238,7 @@ typedef struct {
         struct { int32_t a[8], b[8], ia; uint32_t phase; } fs;   /* the Hilbert chains (w1 w2 per section), chain A's delayed sample, the quadrature oscillator */
         struct { struct grain_line *ln; uint32_t w, acc, seed; uint8_t prev; } gr;   /* acc: grains per sample, Q24 */
         struct { int16_t *buf; uint32_t w, t, seen, beat; uint32_t ring[DELAY_CLK_PPQN]; uint8_t prev; } dly;   /* t, ring, seen, beat: the clock tempo */
-        struct { int16_t *buf; uint16_t ci[4], ai[2]; int32_t lp[4]; } rev;
+        struct { int16_t *buf; uint16_t li[8], ai[2], pi; int32_t lp[8]; uint32_t ph[2]; } rev;   /* the FDN lines' write indices, the diffusers', the pre-delay's; damping states; modulation phases */
         struct { int32_t v; uint32_t t; uint8_t stage, prev; } env;  /* Q30, like the ADSR; t: samples in the segment */
         struct { int16_t *buf; uint32_t w, seed; int32_t lp, s1, err, burst, blen; } str;   /* Q13 line with error feedback */
         struct { uint32_t phase; int32_t s1; } wt;
@@ -1741,47 +1741,102 @@ static void m_delay(const node_t *nd, inst_t *it, uint32_t n)
 
 /* ---- reverb: the same Freeverb-style network as modules.ts, in Q16 with int16 (Q13) delay memory */
 
-static const uint16_t RV_COMB[4] = {1116, 1188, 1277, 1356};
-static const uint16_t RV_AP[2] = {556, 441};
+/* Reverb (modules.ts `reverb`): an eight-line FDN with a Householder feedback matrix (f_k = t_k - sum(t) / 4), a one-pole
+ * damping filter and a decay gain in every line (g_k = 2^(-9.966 L_k / (T sr)): 60 dB in T = 0.2 x 2^(5 size) s), two
+ * input diffusion allpasses (g 0.5), a pre-delay of up to 40 ms, and a sine modulation of the read position of lines 0
+ * and 1 (mod x 6 samples at 0.5 / 0.83 Hz, linear interpolation). All lines int16 Q13 in one block (RV_LEN). */
+static const uint16_t RV_LINE[8] = {331, 439, 547, 661, 773, 881, 991, 1117};
+static const uint16_t RV_DIFF[2] = {223, 347};
+#define RV_PRE 1764u                 /* 40 ms */
+#define RV_GIN 8192                  /* the input into every line: 0.125 */
+#define RV_GOUT 32768                /* the sum of the line outputs: 0.5 */
+#define RV_MOD (6 << 16)             /* the modulation depth at mod 1: samples, Q16 */
+static const uint32_t RV_MOD_INC[2] = {48696u, 80836u};   /* 0.5 and 0.83 Hz in u32 turns per sample */
+#define RV_LOG2_T0 (-152169)         /* log2(0.2) Q16 */
+#define RV_DB60 653118               /* 3 / log10(2) = 9.966 Q16: the octaves of gain lost per T */
 
 static void m_reverb(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *in = it->in[REVERB_I_IN];
     esig_t *out = it->out[0];
-    int16_t *base = it->s.rev.buf, *comb[4], *ap[2];
-    int32_t fb = 45875 + mul16(EF(it, REVERB_P_SIZE), 18350);          /* 0.70 + 0.28 size */
-    int32_t d1 = mul16(EF(it, REVERB_P_DAMP), 26214), mix = EF(it, REVERB_P_MIX), dry = ENG_ONE - mix;
-    uint32_t i, k, off = 0;
-    for (k = 0; k < 4u; k++) {
-        comb[k] = base + off;
-        off += RV_COMB[k];
+    int16_t *base = it->s.rev.buf, *line[8], *ap[2], *pre;
+    int32_t d = mul16(EF(it, REVERB_P_DAMP), 52429), mix = EF(it, REVERB_P_MIX), dry = ENG_ONE - mix;   /* damp x 0.8 */
+    int32_t depth = mul16(EF(it, REVERB_P_MOD), RV_MOD), g[8], t[8];
+    int32_t tq = (int32_t)exp2_q16(mul16(EF(it, REVERB_P_SIZE), 5 << 16) + RV_LOG2_T0 + (16 << 16));   /* T, seconds Q16 */
+    uint32_t dpre = (uint32_t)((mulq(EF(it, REVERB_P_PRE), ENG_SR, 16) + 500) / 1000), i, k, off = 0;
+    if (tq < 1)
+        tq = 1;
+    if (dpre > RV_PRE - 1u)
+        dpre = RV_PRE - 1u;
+    for (k = 0; k < 8u; k++) {
+        int64_t e = -(((int64_t)RV_LINE[k] * RV_DB60) << 16) / ((int64_t)tq * ENG_SR);
+        g[k] = (int32_t)exp2_q16((int32_t)(e < -(16 << 16) ? -(16 << 16) : e) + (16 << 16));
+        line[k] = base + off;
+        off += RV_LINE[k];
     }
     for (k = 0; k < 2u; k++) {
         ap[k] = base + off;
-        off += RV_AP[k];
+        off += RV_DIFF[k];
     }
+    pre = base + off;
     for (i = 0; i < n; i++) {
-        int32_t x = in[i], g = x >> 4, sum = 0;                        /* the input at 1/16 */
-        for (k = 0; k < 4u; k++) {
-            uint32_t ix = it->s.rev.ci[k];
-            int32_t o = (int32_t)comb[k][ix] * 8;
-            it->s.rev.lp[k] = mulr(o, ENG_ONE - d1, 16) + mulr(it->s.rev.lp[k], d1, 16);
-            comb[k][ix] = dly_pack(g + mulr(it->s.rev.lp[k], fb, 16));
-            if (++ix == RV_COMB[k])
-                ix = 0;
-            it->s.rev.ci[k] = (uint16_t)ix;
-            sum += o;
+        int32_t x = in[i], u = x, wet = 0, sum = 0;
+        uint32_t ix = it->s.rev.pi;
+        if (dpre) {
+            uint32_t rp = ix + RV_PRE - dpre;
+            if (rp >= RV_PRE)
+                rp -= RV_PRE;
+            u = (int32_t)pre[rp] * 8;
         }
-        for (k = 0; k < 2u; k++) {
-            uint32_t ix = it->s.rev.ai[k];
-            int32_t bo = (int32_t)ap[k][ix] * 8, y = bo - sum;
-            ap[k][ix] = dly_pack(sum + (bo >> 1));
-            if (++ix == RV_AP[k])
+        pre[ix] = dly_pack(x);
+        if (++ix == RV_PRE)
+            ix = 0;
+        it->s.rev.pi = (uint16_t)ix;
+        for (k = 0; k < 2u; k++) {                                        /* input diffusion */
+            int32_t bo, y;
+            ix = it->s.rev.ai[k];
+            bo = (int32_t)ap[k][ix] * 8;
+            y = bo - u;
+            ap[k][ix] = dly_pack(u + (bo >> 1));
+            if (++ix == RV_DIFF[k])
                 ix = 0;
             it->s.rev.ai[k] = (uint16_t)ix;
-            sum = y;
+            u = y;
         }
-        out[i] = mulr(x, dry, 16) + mulr(sum, mix, 16);
+        u = mulr(u, RV_GIN, 16);
+        for (k = 0; k < 8u; k++) {                                        /* read, damp, decay */
+            int16_t *buf = line[k];
+            uint32_t L = RV_LINE[k], w = it->s.rev.li[k];
+            int32_t o;
+            if (k < 2u && depth > 0) {
+                int32_t sn = sin_turn(it->s.rev.ph[k]);
+                int32_t dl = (int32_t)((L - 2u) << 16) - mulq(depth, 32768 + (sn >> 1), 16);   /* the delay, samples Q16 */
+                uint32_t di = (uint32_t)dl >> 16, fr = (uint32_t)dl & 0xFFFFu, ra = w + L - di, rb;
+                int32_t a, b;
+                if (ra >= L)
+                    ra -= L;
+                rb = ra ? ra - 1u : L - 1u;
+                a = (int32_t)buf[ra] * 8;
+                b = (int32_t)buf[rb] * 8;
+                o = a + (int32_t)(((int64_t)(b - a) * fr) >> 16);
+            } else
+                o = (int32_t)buf[w] * 8;
+            wet += o;
+            it->s.rev.lp[k] = mulr(o, ENG_ONE - d, 16) + mulr(it->s.rev.lp[k], d, 16);
+            t[k] = mulr(it->s.rev.lp[k], g[k], 16);
+            sum += t[k];
+        }
+        sum >>= 2;
+        for (k = 0; k < 8u; k++) {                                        /* Householder feedback, write */
+            uint32_t w = it->s.rev.li[k];
+            line[k][w] = dly_pack(u + t[k] - sum);
+            if (++w == RV_LINE[k])
+                w = 0;
+            it->s.rev.li[k] = (uint16_t)w;
+        }
+        it->s.rev.ph[0] += RV_MOD_INC[0];
+        it->s.rev.ph[1] += RV_MOD_INC[1];
+        out[i] = mulr(x, dry, 16) + mulr(mulr(wet, RV_GOUT, 16), mix, 16);
     }
 }
 

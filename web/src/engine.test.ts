@@ -427,6 +427,79 @@ describe('filter', () => {
   });
 });
 
+describe('reverb', () => {
+  /** noise through a VCA (open for a second, then shut) into the reverb at mix 1; returns the rms of 0.25 s windows of the tail in dB */
+  function tail(params: Record<string, number>, windows = 8): { level: number; tail: number[] } {
+    const p = emptyPatch();
+    const nz = addModule(p, DEFS.noise, 0, 0);
+    nz.params.level = 0.5;
+    const vca = addModule(p, DEFS.vca, 0, 0);
+    const k = addModule(p, DEFS.const, 0, 0);
+    k.params.value = 1;
+    const rv = addModule(p, DEFS.reverb, 0, 0);
+    Object.assign(rv.params, { mix: 1, ...params });
+    const out = addModule(p, DEFS.output, 0, 0);
+    out.params.level = 1;
+    connect(p, DEFS, { module: nz.id, port: 'out' }, { module: vca.id, port: 'in' });
+    connect(p, DEFS, { module: k.id, port: 'out' }, { module: vca.id, port: 'cv' });
+    connect(p, DEFS, { module: vca.id, port: 'out' }, { module: rv.id, port: 'in' });
+    connect(p, DEFS, { module: rv.id, port: 'out' }, { module: out.id, port: 'l' });
+    const e = new Engine(SR);
+    e.load(p);
+    const level = rms(render(e, SR).l);
+    e.setParam(k.id, 'value', 0);
+    const t: number[] = [];
+    for (let i = 0; i < windows; i++) t.push(20 * Math.log10(rms(render(e, SR / 4).l) + 1e-9));
+    return { level, tail: t };
+  }
+
+  it('decays 60 dB in about 0.2 x 2^(5 size) seconds and sits well below the dry level', () => {
+    const half = tail({ size: 0.5, damp: 0 }); // T = 1.13 s
+    expect(half.level).toBeGreaterThan(0.1);
+    expect(half.level).toBeLessThan(0.5);
+    const slope = (t: number[], a: number, b: number): number => (t[a] - t[b]) / ((b - a) * 0.25); // dB per second
+    expect(slope(half.tail, 1, 3)).toBeGreaterThan(40); // 60 dB / 1.13 s = 53 dB/s
+    expect(slope(half.tail, 1, 3)).toBeLessThan(70);
+    const long = tail({ size: 1, damp: 0 }); // 6.4 s: 9.4 dB/s
+    expect(slope(long.tail, 1, 5)).toBeGreaterThan(6);
+    expect(slope(long.tail, 1, 5)).toBeLessThan(14);
+    const short = tail({ size: 0, damp: 0 }, 3); // 0.2 s: gone within the second window
+    expect(short.tail[2]).toBeLessThan(-80);
+  });
+
+  it('damping darkens the tail, the pre-delay moves the onset', () => {
+    const p = emptyPatch();
+    const pl = addModule(p, DEFS.pulse, 0, 0);
+    pl.params.time = 0.001;
+    const lfo = addModule(p, DEFS.lfo, 0, 0);
+    Object.assign(lfo.params, { wave: 3, rate: 0.5, depth: 1 }); // one trigger at sample 0
+    const rv = addModule(p, DEFS.reverb, 0, 0);
+    Object.assign(rv.params, { mix: 1, size: 0.5, damp: 0, pre: 0 });
+    const out = addModule(p, DEFS.output, 0, 0);
+    out.params.level = 1;
+    connect(p, DEFS, { module: lfo.id, port: 'out' }, { module: pl.id, port: 'trig' });
+    connect(p, DEFS, { module: pl.id, port: 'out' }, { module: rv.id, port: 'in' });
+    connect(p, DEFS, { module: rv.id, port: 'out' }, { module: out.id, port: 'l' });
+    const first = (a: Float32Array): number => a.findIndex((v) => Math.abs(v) > 1e-4);
+    const run = (params: Record<string, number>): Float32Array => {
+      Object.assign(rv.params, params);
+      const e = new Engine(SR);
+      e.load(p);
+      return render(e, SR).l;
+    };
+    const dry = run({ pre: 0 });
+    const onset = first(dry);
+    expect(onset).toBeGreaterThan(0); // the diffusers come first
+    expect(first(run({ pre: 20 })) - onset).toBeCloseTo(0.02 * SR, -1); // 20 ms later, within 5 samples
+    const bright = (a: Float32Array): number => {
+      let s = 0;
+      for (let i = 1; i < a.length; i++) s += (a[i] - a[i - 1]) ** 2;
+      return Math.sqrt(s / a.length) / rms(a);
+    };
+    expect(bright(run({ damp: 1 }))).toBeLessThan(bright(run({ damp: 0 })) * 0.7);
+  });
+});
+
 describe('unison', () => {
   function rig(params: Record<string, number>, frames = SR): Float32Array {
     const e = new Engine(SR);
