@@ -35,6 +35,15 @@ Proposed one-voice sizes: `ENG_NBUF` 255, `ENG_MAX_INST` 128, `ENG_NSTRING` 8, `
 `ENG_NCHORUS` 1, plus the grain buffer. Keep `DEVICE` in `web/src/patchbin.ts` and the MEMORY lines of
 `firmware/src/manual.c` in step with the defines at the top of `firmware/src/engine.c`.
 
+## Progress (2026-10-13, all host-tested only: vitest 100, golden 70; never built with the JieLi toolchain, not flashed)
+
+Done, in the priority order: the `ENG_VOICES` switch (step 1 below), the ladder filter (`ladder`), unison / detune on the
+oscillator (patch format 11), the compressor / envelope follower (`dyn`), `math` and `logic`, the granular module
+(`grain`, `gr_pool`, `ENG_NGRAIN`). Each has a section in docs/ARCHITECTURE.md and README.md and a golden kit. Stand-in
+pool after all of it: 390,730 B of 417,792 (27 KB free; build.py wants 8 KB, the stand-in overestimated by ~7 KB before).
+Not started: modal resonator, comb filter, pitch bend / mod wheel / aftertouch as Main outputs + CC to knobs, frequency
+shifter, drum samples from flash. The next big item on the device side is still the first real build and flash.
+
 ## Step 1: the `ENG_VOICES` build switch (DONE 2026-10-13, host-tested; not built with the JieLi toolchain)
 
 Done as planned below, with two deviations: (a) the saved-state record stays version 2 with four voice slots (`BLOB_NV`)

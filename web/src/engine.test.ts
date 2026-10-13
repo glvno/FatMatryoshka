@@ -537,6 +537,65 @@ describe('math and logic', () => {
   });
 });
 
+describe('granular', () => {
+  /** sine -> grain -> output; returns the engine and the grain module id */
+  function rig(params: Record<string, number>, level = 0.5): { e: Engine; id: number; osc: number } {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    const g = addModule(p, DEFS.grain, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    Object.assign(o.params, { wave: 0, level });
+    out.params.level = 1;
+    Object.assign(g.params, { mix: 1, density: 40, size: 0.1, spray: 0, position: 0.2, ...params });
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: g.id, port: 'in' });
+    connect(p, DEFS, { module: g.id, port: 'out' }, { module: out.id, port: 'l' });
+    e.load(p);
+    return { e, id: g.id, osc: o.id };
+  }
+
+  it('plays grains of the recorded sine at its pitch, an octave up with pitch 12', () => {
+    const { e } = rig({});
+    render(e, SR);
+    const a = render(e, SR).l;
+    expect(rms(a)).toBeGreaterThan(0.05);
+    expect(Math.abs(freq(a) - 261.6)).toBeLessThan(40);
+    const { e: e2 } = rig({ pitch: 12 });
+    render(e2, SR);
+    expect(Math.abs(freq(render(e2, SR).l) - 523.2)).toBeLessThan(80);
+  });
+
+  it('is shared: it runs once in a polyphonic patch', () => {
+    const p = emptyPatch();
+    const kb = addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    const g = addModule(p, DEFS.grain, 0, 0);
+    p.voices = 4;
+    connect(p, DEFS, { module: kb.id, port: 'pitch' }, { module: o.id, port: 'pitch' });
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: g.id, port: 'in' });
+    expect(voiceSplit(p).has(o.id)).toBe(true);
+    expect(voiceSplit(p).has(g.id)).toBe(false);
+  });
+
+  it('freeze keeps playing the buffer after the input stops, mix 0 passes the input', () => {
+    const { e, id, osc } = rig({ spray: 0.3 }); // (without spray the frozen grains all read the same segment and can cancel)
+    render(e, SR);
+    e.setParam(id, 'freeze', 1);
+    e.setParam(osc, 'level', 0);
+    render(e, SR);
+    expect(rms(render(e, SR).l)).toBeGreaterThan(0.05);
+    const { e: e2, osc: osc2 } = rig({});
+    render(e2, SR);
+    e2.setParam(osc2, 'level', 0);
+    render(e2, SR * 2);
+    expect(rms(render(e2, SR).l)).toBeLessThan(1e-4); // without freeze the silence has rolled through the buffer
+    const { e: e3 } = rig({ mix: 0 });
+    render(e3, SR);
+    expect(rms(render(e3, SR).l)).toBeCloseTo(0.5 / Math.SQRT2, 3);
+  });
+});
+
 describe('ladder filter', () => {
   /** noise -> ladder -> output left, taken from the given output */
   function rig(port: string, params: Record<string, number>, note?: number, level = 0.3): Float32Array {

@@ -80,6 +80,10 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - The **Oscillator** has `unison` (1..5 copies) and `detune` (cents, spread from −detune to +detune): a supersaw or a thick pulse from one module, summed so the peak stays at `level`. Sync restarts all copies. With `pm` connected or `fb` above 0 the oscillator runs its FM path, which plays one copy.
 
+## Granular
+
+- **Granular** records whatever is patched into it (one second, `freeze` stops the recording) and plays grains from it: `density` grains per second or one per rising edge on `trig`, each reading `size` seconds from `position` back in the buffer (0 = the newest audio) scattered by `spray`, at `pitch` semitones, under a smooth window, up to eight at once, mixed with the input by `mix`. A frozen chord into a cloud, a stutter from a square LFO on `trig`, a pitch-shifted echo. One per patch on the FM-1 (not in the four-voice build).
+
 ## Math and logic
 
 - **Math** takes two signals (`a` scaled by `ka` plus `off`, `b` scaled by `kb`) and outputs their sum, difference, product, min, max, |a| and a gate that is high while a > b: ring modulation, a CV mixer, a comparator, a rectifier.

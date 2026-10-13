@@ -229,3 +229,9 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 - Panel with one voice: SEL does nothing (LED off), no voice number in the top bar, the mixer has one row `K1 LEVEL (OP1: MUTE)`, the MIDI tab one `MIDI CHANNEL` row (`CH_TAB`, hidden rows have tab `MT_NONE`; the menu walks rows by `menu_row_at` / `menu_pos`, not `first + r`), loading line `PATCH`, manual text under `#if ENG_VOICES > 1`. `arp_any_play()` (arp.c) is the clock-source test.
 - Saved state: record version 2 with `BLOB_NV` 4 slots in both builds (the handoff's "version 3" was not needed). HELLO reply uses the defines; `DEVICE` in patchbin.ts is 255 / 128 (the one-voice build).
 - `tools/pool_sizes.sh [-DENG_VOICES=4]` is the stand-in pool estimate (clang for riscv32 `-S` on modular.c, sums the `.size` of `.pool` symbols; runs on this Mac): one voice 302,338 B of 417,792 B (115 KB free; the granular buffer of 88 KB fits), four voices 408,482 B.
+
+## New modules after the switch (host-tested: vitest 100, golden 70; not built with the JieLi toolchain, not flashed)
+
+- `ladder` (4-pole ZDF ladder with a saturator in the loop, cv per block), osc `unison` / `detune` (patch format 11, `inst_t.s.osc.ph[4]`), `dyn` (peak follower + compressor; note `exp2_q16` returns a plain integer: add `16 << 16` for Q16), `math`, `logic`, `grain` (shared; `gr_pool` of `grain_line_t` = 1 s int16 + 8 grain records, `ENG_NGRAIN` 1 in the one-voice build, 0 with four voices). Formulas in docs/ARCHITECTURE.md, each with a golden kit.
+- Golden lessons: anything that spawns events from an accumulator must use the same quantized increment in both engines (the grain's density increment is floored to 2^-24 in TS); a spawn inside a block must see the per-sample write index, not the block's start value.
+- Stand-in pool (`tools/pool_sizes.sh`): 390,730 B of 417,792 B with the granular line (27 KB free). The four-voice build is unchanged apart from +4 B.

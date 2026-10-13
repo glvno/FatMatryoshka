@@ -32,6 +32,7 @@
 #define ENG_NREV 1                  /* reverb memories */
 #define ENG_NSTRING 8               /* string lines (a per-note module: one per note) */
 #define ENG_NCHORUS 1               /* chorus lines (a shared module, like the delay) */
+#define ENG_NGRAIN 1                /* granular lines (a shared module): 1 s of int16 plus the grain records, 88 KB */
 #else
 #define ENG_MAX_INST 96             /* module instances, all voices: a shared module has one, a per-note module one per note */
 #define ENG_NBUF 128u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
@@ -39,7 +40,11 @@
 #define ENG_NREV 2                  /* reverb memories, all voices */
 #define ENG_NSTRING 6               /* string lines, all voices (a per-note module: one per note) */
 #define ENG_NCHORUS 1               /* chorus lines, all voices (a shared module, like the delay) */
+#define ENG_NGRAIN 0                /* no room for a granular line next to four voices: a patch with one does not load */
 #endif
+#define GRAIN_LEN 44100u            /* GRAIN_SECONDS x ENG_SR */
+#define GRAIN_MAX 8
+#define GRAIN_SPRAY (ENG_SR / 4u)   /* spray scatters a grain's start by up to this many samples (0.25 s) */
 #define RV_LEN 5934u                /* the four combs (1116 1188 1277 1356) and two allpasses (556 441), int16 Q13 */
 #define DELAY_LEN 23000u            /* 521 ms (the reference engine, web/src/modules.ts, has the same length; ping-pong halves it) */
 #define STR_LEN 1104u               /* ceil(ENG_SR / 40) + 1: the lowest string is 40 Hz, as the reference */
@@ -220,6 +225,7 @@ typedef struct {
         struct { int32_t ic1, ic2, jc1, jc2; } flt;   /* stage 1 and stage 2 integrators */
         struct { int32_t s[4]; } lad;                 /* the four one-pole states, Q20 */
         struct { int32_t env; } dyn;                  /* the peak follower, Q24 */
+        struct { struct grain_line *ln; uint32_t w, acc, seed; uint8_t prev; } gr;   /* acc: grains per sample, Q24 */
         struct { int16_t *buf; uint32_t w, t, seen, beat; uint32_t ring[DELAY_CLK_PPQN]; uint8_t prev; } dly;   /* t, ring, seen, beat: the clock tempo */
         struct { int16_t *buf; uint16_t ci[4], ai[2]; int32_t lp[4]; } rev;
         struct { int32_t v; uint32_t t; uint8_t stage, prev; } env;  /* Q30, like the ADSR; t: samples in the segment */
@@ -260,7 +266,7 @@ typedef struct {
     uint16_t nsrc;
     uint8_t order[ENG_MAX_MODULES], outputs[ENG_MAX_MODULES];
     uint8_t from_m[ENG_MAX_CABLES], from_p[ENG_MAX_CABLES], to_m[ENG_MAX_CABLES], to_p[ENG_MAX_CABLES];
-    uint16_t ncab, nbuf, ndly, nrev, nstr, nch;
+    uint16_t ncab, nbuf, ndly, nrev, nstr, nch, ngr;
     node_t node[ENG_MAX_MODULES];
     sum_t sum[MAX_SUM];
     const esig_t *sum_src[MAX_SRC];
@@ -294,6 +300,14 @@ static int16_t str_pool[ENG_NSTRING][STR_LEN] ENG_POOL;
 static uint8_t str_own[ENG_NSTRING];
 static int16_t ch_pool[ENG_NCHORUS][CH_LEN] ENG_POOL;
 static uint8_t ch_own[ENG_NCHORUS];
+/* a granular line: the recording (Q13 like the delay) and the grains reading it (start, read phase from it Q16, rate Q16,
+ * window phase and increment (u32 turns, half a turn over the grain), samples left) */
+typedef struct { uint32_t start, rp, rate, wph, winc, left; } grain_t;
+typedef struct grain_line { int16_t buf[GRAIN_LEN]; grain_t g[GRAIN_MAX]; } grain_line_t;
+#if ENG_NGRAIN > 0
+static grain_line_t gr_pool[ENG_NGRAIN] ENG_POOL;
+static uint8_t gr_own[ENG_NGRAIN];
+#endif
 static const esig_t zero_buf[ENG_BLOCK];
 static esig_t dummy_out[ENG_BLOCK];
 
@@ -369,6 +383,9 @@ static void init_state(const node_t *nd, inst_t *it)
     case T_SEQ:
         it->s.seq.seed = 0x9e3779b9u;
         break;
+    case T_GRAIN:
+        it->s.gr.seed = 0x7f4a7c15u;
+        break;
     case T_CLKDIV:
         it->s.cdv.count = -1;
         break;
@@ -419,6 +436,9 @@ int eng_load(const uint8_t *p, uint32_t len)
     pool_free(rev_own, ENG_NREV);
     pool_free(str_own, ENG_NSTRING);
     pool_free(ch_own, ENG_NCHORUS);
+#if ENG_NGRAIN > 0
+    pool_free(gr_own, ENG_NGRAIN);
+#endif
     if (len < 8u || p[0] != 0xA1 || p[1] != ENG_PATCH_VERSION)
         return -1;
     E.nmod = p[2];
@@ -543,6 +563,20 @@ int eng_load(const uint8_t *p, uint32_t len)
                 it->s.ch.buf = ch_pool[s];
                 for (j = 0; j < CH_LEN; j++)
                     it->s.ch.buf[j] = 0;
+            }
+            if (nd->type == T_GRAIN) {
+#if ENG_NGRAIN > 0
+                int s = slot_take(gr_own, ENG_NGRAIN);
+                uint8_t *z;
+                if (s < 0)
+                    return -4;
+                E.ngr++;
+                it->s.gr.ln = &gr_pool[s];
+                for (z = (uint8_t *)it->s.gr.ln, j = 0; j < sizeof(grain_line_t); j++)
+                    z[j] = 0;
+#else
+                return -4;
+#endif
             }
         }
     }
@@ -1415,6 +1449,108 @@ static void m_logic(const node_t *nd, inst_t *it, uint32_t n)     /* modules.ts 
     (void)nd;
 }
 
+/* the delay and granular lines hold Q13 (+-4.0) in int16: half the memory of Q16 in int32, 1.2e-4 resolution */
+static inline int16_t dly_pack(int32_t v)
+{
+    int32_t q = (v + 4) >> 3;
+    return (int16_t)clampi(q, -32768, 32767);
+}
+
+/* Granular (modules.ts `grain`): records in into a 1 s line (Q13), plays up to GRAIN_MAX Hann-windowed grains from it.
+ * A grain starts `density` times a second (Q24 accumulator) or on a rising edge of trig, at `position` of the span back
+ * from the write head plus a random spray, and reads `size` seconds at 2^(pitch / 12), linearly interpolated. The window
+ * is sin^2 of half a turn over the grain (sin_turn). The line is int16 Q13 like the delay's. */
+static void grain_spawn(inst_t *it, uint32_t len, uint32_t span, uint32_t rate, uint32_t avail, int32_t position, uint32_t sprayS)
+{
+    grain_line_t *ln = it->s.gr.ln;
+    grain_t *g = 0;
+    uint32_t k, rnd, off, back;
+    for (k = 0; k < GRAIN_MAX; k++)
+        if (ln->g[k].left == 0u) {
+            g = &ln->g[k];
+            break;
+        }
+    it->s.gr.seed = it->s.gr.seed * 1664525u + 1013904223u;
+    if (!g)
+        return;
+    rnd = it->s.gr.seed >> 8;                                            /* Q24, 0 .. 1 */
+    off = (uint32_t)mul16(position, (int32_t)avail) + (uint32_t)(((uint64_t)rnd * sprayS) >> 24);
+    if (off > avail)
+        off = avail;
+    back = span + off;
+    g->start = it->s.gr.w >= back ? it->s.gr.w - back : it->s.gr.w + GRAIN_LEN - back;
+    g->rp = 0;
+    g->rate = rate;
+    g->wph = 0;
+    g->winc = 0x80000000u / len;
+    g->left = len;
+}
+
+static void m_grain(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[GRAIN_I_IN], *trig = it->in[GRAIN_I_TRIG];
+    esig_t *out = it->out[0];
+    grain_line_t *ln = it->s.gr.ln;
+    int16_t *buf = ln->buf;
+    uint32_t w = it->s.gr.w, acc = it->s.gr.acc, i, k;
+    uint32_t dinc = (uint32_t)(((uint64_t)(uint32_t)EF(it, GRAIN_P_DENSITY) << 8) / ENG_SR);     /* grains per sample, Q24 */
+    uint32_t rate = exp2_q16(EF(it, GRAIN_P_PITCH) / 12 + (16 << 16));
+    uint32_t len = (uint32_t)(((int64_t)EF(it, GRAIN_P_SIZE) * ENG_SR + 32768) >> 16), span, avail;
+    uint32_t sprayS = (uint32_t)mul16(EF(it, GRAIN_P_SPRAY), GRAIN_SPRAY);
+    int32_t position = EF(it, GRAIN_P_POSITION), mix = EF(it, GRAIN_P_MIX), dry = ENG_ONE - mix;
+    int freeze = EF(it, GRAIN_P_FREEZE) >= 32768, prev = it->s.gr.prev;
+    if (len < 1u)
+        len = 1u;
+    span = (uint32_t)(((uint64_t)len * rate) >> 16) + 1u;
+    if (span > GRAIN_LEN - 2u) {
+        len = (uint32_t)(((uint64_t)(GRAIN_LEN - 2u) << 16) / rate);
+        span = (uint32_t)(((uint64_t)len * rate) >> 16) + 1u;
+    }
+    avail = GRAIN_LEN - 1u - span;
+    for (i = 0; i < n; i++) {
+        int32_t x = in[i], sum = 0;
+        int tr = trig[i] >= 32768;
+        acc += dinc;
+        it->s.gr.w = w;                                                  /* (a grain starts from the write head of this sample) */
+        if (acc >= (1u << 24)) {
+            acc -= 1u << 24;
+            grain_spawn(it, len, span, rate, avail, position, sprayS);
+        }
+        if (tr && !prev)
+            grain_spawn(it, len, span, rate, avail, position, sprayS);
+        prev = tr;
+        for (k = 0; k < GRAIN_MAX; k++) {
+            grain_t *g = &ln->g[k];
+            uint32_t i0, i1;
+            int32_t s0, s1, v, sn;
+            if (!g->left)
+                continue;
+            i0 = g->start + (g->rp >> 16);
+            if (i0 >= GRAIN_LEN)
+                i0 -= GRAIN_LEN;
+            i1 = i0 + 1u == GRAIN_LEN ? 0u : i0 + 1u;
+            s0 = (int32_t)buf[i0] * 8;
+            s1 = (int32_t)buf[i1] * 8;
+            v = s0 + mulq(s1 - s0, (int32_t)(g->rp & 0xFFFFu), 16);
+            sn = sin_turn(g->wph);
+            sum += mul16(v, mulq(sn, sn, 16));
+            g->rp += g->rate;
+            g->wph += g->winc;
+            g->left--;
+        }
+        if (!freeze) {
+            buf[w] = dly_pack(x);
+            if (++w == GRAIN_LEN)
+                w = 0;
+        }
+        out[i] = mul16(x, dry) + mul16(sum, mix);
+    }
+    it->s.gr.w = w;
+    it->s.gr.acc = acc;
+    it->s.gr.prev = (uint8_t)prev;
+    (void)nd;
+}
+
 static void m_mixer(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *a = it->in[MIXER_I_IN1], *b = it->in[MIXER_I_IN2], *c = it->in[MIXER_I_IN3], *d = it->in[MIXER_I_IN4];
@@ -1423,13 +1559,6 @@ static void m_mixer(const node_t *nd, inst_t *it, uint32_t n)
     uint32_t i;
     for (i = 0; i < n; i++)
         out[i] = mul16(a[i], la) + mul16(b[i], lb) + mul16(c[i], lc) + mul16(d[i], ld);
-}
-
-/* the delay line holds Q13 (+-4.0) in int16: half the memory of Q16 in int32, 1.2e-4 resolution */
-static inline int16_t dly_pack(int32_t v)
-{
-    int32_t q = (v + 4) >> 3;
-    return (int16_t)clampi(q, -32768, 32767);
 }
 
 #define DELAY_HALF (DELAY_LEN / 2u)
@@ -2086,6 +2215,7 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     case T_DYN: m_dyn(nd, it, n); break;
     case T_MATH: m_math(nd, it, n); break;
     case T_LOGIC: m_logic(nd, it, n); break;
+    case T_GRAIN: m_grain(nd, it, n); break;
     case T_CRUSH: m_crush(nd, it, n); break;
     default: break;                      /* output: read by eng_render */
     }

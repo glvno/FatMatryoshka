@@ -648,6 +648,126 @@ const logic: ModuleImpl<null> = {
   },
 };
 
+/** the granular module's buffer: one second, and up to this many grains at once */
+export const GRAIN_SECONDS = 1;
+export const GRAIN_MAX = 8;
+/** spray scatters a grain's start by up to this many seconds */
+const GRAIN_SPRAY_S = 0.25;
+
+interface Grain {
+  /** start sample in the buffer, samples played so far, samples to play, read rate (samples per sample) */
+  start: number;
+  t: number;
+  len: number;
+  rate: number;
+  left: number;
+}
+interface GrainState {
+  buf: Float32Array;
+  w: number;
+  /** the spawn accumulator (grains per sample), the random seed, the previous trig sample */
+  acc: number;
+  seed: number;
+  prev: number;
+  g: Grain[];
+}
+
+/**
+ * Granular: records its input into a one second buffer (freeze stops the recording) and plays up to GRAIN_MAX grains from
+ * it. `density` grains per second start on their own (0 = none), a rising edge on `trig` starts one too. A grain reads
+ * `size` seconds of the buffer, `position` back from the newest audio (0 = the newest, 1 = the oldest) plus a random
+ * `spray` (up to 0.25 s), at the rate 2^(pitch / 12), under a Hann window, linearly interpolated; the grains are summed
+ * (not normalised: density x size is the average overlap). out = in (1 - mix) + grains mix. Shared like the delay: one
+ * instance per patch, one line on the FM-1.
+ */
+const grain: ModuleImpl<GrainState> = {
+  def: {
+    type: 'grain',
+    label: 'Granular',
+    inputs: [audio('in'), gate('trig')],
+    outputs: [audio('out')],
+    params: [
+      param('position', 0, 1, 0.3, { step: 0.01 }),
+      param('size', 0.01, 0.5, 0.08, { unit: 's', step: 0.001, log: true }),
+      param('density', 0, 100, 20, { unit: 'Hz', step: 0.5 }),
+      param('pitch', -24, 24, 0, { unit: 'st', step: 1 }),
+      param('spray', 0, 1, 0.2, { step: 0.01 }),
+      param('freeze', 0, 1, 0, { step: 1, choices: ['off', 'on'], toggle: true }),
+      param('mix', 0, 1, 0.5, { step: 0.01 }),
+    ],
+  },
+  init: (sr) => ({
+    buf: new Float32Array(Math.round(sr * GRAIN_SECONDS)),
+    w: 0,
+    acc: 0,
+    seed: 0x7f4a7c15,
+    prev: 0,
+    g: Array.from({ length: GRAIN_MAX }, () => ({ start: 0, t: 0, len: 0, rate: 1, left: 0 })),
+  }),
+  process(c, s) {
+    const LEN = s.buf.length;
+    const dinc = Math.floor(((c.p.density ?? 0) / c.sr) * 16777216) / 16777216; // grains per sample, in steps of 2^-24 like the firmware, so both spawn on the same samples
+    const rate = Math.pow(2, Math.trunc(c.p.pitch ?? 0) / 12);
+    let len = Math.max(1, Math.round((c.p.size ?? 0.08) * c.sr));
+    let span = Math.floor(len * rate) + 1;
+    if (span > LEN - 2) {
+      len = Math.floor((LEN - 2) / rate);
+      span = Math.floor(len * rate) + 1;
+    }
+    const avail = LEN - 1 - span;
+    const position = c.p.position ?? 0;
+    const sprayS = Math.floor((c.p.spray ?? 0) * GRAIN_SPRAY_S * c.sr);
+    const freeze = (c.p.freeze ?? 0) >= 0.5;
+    const mix = c.p.mix ?? 0.5;
+    const dry = 1 - mix;
+    const spawn = (): void => {
+      let g: Grain | undefined;
+      for (const k of s.g) if (k.left === 0) { g = k; break; }
+      s.seed = (Math.imul(s.seed, 1664525) + 1013904223) >>> 0;
+      if (!g) return;
+      const rnd = (s.seed >>> 8) / 16777216;
+      let off = Math.floor(position * avail) + Math.floor(rnd * sprayS);
+      if (off > avail) off = avail;
+      const back = span + off;
+      g.start = s.w >= back ? s.w - back : s.w + LEN - back;
+      g.t = 0;
+      g.len = len;
+      g.rate = rate;
+      g.left = len;
+    };
+    for (let i = 0; i < c.n; i++) {
+      const x = c.inp.in[i];
+      const tr = c.inp.trig[i];
+      s.acc += dinc;
+      if (s.acc >= 1) {
+        s.acc -= 1;
+        spawn();
+      }
+      if (tr >= 0.5 && s.prev < 0.5) spawn();
+      s.prev = tr;
+      let sum = 0;
+      for (const g of s.g) {
+        if (g.left === 0) continue;
+        const rp = g.t * g.rate;
+        let i0 = g.start + Math.floor(rp);
+        if (i0 >= LEN) i0 -= LEN;
+        const i1 = i0 + 1 === LEN ? 0 : i0 + 1;
+        const fr = rp - Math.floor(rp);
+        const v = s.buf[i0] + (s.buf[i1] - s.buf[i0]) * fr;
+        const sn = Math.sin((Math.PI * g.t) / g.len);
+        sum += v * sn * sn;
+        g.t++;
+        g.left--;
+      }
+      if (!freeze) {
+        s.buf[s.w] = x;
+        if (++s.w === LEN) s.w = 0;
+      }
+      c.out.out[i] = x * dry + sum * mix;
+    }
+  },
+};
+
 const mixer: ModuleImpl<null> = {
   def: {
     type: 'mixer',
@@ -1503,7 +1623,7 @@ const crush: ModuleImpl<{ held: number; cnt: number }> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic];
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic, grain];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an

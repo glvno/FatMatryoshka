@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 33
+#define N_TYPES 34
 enum {
     T_FM1,
     T_OSC,
@@ -38,6 +38,7 @@ enum {
     T_DYN,
     T_MATH,
     T_LOGIC,
+    T_GRAIN,
 };
 
 /* fm1: Main */
@@ -532,6 +533,24 @@ enum {
 #define LOGIC_NPAR 1
 #define LOGIC_CVBASE 2
 
+/* grain: Granular */
+#define GRAIN_I_IN 0
+#define GRAIN_I_TRIG 1
+#define GRAIN_I_P1 2
+#define GRAIN_I_P2 3
+#define GRAIN_O_OUT 0
+#define GRAIN_P_POSITION 0
+#define GRAIN_P_SIZE 1
+#define GRAIN_P_DENSITY 2
+#define GRAIN_P_PITCH 3
+#define GRAIN_P_SPRAY 4
+#define GRAIN_P_FREEZE 5
+#define GRAIN_P_MIX 6
+#define GRAIN_NIN 4
+#define GRAIN_NOUT 1
+#define GRAIN_NPAR 7
+#define GRAIN_CVBASE 2
+
 #define DELAY_NDIV 11
 #define DELAY_CLK_PPQN 24
 static const uint8_t DELAY_DIV_NUM[DELAY_NDIV] = {1, 1, 1, 3, 1, 3, 1, 3, 2, 5, 4};
@@ -866,6 +885,16 @@ static const char *const LOGIC_PN[] = {"THRESH"};
 static const uint8_t LOGIC_LOG[] = {0};
 static const char *const LOGIC_UNIT[] = {""};
 static const char *const *const LOGIC_CH[] = {0};
+static const char *const GRAIN_INNAMES[] = {"IN", "TRIG", "P1", "P2"};
+static const int32_t GRAIN_MIN[] = {0, 655, 0, -1572864, 0, 0, 0};
+static const int32_t GRAIN_MAX[] = {65536, 32768, 6553600, 1572864, 65536, 65536, 65536};
+static const int32_t GRAIN_DEF[] = {19661, 5243, 1310720, 0, 13107, 0, 32768};
+static const int32_t GRAIN_INC[] = {655, 321, 65536, 65536, 655, 65536, 655};
+static const char *const GRAIN_PN[] = {"POSITION", "SIZE", "DENSITY", "PITCH", "SPRAY", "FREEZE", "MIX"};
+static const uint8_t GRAIN_LOG[] = {0, 1, 0, 0, 0, 0, 0};
+static const char *const GRAIN_UNIT[] = {"", "S", "HZ", "ST", "", "", ""};
+static const char *const GRAIN_CH5[] = {"OFF", "ON", 0};
+static const char *const *const GRAIN_CH[] = {0, 0, 0, 0, 0, GRAIN_CH5, 0};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, FM1_CVBASE, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -901,4 +930,5 @@ static const def_t DEFS[N_TYPES] = {
     {DYN_NIN, DYN_NOUT, DYN_NPAR, DYN_CVBASE, DYN_MIN, DYN_MAX, DYN_DEF, DYN_INC, "COMPRESSOR", DYN_PN, DYN_INNAMES, DYN_LOG, DYN_UNIT, DYN_CH},   /* dyn */
     {MATH_NIN, MATH_NOUT, MATH_NPAR, MATH_CVBASE, MATH_MIN, MATH_MAX, MATH_DEF, MATH_INC, "MATH", MATH_PN, MATH_INNAMES, MATH_LOG, MATH_UNIT, MATH_CH},   /* math */
     {LOGIC_NIN, LOGIC_NOUT, LOGIC_NPAR, LOGIC_CVBASE, LOGIC_MIN, LOGIC_MAX, LOGIC_DEF, LOGIC_INC, "LOGIC", LOGIC_PN, LOGIC_INNAMES, LOGIC_LOG, LOGIC_UNIT, LOGIC_CH},   /* logic */
+    {GRAIN_NIN, GRAIN_NOUT, GRAIN_NPAR, GRAIN_CVBASE, GRAIN_MIN, GRAIN_MAX, GRAIN_DEF, GRAIN_INC, "GRANULAR", GRAIN_PN, GRAIN_INNAMES, GRAIN_LOG, GRAIN_UNIT, GRAIN_CH},   /* grain */
 };

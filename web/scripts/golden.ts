@@ -178,6 +178,22 @@ kit('math-logic', (add, wire) => {
   wire(vca2, 'out', out, 'l');
   wire(mt, 'abs', osc, 'pitch');
 });
+kit('grain', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.7 });
+  const adsr = add('adsr', 0, 0, { a: 0.01, d: 0.3, s: 0.5, r: 0.2 });
+  const vca = add('vca', 0, 0);
+  const lfo = add('lfo', 0, 0, { wave: 3, rate: 6, depth: 1 });
+  const gr = add('grain', 0, 0, { position: 0.25, size: 0.06, density: 15, pitch: 7, spray: 0.3, mix: 0.7 });
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(kb, 'gate', adsr, 'gate');
+  wire(osc, 'out', vca, 'in');
+  wire(adsr, 'env', vca, 'cv');
+  wire(vca, 'out', gr, 'in');
+  wire(lfo, 'out', gr, 'trig');
+  wire(gr, 'out', out, 'l');
+});
 kit('ladder', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.8 });
