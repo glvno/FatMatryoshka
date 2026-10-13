@@ -37,6 +37,8 @@ static const char *const MANUAL[] = {
 #else
     " MIXER: K1 LEVEL, KEY F# (OP1) MUTE,",
     "   LED = MUTED, ALGO: POLYPHONY 1-8",
+    "   K2: MORPH A > B (THE EDITOR SETS",
+    "   THE B SIDE FROM ANOTHER PATCH)",
 #endif
     "",
     "#MIDI MAPPING",
@@ -58,7 +60,7 @@ static const char *const MANUAL[] = {
     "   ELSE MIDI CLOCK",
     " BEND: +-2 ST ON PITCH, BEND OUT",
     " CC 1: MOD OUT, AFTERTOUCH: AT OUT",
-    " CC 16-19: MAIN K1-K4",
+    " CC 16-19: MAIN K1-K4, CC 20: MORPH",
     " OTHER CC: NOT MAPPED",
     " SYSEX: EDITOR LINK (USB)",
     "",
@@ -79,7 +81,7 @@ static const char *const MANUAL[] = {
     " PER VOICE: 32 MODULES, 192 CABLES,",
     "   PATCH MAX 3072 BYTES, 1-8 NOTES",
     " SHARED BY THE 4 VOICES: 108 SIGNAL",
-    "   BUFFERS, 92 MODULE INSTANCES,",
+    "   BUFFERS, 80 MODULE INSTANCES,",
     "   4 DELAYS (MAX 521 MS, PING-PONG",
     "   HALVES IT), 2 REVERBS, 6 STRINGS,",
     "   1 CHORUS. NO ROOM = NOT LOADED",

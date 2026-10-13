@@ -93,9 +93,11 @@ const fm1: ModuleImpl<null> = {
   def: {
     type: 'fm1',
     label: 'Main',
-    inputs: [],
+    // the one input: the morph position added to the `morph` parameter (block mean, one block late), so an LFO or a
+    // sequencer can morph the patch; the engine reads it, not this module (engine.ts morphPosition)
+    inputs: [control('morph')],
     outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), gate('clock'), control('spread'), control('bend'), control('mod'), control('at')],
-    params: [...knobNames.map((n) => param(n, 0, 1, 0.5, { step: 0.01 }))],
+    params: [...knobNames.map((n) => param(n, 0, 1, 0.5, { step: 0.01 })), param('morph', 0, 1, 0, { step: 0.01 })],
   },
   init: () => null,
   process(c) {

@@ -45,6 +45,7 @@ enum {
 };
 
 /* fm1: Main */
+#define FM1_I_MORPH 0
 #define FM1_O_PITCH 0
 #define FM1_O_GATE 1
 #define FM1_O_VEL 2
@@ -61,9 +62,10 @@ enum {
 #define FM1_P_K2 1
 #define FM1_P_K3 2
 #define FM1_P_K4 3
-#define FM1_NIN 0
+#define FM1_P_MORPH 4
+#define FM1_NIN 1
 #define FM1_NOUT 12
-#define FM1_NPAR 4
+#define FM1_NPAR 5
 #define FM1_CVBASE -1
 
 /* osc: Oscillator */
@@ -635,15 +637,15 @@ typedef struct {
     const char *const *const *pchoice;      /* per parameter: the names of a choice parameter (0-terminated), or 0 */
 } def_t;
 
-static const char *const FM1_INNAMES[] = {0};
-static const int32_t FM1_MIN[] = {0, 0, 0, 0};
-static const int32_t FM1_MAX[] = {65536, 65536, 65536, 65536};
-static const int32_t FM1_DEF[] = {32768, 32768, 32768, 32768};
-static const int32_t FM1_INC[] = {655, 655, 655, 655};
-static const char *const FM1_PN[] = {"K1", "K2", "K3", "K4"};
-static const uint8_t FM1_LOG[] = {0, 0, 0, 0};
-static const char *const FM1_UNIT[] = {"", "", "", ""};
-static const char *const *const FM1_CH[] = {0, 0, 0, 0};
+static const char *const FM1_INNAMES[] = {"MORPH"};
+static const int32_t FM1_MIN[] = {0, 0, 0, 0, 0};
+static const int32_t FM1_MAX[] = {65536, 65536, 65536, 65536, 65536};
+static const int32_t FM1_DEF[] = {32768, 32768, 32768, 32768, 0};
+static const int32_t FM1_INC[] = {655, 655, 655, 655, 655};
+static const char *const FM1_PN[] = {"K1", "K2", "K3", "K4", "MORPH"};
+static const uint8_t FM1_LOG[] = {0, 0, 0, 0, 0};
+static const char *const FM1_UNIT[] = {"", "", "", "", ""};
+static const char *const *const FM1_CH[] = {0, 0, 0, 0, 0};
 static const char *const OSC_INNAMES[] = {"PITCH", "PM", "SYNC", "P1", "P2"};
 static const int32_t OSC_MIN[] = {0, 3277, -3145728, -6553600, 0, 0, 0, 65536, 0};
 static const int32_t OSC_MAX[] = {196608, 62259, 3145728, 6553600, 524288, 65536, 65536, 327680, 6553600};

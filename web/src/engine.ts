@@ -8,7 +8,7 @@
 // FM-1 panel is shared but its pitch / gate / vel outputs are per voice. With one voice this is exactly the mono engine.
 
 import { IMPLS, type Ctx, type ModuleImpl, type Voice } from './modules';
-import { defaultMap, modulate, processingOrder, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Cable, type Patch, type Source, thruInput } from './patch';
+import { defaultMap, modulate, morphValue, processingOrder, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Cable, type Patch, type Source, thruInput } from './patch';
 
 export const BLOCK = 128;
 
@@ -35,6 +35,8 @@ interface Node {
   /** bypassed: run() copies `thru` (or silence) to the outputs instead of processing */
   bypass: boolean;
   thru: string | undefined;
+  /** the B side of the morph (patch.ts paramsB), null without one */
+  paramsB: Record<string, number> | null;
   inst: Inst[];
   /** the FM-1 panel with several voices: its pitch / gate / vel, one buffer per voice */
   vout: Record<string, Float32Array[]> | null;
@@ -66,6 +68,10 @@ export class Engine {
   private clockOn = true;
   /** the performance controls (pitch bend -1..1, mod wheel 0..1, channel aftertouch 0..1): one set, every voice sees it */
   private ctl = { bend: 0, mod: 0, at: 0 };
+  /** the Main module, and the morph position of the current block (its morph parameter plus the block mean of its morph input, one block late) */
+  private main: Node | null = null;
+  private morphT = 0;
+  private hasB = false;
 
   constructor(readonly sampleRate: number) {}
 
@@ -124,6 +130,7 @@ export class Engine {
             poly: isPoly,
             bypass: false,
             thru: thruInput(impl.def),
+            paramsB: null,
             inst: Array.from({ length: ninst }, () => this.newInst(impl)),
             vout: panelVoices ? Object.fromEntries([...VOICE_PORTS].map((p) => [p, Array.from({ length: panelVoices }, () => new Float32Array(BLOCK))])) : null,
           };
@@ -131,6 +138,7 @@ export class Engine {
       node.att = m.att ? [m.att[0], m.att[1]] : [1, 1];
       node.map = Object.fromEntries(SOURCES.map((s) => [s, [...(m.map?.[s] ?? [])]])) as Record<Source, string[]>;
       node.bypass = !!m.bypass;
+      node.paramsB = m.paramsB && m.type !== 'fm1' ? { ...m.paramsB } : null;
       node.sources = [];
       node.connected = {};
       next.set(m.id, node);
@@ -145,6 +153,27 @@ export class Engine {
     const { order } = processingOrder(patch);
     this.order = order.map((id) => next.get(id)!);
     this.outputs = this.order.filter((n) => n.type === 'output');
+    this.main = this.order.find((n) => n.type === 'fm1') ?? null;
+    this.hasB = this.order.some((n) => n.paramsB);
+  }
+
+  /** the morph position the current block uses (for tests) */
+  get morph(): number {
+    return this.morphT;
+  }
+
+  /** the morph position for the next block: the Main module's `morph` parameter plus the block mean of its morph input (what the input summed in the previous block) */
+  private morphPosition(n: number): number {
+    const m = this.main;
+    if (!m) return 0;
+    let t = m.params.morph ?? 0;
+    if (m.connected.morph) {
+      const b = m.inst[0].inp.morph;
+      let s = 0;
+      for (let i = 0; i < n; i++) s += b[i];
+      t += s / n;
+    }
+    return Math.min(1, Math.max(0, t));
   }
 
   setParam(id: number, name: string, value: number): void {
@@ -201,7 +230,8 @@ export class Engine {
         pins[s] = (sum / n) * node.att[s];
       });
     for (const pd of node.impl.def.params) {
-      const base = node.params[pd.name] ?? pd.default;
+      const a = node.params[pd.name] ?? pd.default;
+      const base = node.paramsB && this.morphT > 0 ? morphValue(pd, a, node.paramsB[pd.name] ?? a, this.morphT) : a;
       let mod = 0;
       let touched = false;
       (['p1', 'p2'] as const).forEach((name, s) => {
@@ -348,6 +378,7 @@ export class Engine {
       const n = Math.min(BLOCK, total - off);
       const clock = this.ticks > 0; // the Main module's clock output: one pulse per block that saw a tick, the same for every voice
       this.ticks = 0;
+      this.morphT = this.hasB ? this.morphPosition(n) : 0;
       for (const x of vs) {
         x.clock = clock;
         x.bend = this.ctl.bend;

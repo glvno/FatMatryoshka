@@ -523,14 +523,14 @@ static void midi_drain(void)                    /* USB-MIDI events -> the engine
                     eng_all_notes_off_v(mv);
                 } else if (st == 0xB0u && n == 1u) {        /* mod wheel: the Main module's mod output */
                     eng_ctl_v(mv, ENG_CTL_MOD, (int32_t)(v * 65536u / 127u));
-                } else if (st == 0xB0u && n >= 16u && n <= 19u) {   /* CC 16..19: the Main module's knobs K1..K4 */
+                } else if (st == 0xB0u && n >= 16u && n <= 20u) {   /* CC 16..19: the Main module's knobs K1..K4; CC 20: its MORPH */
                     uint32_t keep = eng_voice();
                     int m;
                     eng_voice_select(mv);
                     m = eng_find(T_FM1);
                     if (m >= 0) {
-                        eng_set_param((uint32_t)m, n - 16u, (int32_t)(v * 65536u / 127u));
-                        m1_patch_param((uint32_t)m, n - 16u, (int32_t)(v * 65536u / 127u));
+                        eng_set_param((uint32_t)m, n == 20u ? FM1_P_MORPH : n - 16u, (int32_t)(v * 65536u / 127u));
+                        m1_patch_param((uint32_t)m, n == 20u ? FM1_P_MORPH : n - 16u, (int32_t)(v * 65536u / 127u));
                         if (mv == keep && !ui_dirty)
                             ui_dirty = 1;
                     }
@@ -624,6 +624,22 @@ static void poly_set(int32_t n)
     ui_dirty = 2;
 }
 
+#if ENG_VOICES == 1
+/* the mixer page's K2: the patch's MORPH position (the Main module's parameter, 0..100 %) by `clicks` percent */
+static void morph_turn(int32_t clicks)
+{
+    int m = eng_find(T_FM1);
+    int32_t v;
+    if (m < 0)
+        return;
+    v = clampi(eng_get_param((uint32_t)m, FM1_P_MORPH) + clicks * 655, 0, 65536);
+    eng_set_param((uint32_t)m, FM1_P_MORPH, v);
+    m1_patch_param((uint32_t)m, FM1_P_MORPH, v);
+    if (!ui_dirty)
+        ui_dirty = 1;
+}
+#endif
+
 static void knobs_poll(void)
 {
     static uint32_t last_ms[4];
@@ -647,6 +663,13 @@ static void knobs_poll(void)
                 mix_turn(k, st[2u + k], (int)fast);
             }
         }
+#if ENG_VOICES == 1
+        if (st[3]) {                                /* K2: the patch's MORPH (the Main module's parameter), 1 % per click */
+            uint32_t fast = cfg.accel && fm1_ms - last_ms[1] < 80u;
+            last_ms[1] = fm1_ms;
+            morph_turn(st[3] * (fast ? 5 : 1));
+        }
+#endif
         if (st[1])
             poly_set(eng_poly() + st[1]);
         if (st[0])

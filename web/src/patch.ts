@@ -95,6 +95,9 @@ export interface ModuleInst {
   map?: Record<Source, string[]>;
   /** bypassed: the module does not run; its outputs carry its through input (thruInput) or silence. Not on the panel or the output. */
   bypass?: boolean;
+  /** the B side of a morph: the same parameters as `params`, taken from another patch of the same structure (setMorphTarget); the
+   * Main module's `morph` (plus its morph input) fades every parameter from `params` to these. Not on the Main module. */
+  paramsB?: Record<string, number>;
 }
 
 export interface Patch {
@@ -106,6 +109,50 @@ export interface Patch {
   voices?: number;
   /** groups of modules shown as one card (an editor-only overlay, see assembly.ts); the engine and the FM-1 ignore it */
   assemblies?: AssemblyInst[];
+  /** the name of the patch the B side (paramsB) was taken from, for display */
+  morphName?: string;
+}
+
+/** do two patches have the same structure (modules of the same types in the same order, the same cables), so that one can be the B side of the other? */
+export function sameStructure(a: Patch, b: Patch): boolean {
+  if (a.modules.length !== b.modules.length || a.cables.length !== b.cables.length) return false;
+  if (a.modules.some((m, i) => m.type !== b.modules[i].type)) return false;
+  const key = (p: Patch): string => {
+    const idx = new Map(p.modules.map((m, i) => [m.id, i]));
+    return p.cables
+      .map((c) => `${idx.get(c.from.module)}:${c.from.port}>${idx.get(c.to.module)}:${c.to.port}`)
+      .sort()
+      .join(' ');
+  };
+  return key(a) === key(b);
+}
+
+/** take patch b's parameters as the B side of p (same structure required); the Main module's own parameters are not morphed */
+export function setMorphTarget(p: Patch, b: Patch, defs: Record<string, ModuleDef>): void {
+  if (!sameStructure(p, b)) throw new Error('the B patch must have the same modules and cables');
+  p.modules.forEach((m, i) => {
+    if (m.type === 'fm1') return;
+    const out: Record<string, number> = {};
+    for (const pd of defs[m.type].params) out[pd.name] = b.modules[i].params[pd.name] ?? pd.default;
+    m.paramsB = out;
+  });
+  p.morphName = b.name;
+}
+
+export function clearMorph(p: Patch): void {
+  for (const m of p.modules) delete m.paramsB;
+  delete p.morphName;
+}
+
+export const hasMorph = (p: Patch): boolean => p.modules.some((m) => m.paramsB);
+
+/** a parameter between its A and B values at morph position t (0..1): linearly, or in octaves for a log parameter (without the
+ * slider's bend: the midpoint of 200 and 3200 Hz is 800 Hz); a choice or switch snaps at 0.5 */
+export function morphValue(pd: ParamDef, a: number, b: number, t: number): number {
+  if (pd.choices || pd.toggle) return t < 0.5 ? a : b;
+  const clamp = (v: number): number => Math.min(pd.max, Math.max(pd.min, v));
+  if (!pd.log) return clamp(a + (b - a) * t);
+  return clamp(clamp(a) * Math.pow(clamp(b) / clamp(a), t));
 }
 
 export const MAX_MODULES = 32;
@@ -142,7 +189,7 @@ export function voiceSplit(p: Patch): Set<number> {
     let grew = false;
     for (const c of p.cables) {
       const t = types.get(c.to.module);
-      if (!t || SHARED_TYPES.has(t) || poly.has(c.to.module)) continue;
+      if (!t || t === 'fm1' || SHARED_TYPES.has(t) || poly.has(c.to.module)) continue; // the Main module's own input (morph) does not make it per voice
       if (isPolyPort(c.from.module, c.from.port)) {
         poly.add(c.to.module);
         grew = true;
@@ -267,6 +314,11 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
     }
     if (m.bypass && m.type !== 'fm1' && m.type !== 'output') m.bypass = true;
     else delete m.bypass;
+    if (m.paramsB && typeof m.paramsB === 'object' && m.type !== 'fm1') {
+      const out: Record<string, number> = {};
+      for (const pd of def.params) out[pd.name] = Number.isFinite(Number(m.paramsB[pd.name])) ? Number(m.paramsB[pd.name]) : m.params[pd.name];
+      m.paramsB = out;
+    } else delete m.paramsB;
     fixMatrix(m, def);
   }
   if (p.version === 1) {
@@ -296,6 +348,7 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
     if (!defs[mt.type].inputs.some((i) => i.name === c.to.port)) throw new Error(`no input "${c.to.port}" on ${mt.type}`);
   }
   p.name = String(p.name ?? 'patch');
+  if (!hasMorph(p as Patch) || typeof p.morphName !== 'string') delete p.morphName;
   if (p.voices === undefined || p.voices === null) delete p.voices;
   else p.voices = voicesOf(p);
   return p as Patch;

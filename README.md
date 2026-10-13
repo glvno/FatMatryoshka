@@ -106,7 +106,12 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - **Compressor** is an envelope follower and compressor in one: `env` outputs the follower (a control: an oscillator's loudness as a CV, a sidechain pump from a kick into a VCA), `out` the signal compressed above `thresh` by `ratio` with `attack`, `release` and makeup `gain`. The `side` input is the sidechain; without it the detector listens to `in`.
 
+## Patch morphing
+
+- A patch can carry a **B side**: the parameters of another stored patch with the same modules and cables. Pick it on the Main card ("B side": the Patches page and the factory list are offered, only those of the same structure), then the Main module's `morph` slider fades every parameter from this patch (A, at 0) to the other (B, at 1): linearly, in octaves for a logarithmic one (a cutoff morphs musically), a choice or a switch flips at the midpoint. Notes keep sounding while you morph: only the parameters move. The Main module has a `morph` input as well; it adds to the slider, so an LFO, an envelope or a sequencer can morph the patch (block rate, one block late). On the FM-1 the mixer page's K2 is the morph (one-voice build) and CC 20 sets it; the B side travels with the patch (binary format 14) and is saved with it. To get a B side: save the patch under a second name, change its sounds, come back to the first and pick the copy.
+
 ## Reverb
+
 
 - The **Reverb** is an eight-line feedback network (dense from the first reflections on, no metallic ring thanks to a slow modulation of two of its lines). `size` is the decay: 0.2 s at 0 to 6.4 s at 1 (60 dB), `damp` rolls off the highs in the tail, `pre` holds the tail back by up to 40 ms so the attack stays clear, `mod` is the chorusing of the tail (0 for a static, perfectly repeatable tail), `mix` the wet share. One per patch, like the Delay. Old patches keep their size / damp / mix and get the new tail.
 

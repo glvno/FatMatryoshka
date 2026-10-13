@@ -161,7 +161,7 @@ static void m1_patch_bypass(uint32_t mod, int on)
 /* a patch binary that eng_load would at least not reject for its framing: header, record sizes add up to the length */
 static int m1_valid(const uint8_t *p, uint32_t len)
 {
-    uint32_t at = 8, i, nmod, ncab;
+    uint32_t at = 8, i, nmod, ncab, npar = 0;
     if (len < 8u || p[0] != 0xA1 || p[1] != ENG_PATCH_VERSION)
         return 0;
     nmod = p[2];
@@ -174,8 +174,9 @@ static int m1_valid(const uint8_t *p, uint32_t len)
             return 0;
         d = &DEFS[M1_TYPE(p[at])];
         at += 1u + 4u * d->npar + (d->cvbase >= 0 ? 20u : 0u);
+        npar += d->npar;
     }
-    return at + 4u * ncab == len;
+    return at + 4u * ncab + ((p[6] & 1u) ? 4u * npar : 0u) == len;   /* flag bit 0: the morph B set after the cables */
 }
 
 /* f: the bytes between F0 and F7. Returns 1 if the frame was ours (and is consumed). */

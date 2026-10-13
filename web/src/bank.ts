@@ -41,6 +41,9 @@ function save(list: Entry[]): void {
 
 const patchOf = (e: Entry): Patch => (e.patch ? e.patch : PRESETS[e.name]());
 
+/** the patches the Patches page holds (the editor's own copies; factory patches are rebuilt), for the morph picker */
+export const bankPatches = (): { name: string; patch: Patch }[] => load().map((e) => ({ name: e.name, patch: patchOf(e) }));
+
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> & { class?: string } = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   const { class: cls, ...rest } = props as Record<string, unknown>;

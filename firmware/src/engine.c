@@ -34,7 +34,7 @@
 #define ENG_NCHORUS 1               /* chorus lines (a shared module, like the delay) */
 #define ENG_NGRAIN 1                /* granular lines (a shared module): 1 s of int16 plus the grain records, 88 KB */
 #else
-#define ENG_MAX_INST 92             /* module instances, all voices: a shared module has one, a per-note module one per note */
+#define ENG_MAX_INST 80             /* module instances, all voices: a shared module has one, a per-note module one per note */
 #define ENG_NBUF 108u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
 #define ENG_NDELAY 4                /* delay lines, all voices (one each when every voice has a delay) */
 #define ENG_NREV 2                  /* reverb memories, all voices */
@@ -258,6 +258,7 @@ typedef struct {
     uint16_t map[6];                 /* the matrix: bit j of map[s] = source s controls parameter j. s: p1 p2 k1 k2 k3 k4 */
     int32_t att[2];                  /* attenuverters of p1, p2: Q16, -1..1 */
     int32_t par[MAX_PAR];
+    uint16_t parb[MAX_PAR];          /* the morph B side as unit positions (0..65535 of the range, octaves for a log parameter), when E.has_b */
 } node_t;
 
 typedef struct {
@@ -288,6 +289,9 @@ typedef struct {
     uint32_t stamp;
     uint32_t clk_seen, clk_pulse;    /* the Main module's clock output: ticks seen so far, the pulse length of this block */
     int32_t ctl[ENG_NCTL];           /* pitch bend, mod wheel, aftertouch (engine.h ENG_CTL_*), Q16 */
+    uint8_t has_b;                   /* the patch carries a morph B set (node_t.parb) */
+    int8_t main;                     /* the Main module, -1 without one */
+    int32_t morph;                   /* the morph position of this block, Q16 0..1: the Main's MORPH parameter plus the mean of its morph input */
 } eng_t;
 
 /* the voices: one engine per patch that plays. E is the one the API calls act on (eng_voice_select; the panel code), the
@@ -430,6 +434,8 @@ static inline int32_t rd32(const uint8_t *p)
 /* bytes a module record has beyond its type byte and parameters: the attenuverters and the matrix */
 static inline uint32_t eng_record_extra(const def_t *d) { return d->cvbase >= 0 ? 20u : 0u; }
 
+static int32_t morph_unit(const def_t *d, uint32_t j, int32_t v);
+
 int eng_load(const uint8_t *p, uint32_t len)
 {
     uint32_t i, j, c, k, v, at = 8, ncab, nv;
@@ -464,6 +470,9 @@ int eng_load(const uint8_t *p, uint32_t len)
     if (E.nmod > ENG_MAX_MODULES || ncab > ENG_MAX_CABLES)
         return -2;
     E.ncab = (uint16_t)ncab;
+    E.has_b = 0;
+    E.main = -1;
+    E.morph = 0;
     E.nbuf = 0;
     E.ndly = 0;
     E.nrev = 0;
@@ -494,6 +503,8 @@ int eng_load(const uint8_t *p, uint32_t len)
                 nd->map[j] = (uint16_t)((uint32_t)p[at] | (uint32_t)p[at + 1] << 8);
         }
         nd->ninst = 1;
+        if (nd->type == T_FM1 && E.main < 0)
+            E.main = (int8_t)i;
     }
     if (at + 4u * ncab > len)
         return -3;
@@ -509,6 +520,17 @@ int eng_load(const uint8_t *p, uint32_t len)
         E.to_p[c] = tp;
         E.node[tm].conn |= (uint8_t)(1u << tp);
     }
+    if (p[6] & 1u) {                             /* the morph B set: one Q16 value per parameter of every module, kept as unit positions */
+        for (i = 0; i < E.nmod; i++) {
+            node_t *nd = &E.node[i];
+            const def_t *d = &DEFS[nd->type];
+            if (at + 4u * d->npar > len)
+                return -3;
+            for (j = 0; j < d->npar; j++, at += 4)
+                nd->parb[j] = (uint16_t)clampi(morph_unit(d, j, rd32(p + at)), 0, 65535);
+        }
+        E.has_b = 1;
+    }
     /* which modules run once per voice (patch.ts voiceSplit): with several voices the panel's pitch / gate / vel are per
      * voice, and so is everything downstream of them except delay, reverb and output */
     if (nv > 1) {
@@ -520,7 +542,7 @@ int eng_load(const uint8_t *p, uint32_t len)
             grew = 0;
             for (c = 0; c < ncab; c++) {
                 node_t *t = &E.node[E.to_m[c]];
-                if (t->ninst > 1 || t->type == T_DELAY || t->type == T_REVERB || t->type == T_CHORUS || t->type == T_OUTPUT)
+                if (t->ninst > 1 || t->type == T_DELAY || t->type == T_REVERB || t->type == T_CHORUS || t->type == T_GRAIN || t->type == T_OUTPUT)
                     continue;
                 if (port_poly(E.from_m[c], E.from_p[c])) {
                     t->ninst = (uint8_t)nv;
@@ -760,6 +782,64 @@ void eng_set_param(uint32_t module, uint32_t param, int32_t q16)
 {
     if (module < E.nmod && param < DEFS[E.node[module].type].npar)
         E.node[module].par[param] = q16;
+}
+
+int eng_has_morph(void) { return E.loaded && E.has_b; }
+
+/* the morph position of the coming block (engine.ts morphPosition): the Main module's MORPH parameter plus the block mean
+ * of its morph input, which holds what the input summed in the previous block (one block late), clamped to 0..1 */
+static int32_t morph_position(uint32_t n)
+{
+    const node_t *nd;
+    int32_t t;
+    if (E.main < 0)
+        return 0;
+    nd = &E.node[E.main];
+    t = nd->par[FM1_P_MORPH];
+    if (nd->conn & (1u << FM1_I_MORPH)) {
+        const esig_t *b = inst_pool[nd->inst0].in[FM1_I_MORPH];
+        int64_t s = 0;
+        uint32_t i;
+        for (i = 0; i < n; i++)
+            s += b[i];
+        t += (int32_t)(s / (int64_t)n);
+    }
+    return clampi(t, 0, ENG_ONE);
+}
+
+/* the space the morph moves in: a parameter's position in its range as Q16 0..1, octaves for a log parameter but without
+ * the knob bend of unit_of (the midpoint of 200 and 3200 Hz is 800 Hz), and back */
+static int32_t morph_unit(const def_t *d, uint32_t j, int32_t v)
+{
+    int32_t lo = d->pmin[j], hi = d->pmax[j];
+    v = clampi(v, lo, hi);
+    if (d->plog && d->plog[j]) {
+        int32_t l0 = log2_q16((uint32_t)lo);
+        return (int32_t)(((int64_t)(log2_q16((uint32_t)v) - l0) << 16) / (log2_q16((uint32_t)hi) - l0));
+    }
+    return (int32_t)(((int64_t)(v - lo) << 16) / (hi - lo));
+}
+
+static int32_t morph_value(const def_t *d, uint32_t j, int32_t u)
+{
+    int32_t lo = d->pmin[j], hi = d->pmax[j];
+    u = clampi(u, 0, ENG_ONE);
+    if (d->plog && d->plog[j]) {
+        int32_t l0 = log2_q16((uint32_t)lo);
+        return clampi((int32_t)exp2_q16(l0 + (int32_t)(((int64_t)u * (log2_q16((uint32_t)hi) - l0)) >> 16)), lo, hi);
+    }
+    return lo + (int32_t)(((int64_t)u * (hi - lo)) >> 16);
+}
+
+/* a parameter at morph position t between its value and its B side (patch.ts morphValue): a choice or switch snaps at
+ * 0.5, the rest moves in morph_unit space */
+static int32_t morph_of(const def_t *d, uint32_t j, int32_t a, uint32_t ub, int32_t t)
+{
+    int32_t ua;
+    if (d->pchoice && d->pchoice[j])
+        return t < 32768 ? a : morph_value(d, j, (int32_t)ub);
+    ua = morph_unit(d, j, a);
+    return morph_value(d, j, ua + (int32_t)(((int64_t)((int32_t)ub - ua) * t) >> 16));
 }
 
 /* for the knobs: a parameter moved by `clicks` steps of 1/100 of its range (octaves for the cutoff) */
@@ -2466,7 +2546,7 @@ static void apply_cv(const node_t *nd, inst_t *it, uint32_t n)
             have |= 1u << s;
         }
     for (j = 0; j < d->npar; j++) {
-        int32_t v = nd->par[j];
+        int32_t v = E.has_b && E.morph > 0 && nd->type != T_FM1 ? morph_of(d, j, nd->par[j], nd->parb[j], E.morph) : nd->par[j];
         uint32_t touched = 0;
         int32_t mod = 0;
         for (s = 0; s < 2u; s++)
@@ -2551,6 +2631,7 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
         return;
     for (off = 0; off < total; off += ENG_BLOCK) {
         uint32_t n = total - off < ENG_BLOCK ? total - off : ENG_BLOCK;
+        E.morph = E.has_b ? morph_position(n) : 0;
         for (k = 0; k < E.norder; k++) {
             const node_t *nd = &E.node[E.order[k]];
             for (v = 0; v < nd->ninst; v++) {           /* every voice of a per-voice module, once for a shared one */

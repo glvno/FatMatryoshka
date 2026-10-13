@@ -3,7 +3,7 @@ import { AudioHost } from './audio';
 import type { HostMsg } from './worklet';
 import { DeviceLink } from './device';
 import { Editor } from './editor';
-import { buildBankTab } from './bank';
+import { bankPatches, buildBankTab } from './bank';
 import { buildAssembliesTab, storeAssembly } from './assemblies';
 import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi } from './input';
@@ -120,6 +120,17 @@ const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw']
     const r = storeAssembly(def);
     status.textContent = r === 'cancelled' ? 'not saved' : `"${def.name}" ${r === 'replaced' ? 'replaced in' : 'saved to'} the assembly library`;
     refreshAssemblies();
+  },
+  morphCandidates() {
+    // the factory patches and the Patches page's own copies; the picker keeps those of the same structure
+    const seen = new Set<string>();
+    const out: { name: string; patch: Patch }[] = [];
+    for (const c of [...bankPatches(), ...Object.entries(PRESETS).map(([name, make]) => ({ name, patch: make() }))])
+      if (!seen.has(c.name)) {
+        seen.add(c.name);
+        out.push(c);
+      }
+    return out;
   },
 });
 host.setPatch(editor.patch);

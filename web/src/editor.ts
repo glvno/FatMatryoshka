@@ -22,6 +22,10 @@ import {
   MAX_VOICES,
   voiceSplit,
   voicesOf,
+  sameStructure,
+  setMorphTarget,
+  clearMorph,
+  hasMorph,
 } from './patch';
 import {
   addChild,
@@ -92,6 +96,8 @@ export interface EditorEvents {
   onError(msg: string): void;
   /** "save" on an assembly: put this definition into the library */
   onSaveAssembly(def: AssemblyDef): void;
+  /** the patches the morph picker on the Main card offers as the B side (those of the same structure are listed) */
+  morphCandidates?(): { name: string; patch: Patch }[];
 }
 
 type Pt = { x: number; y: number };
@@ -334,7 +340,7 @@ export class Editor {
     for (const pd of def.params) params.append(this.paramRow(m, def, pd, { open }));
     body.append(io);
     if (def.paramInputs) body.append(this.pins(m, def, open), this.matrix(m, def));
-    if (def.type === 'fm1') params.append(this.voicesRow());
+    if (def.type === 'fm1') params.append(this.voicesRow(), this.morphRow());
     body.append(params);
     el.append(head, body);
     return el;
@@ -449,6 +455,39 @@ export class Editor {
       this.change(() => {
         if (n > 1) this.patch.voices = n;
         else delete this.patch.voices;
+      });
+    };
+    row.append(name, val, sel);
+    return row;
+  }
+
+  /** the morph picker: the B side of the patch (another patch of the same structure); the `morph` slider above fades every parameter A -> B */
+  private morphRow(): HTMLElement {
+    const row = document.createElement('label');
+    row.className = 'param morph-row';
+    const name = document.createElement('span');
+    name.textContent = 'B side';
+    const val = document.createElement('output');
+    const sel = document.createElement('select');
+    sel.setAttribute('aria-label', 'Morph B side');
+    const cands = (this.ev.morphCandidates?.() ?? []).filter((c) => sameStructure(this.patch, c.patch));
+    sel.append(new Option('none', ''), ...cands.map((c, i) => new Option(c.name, String(i))));
+    const show = (): void => {
+      const has = hasMorph(this.patch);
+      val.textContent = has ? (this.patch.morphName ?? 'set') : '';
+      sel.value = '';
+      row.title = has
+        ? `The morph slider fades every parameter from this patch (A) to "${this.patch.morphName ?? 'B'}" (B): in octaves for a logarithmic one, a choice or switch flips at 0.5. The Main module's morph input adds to the slider (an LFO morphs the patch). Choose "none" to drop the B side.`
+        : cands.length
+          ? 'Pick a patch with the same modules and cables as the B side; the morph slider then fades every parameter from this patch to it.'
+          : 'No stored patch has the same modules and cables as this one. Save this patch under another name, change its sounds, and pick that copy here.';
+    };
+    show();
+    sel.onchange = () => {
+      const v = sel.value;
+      this.change(() => {
+        if (v === '') clearMorph(this.patch);
+        else setMorphTarget(this.patch, cands[Number(v)].patch, DEFS);
       });
     };
     row.append(name, val, sel);

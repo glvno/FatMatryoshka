@@ -96,13 +96,40 @@ static void mix_row(uint32_t v, int32_t y)
     lcd_fill(12 + w, (uint32_t)y + 27u, 216u - w, 4, 0x2104u);
 }
 
+#if ENG_VOICES == 1
+/* the one-voice build's second mixer row: the patch's MORPH position (the Main module's parameter; K2) */
+static void morph_row(int32_t y)
+{
+    char line[40], num[12], *p;
+    int m = eng_find(T_FM1), has = eng_has_morph();
+    uint32_t pct = m >= 0 ? (uint32_t)clampi(eng_get_param((uint32_t)m, FM1_P_MORPH), 0, 65536) * 100u / 65536u : 0u, w = pct * 216u / 100u;
+    p = put(line, "K2  MORPH  (A > B OF THE PATCH)");
+    pad(p, line, 28);
+    text5x7(12, (uint32_t)y, line, 1, C_DIM, C_BG);
+    if (!has)
+        p = put(line, "NO B SIDE");
+    else {
+        fmt_int(num, (int32_t)pct);
+        p = put(line, num);
+        *p++ = '%';
+    }
+    pad(p, line, 14);
+    text_mid(12, (uint32_t)y + 11u, line, has ? C_FG : C_DIM, C_BG);
+    lcd_fill(12, (uint32_t)y + 27u, w, 4, has ? C_ACC : C_DIM);
+    lcd_fill(12 + w, (uint32_t)y + 27u, 216u - w, 4, 0x2104u);
+}
+#endif
+
 static void mixer_draw(int full)
 {
     uint32_t v;
     if (full)
-        text5x7(12, 226, ENG_VOICES > 1 ? "K1-4: LEVEL  OP1-4: MUTE  ALGO: POLY" : "K1: LEVEL  OP1: MUTE  ALGO: POLY", 1, 0x4208u, C_BG);
+        text5x7(12, 226, ENG_VOICES > 1 ? "K1-4: LEVEL  OP1-4: MUTE  ALGO: POLY" : "K1 LEVEL K2 MORPH OP1 MUTE ALGO POLY", 1, 0x4208u, C_BG);
     for (v = 0; v < ENG_VOICES; v++)
         mix_row(v, 32 + 48 * (int32_t)v);
+#if ENG_VOICES == 1
+    morph_row(80);
+#endif
 }
 
 static void mix_turn(uint32_t v, int32_t clicks, int fast)

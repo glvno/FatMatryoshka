@@ -8,7 +8,7 @@ import { encodePatch, toQ16 } from '../src/patchbin';
 import { DEFS } from '../src/modules';
 import { attFrame, chunkFrames, commitFrame, paramFrame, slotEraseFrame, slotFrame, slotInfoFrame } from '../src/protocol';
 import { make, PRESETS, type Build } from '../src/presets';
-import type { Patch } from '../src/patch';
+import { setMorphTarget, type Patch } from '../src/patch';
 
 const SR = 44100;
 const OUT = new URL('../../build/golden/', import.meta.url);
@@ -778,6 +778,29 @@ kit('seq-glide', (add, wire) => {
   wire(env, 'env', vca, 'cv');
   wire(vca, 'out', out, 'l');
 });
+// morphing: the same subtractive voice twice, the B side brighter and square, an LFO on the Main's morph input
+const morphVoice = (b: boolean): Build => (add, wire) => {
+  const kb = add('fm1', 0, 0, { morph: 0.3 });
+  const lfo = add('lfo', 0, 0, { wave: 1, rate: 0.6, depth: 0.5 });
+  const sc = add('scale', 0, 0, { gain: 1, offset: 0.2 });
+  const osc = add('osc', 0, 0, { wave: b ? 3 : 2, pw: b ? 0.3 : 0.5, level: 0.7, coarse: b ? -12 : 0 });
+  const env = add('adsr', 0, 0, { a: b ? 0.2 : 0.005, d: 0.2, s: b ? 0.9 : 0.4, r: b ? 0.5 : 0.1 });
+  const flt = add('filter', 0, 0, { cutoff: b ? 6000 : 250, res: b ? 0.1 : 0.7 });
+  const vca = add('vca', 0, 0);
+  const dly = add('delay', 0, 0, { time: b ? 375 : 120, fb: b ? 0.6 : 0.2, mix: b ? 0.5 : 0.1 });
+  const out = add('output', 0, 0, { level: 0.8 });
+  wire(lfo, 'out', sc, 'in');
+  wire(sc, 'out', kb, 'morph');
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(kb, 'gate', env, 'gate');
+  wire(osc, 'out', flt, 'in');
+  wire(flt, 'lp24', vca, 'in');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', dly, 'in');
+  wire(dly, 'out', out, 'l');
+};
+kit('morph', morphVoice(false));
+setMorphTarget(tests.morph, make('morph-b', morphVoice(true)), DEFS);
 kit('crush-color', (add, wire) => {
   const nz = add('noise', 0, 0, { level: 0.6, color: 0.6 });
   const cr = add('crush', 0, 0, { bits: 6, rate: 5 });

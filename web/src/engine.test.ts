@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { Engine } from './engine';
 import { DEFS, DELAY_TIME_MAX, DELAY_TIME_MIN } from './modules';
-import { addModule, connect, disconnect, emptyPatch, fromUnit, modulate, processingOrder, removeModule, toUnit, validatePatch, voiceSplit, type Patch } from './patch';
+import { addModule, clearMorph, connect, disconnect, emptyPatch, fromUnit, hasMorph, modulate, morphValue, processingOrder, removeModule, sameStructure, setMorphTarget, toUnit, validatePatch, voiceSplit, type Patch } from './patch';
 import { PRESETS } from './presets';
 import { encodePatch, recordSize } from './patchbin';
 
@@ -424,6 +424,106 @@ describe('filter', () => {
     const cable = q.cables.find((c: { from: { module: number } }) => c.from.module === flt);
     cable.from.port = 'lp'; // what an old patch calls the 12 dB output
     expect(validatePatch(q, DEFS).cables.find((c) => c.from.module === flt)!.from.port).toBe('lp12');
+  });
+});
+
+describe('morph', () => {
+  /** saw -> filter -> output, with the cutoff and the wave as the morphed parameters */
+  function rig(): { p: Patch; osc: number; flt: number; kb: number } {
+    const p = emptyPatch('A');
+    const kb = addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    const f = addModule(p, DEFS.filter, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    Object.assign(o.params, { wave: 2, level: 0.5 });
+    Object.assign(f.params, { cutoff: 200, res: 0 });
+    connect(p, DEFS, { module: kb.id, port: 'pitch' }, { module: o.id, port: 'pitch' });
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: f.id, port: 'in' });
+    connect(p, DEFS, { module: f.id, port: 'lp12' }, { module: out.id, port: 'l' });
+    return { p, osc: o.id, flt: f.id, kb: kb.id };
+  }
+  const bright = (a: Float32Array): number => {
+    let s = 0;
+    for (let i = 1; i < a.length; i++) s += (a[i] - a[i - 1]) ** 2;
+    return Math.sqrt(s / a.length) / rms(a);
+  };
+  const play = (p: Patch): { e: Engine; out: Float32Array } => {
+    const e = new Engine(SR);
+    e.load(p);
+    e.noteOn(48);
+    render(e, 4800);
+    return { e, out: render(e, SR / 4).l };
+  };
+
+  it('structure check, B side from another patch, and the unit-space value between A and B', () => {
+    const a = rig();
+    const b = rig();
+    expect(sameStructure(a.p, b.p)).toBe(true);
+    const c = rig();
+    addModule(c.p, DEFS.lfo, 0, 0);
+    expect(sameStructure(a.p, c.p)).toBe(false);
+    b.p.modules.find((m) => m.id === b.flt)!.params.cutoff = 3200;
+    b.p.name = 'B';
+    setMorphTarget(a.p, b.p, DEFS);
+    expect(hasMorph(a.p)).toBe(true);
+    expect(a.p.morphName).toBe('B');
+    expect(a.p.modules.find((m) => m.id === a.flt)!.paramsB!.cutoff).toBe(3200);
+    expect(a.p.modules.find((m) => m.id === a.kb)!.paramsB).toBeUndefined(); // the Main module is not morphed
+    const cutoff = DEFS.filter.params.find((q) => q.name === 'cutoff')!;
+    expect(morphValue(cutoff, 200, 3200, 0.5)).toBeCloseTo(800, 3); // two octaves of four: in octaves, not Hz
+    const wave = DEFS.osc.params.find((q) => q.name === 'wave')!;
+    expect(morphValue(wave, 2, 0, 0.49)).toBe(2);
+    expect(morphValue(wave, 2, 0, 0.5)).toBe(0);
+    expect(() => setMorphTarget(a.p, c.p, DEFS)).toThrow();
+    clearMorph(a.p);
+    expect(hasMorph(a.p)).toBe(false);
+    expect(a.p.morphName).toBeUndefined();
+    // the B side survives validation and is dropped when it is not an object
+    setMorphTarget(a.p, b.p, DEFS);
+    const v = validatePatch(JSON.parse(JSON.stringify(a.p)), DEFS);
+    expect(v.modules.find((m) => m.id === a.flt)!.paramsB!.cutoff).toBe(3200);
+    (v.modules[2] as { paramsB?: unknown }).paramsB = 'junk';
+    expect(validatePatch(JSON.parse(JSON.stringify(v)), DEFS).modules[2].paramsB).toBeUndefined();
+  });
+
+  it('the Main morph parameter fades the sound from A to B; the morph input adds to it one block late', () => {
+    const a = rig();
+    const b = rig();
+    b.p.modules.find((m) => m.id === b.flt)!.params.cutoff = 3200;
+    setMorphTarget(a.p, b.p, DEFS);
+    const at = (t: number): Float32Array => {
+      a.p.modules.find((m) => m.id === a.kb)!.params.morph = t;
+      return play(a.p).out;
+    };
+    const b0 = bright(at(0)), b5 = bright(at(0.5)), b1 = bright(at(1));
+    expect(b5).toBeGreaterThan(b0 * 1.3);
+    expect(b1).toBeGreaterThan(b5 * 1.3);
+    // the same patch without a B side ignores the morph parameter
+    clearMorph(a.p);
+    expect(bright(at(1))).toBeCloseTo(b0, 3);
+    // a constant into the Main module's morph input: morph 0 + 1 from the cable = B
+    setMorphTarget(a.p, b.p, DEFS);
+    a.p.modules.find((m) => m.id === a.kb)!.params.morph = 0;
+    const k = addModule(a.p, DEFS.const, 0, 0);
+    k.params.value = 1;
+    connect(a.p, DEFS, { module: k.id, port: 'out' }, { module: a.kb, port: 'morph' });
+    const { e, out } = play(a.p);
+    expect(bright(out)).toBeCloseTo(b1, 2);
+    expect(e.morph).toBe(1);
+    expect(voiceSplit({ ...a.p, voices: 3 }).has(a.kb)).toBe(false); // the Main's own input never makes it per voice
+  });
+
+  it('encodes the B side after the cables with the header flag', () => {
+    const a = rig();
+    const plain = encodePatch(a.p);
+    expect(plain[6]).toBe(0);
+    const b = rig();
+    setMorphTarget(a.p, b.p, DEFS);
+    const withB = encodePatch(a.p);
+    expect(withB[6]).toBe(1);
+    const npar = a.p.modules.reduce((s, m) => s + DEFS[m.type].params.length, 0);
+    expect(withB.length).toBe(plain.length + 4 * npar);
+    expect(Array.from(withB.subarray(0, plain.length)).slice(8)).toEqual(Array.from(plain).slice(8)); // the records and cables are untouched
   });
 });
 
