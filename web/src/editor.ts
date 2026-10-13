@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Patch editor: module cards on a canvas, SVG cables, drag-to-connect, a selection, assemblies and undo.
 import { DEFS } from './modules';
+import type { ParameterValues } from './engine';
 import { deviceBudget, DEVICE } from './patchbin';
 import {
   addModule,
@@ -136,6 +137,13 @@ export class Editor {
   private drag: { from: Endpoint; kind: 'out' | 'in'; path: SVGPathElement } | null = null;
   private history: string[] = [];
   private future: string[] = [];
+  private parameterDisplays: { id: number; update: (values: Record<string, number> | null) => void }[] = [];
+
+  /** Display only: never write telemetry into the patch, undo history, or parameter callbacks. */
+  showParameterValues(values: ParameterValues | null): void {
+    const byId = new Map(values?.map((m) => [m.id, m.params]));
+    for (const display of this.parameterDisplays) display.update(byId.get(display.id) ?? null);
+  }
 
   constructor(private canvas: HTMLElement, patch: Patch, private ev: EditorEvents) {
     this.patch = patch;
@@ -266,6 +274,7 @@ export class Editor {
   // ---- building the canvas
 
   rebuild(): void {
+    this.parameterDisplays = [];
     this.modulesEl.replaceChildren();
     this.ports.clear();
     this.cards.clear();
@@ -412,8 +421,8 @@ export class Editor {
       };
     }
     const val = document.createElement('output');
-    const fmt = (v: number): string =>
-      pd.altText && m.params[pd.altText.when] >= 0.5 ? pd.altText.text(v) : pd.choices ? pd.choices[Math.round(v)] : `${Number(v.toFixed(3))}${pd.unit ? ' ' + pd.unit : ''}`;
+    const fmt = (v: number, params = m.params): string =>
+      pd.altText && params[pd.altText.when] >= 0.5 ? pd.altText.text(v) : pd.choices ? pd.choices[Math.round(v)] : `${Number(v.toFixed(3))}${pd.unit ? ' ' + pd.unit : ''}`;
     val.textContent = fmt(m.params[pd.name]);
     this.refreshers.set(row, () => (val.textContent = fmt(m.params[pd.name])));
     const input = document.createElement('input');
@@ -431,6 +440,17 @@ export class Editor {
       input.value = String(m.params[pd.name]);
     }
     input.setAttribute('aria-label', `${def.label} ${o.label ?? pd.name}`);
+    // Pointer capture also releases the edit lock when a drag ends outside the card.
+    let editing = false;
+    input.onpointerdown = (e) => {
+      editing = true;
+      input.setPointerCapture(e.pointerId);
+    };
+    input.onpointerup = input.onpointercancel = input.onlostpointercapture = () => { editing = false; };
+    input.onkeydown = (e) => {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown', ' '].includes(e.key)) editing = true;
+    };
+    input.onkeyup = input.onblur = () => { editing = false; };
     input.oninput = () => {
       const v = pd.log ? snapTo(pd, fromUnit(pd, Number(input.value) / 1000)) : Number(input.value);
       m.params[pd.name] = v;
@@ -448,6 +468,21 @@ export class Editor {
         this.ev.onParam(m.id, pd.name, v);
       };
     }
+    this.parameterDisplays.push({ id: m.id, update: (values) => {
+      if (editing) return;
+      const base = m.params[pd.name];
+      const v = values?.[pd.name] ?? base;
+      if (!Number.isFinite(v)) return;
+      const position = String(pd.log ? Math.round(toUnit(pd, v) * 1000) : v);
+      if (pd.toggle) input.checked = v >= 0.5;
+      else if (input.value !== position) input.value = position;
+      const text = fmt(v, values ?? m.params);
+      if (val.textContent !== text) val.textContent = text;
+      input.setAttribute('aria-valuetext', text);
+      const automated = Math.abs(v - base) > 1e-6;
+      row.classList.toggle('automated', automated);
+      input.title = automated ? `Live: ${text}. Base: ${fmt(base)}. Drag to edit the base value.` : '';
+    } });
     row.append(name, val, input);
     return row;
   }

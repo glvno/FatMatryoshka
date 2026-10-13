@@ -12,6 +12,9 @@ import { defaultMap, modulate, morphValue, paramValue, processingOrder, SOURCES,
 
 export const BLOCK = 128;
 
+/** A display snapshot, detached from the patch and the audio thread's mutable state. */
+export type ParameterValues = { id: number; params: Record<string, number> }[];
+
 /** one running copy of a module: shared modules have one, per-voice modules one per voice */
 interface Inst {
   state: unknown;
@@ -172,6 +175,23 @@ export class Engine {
     if (!n) return null;
     if (n.vout && VOICE_PORTS.has(port)) return n.vout[port][0];
     return n.inst[0]?.out[port] ?? null;
+  }
+
+  /** Last rendered values. Polyphonic controls follow the newest held voice, or its release. */
+  parameterValues(): ParameterValues {
+    let voice = 0;
+    for (let i = 1; i < this.voices.length; i++) {
+      const a = this.voices[i], b = this.voices[voice];
+      if ((a.on && !b.on) || (a.on === b.on && a.onStamp > b.onStamp)) voice = i;
+    }
+    return this.order.map((node) => {
+      const eff = node.inst[node.poly ? voice : 0].eff;
+      const params = Object.fromEntries(node.impl.def.params.map((pd) => [
+        pd.name, node.bypass ? node.params[pd.name] ?? pd.default : eff[pd.name] ?? node.params[pd.name] ?? pd.default,
+      ]));
+      if (node === this.main && this.hasB) params.morph = this.morphT;
+      return { id: node.id, params };
+    });
   }
 
   /** the morph position for the next block: the Main module's `morph` parameter plus the block mean of its morph input (what the input summed in the previous block) */

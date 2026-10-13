@@ -6,7 +6,7 @@ import { Editor } from './editor';
 import { bankPatches, buildBankTab } from './bank';
 import { buildAssembliesTab, storeAssembly } from './assemblies';
 import { AssemblyBrowser } from './browser';
-import { score } from './fuzzy';
+import { searchCommands, type Command } from './commands';
 import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi } from './input';
 import { DEFS } from './modules';
@@ -14,7 +14,7 @@ import { newPatch, validatePatch, voicesOf, type Patch } from './patch';
 import { ARP_DEFAULT } from './arp';
 import { Scope } from './scope';
 import { diffCount, diffLines, diffPatches } from './diff';
-import { FACTORY, loadLibrary } from './assemblies';
+import { FACTORY, loadLibrary, categoryOf, USER_SHELF, summary } from './assemblies';
 import type { AssemblyDef } from './assembly';
 import { decodeShare, encodeShare, shareCodeOf, shareLink } from './share';
 import { PRESETS } from './presets';
@@ -179,6 +179,7 @@ const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw']
   morphCandidates: patchCandidates,
 });
 host.setPatch(editor.patch);
+host.onValues = (values) => editor.showParameterValues(values);
 
 // toolbar
 const presetSel = $<HTMLSelectElement>('preset');
@@ -291,17 +292,15 @@ abToggle.onclick = flipAB;
 const palette = $<HTMLDialogElement>('palette');
 const palInput = $<HTMLInputElement>('palette-input');
 const palList = $('palette-list');
-interface Cmd {
-  kind: string;
-  label: string;
-  run: () => void;
-}
-const commands = (): Cmd[] => {
-  const seen = new Set<string>();
-  const asms: AssemblyDef[] = [...loadLibrary(), ...FACTORY].filter((d) => (seen.has(d.name) ? false : (seen.add(d.name), true)));
+const commands = (): Command[] => {
+  const assembly = (d: AssemblyDef, shelf: string): Command => ({
+    kind: 'assembly', tags: ['assembly', shelf], label: d.name, detail: shelf, keywords: `insert ${summary(d)}`,
+    run: () => editor.insert(d),
+  });
   return [
-    ...Object.values(DEFS).map((d) => ({ kind: 'add module', label: d.label, run: () => editor.add(d.type) })),
-    ...asms.map((d) => ({ kind: 'insert', label: d.name, run: () => editor.insert(d) })),
+    ...Object.values(DEFS).map((d) => ({ kind: 'add module', tags: ['module'], label: d.label, run: () => editor.add(d.type) })),
+    ...loadLibrary().map((d) => assembly(d, USER_SHELF)),
+    ...FACTORY.map((d) => assembly(d, categoryOf(d))),
     ...patchCandidates().map((c) => ({ kind: 'load patch', label: c.name, run: () => loadNamed(c.patch) })),
     { kind: 'command', label: 'New patch', run: () => loadNamed(newPatch(DEFS)) },
     { kind: 'command', label: 'Insert assembly… (browser)', run: () => browser.open() },
@@ -315,15 +314,10 @@ const loadNamed = (p: Patch): void => {
   nameInput.value = editor.patch.name;
 };
 let palSel = 0;
-let palItems: Cmd[] = [];
+let palItems: Command[] = [];
 const palRender = (): void => {
   const q = palInput.value.trim().toLowerCase();
-  palItems = commands()
-    .map((c) => ({ c, s: q ? score(q, c.label) : 0 }))
-    .filter((x) => x.s >= 0)
-    .sort((a, b) => b.s - a.s)
-    .slice(0, 12)
-    .map((x) => x.c);
+  palItems = searchCommands(commands(), q);
   palSel = Math.min(palSel, Math.max(0, palItems.length - 1));
   palList.replaceChildren(
     ...palItems.map((c, i) => {
@@ -333,12 +327,25 @@ const palRender = (): void => {
       k.className = 'k';
       k.textContent = c.kind;
       li.append(k, c.label);
+      if (c.detail) {
+        const detail = document.createElement('span');
+        detail.className = 'detail';
+        detail.textContent = c.detail;
+        li.append(detail);
+      }
       li.onclick = () => palRun(c);
       return li;
     }),
   );
+  if (!palItems.length) {
+    const empty = document.createElement('li');
+    empty.className = 'muted';
+    empty.textContent = 'No matching modules, assemblies or patches.';
+    palList.append(empty);
+  }
+  palList.querySelector('.sel')?.scrollIntoView({ block: 'nearest' });
 };
-const palRun = (c: Cmd): void => {
+const palRun = (c: Command): void => {
   palette.close();
   c.run();
 };

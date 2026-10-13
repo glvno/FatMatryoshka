@@ -55,6 +55,8 @@ GPL-3.0-only. The flasher, loader, hardware layer and tools are copied from [Fel
 
 ## Assemblies
 
+**Ctrl/Cmd+K** searches the command palette directly: `module` lists modules, `assembly` lists factory and saved assemblies alongside assembly actions, and `assembly drums` or `assembly kick` narrows the list. Names, type tags, shelves and the modules / ports inside a prefab are searchable. Arrow keys select a result; Enter inserts it without opening the assembly browser.
+
 A **patch** is a complete sound: it starts from Main and Output ("New patch" in the toolbar's patch select) and is what the bank and the FM-1 hold. An **assembly** is a building block: a group of prewired modules that appears as one card with the ports and parameters it exposes: an "operator" of oscillator, envelope and VCA, a whole subtractive voice, an echo. Select modules in the editor (shift-click, or drag a box on the canvas) and click **Make assembly**: the ports that had cables to the outside become the card's ports (Main and Output never join: they stay outside, and a `.json` with them in loses them). **open** shows the modules inside a frame, where ○ / ● next to a port or a parameter puts it on the card; drag cards into or out of the frame to change what belongs to it. **save** puts the assembly into the library (your shelf of the **Insert assembly** browser and of the Library page), from where it can be inserted into any patch, exported as a `.json` file and imported again. Forty-three come with the editor, on the shelves Drums, Voices, Effects, Textures and Utilities.
 
 Assemblies are an editor-only overlay: the patch stays a flat list of modules and cables, the FM-1 receives it unchanged, and an older editor loads such a patch and only loses the grouping. Knob assignments (K1..K4) are not part of a saved assembly, since the knobs belong to the patch. Ctrl/Cmd+Z undoes structural changes, Shift redoes.
@@ -99,7 +101,9 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 ## Performance controls
 
-- Pitch bend moves the Main module's `pitch` by ±2 semitones in every patch; the wheel is also a `bend` output (−1..1). The mod wheel (CC 1) is the `mod` output, channel aftertouch the `at` output: patch them into any `p1` / `p2`. CC 16..19 turn the Main module's K1..K4 from a controller. In the browser the editor's sliders do not follow CC.
+During browser playback, sliders and their readouts follow parameter-input modulation, macro ranges and patch morphing, including parameters exposed on assembly cards. A moving value uses the teal accent; hover it to see its saved base value. Dragging or using the keyboard edits that base value, and animation resumes when you release the control. Fast modulation is sampled as often as the display can update. Polyphonic parameters show the newest held note (or its release when no notes are held). These displays follow the browser engine; the FM-1 does not send live parameter telemetry back.
+
+- Pitch bend moves the Main module's `pitch` by ±2 semitones in every patch; the wheel is also a `bend` output (−1..1). The mod wheel (CC 1) is the `mod` output, channel aftertouch the `at` output: patch them into any `p1` / `p2`. CC 16..19 turn the Main module's K1..K4 from a controller. During browser playback, the Main sliders follow incoming CC values.
 
 ## Comb filter and modal resonator
 

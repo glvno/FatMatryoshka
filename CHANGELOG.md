@@ -5,6 +5,8 @@
 The merge of the four-voice firmware (1.0.2) with the polyphony, assembly and module work. Host-tested (vitest, golden vectors, arpeggiator and protocol tests, LCD preview), **not built with the JieLi toolchain and not flashed**.
 
 ### Added
+- **Command palette:** searchable module / assembly tags, shelves and prefab contents; direct insertion of factory and saved assemblies, including same-name variants, with all matching results available.
+- **Live parameter displays:** browser sliders and assembly controls follow effective parameter-input modulation, macro ranges, morphing and MIDI knob values at animation-frame cadence. Dragging keeps control of the base value, saved patches stay unchanged by animation, and stale snapshots are discarded after loading another patch. Polyphony follows the newest held voice.
 - Editor: "New patch" starts with Main and Output (the module-free "Empty patch" is gone); the module select is grouped by kind and inserts on pick (no "Add module" button); "Insert assembly" opens a browser with shelves (your library, Drums, Voices, Effects, Textures, Utilities), descriptions, ports and a search; Main and Output never enter an assembly (left out of a selection, stripped from imports); the Patches and Assemblies tabs are one Library tab.
 - Shaper: `sym` (asymmetry: an offset before the curve) and `stages` (the curve cascaded 1..4 times, a denser wavefolder); binary patch format 16.
 - Assembly cards: the toggle button reads expand / collapse (was open / close); hints and docs follow (#21).

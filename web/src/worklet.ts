@@ -11,7 +11,8 @@ declare class AudioWorkletProcessor {
 declare function registerProcessor(name: string, ctor: new () => AudioWorkletProcessor): void;
 
 export type HostMsg =
-  | { t: 'patch'; patch: Patch }
+  | { t: 'patch'; patch: Patch; revision?: number }
+  | { t: 'values' }
   | { t: 'param'; id: number; name: string; value: number }
   | { t: 'att'; id: number; index: number; value: number }
   | { t: 'bypass'; id: number; on: boolean }
@@ -39,6 +40,8 @@ class ModularProcessor extends AudioWorkletProcessor {
   /** the arpeggiator: runs before every block, plays the engine, drives its clock while it plays (then MIDI clock is ignored, as on the device) */
   private arp = new Arp(sampleRate, (Math.random() * 0xffffffff) >>> 0);
   private failed = false;
+  private revision = 0;
+  private valuesRequested = false;
   /** scope probes: the last PROBE_LEN samples of an output, sent to the host about 30 times a second */
   private probes = new Map<string, { id: number; port: string; ring: Float32Array; w: number }>();
   private probeBlocks = 0;
@@ -49,8 +52,10 @@ class ModularProcessor extends AudioWorkletProcessor {
       try {
         if (m.t === 'patch') {
           this.engine.load(m.patch);
+          this.revision = m.revision ?? 0;
           this.failed = false;
         }
+        else if (m.t === 'values') this.valuesRequested = true;
         else if (m.t === 'param') this.engine.setParam(m.id, m.name, m.value);
         else if (m.t === 'att') this.engine.setAtt(m.id, m.index, m.value);
         else if (m.t === 'bypass') this.engine.setBypass(m.id, m.on);
@@ -104,6 +109,10 @@ class ModularProcessor extends AudioWorkletProcessor {
       this.arp.run(out[0].length, this.engine);
       this.engine.render(out[0], out[1] ?? out[0]);
       if (this.probes.size) this.feedProbes(out[0].length);
+      if (this.valuesRequested) {
+        this.valuesRequested = false;
+        this.port.postMessage({ values: this.engine.parameterValues(), revision: this.revision });
+      }
     } catch (e) {
       if (!this.failed) this.port.postMessage({ error: `engine: ${e}` });
       this.failed = true; // stay silent instead of throwing in the audio thread on every block

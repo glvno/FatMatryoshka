@@ -2104,3 +2104,70 @@ describe('delay sync and ping-pong', () => {
     expect(a.r[127]).toBeGreaterThan(0.4);
   });
 });
+
+describe('live parameter displays', () => {
+  it('reports modulation without changing the patch or sharing mutable state', () => {
+    const p = emptyPatch();
+    const source = addModule(p, DEFS.const, 0, 0);
+    source.params.value = 0.25;
+    const amp = addModule(p, DEFS.vca, 0, 0);
+    amp.params.gain = 0.5;
+    amp.map!.p1 = ['gain'];
+    connect(p, DEFS, { module: source.id, port: 'out' }, { module: amp.id, port: 'p1' });
+    const original = JSON.stringify(p);
+    const e = new Engine(SR);
+    e.load(p);
+    render(e, 128);
+    const snapshot = e.parameterValues();
+    expect(snapshot.find((m) => m.id === amp.id)!.params.gain).toBeCloseTo(1);
+    expect(JSON.stringify(p)).toBe(original);
+    snapshot.find((m) => m.id === amp.id)!.params.gain = 99;
+    expect(e.parameterValues().find((m) => m.id === amp.id)!.params.gain).toBeCloseTo(1);
+    e.setBypass(amp.id, true);
+    expect(e.parameterValues().find((m) => m.id === amp.id)!.params.gain).toBe(0.5);
+    e.load(emptyPatch());
+    expect(e.parameterValues()).toEqual([]);
+  });
+
+  it('reports logarithmic macro ranges, morph values, and MIDI-controlled Main knobs', () => {
+    const p = emptyPatch();
+    const main = addModule(p, DEFS.fm1, 0, 0);
+    main.params.morph = 0.5;
+    const source = addModule(p, DEFS.const, 0, 0);
+    source.params.value = 0.5;
+    const filter = addModule(p, DEFS.filter, 0, 0);
+    filter.map!.p1 = ['cutoff'];
+    filter.range = { p1: { cutoff: [0, 1] } };
+    filter.params.res = 0;
+    filter.paramsB = { ...filter.params, res: 1 };
+    connect(p, DEFS, { module: source.id, port: 'out' }, { module: filter.id, port: 'p1' });
+    const e = new Engine(SR);
+    e.load(p);
+    e.cc(16, 127);
+    render(e, 128);
+    const values = new Map(e.parameterValues().map((m) => [m.id, m.params]));
+    expect(values.get(filter.id)!.cutoff).toBeCloseTo(Math.sqrt(20 * 16000));
+    expect(values.get(filter.id)!.res).toBeCloseTo(0.5);
+    expect(values.get(main.id)!.k1).toBe(1);
+    expect(values.get(main.id)!.morph).toBe(0.5);
+  });
+
+  it('follows the newest held polyphonic voice, then a remaining held note', () => {
+    const p = emptyPatch();
+    p.voices = 2;
+    const main = addModule(p, DEFS.fm1, 0, 0);
+    const amp = addModule(p, DEFS.vca, 0, 0);
+    amp.params.gain = 0;
+    amp.map!.p1 = ['gain'];
+    connect(p, DEFS, { module: main.id, port: 'vel' }, { module: amp.id, port: 'p1' });
+    const e = new Engine(SR);
+    e.load(p);
+    e.noteOn(60, 0.2);
+    e.noteOn(64, 0.7);
+    render(e, 128);
+    expect(e.parameterValues().find((m) => m.id === amp.id)!.params.gain).toBeCloseTo(1.4);
+    e.noteOff(64);
+    render(e, 128);
+    expect(e.parameterValues().find((m) => m.id === amp.id)!.params.gain).toBeCloseTo(0.4);
+  });
+});
