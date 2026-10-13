@@ -205,6 +205,10 @@ typedef struct {
         struct { int16_t *buf; uint32_t w, seed; int32_t lp, s1, err, burst, blen; } str;   /* Q13 line with error feedback */
         struct { uint32_t phase; int32_t s1; } wt;
         struct { int16_t *buf; uint32_t w, phase; } ch;
+        struct { uint32_t seed; int32_t c1, r1; int8_t pos, down; } seq;
+        struct { int32_t count, c1, r1; } cdv;
+        struct { int32_t v, c1; } sh;
+        struct { int32_t rem, t1; } pls;
     } s;
 } inst_t;
 
@@ -294,6 +298,12 @@ static void init_state(const node_t *nd, inst_t *it)
     case T_STRING:
         it->s.str.seed = 0x3779b97fu;
         it->s.str.blen = 1;
+        break;
+    case T_SEQ:
+        it->s.seq.seed = 0x9e3779b9u;
+        break;
+    case T_CLKDIV:
+        it->s.cdv.count = -1;
         break;
     default:
         break;
@@ -1406,6 +1416,155 @@ static void m_chorus(const node_t *nd, inst_t *it, uint32_t n)
     it->s.ch.phase = phase;
 }
 
+/* The step sequencer (modules.ts seq): out is the current step all the time, gate follows the clock unless the step is a
+ * rest (fully down, -1). A rising clock edge advances (fwd, back, pendulum, random), a rising reset edge goes to step 1. */
+static void m_seq(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *clock = it->in[SEQ_I_CLOCK], *reset = it->in[SEQ_I_RESET];
+    esig_t *out = it->out[SEQ_O_OUT], *gate = it->out[SEQ_O_GATE];
+    int32_t len = clampi(round_q16(EF(it, SEQ_P_LEN)), 1, 8), dir = round_q16(EF(it, SEQ_P_DIR));
+    int32_t pos = it->s.seq.pos, down = it->s.seq.down, c1 = it->s.seq.c1, r1 = it->s.seq.r1;
+    uint32_t seed = it->s.seq.seed, i;
+    for (i = 0; i < n; i++) {
+        int rst = reset[i] >= 32768 && r1 < 32768, clk = clock[i] >= 32768 && c1 < 32768;
+        int32_t v;
+        r1 = reset[i];
+        c1 = clock[i];
+        if (rst) {
+            pos = 0;
+            down = 0;
+        } else if (clk) {
+            if (pos >= len)
+                pos = len - 1;
+            if (dir == 1)
+                pos = (pos + len - 1) % len;
+            else if (dir == 2) {
+                if (!down) {
+                    if (pos + 1 < len)
+                        pos++;
+                    else {
+                        pos = len - 2 > 0 ? len - 2 : 0;
+                        down = 1;
+                    }
+                } else if (pos > 0)
+                    pos--;
+                else {
+                    pos = len - 1 < 1 ? len - 1 : 1;
+                    down = 0;
+                }
+            } else if (dir == 3) {
+                seed = seed * 1664525u + 1013904223u;
+                pos = (int32_t)((seed >> 16) % (uint32_t)len);
+            } else
+                pos = (pos + 1) % len;
+        }
+        v = EF(it, SEQ_P_S1 + (pos < len ? pos : len - 1));
+        out[i] = v;
+        gate[i] = clock[i] >= 32768 && v > -ENG_ONE ? ENG_ONE : 0;
+    }
+    it->s.seq.pos = (int8_t)pos;
+    it->s.seq.down = (int8_t)down;
+    it->s.seq.c1 = c1;
+    it->s.seq.r1 = r1;
+    it->s.seq.seed = seed;
+}
+
+static void m_clkdiv(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *clock = it->in[CLKDIV_I_CLOCK], *reset = it->in[CLKDIV_I_RESET];
+    int32_t div = clampi(round_q16(EF(it, CLKDIV_P_DIV)), 1, 16), count = it->s.cdv.count, c1 = it->s.cdv.c1, r1 = it->s.cdv.r1;
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        int hi;
+        if (reset[i] >= 32768 && r1 < 32768)
+            count = -1;
+        else if (clock[i] >= 32768 && c1 < 32768)
+            count = (count + 1) % (16 * div);
+        r1 = reset[i];
+        c1 = clock[i];
+        hi = clock[i] >= 32768 && count >= 0;
+        it->out[CLKDIV_O_OUT][i] = hi && count % div == 0 ? ENG_ONE : 0;
+        it->out[CLKDIV_O_D2][i] = hi && (count & 1) == 0 ? ENG_ONE : 0;
+        it->out[CLKDIV_O_D4][i] = hi && (count & 3) == 0 ? ENG_ONE : 0;
+        it->out[CLKDIV_O_D8][i] = hi && (count & 7) == 0 ? ENG_ONE : 0;
+    }
+    it->s.cdv.count = count;
+    it->s.cdv.c1 = c1;
+    it->s.cdv.r1 = r1;
+}
+
+static void m_sh(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[SH_I_IN], *clock = it->in[SH_I_CLOCK];
+    esig_t *out = it->out[0];
+    int track = round_q16(EF(it, SH_P_MODE)) == 1;
+    int32_t v = it->s.sh.v, c1 = it->s.sh.c1;
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        int up = clock[i] >= 32768;
+        if (track ? up : up && c1 < 32768)
+            v = in[i];
+        c1 = clock[i];
+        out[i] = v;
+    }
+    it->s.sh.v = v;
+    it->s.sh.c1 = c1;
+}
+
+/* the quantizer's scales (modules.ts SCALES), semitones above the root */
+static const uint8_t SC_CHROM[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, SC_MAJ[] = {0, 2, 4, 5, 7, 9, 11}, SC_MIN[] = {0, 2, 3, 5, 7, 8, 10};
+static const uint8_t SC_PMAJ[] = {0, 2, 4, 7, 9}, SC_PMIN[] = {0, 3, 5, 7, 10}, SC_DOR[] = {0, 2, 3, 5, 7, 9, 10}, SC_MIX[] = {0, 2, 4, 5, 7, 9, 10};
+static const uint8_t SC_BLUES[] = {0, 3, 5, 6, 7, 10}, SC_WHOLE[] = {0, 2, 4, 6, 8, 10}, SC_FIFTH[] = {0, 7}, SC_OCT[] = {0};
+static const struct { const uint8_t *st; uint8_t n; } SCALES[] = {
+    {SC_CHROM, 12}, {SC_MAJ, 7}, {SC_MIN, 7}, {SC_PMAJ, 5}, {SC_PMIN, 5}, {SC_DOR, 7}, {SC_MIX, 7}, {SC_BLUES, 6}, {SC_WHOLE, 6}, {SC_FIFTH, 2}, {SC_OCT, 1},
+};
+#define N_SCALES ((int32_t)(sizeof SCALES / sizeof SCALES[0]))
+#define OCT_Q16 (12 * ENG_ONE)
+
+static void m_quant(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[QUANT_I_IN];
+    esig_t *out = it->out[0];
+    int32_t si = clampi(round_q16(EF(it, QUANT_P_SCALE)), 0, N_SCALES - 1), root = round_q16(EF(it, QUANT_P_ROOT));
+    const uint8_t *sc = SCALES[si].st;
+    uint32_t ns = SCALES[si].n, i, k;
+    for (i = 0; i < n; i++) {
+        int32_t semis = clampi(in[i], -(1 << 27), 1 << 27) * 12 - root * ENG_ONE, oct, w, best, bd;
+        oct = semis >= 0 ? semis / OCT_Q16 : -((-semis + OCT_Q16 - 1) / OCT_Q16);     /* floor */
+        w = semis - oct * OCT_Q16;
+        best = sc[0] * ENG_ONE;
+        bd = w - best < 0 ? best - w : w - best;
+        for (k = 1; k <= ns; k++) {
+            int32_t d = (k < ns ? sc[k] : sc[0] + 12) * ENG_ONE, dd = w - d < 0 ? d - w : w - d;
+            if (dd < bd) {
+                bd = dd;
+                best = d;
+            }
+        }
+        out[i] = (oct * OCT_Q16 + best + root * ENG_ONE) / 12;
+    }
+}
+
+static void m_pulse(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *trig = it->in[PULSE_I_TRIG];
+    esig_t *out = it->out[0];
+    int32_t len = (int32_t)((((uint64_t)(uint32_t)EF(it, PULSE_P_TIME) * ENG_SR) + 32768u) >> 16), rem = it->s.pls.rem, t1 = it->s.pls.t1;
+    uint32_t i;
+    if (len < 1)
+        len = 1;
+    for (i = 0; i < n; i++) {
+        if (trig[i] >= 32768 && t1 < 32768)
+            rem = len;
+        t1 = trig[i];
+        out[i] = rem > 0 ? ENG_ONE : 0;
+        if (rem > 0)
+            rem--;
+    }
+    it->s.pls.rem = rem;
+    it->s.pls.t1 = t1;
+}
+
 /* ------------------------------------------------------------------ rendering */
 
 /* Block-rate parameter modulation (engine.ts applyCv): the mean of p1 / p2 over the block, times the attenuverter, is
@@ -1466,6 +1625,11 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     case T_STRING: m_string(nd, it, n); break;
     case T_WAVETABLE: m_wavetable(nd, it, n); break;
     case T_CHORUS: m_chorus(nd, it, n); break;
+    case T_SEQ: m_seq(nd, it, n); break;
+    case T_CLKDIV: m_clkdiv(nd, it, n); break;
+    case T_SH: m_sh(nd, it, n); break;
+    case T_QUANT: m_quant(nd, it, n); break;
+    case T_PULSE: m_pulse(nd, it, n); break;
     default: break;                      /* output: read by eng_render */
     }
 }

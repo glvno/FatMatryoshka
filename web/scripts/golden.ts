@@ -446,6 +446,70 @@ kit(
   2,
 );
 
+// a clocked sequence: square LFO -> clock divider -> pendulum sequencer -> quantizer -> oscillator; the sequencer's gate
+// through a pulse into the envelope; the divider's d4 syncs the oscillator
+kit('seq-clock', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const clk = add('lfo', 0, 0, { wave: 3, rate: 12, depth: 1 });
+  const dv = add('clkdiv', 0, 0, { div: 2 });
+  const sq = add('seq', 0, 0, { s1: 0, s2: 0.25, s3: 0.58, s4: -1, s5: 0.33, s6: 1, s7: 0.75, s8: 0.1, len: 7, dir: 2 });
+  const qn = add('quant', 0, 0, { scale: 2, root: 9 });
+  const pl = add('pulse', 0, 0, { time: 0.03 });
+  const env = add('adsr', 0, 0, { a: 0.002, d: 0.08, s: 0.3, r: 0.05 });
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.7 });
+  const vca = add('vca', 0, 0);
+  const out = add('output', 0, 0, { level: 0.8 });
+  wire(clk, 'out', dv, 'clock');
+  wire(kb, 'gate', dv, 'reset');
+  wire(dv, 'out', sq, 'clock');
+  wire(kb, 'gate', sq, 'reset');
+  wire(sq, 'out', qn, 'in');
+  wire(qn, 'out', osc, 'pitch');
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(sq, 'gate', pl, 'trig');
+  wire(pl, 'out', env, 'gate');
+  wire(dv, 'd4', osc, 'sync');
+  wire(osc, 'out', vca, 'in');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', out, 'l');
+});
+// a random melody: noise sampled by a clock, quantized to a pentatonic, a tracked S&H on the filter; a random sequencer
+// on the second voice's pulse width
+kit(
+  'sh-random',
+  (add, wire) => {
+    const kb = add('fm1', 0, 0);
+    const clk = add('lfo', 0, 0, { wave: 3, rate: 7, depth: 1 });
+    const nz = add('noise', 0, 0, { level: 1 });
+    const sh = add('sh', 0, 0, { mode: 0 });
+    const qn = add('quant', 0, 0, { scale: 4, root: 2 });
+    const tri = add('lfo', 0, 0, { wave: 1, rate: 0.3, depth: 1 });
+    const th = add('sh', 0, 0, { mode: 1 });
+    const sq = add('seq', 0, 0, { s1: -0.5, s2: 0.2, s3: 0.4, s4: -0.2, len: 4, dir: 3 });
+    const osc = add('osc', 0, 0, { wave: 3, pw: 0.5, level: 0.6 }, { map: { p1: ['pw'] }, att: [0.4, 1] });
+    const flt = add('filter', 0, 0, { cutoff: 600, res: 0.4, cvamt: 2 });
+    const env = add('adsr', 0, 0, { a: 0.005, d: 0.15, s: 0.2, r: 0.1 });
+    const vca = add('vca', 0, 0);
+    const out = add('output', 0, 0, { level: 0.7 });
+    wire(nz, 'out', sh, 'in');
+    wire(clk, 'out', sh, 'clock');
+    wire(sh, 'out', qn, 'in');
+    wire(qn, 'out', osc, 'pitch');
+    wire(kb, 'pitch', osc, 'pitch');
+    wire(tri, 'out', th, 'in');
+    wire(clk, 'out', th, 'clock');
+    wire(th, 'out', flt, 'cv');
+    wire(clk, 'out', sq, 'clock');
+    wire(sq, 'out', osc, 'p1');
+    wire(osc, 'out', flt, 'in');
+    wire(flt, 'lp24', vca, 'in');
+    wire(clk, 'out', env, 'gate');
+    wire(env, 'env', vca, 'cv');
+    wire(vca, 'out', out, 'l');
+  },
+  2,
+);
+
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 for (const [name, patch] of Object.entries(tests)) {
   const e = new Engine(SR);

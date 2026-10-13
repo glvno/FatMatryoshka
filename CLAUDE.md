@@ -146,3 +146,8 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 - Modules `env` (DX7 level / rate envelope), `string` (Karplus-Strong, `exc` input, 8 per patch, `str_pool`), `wavetable` (banks from `tools/gen_wavetables.py` -> `web/src/wavetables.json` + `firmware/src/wt_tables.h`; rerun the script after changing the recipes), `chorus` (shared, stereo, one per patch). Appended to `ALL`; binary format 9 (also: u16 matrix masks).
 - The string loop is clamped to ±2 in both engines (a steady `exc` would grow by 1 / (1 − g)); its int16 line uses error feedback. Falling `env` segments end after `r` (not when within 1e-4 like the ADSR decay), else the next segment starts about 2 r late.
 - Pool: about 10 KB free after this batch (numbers in docs/ARCHITECTURE.md). The LCD colours of new types go in `TYPE_COLOR` (ui.c), or the module page draws them black.
+
+## Sequencer, clock divider, S&H, quantizer, pulse (host-tested, golden 55 patches pass; not flashed)
+
+- Modules `seq` (10 params: s1..s8, len, dir; rest = step at −1), `clkdiv` (out / d2 / d4 / d8, reset), `sh` (hold / track), `quant` (scales in `SCALES` in modules.ts and engine.c: keep both lists in the same order), `pulse`. Appended to `ALL`; MAX_PAR is 10 now (inst_t.eff grew by 3 words).
+- A square LFO is the clock in tests and golden kits (rising edge at sample 0 because the square starts high); a reset edge on the same sample as a clock edge wins.

@@ -924,3 +924,145 @@ describe('level/rate envelope, string, wavetable, chorus', () => {
     expect(peak(render(build(0.5, 4), SR / 4).l)).toBeGreaterThan(0.1);
   });
 });
+
+describe('sequencer, clock divider, S&H, quantizer, pulse', () => {
+  const wire = (p: Patch, a: number, ap: string, b: number, bp: string): void => {
+    expect(connect(p, DEFS, { module: a, port: ap }, { module: b, port: bp })).toBe(true);
+  };
+  /** a patch with a 100 Hz square LFO as the clock (rising edges every 480 samples at 48 kHz, the first at sample 0) */
+  const clocked = (): { p: Patch; clock: number; out: number } => {
+    const p = emptyPatch();
+    const clock = addModule(p, DEFS.lfo, 0, 0);
+    Object.assign(clock.params, { wave: 3, rate: 100, depth: 1 });
+    const out = addModule(p, DEFS.output, 0, 0);
+    out.params.level = 1;
+    return { p, clock: clock.id, out: out.id };
+  };
+  const edges = (a: Float32Array): number[] => {
+    const r: number[] = [];
+    for (let i = 1; i < a.length; i++) if (a[i - 1] < 0.5 && a[i] >= 0.5) r.push(i);
+    return r;
+  };
+  const CLK = 480;
+
+  it('sequencer steps on clock edges, rests on -1, resets, and walks the pendulum without repeating the ends', () => {
+    const { p, clock, out } = clocked();
+    const s = addModule(p, DEFS.seq, 0, 0);
+    Object.assign(s.params, { s1: 0.1, s2: 0.2, s3: -1, s4: 0.4, len: 4 });
+    const rst = addModule(p, DEFS.lfo, 0, 0);
+    Object.assign(rst.params, { wave: 3, rate: 100 / 7, depth: 1 }); // a reset every 7 clocks
+    wire(p, clock, 'out', s.id, 'clock');
+    wire(p, s.id, 'out', out, 'l');
+    wire(p, s.id, 'gate', out, 'r');
+    const e = new Engine(SR);
+    e.load(p);
+    const r = render(e, CLK * 5);
+    const at = (k: number): number => r.l[k * CLK + 10];
+    // the square starts high: the first edge at sample 0 moves to step 2 straight away
+    expect([at(0), at(1), at(2), at(3), at(4)].map((v) => Number(v.toFixed(2)))).toEqual([0.2, -1, 0.4, 0.1, 0.2]);
+    expect(r.r[1 * CLK + 10]).toBe(0); // the rest has no gate
+    expect(r.r[2 * CLK + 10]).toBe(1);
+    expect(r.r[2 * CLK + CLK / 2 + 10]).toBe(0); // the gate follows the clock's width
+    wire(p, rst.id, 'out', s.id, 'reset');
+    const e2 = new Engine(SR);
+    e2.load(p);
+    const r2 = render(e2, CLK * 9);
+    expect(r2.l[7 * CLK + 10]).toBeCloseTo(0.1, 5); // back on step 1 at the reset edge
+    expect(r2.l[8 * CLK + 10]).toBeCloseTo(0.2, 5);
+    s.params.dir = 2;
+    s.params.s3 = 0.3;
+    const e3 = new Engine(SR);
+    e3.load(p);
+    const r3 = render(e3, CLK * 7); // the reset edge at sample 0 wins over the clock edge: step 1 first
+    expect([0, 1, 2, 3, 4, 5, 6].map((k) => Number(r3.l[k * CLK + 10].toFixed(2)))).toEqual([0.1, 0.2, 0.3, 0.4, 0.3, 0.2, 0.1]);
+  });
+
+  it('clock divider passes every div-th pulse and the fixed divisions, reset makes the next pulse a downbeat', () => {
+    const { p, clock, out } = clocked();
+    const d = addModule(p, DEFS.clkdiv, 0, 0);
+    d.params.div = 3;
+    wire(p, clock, 'out', d.id, 'clock');
+    wire(p, d.id, 'out', out, 'l');
+    wire(p, d.id, 'd4', out, 'r');
+    const e = new Engine(SR);
+    e.load(p);
+    const r = render(e, CLK * 12 + 1);
+    expect(edges(r.l).map((x) => Math.round(x / CLK))).toEqual([3, 6, 9, 12]);
+    expect(r.l[CLK * 3 + 10]).toBe(1);
+    expect(r.l[CLK * 3 + CLK / 2 + 10]).toBe(0);
+    expect(edges(r.r).map((x) => Math.round(x / CLK))).toEqual([4, 8, 12]);
+  });
+
+  it('S&H holds the input at the clock edge and tracks it while the clock is up', () => {
+    const run = (mode: number): Float32Array => {
+      const { p, clock, out } = clocked();
+      const s = addModule(p, DEFS.sh, 0, 0);
+      const ramp = addModule(p, DEFS.lfo, 0, 0);
+      Object.assign(ramp.params, { wave: 2, rate: 10, depth: 1 });
+      s.params.mode = mode;
+      wire(p, clock, 'out', s.id, 'clock');
+      wire(p, ramp.id, 'out', s.id, 'in');
+      wire(p, s.id, 'out', out, 'l');
+      const e = new Engine(SR);
+      e.load(p);
+      return render(e, CLK * 4).l;
+    };
+    const hold = run(0);
+    expect(hold[CLK + 5]).toBeCloseTo(hold[CLK + 200], 6); // flat between edges
+    expect(hold[2 * CLK + 5]).toBeGreaterThan(hold[CLK + 5]); // the ramp has risen
+    const track = run(1);
+    expect(track[CLK + 100]).toBeGreaterThan(track[CLK + 5]); // following while high
+    expect(track[CLK + 300]).toBeCloseTo(track[CLK + 400], 6); // held while low
+  });
+
+  it('quantizer snaps to the scale on the root, down on ties, in every octave', () => {
+    const run = (scale: number, root: number, v: number): number => {
+      const p = emptyPatch();
+      const k = addModule(p, DEFS.const, 0, 0);
+      const q = addModule(p, DEFS.quant, 0, 0);
+      const sc = addModule(p, DEFS.scale, 0, 0);
+      const out = addModule(p, DEFS.output, 0, 0);
+      out.params.level = 1;
+      k.params.value = v;
+      q.params.scale = scale;
+      q.params.root = root;
+      sc.params.gain = 0.25; // keep +-4 octaves inside the output's clamp
+      wire(p, k.id, 'out', q.id, 'in');
+      wire(p, q.id, 'out', sc.id, 'in');
+      wire(p, sc.id, 'out', out.id, 'l');
+      const e = new Engine(SR);
+      e.load(p);
+      return render(e, 128).l[100] * 4 * 12;
+    };
+    expect(run(1, 0, 0.9 / 12)).toBeCloseTo(0, 5); // nearly C# -> C
+    expect(run(1, 0, 1.1 / 12)).toBeCloseTo(2, 5); // -> D
+    expect(run(1, 0, 2.5 / 12)).toBeCloseTo(2, 5); // D / E tie goes down
+    expect(run(1, 0, 11.6 / 12)).toBeCloseTo(12, 5); // up to the next C
+    expect(run(1, 0, -0.4 / 12)).toBeCloseTo(0, 5);
+    expect(run(1, 0, -13.2 / 12)).toBeCloseTo(-13, 4); // B two octaves down
+    expect(run(2, 9, 4 / 12)).toBeCloseTo(4, 5); // A minor has E
+    expect(run(2, 9, 4.6 / 12)).toBeCloseTo(5, 5); // F
+    expect(run(10, 0, 5 / 12)).toBeCloseTo(0, 5); // octaves only
+    expect(run(10, 0, 7 / 12)).toBeCloseTo(12, 5);
+    expect(run(0, 0, 3.4 / 12)).toBeCloseTo(3, 5); // chromatic
+  });
+
+  it('pulse raises a gate of `time` on a trigger edge and restarts on the next', () => {
+    const { p, clock, out } = clocked();
+    const pl = addModule(p, DEFS.pulse, 0, 0);
+    pl.params.time = 0.005; // 240 samples: half the clock period
+    wire(p, clock, 'out', pl.id, 'trig');
+    wire(p, pl.id, 'out', out, 'l');
+    const e = new Engine(SR);
+    e.load(p);
+    const r = render(e, CLK * 3).l;
+    expect(r[1]).toBe(1);
+    expect(r[239]).toBe(1);
+    expect(r[240]).toBe(0);
+    expect(r[CLK + 100]).toBe(1);
+    pl.params.time = 0.015; // longer than the clock: retriggered before it ends, never falls
+    const e2 = new Engine(SR);
+    e2.load(p);
+    expect(Math.min(...Array.from(render(e2, CLK * 3).l))).toBe(1);
+  });
+});

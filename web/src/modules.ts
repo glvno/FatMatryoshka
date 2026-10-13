@@ -818,7 +818,195 @@ const chorus: ModuleImpl<ChorusState> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus];
+/**
+ * An eight-step control sequencer. A rising edge on `clock` moves to the next step (`len` steps, `dir`: forward, backward,
+ * pendulum without repeating the ends, random); `reset` goes back to step 1. `out` is the current step's value all the
+ * time (turning the step's knob is heard at once); `gate` follows the clock while the step is not a rest. A step turned
+ * fully down (-1) is a rest.
+ */
+const SEQ_DIRS = ['fwd', 'back', 'pendulum', 'random'];
+interface SeqState {
+  pos: number;
+  down: number;
+  c1: number;
+  r1: number;
+  seed: number;
+}
+
+const seq: ModuleImpl<SeqState> = {
+  def: {
+    type: 'seq',
+    label: 'Sequencer',
+    inputs: [gate('clock'), gate('reset')],
+    outputs: [control('out'), gate('gate')],
+    params: [
+      ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => param(`s${n}`, -1, 1, 0, { step: 0.01 })),
+      param('len', 1, 8, 8, { step: 1 }),
+      param('dir', 0, 3, 0, { step: 1, choices: SEQ_DIRS }),
+    ],
+  },
+  init: () => ({ pos: 0, down: 0, c1: 0, r1: 0, seed: 0x9e3779b9 }),
+  process(c, s) {
+    const steps = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => c.p[`s${n}`] ?? 0);
+    const len = Math.min(8, Math.max(1, Math.round(c.p.len ?? 8)));
+    const dir = Math.round(c.p.dir ?? 0);
+    const { clock, reset } = c.inp;
+    for (let i = 0; i < c.n; i++) {
+      const rst = reset[i] >= 0.5 && s.r1 < 0.5;
+      const clk = clock[i] >= 0.5 && s.c1 < 0.5;
+      s.r1 = reset[i];
+      s.c1 = clock[i];
+      if (rst) {
+        s.pos = 0;
+        s.down = 0;
+      } else if (clk) {
+        if (s.pos >= len) s.pos = len - 1;
+        if (dir === 1) s.pos = (s.pos + len - 1) % len;
+        else if (dir === 2) {
+          if (!s.down) {
+            if (s.pos + 1 < len) s.pos++;
+            else {
+              s.pos = Math.max(len - 2, 0);
+              s.down = 1;
+            }
+          } else if (s.pos > 0) s.pos--;
+          else {
+            s.pos = Math.min(1, len - 1);
+            s.down = 0;
+          }
+        } else if (dir === 3) {
+          s.seed = (Math.imul(s.seed, 1664525) + 1013904223) >>> 0;
+          s.pos = (s.seed >>> 16) % len;
+        } else s.pos = (s.pos + 1) % len;
+      }
+      const v = steps[Math.min(s.pos, len - 1)];
+      c.out.out[i] = v;
+      c.out.gate[i] = clock[i] >= 0.5 && v > -1 ? 1 : 0;
+    }
+  },
+};
+
+/** a clock divider: `out` passes every `div`-th clock pulse (its width is the clock's), `d2` `d4` `d8` every 2nd, 4th, 8th; `reset` restarts the count so the next pulse is a downbeat */
+const clkdiv: ModuleImpl<{ count: number; c1: number; r1: number }> = {
+  def: {
+    type: 'clkdiv',
+    label: 'Clock div',
+    inputs: [gate('clock'), gate('reset')],
+    outputs: [gate('out'), gate('d2'), gate('d4'), gate('d8')],
+    params: [param('div', 1, 16, 3, { step: 1 })],
+  },
+  init: () => ({ count: -1, c1: 0, r1: 0 }),
+  process(c, s) {
+    const div = Math.min(16, Math.max(1, Math.round(c.p.div ?? 3)));
+    const { clock, reset } = c.inp;
+    for (let i = 0; i < c.n; i++) {
+      if (reset[i] >= 0.5 && s.r1 < 0.5) s.count = -1;
+      else if (clock[i] >= 0.5 && s.c1 < 0.5) s.count = (s.count + 1) % (16 * div);
+      s.r1 = reset[i];
+      s.c1 = clock[i];
+      const hi = clock[i] >= 0.5 && s.count >= 0;
+      c.out.out[i] = hi && s.count % div === 0 ? 1 : 0;
+      c.out.d2[i] = hi && s.count % 2 === 0 ? 1 : 0;
+      c.out.d4[i] = hi && s.count % 4 === 0 ? 1 : 0;
+      c.out.d8[i] = hi && s.count % 8 === 0 ? 1 : 0;
+    }
+  },
+};
+
+/** sample & hold: `out` takes `in` on a rising edge of `clock` (hold), or follows it while the clock is up (track) */
+const sh: ModuleImpl<{ v: number; c1: number }> = {
+  def: {
+    type: 'sh',
+    label: 'S&H',
+    inputs: [control('in'), gate('clock')],
+    outputs: [control('out')],
+    params: [param('mode', 0, 1, 0, { step: 1, choices: ['hold', 'track'] })],
+  },
+  init: () => ({ v: 0, c1: 0 }),
+  process(c, s) {
+    const track = Math.round(c.p.mode ?? 0) === 1;
+    const { clock } = c.inp;
+    for (let i = 0; i < c.n; i++) {
+      const up = clock[i] >= 0.5;
+      if (track ? up : up && s.c1 < 0.5) s.v = c.inp.in[i];
+      s.c1 = clock[i];
+      c.out.out[i] = s.v;
+    }
+  },
+};
+
+/** the scales of the quantizer as semitones above the root */
+const SCALES: { name: string; st: number[] }[] = [
+  { name: 'chromatic', st: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+  { name: 'major', st: [0, 2, 4, 5, 7, 9, 11] },
+  { name: 'minor', st: [0, 2, 3, 5, 7, 8, 10] },
+  { name: 'pent maj', st: [0, 2, 4, 7, 9] },
+  { name: 'pent min', st: [0, 3, 5, 7, 10] },
+  { name: 'dorian', st: [0, 2, 3, 5, 7, 9, 10] },
+  { name: 'mixolydian', st: [0, 2, 4, 5, 7, 9, 10] },
+  { name: 'blues', st: [0, 3, 5, 6, 7, 10] },
+  { name: 'whole', st: [0, 2, 4, 6, 8, 10] },
+  { name: 'fifths', st: [0, 7] },
+  { name: 'octaves', st: [0] },
+];
+const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+export const SCALE_TABLE = SCALES;
+
+/** a pitch quantizer: the nearest note of `scale` on `root` (pitch in octaves, C4 = 0; ties go down) */
+const quant: ModuleImpl<null> = {
+  def: {
+    type: 'quant',
+    label: 'Quantizer',
+    inputs: [control('in')],
+    outputs: [control('out')],
+    params: [param('scale', 0, SCALES.length - 1, 1, { step: 1, choices: SCALES.map((x) => x.name) }), param('root', 0, 11, 0, { step: 1, choices: NOTES })],
+  },
+  init: () => null,
+  process(c) {
+    const sc = SCALES[Math.min(SCALES.length - 1, Math.max(0, Math.round(c.p.scale ?? 0)))].st;
+    const root = Math.round(c.p.root ?? 0);
+    for (let i = 0; i < c.n; i++) {
+      const semis = c.inp.in[i] * 12 - root;
+      const oct = Math.floor(semis / 12);
+      const w = semis - 12 * oct;
+      let best = sc[0];
+      let bd = Math.abs(w - best);
+      for (let k = 1; k <= sc.length; k++) {
+        const d = k < sc.length ? sc[k] : sc[0] + 12;
+        const dd = Math.abs(w - d);
+        if (dd < bd) {
+          bd = dd;
+          best = d;
+        }
+      }
+      c.out.out[i] = (12 * oct + best + root) / 12;
+    }
+  },
+};
+
+/** a trigger to a gate of a set length: a rising edge on `trig` raises `out` for `time` (a new edge restarts it) */
+const pulse: ModuleImpl<{ rem: number; t1: number }> = {
+  def: {
+    type: 'pulse',
+    label: 'Pulse',
+    inputs: [gate('trig')],
+    outputs: [gate('out')],
+    params: [param('time', 0.001, 2, 0.1, { unit: 's', step: 0.001, log: true })],
+  },
+  init: () => ({ rem: 0, t1: 0 }),
+  process(c, s) {
+    const len = Math.max(1, Math.round((c.p.time ?? 0.1) * c.sr));
+    const { trig } = c.inp;
+    for (let i = 0; i < c.n; i++) {
+      if (trig[i] >= 0.5 && s.t1 < 0.5) s.rem = len;
+      s.t1 = trig[i];
+      c.out.out[i] = s.rem > 0 ? 1 : 0;
+      if (s.rem > 0) s.rem--;
+    }
+  },
+};
+
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an

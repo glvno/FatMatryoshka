@@ -57,3 +57,11 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 - **String** is a plucked string (Karplus-Strong). Main `pitch` and `gate` play it: a `gate` fires a one-period burst of `noise` or a `pulse` into a loop that decays to −60 dB in `decay`; `damp` darkens it. Anything into `exc` plucks or rings it too, so a short oscillator click is a different pick, and a steady signal makes it a tuned resonator. Lowest note 40 Hz, 8 strings per patch on the FM-1.
 - **Wavetable** is an oscillator with four banks of eight single-cycle frames (`analog`: sine, triangle, saw, square, pulses; `organ`: drawbar sets; `formant`: a moving bump of harmonics; `digital`: steps and corners). `pos` sweeps the frames with crossfades; an LFO into `p1` on `pos` is the classic wavetable sweep. It has `pm` and `sync` like the Oscillator (the FM path is not oversampled), and it is band-limited in three steps so high notes stay clean.
 - **Chorus** is a stereo chorus (two taps in quadrature around 12 ms, swept up to ±8 ms) with `l` and `r` outputs for the Output. Like the Delay it runs once for all voices; one per patch on the FM-1.
+
+## Sequencer, clock divider, S&H, quantizer, pulse
+
+- **Sequencer**: eight steps (`s1`..`s8`, −1..1), `len` and `dir` (forward, backward, pendulum, random). A rising edge on `clock` moves on, `reset` goes back to step 1. `out` is the current step all the time, `gate` follows the clock while the step is not a rest; a step turned fully down is a rest. A square LFO is a clock; Main `gate` into `reset` restarts the pattern on every key.
+- **Clock div**: `out` passes every `div`-th clock pulse, `d2` `d4` `d8` every 2nd, 4th and 8th; `reset` makes the next pulse a downbeat.
+- **S&H**: `out` takes `in` on a clock edge (`hold`) or follows it while the clock is up (`track`). Noise into a clocked S&H into a Quantizer is a random melody.
+- **Quantizer**: snaps a pitch to the nearest note of a scale on a root (chromatic, major, minor, pentatonics, dorian, mixolydian, blues, whole tone, fifths, octaves). Put it after a Sequencer, an S&H, a Glide or an LFO into `pitch`.
+- **Pulse**: a trigger in, a gate of `time` out; a new trigger restarts it. It turns a short clock tick into a gate long enough for an envelope's attack, or a long gate into a short one.

@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 19
+#define N_TYPES 24
 enum {
     T_FM1,
     T_OSC,
@@ -24,6 +24,11 @@ enum {
     T_STRING,
     T_WAVETABLE,
     T_CHORUS,
+    T_SEQ,
+    T_CLKDIV,
+    T_SH,
+    T_QUANT,
+    T_PULSE,
 };
 
 /* fm1: Main */
@@ -298,9 +303,81 @@ enum {
 #define CHORUS_NPAR 3
 #define CHORUS_CVBASE 1
 
+/* seq: Sequencer */
+#define SEQ_I_CLOCK 0
+#define SEQ_I_RESET 1
+#define SEQ_I_P1 2
+#define SEQ_I_P2 3
+#define SEQ_O_OUT 0
+#define SEQ_O_GATE 1
+#define SEQ_P_S1 0
+#define SEQ_P_S2 1
+#define SEQ_P_S3 2
+#define SEQ_P_S4 3
+#define SEQ_P_S5 4
+#define SEQ_P_S6 5
+#define SEQ_P_S7 6
+#define SEQ_P_S8 7
+#define SEQ_P_LEN 8
+#define SEQ_P_DIR 9
+#define SEQ_NIN 4
+#define SEQ_NOUT 2
+#define SEQ_NPAR 10
+#define SEQ_CVBASE 2
+
+/* clkdiv: Clock div */
+#define CLKDIV_I_CLOCK 0
+#define CLKDIV_I_RESET 1
+#define CLKDIV_I_P1 2
+#define CLKDIV_I_P2 3
+#define CLKDIV_O_OUT 0
+#define CLKDIV_O_D2 1
+#define CLKDIV_O_D4 2
+#define CLKDIV_O_D8 3
+#define CLKDIV_P_DIV 0
+#define CLKDIV_NIN 4
+#define CLKDIV_NOUT 4
+#define CLKDIV_NPAR 1
+#define CLKDIV_CVBASE 2
+
+/* sh: S&H */
+#define SH_I_IN 0
+#define SH_I_CLOCK 1
+#define SH_I_P1 2
+#define SH_I_P2 3
+#define SH_O_OUT 0
+#define SH_P_MODE 0
+#define SH_NIN 4
+#define SH_NOUT 1
+#define SH_NPAR 1
+#define SH_CVBASE 2
+
+/* quant: Quantizer */
+#define QUANT_I_IN 0
+#define QUANT_I_P1 1
+#define QUANT_I_P2 2
+#define QUANT_O_OUT 0
+#define QUANT_P_SCALE 0
+#define QUANT_P_ROOT 1
+#define QUANT_NIN 3
+#define QUANT_NOUT 1
+#define QUANT_NPAR 2
+#define QUANT_CVBASE 1
+
+/* pulse: Pulse */
+#define PULSE_I_TRIG 0
+#define PULSE_I_P1 1
+#define PULSE_I_P2 2
+#define PULSE_O_OUT 0
+#define PULSE_P_TIME 0
+#define PULSE_NIN 3
+#define PULSE_NOUT 1
+#define PULSE_NPAR 1
+#define PULSE_CVBASE 1
+
 #define MAX_IN 6
 #define MAX_OUT 8
-#define MAX_PAR 8
+#define MAX_PAR 10
 
 typedef struct {
     uint8_t nin, nout, npar;
@@ -491,6 +568,55 @@ static const char *const CHORUS_PN[] = {"RATE", "DEPTH", "MIX"};
 static const uint8_t CHORUS_LOG[] = {1, 0, 0};
 static const char *const CHORUS_UNIT[] = {"HZ", "", ""};
 static const char *const *const CHORUS_CH[] = {0, 0, 0};
+static const char *const SEQ_INNAMES[] = {"CLOCK", "RESET", "P1", "P2"};
+static const int32_t SEQ_MIN[] = {-65536, -65536, -65536, -65536, -65536, -65536, -65536, -65536, 65536, 0};
+static const int32_t SEQ_MAX[] = {65536, 65536, 65536, 65536, 65536, 65536, 65536, 65536, 524288, 196608};
+static const int32_t SEQ_DEF[] = {0, 0, 0, 0, 0, 0, 0, 0, 524288, 0};
+static const int32_t SEQ_INC[] = {1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 65536, 65536};
+static const char *const SEQ_PN[] = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "LEN", "DIR"};
+static const uint8_t SEQ_LOG[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const char *const SEQ_UNIT[] = {"", "", "", "", "", "", "", "", "", ""};
+static const char *const SEQ_CH9[] = {"FWD", "BACK", "PENDULUM", "RANDOM", 0};
+static const char *const *const SEQ_CH[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, SEQ_CH9};
+static const char *const CLKDIV_INNAMES[] = {"CLOCK", "RESET", "P1", "P2"};
+static const int32_t CLKDIV_MIN[] = {65536};
+static const int32_t CLKDIV_MAX[] = {1048576};
+static const int32_t CLKDIV_DEF[] = {196608};
+static const int32_t CLKDIV_INC[] = {65536};
+static const char *const CLKDIV_PN[] = {"DIV"};
+static const uint8_t CLKDIV_LOG[] = {0};
+static const char *const CLKDIV_UNIT[] = {""};
+static const char *const *const CLKDIV_CH[] = {0};
+static const char *const SH_INNAMES[] = {"IN", "CLOCK", "P1", "P2"};
+static const int32_t SH_MIN[] = {0};
+static const int32_t SH_MAX[] = {65536};
+static const int32_t SH_DEF[] = {0};
+static const int32_t SH_INC[] = {65536};
+static const char *const SH_PN[] = {"MODE"};
+static const uint8_t SH_LOG[] = {0};
+static const char *const SH_UNIT[] = {""};
+static const char *const SH_CH0[] = {"HOLD", "TRACK", 0};
+static const char *const *const SH_CH[] = {SH_CH0};
+static const char *const QUANT_INNAMES[] = {"IN", "P1", "P2"};
+static const int32_t QUANT_MIN[] = {0, 0};
+static const int32_t QUANT_MAX[] = {655360, 720896};
+static const int32_t QUANT_DEF[] = {65536, 0};
+static const int32_t QUANT_INC[] = {65536, 65536};
+static const char *const QUANT_PN[] = {"SCALE", "ROOT"};
+static const uint8_t QUANT_LOG[] = {0, 0};
+static const char *const QUANT_UNIT[] = {"", ""};
+static const char *const QUANT_CH0[] = {"CHROMATIC", "MAJOR", "MINOR", "PENT MAJ", "PENT MIN", "DORIAN", "MIXOLYDIAN", "BLUES", "WHOLE", "FIFTHS", "OCTAVES", 0};
+static const char *const QUANT_CH1[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B", 0};
+static const char *const *const QUANT_CH[] = {QUANT_CH0, QUANT_CH1};
+static const char *const PULSE_INNAMES[] = {"TRIG", "P1", "P2"};
+static const int32_t PULSE_MIN[] = {66};
+static const int32_t PULSE_MAX[] = {131072};
+static const int32_t PULSE_DEF[] = {6554};
+static const int32_t PULSE_INC[] = {1310};
+static const char *const PULSE_PN[] = {"TIME"};
+static const uint8_t PULSE_LOG[] = {1};
+static const char *const PULSE_UNIT[] = {"S"};
+static const char *const *const PULSE_CH[] = {0};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, FM1_CVBASE, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -512,4 +638,9 @@ static const def_t DEFS[N_TYPES] = {
     {STRING_NIN, STRING_NOUT, STRING_NPAR, STRING_CVBASE, STRING_MIN, STRING_MAX, STRING_DEF, STRING_INC, "STRING", STRING_PN, STRING_INNAMES, STRING_LOG, STRING_UNIT, STRING_CH},   /* string */
     {WAVETABLE_NIN, WAVETABLE_NOUT, WAVETABLE_NPAR, WAVETABLE_CVBASE, WAVETABLE_MIN, WAVETABLE_MAX, WAVETABLE_DEF, WAVETABLE_INC, "WAVETABLE", WAVETABLE_PN, WAVETABLE_INNAMES, WAVETABLE_LOG, WAVETABLE_UNIT, WAVETABLE_CH},   /* wavetable */
     {CHORUS_NIN, CHORUS_NOUT, CHORUS_NPAR, CHORUS_CVBASE, CHORUS_MIN, CHORUS_MAX, CHORUS_DEF, CHORUS_INC, "CHORUS", CHORUS_PN, CHORUS_INNAMES, CHORUS_LOG, CHORUS_UNIT, CHORUS_CH},   /* chorus */
+    {SEQ_NIN, SEQ_NOUT, SEQ_NPAR, SEQ_CVBASE, SEQ_MIN, SEQ_MAX, SEQ_DEF, SEQ_INC, "SEQUENCER", SEQ_PN, SEQ_INNAMES, SEQ_LOG, SEQ_UNIT, SEQ_CH},   /* seq */
+    {CLKDIV_NIN, CLKDIV_NOUT, CLKDIV_NPAR, CLKDIV_CVBASE, CLKDIV_MIN, CLKDIV_MAX, CLKDIV_DEF, CLKDIV_INC, "CLOCK DIV", CLKDIV_PN, CLKDIV_INNAMES, CLKDIV_LOG, CLKDIV_UNIT, CLKDIV_CH},   /* clkdiv */
+    {SH_NIN, SH_NOUT, SH_NPAR, SH_CVBASE, SH_MIN, SH_MAX, SH_DEF, SH_INC, "S&H", SH_PN, SH_INNAMES, SH_LOG, SH_UNIT, SH_CH},   /* sh */
+    {QUANT_NIN, QUANT_NOUT, QUANT_NPAR, QUANT_CVBASE, QUANT_MIN, QUANT_MAX, QUANT_DEF, QUANT_INC, "QUANTIZER", QUANT_PN, QUANT_INNAMES, QUANT_LOG, QUANT_UNIT, QUANT_CH},   /* quant */
+    {PULSE_NIN, PULSE_NOUT, PULSE_NPAR, PULSE_CVBASE, PULSE_MIN, PULSE_MAX, PULSE_DEF, PULSE_INC, "PULSE", PULSE_PN, PULSE_INNAMES, PULSE_LOG, PULSE_UNIT, PULSE_CH},   /* pulse */
 };
