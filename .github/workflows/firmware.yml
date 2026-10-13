@@ -1,0 +1,68 @@
+name: firmware
+# Builds the firmware with the JieLi toolchain on every push and pull request, for the one-voice and the four-voice
+# build, and fails on compiler warnings or on a pool headroom below 8 KB (tools/build.py). Then the host tests that need
+# a C compiler: the golden vectors (web engine vs firmware engine), the arpeggiator and protocol tests, the LCD preview.
+# The .fwsc of the one-voice build is kept as an artifact (not for the only device: see the fork's issue 1).
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        voices: [1, 4]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - name: JieLi toolchain and AC79 SDK (cached)
+        id: jieli
+        uses: actions/cache@v5
+        with:
+          path: ~/.jieli
+          key: jieli-AC79NN_SDK_V1.2.1_2023-12-13-toolchain-v1
+      - name: fetch the toolchain and the three SDK files
+        if: steps.jieli.outputs.cache-hit != 'true'
+        run: |
+          tools/get_toolchain.sh
+          git clone --filter=blob:none --no-checkout --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 \
+            https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git ~/.jieli/ac79-sdk
+          git -C ~/.jieli/ac79-sdk sparse-checkout set cpu/wl82/tools
+          git -C ~/.jieli/ac79-sdk checkout
+      - name: the generated headers are current
+        working-directory: web
+        run: |
+          npm run export-defs
+          git diff --exit-code ../firmware/src/defs.h ../firmware/src/presets.h || { echo "::error::defs.h / presets.h are stale: run 'npm run export-defs' and commit"; exit 1; }
+      - name: build the firmware (M1_VOICES=${{ matrix.voices }}), no warnings, pool headroom >= 8 KB
+        run: |
+          export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/.jieli/ac79-sdk" M1_VOICES=${{ matrix.voices }}
+          mkdir -p build
+          python3 tools/build.py 2>&1 | tee build/build.log
+          test "${PIPESTATUS[0]}" -eq 0
+          if grep -E "warning:" build/build.log | grep -v "SDK .* differs"; then echo "::error::compiler warnings"; exit 1; fi
+          grep -E "pool [0-9]+ B of [0-9]+" build/build.log
+      - name: golden vectors, arpeggiator and protocol tests, LCD preview
+        run: |
+          export M1_VOICES=${{ matrix.voices }}
+          tools/golden.sh
+          tools/arp_test.sh
+          tools/ui_preview.sh build/ui-preview.png 0 1
+      - uses: actions/upload-artifact@v4
+        if: matrix.voices == 1
+        with:
+          name: modular-1-firmware
+          path: |
+            build/modular-1.fwsc
+            build/modular-1.bin
+            build/ui-preview.png
+          if-no-files-found: error

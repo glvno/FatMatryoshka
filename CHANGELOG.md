@@ -17,6 +17,8 @@ The merge of the four-voice firmware (1.0.2) with the polyphony, assembly and mo
 - Module **Ladder**: a four-pole ladder low pass with drive and self-oscillating resonance (outputs `lp24`, `lp12`; the saturator sits inside the loop). Cutoff modulation per block.
 - The LFO's restart input is `reset` (it was `sync` on the development branch; patches are converted on load) next to upstream's `clk`.
 - **Filter** outputs `notch`, `peak` and `ap` (allpass) after `mix`, from the same states (no patch format change).
+- **Safe mode:** SAVE held during the loading screen (or after a failed boot) skips the stored state; the factory patch plays and the state stays in flash.
+- **Firmware CI** (`.github/workflows/firmware.yml`): the JieLi build for both voice counts on every push and pull request, failing on compiler warnings, stale generated headers or a pool headroom below 8 KB; the golden, arpeggiator, protocol and LCD-preview tests; the `.fwsc` as an artifact.
 - **Factory patches open as assemblies:** five recipe assemblies (filter voice, adsr operator, noise voice, stack voice, vibrato) and an `assemblies` overlay in 29 of the 33 factory patches (binaries unchanged, checked by a test).
 - **Phone / tablet:** canvas zoom (pinch, Ctrl + wheel, buttons, fit), one-finger pan, bigger jacks and controls on touch screens, long-press card actions, a floating palette button, narrow-screen toolbars.
 - **Share link:** a patch as a URL (deflated JSON in the fragment); opening it loads the patch, the Patches page imports one into the bank list.

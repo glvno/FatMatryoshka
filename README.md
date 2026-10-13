@@ -28,6 +28,7 @@ Knobs and stuff.
 * **SEQ** opens the arpeggiator's rhythm page (euclid steps, pulses, rotation, rate)
 * **LFO** opens arpeggiator's chaos page, adds some randomness and lets select how many octaves the arpeggio spans.
 * **HOME** opens the main page of the patch
+* **SAVE held at power-on** boots in safe mode: the stored state is skipped and the factory patch plays (`SAFE MODE: STATE SKIPPED`); the state stays in flash for the next normal boot, MENU > SYSTEM > DEFAULTS erases it. A boot that did not get through makes the next one safe by itself; two in a row still go to the update loader.
 * **GLO** opens the mixer: K1 sets the level, the black key F# mutes, ALGORITHM sets the polyphony (the patch reloads with the new count). Four-voice build: K1-K4 and F# G# A# C# for the four voices (patches), ALGORITHM acts on the selected one
 * **SEL** switches to the next voice (patch) in the four-voice build; keys, knobs, LCD and the editor act on it. Unused in the one-voice build
 

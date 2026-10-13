@@ -446,12 +446,22 @@ static int boot_blob(const uint8_t *b, uint32_t len)    /* the saved state (blob
     return 0;
 }
 
+/* safe mode: SAVE held while the loading screen is up, or the previous boot did not get through (bootguard): the stored
+ * state is skipped (it stays in flash: a normal boot tries it again, MENU > SYSTEM > DEFAULTS erases it) */
+static uint8_t boot_safe;
+
 static void patch_boot(void)                    /* the stored state if there is one, else the first factory patches */
 {
     static uint8_t buf[PS_MAX] ENG_POOL;
     uint32_t len, seq, sector;
     if (flash_ok)
         sl_scan();
+    if (boot_safe) {
+        voices_boot(0u);
+        boot_msg = "SAFE MODE: STATE SKIPPED";
+        boot_msg_ms = 4000;
+        return;
+    }
     if (flash_ok && ps_load(buf, &len, &seq, &sector) == 0) {
         int ok = 0;
         if (buf[0] == BLOB_MAGIC)
@@ -1094,6 +1104,7 @@ static void fm1_main(void)
     fm1_irq_enable_all();
     fm1_delay_ms(30);
     boot_step("STATE");
+    boot_safe = (uint8_t)((fm1_in.buttons >> BTN_SAVE & 1u) || bootguard.failed >= 1u);   /* SAVE held, or the last boot failed */
     patch_boot();
     while (fm1_ms - t_splash < SPLASH_MS) {             /* the screen stays up; the bar fills with the time; MIDI and the host */
         fm1_wdt_feed();                                 /* are served meanwhile (notes play, the editor and flasher get answers) */
