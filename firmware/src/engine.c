@@ -1348,19 +1348,30 @@ static inline int32_t shape_curve(int32_t x, int32_t mode)
     return y;
 }
 
+/* the whole transfer: sym offsets the driven sample, then the curve runs stages (1..4) times with a gain of 2 between them */
+static inline int32_t shape_chain(int32_t x, int32_t mode, int32_t sym, int32_t stages)
+{
+    int32_t y = shape_curve(x + sym, mode), k;
+    for (k = 1; k < stages; k++)
+        y = shape_curve(y << 1, mode);
+    return y;
+}
+
 static void m_shape(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *in = it->in[SHAPE_I_IN];
     esig_t *out = it->out[0];
     int32_t drive = EF(it, SHAPE_P_DRIVE), mode = round_q16(EF(it, SHAPE_P_MODE)), lvl = EF(it, SHAPE_P_LEVEL);
+    int32_t sym = EF(it, SHAPE_P_SYM), stages = clampi(round_q16(EF(it, SHAPE_P_STAGES)), 1, 4);
     int os = EF(it, SHAPE_P_OS) >= 32768, *ap = it->s.shp.ap;
     uint32_t i;
     for (i = 0; i < n; i++) {
         int32_t x = mul16(in[i], drive), y;
         if (os)
-            y = os_down(ap + 8, &it->s.shp.xb, shape_curve(os_up0(ap, x), mode), shape_curve(os_up1(ap, x), mode));
+            y = os_down(ap + 8, &it->s.shp.xb, shape_chain(os_up0(ap, x), mode, sym, stages),
+                        shape_chain(os_up1(ap, x), mode, sym, stages));
         else
-            y = shape_curve(x, mode);
+            y = shape_chain(x, mode, sym, stages);
         out[i] = mul16(y, lvl);
     }
 }

@@ -1248,7 +1248,19 @@ function shapeCurve(x: number, mode: number): number {
   return Math.abs(x) >= 1 ? Math.sign(x) : 1.5 * x - 0.5 * x * x * x; // cubic: smooth up to the knee at 1
 }
 
-/** a waveshaper: drive into a cubic soft clip, a hard clip or a triangle fold; the peak stays at 1; `os` runs it 2x oversampled */
+/** the shaper's whole transfer: `sym` offsets the driven sample, then the curve runs `stages` times with a gain of 2 between them */
+function shapeChain(x: number, mode: number, sym: number, stages: number): number {
+  let y = shapeCurve(x + sym, mode);
+  for (let k = 1; k < stages; k++) y = shapeCurve(y * 2, mode);
+  return y;
+}
+
+/**
+ * A waveshaper: drive into a cubic soft clip, a hard clip or a triangle fold; the peak stays at 1; `os` runs it 2x oversampled.
+ * `sym` adds an offset before the curve (asymmetry: even harmonics, and a DC part that a high pass after it removes), `stages`
+ * cascades the curve 1..4 times with a gain of 2 between stages: a fold folds its folds (a denser wavefolder), a clip saturates
+ * like cascaded gain stages.
+ */
 const shape: ModuleImpl<OsState> = {
   def: {
     type: 'shape',
@@ -1260,6 +1272,8 @@ const shape: ModuleImpl<OsState> = {
       param('mode', 0, 2, 0, { step: 1, choices: SHAPES }),
       param('level', 0, 1, 0.7, { step: 0.01 }),
       param('os', 0, 1, 0, { step: 1, choices: OS_CHOICES, toggle: true }),
+      param('sym', -1, 1, 0, { step: 0.01 }),
+      param('stages', 1, 4, 1, { step: 1 }),
     ],
   },
   init: osInit,
@@ -1268,10 +1282,12 @@ const shape: ModuleImpl<OsState> = {
     const mode = Math.round(c.p.mode ?? 0);
     const lvl = c.p.level ?? 1;
     const os = (c.p.os ?? 0) >= 0.5;
-    const f = (v: number): number => shapeCurve(v, mode);
+    const sym = c.p.sym ?? 0;
+    const stages = Math.max(1, Math.min(4, Math.round(c.p.stages ?? 1)));
+    const f = (v: number): number => shapeChain(v, mode, sym, stages);
     for (let i = 0; i < c.n; i++) {
       const x = c.inp.in[i] * drive;
-      c.out.out[i] = (os ? os2(s, x, f) : shapeCurve(x, mode)) * lvl;
+      c.out.out[i] = (os ? os2(s, x, f) : f(x)) * lvl;
     }
   },
 };

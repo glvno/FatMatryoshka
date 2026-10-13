@@ -761,6 +761,17 @@ kit('os-shape-crush', (add, wire) => {
   wire(sh, 'out', cr, 'in');
   wire(cr, 'out', out, 'l');
 });
+kit('wavefold', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 0, level: 0.9 });
+  const lfo = add('lfo', 0, 0, { wave: 0, rate: 0.7, depth: 1 });
+  const sh = add('shape', 0, 0, { mode: 2, drive: 3, level: 0.5, os: 1, sym: 0.3, stages: 3 }, { map: { p1: ['drive'] }, att: [0.5, 1] });
+  const out = add('output', 0, 0, { level: 0.8 });
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(osc, 'out', sh, 'in');
+  wire(lfo, 'out', sh, 'p1');
+  wire(sh, 'out', out, 'l');
+});
 kit('seq-glide', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const clk = add('lfo', 0, 0, { wave: 3, rate: 8, depth: 1 });

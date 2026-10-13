@@ -267,9 +267,11 @@ enum {
 #define SHAPE_P_MODE 1
 #define SHAPE_P_LEVEL 2
 #define SHAPE_P_OS 3
+#define SHAPE_P_SYM 4
+#define SHAPE_P_STAGES 5
 #define SHAPE_NIN 3
 #define SHAPE_NOUT 1
-#define SHAPE_NPAR 4
+#define SHAPE_NPAR 6
 #define SHAPE_CVBASE 1
 
 /* env: Env L/R */
@@ -771,16 +773,16 @@ static const uint8_t GLIDE_LOG[] = {1};
 static const char *const GLIDE_UNIT[] = {"S"};
 static const char *const *const GLIDE_CH[] = {0};
 static const char *const SHAPE_INNAMES[] = {"IN", "P1", "P2"};
-static const int32_t SHAPE_MIN[] = {65536, 0, 0, 0};
-static const int32_t SHAPE_MAX[] = {2097152, 131072, 65536, 65536};
-static const int32_t SHAPE_DEF[] = {131072, 0, 45875, 0};
-static const int32_t SHAPE_INC[] = {20316, 65536, 655, 65536};
-static const char *const SHAPE_PN[] = {"DRIVE", "MODE", "LEVEL", "OS"};
-static const uint8_t SHAPE_LOG[] = {1, 0, 0, 0};
-static const char *const SHAPE_UNIT[] = {"", "", "", ""};
+static const int32_t SHAPE_MIN[] = {65536, 0, 0, 0, -65536, 65536};
+static const int32_t SHAPE_MAX[] = {2097152, 131072, 65536, 65536, 65536, 262144};
+static const int32_t SHAPE_DEF[] = {131072, 0, 45875, 0, 0, 65536};
+static const int32_t SHAPE_INC[] = {20316, 65536, 655, 65536, 1311, 65536};
+static const char *const SHAPE_PN[] = {"DRIVE", "MODE", "LEVEL", "OS", "SYM", "STAGES"};
+static const uint8_t SHAPE_LOG[] = {1, 0, 0, 0, 0, 0};
+static const char *const SHAPE_UNIT[] = {"", "", "", "", "", ""};
 static const char *const SHAPE_CH1[] = {"SOFT", "HARD", "FOLD", 0};
 static const char *const SHAPE_CH3[] = {"OFF", "ON", 0};
-static const char *const *const SHAPE_CH[] = {0, SHAPE_CH1, 0, SHAPE_CH3};
+static const char *const *const SHAPE_CH[] = {0, SHAPE_CH1, 0, SHAPE_CH3, 0, 0};
 static const char *const ENV_INNAMES[] = {"GATE", "P1", "P2"};
 static const int32_t ENV_MIN[] = {0, 66, 0, 66, 0, 66, 0, 66};
 static const int32_t ENV_MAX[] = {65536, 655360, 65536, 655360, 65536, 655360, 65536, 655360};

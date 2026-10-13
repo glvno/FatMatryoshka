@@ -1970,6 +1970,33 @@ describe('pan, crossfade, vowel, phaser, digitizer, noise colour', () => {
     expect(power(over, fold(7 * f0))).toBeLessThan(power(plain, fold(7 * f0)) * 0.4);
   });
 
+  it('shaper: sym makes the fold asymmetric (even harmonics appear), stages fold the folds (brighter, still within 1)', () => {
+    const run = (sym: number, stages: number): Float32Array => {
+      const { p, out, add } = start();
+      const o = add('osc', { wave: 0, level: 1, coarse: 12 }); // 523 Hz sine
+      const s = add('shape', { mode: 2, drive: 2.5, level: 1, sym, stages });
+      wire(p, o, 'out', s, 'in');
+      wire(p, s, 'out', out, 'l');
+      const e = new Engine(SR);
+      e.load(p);
+      render(e, 2048);
+      return render(e, SR).l;
+    };
+    const f0 = 261.6255653 * 2;
+    const bright = (a: Float32Array): number => {
+      let q = 0;
+      for (let i = 1; i < a.length; i++) q += (a[i] - a[i - 1]) ** 2;
+      return Math.sqrt(q / a.length) / rms(a);
+    };
+    const peak = (a: Float32Array): number => Math.max(...Array.from(a).map(Math.abs));
+    const even = run(0, 1), odd = run(0.3, 1), dense = run(0, 3);
+    expect(power(even, 2 * f0)).toBeLessThan(power(even, f0) * 0.001); // a symmetric fold of a sine has no even harmonics
+    expect(power(odd, 2 * f0)).toBeGreaterThan(power(odd, f0) * 0.02); // the offset puts them in
+    expect(bright(dense)).toBeGreaterThan(bright(even) * 1.5); // three stages: more corners per cycle
+    expect(peak(dense)).toBeLessThanOrEqual(1.0001);
+    expect(peak(odd)).toBeLessThanOrEqual(1.0001);
+  });
+
   it('oversampling: the digitizer with os on holds each value for rate input samples and quantizes the same', () => {
     const run = (os: number): Float32Array => {
       const { p, out, add } = start();
