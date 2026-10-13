@@ -113,3 +113,13 @@ Rules: `reconcile` keeps an assembly consistent after every structural change (d
 - `spread`: a new per-voice panel output (`VOICE_PORTS`), `(2 v - (n - 1)) / (n - 1)` for voice v of n, 0 for one voice. `port_poly` in the firmware treats it like pitch / gate / vel.
 - Binary patch format 8: the two sync inputs moved `p1` / `p2` of osc and lfo, two module types were appended, the panel grew an output. `TYPE_COLOR` in `ui.c` has entries for the new types.
 
+
+## Pan, crossfade, vowel, phaser, digitizer, noise colour
+
+- `pan`: l = in·cos((p+1)π/4), r = in·sin((p+1)π/4) with p = clamp(pan + pos, −1, 1), per sample (C: sin_turn at (p+1)/8 of a turn).
+- `xfade`: out = a·(1−m) + b·m, m = clamp(mix + pos, 0, 1).
+- `vowel`: three SVF stages (the normalized band output k·v1, peak 1) at the formant frequencies of A (730, 1090, 2440), E (530, 1840, 2480), I (390, 1990, 2550), O (570, 840, 2410), U (440, 1020, 2240) Hz with gains 1, ½, ¼; the position v = clamp(vowel + input[0], 0, 4) interpolates the frequencies linearly between neighbours once per block; k = 1/Q, Q = 2 + 18·res. The C version reuses svf_g / svf_stage and Q20 states like the filter.
+- `phaser`: four first-order allpasses y = a(x − y₁) + x₁ with one coefficient a = (g−1)/(g+1), g = tan(πf/sr), f = center·2^(2·depth·tri), tri a triangle LFO at `rate` read once per block; the input of stage 1 is in + fb·(stage 4's previous output), clamped to ±8; out = in·(1−mix) + wet·mix. In C the coefficient is Q24 from one 64-bit division per block.
+- `crush`: step 2^(1−bits), y = floor(x/step + ½)·step on the taken sample, held for `rate` samples (C: shift by 17 − bits).
+- `noise` `color`: y += c·(white − y), c = 2^(−5·color) (color 0 is c = 1: the old noise bit for bit); the state is Q24 in C.
+- Golden kits: `pan-xfade` (3 voices), `vowel-phaser`, `crush-color`.

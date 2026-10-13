@@ -140,3 +140,7 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 - `osc` / `lfo` input `sync` (rising edge restarts the phase), modules `glide` (one-pole slew, Q24 state in C) and `shape` (soft / hard / fold), panel output `spread` (-1..1 per voice, in `VOICE_PORTS` and `port_poly`). Appended to `ALL` in `modules.ts` so type indices stay; binary format 8. Golden adds `sync-glide-shape` and `spread` (3 voices).
 - Lesson: a Q16 one-pole with a small coefficient stalls about 1 % short of its target (the step rounds to 0); keep such states in Q24 / Q30 as the ADSR does.
 
+
+## Pan, crossfade, vowel, phaser, digitizer, noise colour (host-tested, golden 52 patches pass; not flashed)
+
+- Modules `pan` (in, pos → l, r; equal power), `xfade` (a, b, pos → out), `vowel` (three formant band passes, position per block), `phaser` (four allpasses, triangle sweep per block, feedback), `crush` (bits / rate reduction); `noise` got a `color` parameter after `level` (color 0 = unchanged output). Appended to `ALL`; formulas in docs/ARCHITECTURE.md. `inst_t` union grew: `vow` (6 words), `phs` (10 words); `MAX_IN` / `MAX_OUT` / `MAX_PAR` are unchanged (6 / 8 / 7). Golden adds `pan-xfade` (3 voices), `vowel-phaser`, `crush-color`.

@@ -361,6 +361,59 @@ kit(
   2,
 );
 
+// pan by the panel's spread (three voices) and a crossfade of two oscillators swept by an LFO
+kit(
+  'pan-xfade',
+  (add, wire) => {
+    const kb = add('fm1', 0, 0);
+    const o1 = add('osc', 0, 0, { wave: 2, level: 0.3 });
+    const o2 = add('osc', 0, 0, { wave: 1, coarse: 7, level: 0.3 });
+    const o3 = add('osc', 0, 0, { wave: 3, coarse: -12, pw: 0.3, level: 0.3 });
+    const pn = add('pan', 0, 0, { pan: 0.1 });
+    const lfo = add('lfo', 0, 0, { wave: 1, rate: 1.3, depth: 0.5 });
+    const xf = add('xfade', 0, 0, { mix: 0.5 });
+    const out = add('output', 0, 0, { level: 0.4 });
+    wire(kb, 'pitch', o1, 'pitch');
+    wire(kb, 'pitch', o2, 'pitch');
+    wire(kb, 'pitch', o3, 'pitch');
+    wire(kb, 'spread', pn, 'pos');
+    wire(o1, 'out', pn, 'in');
+    wire(o2, 'out', xf, 'a');
+    wire(o3, 'out', xf, 'b');
+    wire(lfo, 'out', xf, 'pos');
+    wire(pn, 'l', out, 'l');
+    wire(pn, 'r', out, 'r');
+    wire(xf, 'out', out, 'l');
+    wire(xf, 'out', out, 'r');
+  },
+  3,
+);
+// a saw through the vowel filter swept A -> U by an LFO, then the phaser
+kit('vowel-phaser', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.6 });
+  const lfo = add('lfo', 0, 0, { wave: 1, rate: 0.7, depth: 1 });
+  const sc = add('scale', 0, 0, { gain: 2, offset: 2 });
+  const vw = add('vowel', 0, 0, { vowel: 0, res: 0.6, level: 0.9 });
+  const ph = add('phaser', 0, 0, { rate: 1.1, depth: 0.8, center: 600, fb: 0.5, mix: 0.5 });
+  const out = add('output', 0, 0, { level: 0.8 });
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(osc, 'out', vw, 'in');
+  wire(lfo, 'out', sc, 'in');
+  wire(sc, 'out', vw, 'vowel');
+  wire(vw, 'out', ph, 'in');
+  wire(ph, 'out', out, 'l');
+  wire(ph, 'out', out, 'r');
+});
+// coloured noise through the digitizer
+kit('crush-color', (add, wire) => {
+  const nz = add('noise', 0, 0, { level: 0.6, color: 0.6 });
+  const cr = add('crush', 0, 0, { bits: 6, rate: 5 });
+  const out = add('output', 0, 0, { level: 0.8 });
+  wire(nz, 'out', cr, 'in');
+  wire(cr, 'out', out, 'l');
+});
+
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 for (const [name, patch] of Object.entries(tests)) {
   const e = new Engine(SR);

@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 15
+#define N_TYPES 20
 enum {
     T_FM1,
     T_OSC,
@@ -20,6 +20,11 @@ enum {
     T_OUTPUT,
     T_GLIDE,
     T_SHAPE,
+    T_PAN,
+    T_XFADE,
+    T_VOWEL,
+    T_PHASER,
+    T_CRUSH,
 };
 
 /* fm1: Main */
@@ -77,9 +82,10 @@ enum {
 #define NOISE_I_P2 1
 #define NOISE_O_OUT 0
 #define NOISE_P_LEVEL 0
+#define NOISE_P_COLOR 1
 #define NOISE_NIN 2
 #define NOISE_NOUT 1
-#define NOISE_NPAR 1
+#define NOISE_NPAR 2
 #define NOISE_CVBASE 0
 
 /* const: Constant */
@@ -227,6 +233,73 @@ enum {
 #define SHAPE_NPAR 3
 #define SHAPE_CVBASE 1
 
+/* pan: Pan */
+#define PAN_I_IN 0
+#define PAN_I_POS 1
+#define PAN_I_P1 2
+#define PAN_I_P2 3
+#define PAN_O_L 0
+#define PAN_O_R 1
+#define PAN_P_PAN 0
+#define PAN_NIN 4
+#define PAN_NOUT 2
+#define PAN_NPAR 1
+#define PAN_CVBASE 2
+
+/* xfade: Crossfade */
+#define XFADE_I_A 0
+#define XFADE_I_B 1
+#define XFADE_I_POS 2
+#define XFADE_I_P1 3
+#define XFADE_I_P2 4
+#define XFADE_O_OUT 0
+#define XFADE_P_MIX 0
+#define XFADE_NIN 5
+#define XFADE_NOUT 1
+#define XFADE_NPAR 1
+#define XFADE_CVBASE 3
+
+/* vowel: Vowel */
+#define VOWEL_I_IN 0
+#define VOWEL_I_VOWEL 1
+#define VOWEL_I_P1 2
+#define VOWEL_I_P2 3
+#define VOWEL_O_OUT 0
+#define VOWEL_P_VOWEL 0
+#define VOWEL_P_RES 1
+#define VOWEL_P_LEVEL 2
+#define VOWEL_NIN 4
+#define VOWEL_NOUT 1
+#define VOWEL_NPAR 3
+#define VOWEL_CVBASE 2
+
+/* phaser: Phaser */
+#define PHASER_I_IN 0
+#define PHASER_I_P1 1
+#define PHASER_I_P2 2
+#define PHASER_O_OUT 0
+#define PHASER_P_RATE 0
+#define PHASER_P_DEPTH 1
+#define PHASER_P_CENTER 2
+#define PHASER_P_FB 3
+#define PHASER_P_MIX 4
+#define PHASER_NIN 3
+#define PHASER_NOUT 1
+#define PHASER_NPAR 5
+#define PHASER_CVBASE 1
+
+/* crush: Digitizer */
+#define CRUSH_I_IN 0
+#define CRUSH_I_P1 1
+#define CRUSH_I_P2 2
+#define CRUSH_O_OUT 0
+#define CRUSH_P_BITS 0
+#define CRUSH_P_RATE 1
+#define CRUSH_NIN 3
+#define CRUSH_NOUT 1
+#define CRUSH_NPAR 2
+#define CRUSH_CVBASE 1
+
 #define MAX_IN 6
 #define MAX_OUT 8
 #define MAX_PAR 7
@@ -273,14 +346,14 @@ static const char *const LFO_UNIT[] = {"", "HZ", ""};
 static const char *const LFO_CH0[] = {"SINE", "TRIANGLE", "SAW", "SQUARE", "S&H", 0};
 static const char *const *const LFO_CH[] = {LFO_CH0, 0, 0};
 static const char *const NOISE_INNAMES[] = {"P1", "P2"};
-static const int32_t NOISE_MIN[] = {0};
-static const int32_t NOISE_MAX[] = {65536};
-static const int32_t NOISE_DEF[] = {32768};
-static const int32_t NOISE_INC[] = {655};
-static const char *const NOISE_PN[] = {"LEVEL"};
-static const uint8_t NOISE_LOG[] = {0};
-static const char *const NOISE_UNIT[] = {""};
-static const char *const *const NOISE_CH[] = {0};
+static const int32_t NOISE_MIN[] = {0, 0};
+static const int32_t NOISE_MAX[] = {65536, 65536};
+static const int32_t NOISE_DEF[] = {32768, 0};
+static const int32_t NOISE_INC[] = {655, 655};
+static const char *const NOISE_PN[] = {"LEVEL", "COLOR"};
+static const uint8_t NOISE_LOG[] = {0, 0};
+static const char *const NOISE_UNIT[] = {"", ""};
+static const char *const *const NOISE_CH[] = {0, 0};
 static const char *const CONST_INNAMES[] = {"P1", "P2"};
 static const int32_t CONST_MIN[] = {-262144};
 static const int32_t CONST_MAX[] = {262144};
@@ -382,6 +455,51 @@ static const uint8_t SHAPE_LOG[] = {1, 0, 0};
 static const char *const SHAPE_UNIT[] = {"", "", ""};
 static const char *const SHAPE_CH1[] = {"SOFT", "HARD", "FOLD", 0};
 static const char *const *const SHAPE_CH[] = {0, SHAPE_CH1, 0};
+static const char *const PAN_INNAMES[] = {"IN", "POS", "P1", "P2"};
+static const int32_t PAN_MIN[] = {-65536};
+static const int32_t PAN_MAX[] = {65536};
+static const int32_t PAN_DEF[] = {0};
+static const int32_t PAN_INC[] = {1311};
+static const char *const PAN_PN[] = {"PAN"};
+static const uint8_t PAN_LOG[] = {0};
+static const char *const PAN_UNIT[] = {""};
+static const char *const *const PAN_CH[] = {0};
+static const char *const XFADE_INNAMES[] = {"A", "B", "POS", "P1", "P2"};
+static const int32_t XFADE_MIN[] = {0};
+static const int32_t XFADE_MAX[] = {65536};
+static const int32_t XFADE_DEF[] = {32768};
+static const int32_t XFADE_INC[] = {655};
+static const char *const XFADE_PN[] = {"MIX"};
+static const uint8_t XFADE_LOG[] = {0};
+static const char *const XFADE_UNIT[] = {""};
+static const char *const *const XFADE_CH[] = {0};
+static const char *const VOWEL_INNAMES[] = {"IN", "VOWEL", "P1", "P2"};
+static const int32_t VOWEL_MIN[] = {0, 0, 0};
+static const int32_t VOWEL_MAX[] = {262144, 65536, 65536};
+static const int32_t VOWEL_DEF[] = {0, 32768, 45875};
+static const int32_t VOWEL_INC[] = {2621, 655, 655};
+static const char *const VOWEL_PN[] = {"VOWEL", "RES", "LEVEL"};
+static const uint8_t VOWEL_LOG[] = {0, 0, 0};
+static const char *const VOWEL_UNIT[] = {"", "", ""};
+static const char *const *const VOWEL_CH[] = {0, 0, 0};
+static const char *const PHASER_INNAMES[] = {"IN", "P1", "P2"};
+static const int32_t PHASER_MIN[] = {1311, 0, 6553600, 0, 0};
+static const int32_t PHASER_MAX[] = {655360, 65536, 262144000, 58982, 65536};
+static const int32_t PHASER_DEF[] = {32768, 45875, 52428800, 19661, 32768};
+static const int32_t PHASER_INC[] = {6540, 655, 2555904, 655, 655};
+static const char *const PHASER_PN[] = {"RATE", "DEPTH", "CENTER", "FB", "MIX"};
+static const uint8_t PHASER_LOG[] = {1, 0, 1, 0, 0};
+static const char *const PHASER_UNIT[] = {"HZ", "", "HZ", "", ""};
+static const char *const *const PHASER_CH[] = {0, 0, 0, 0, 0};
+static const char *const CRUSH_INNAMES[] = {"IN", "P1", "P2"};
+static const int32_t CRUSH_MIN[] = {65536, 65536};
+static const int32_t CRUSH_MAX[] = {1048576, 4194304};
+static const int32_t CRUSH_DEF[] = {524288, 65536};
+static const int32_t CRUSH_INC[] = {65536, 65536};
+static const char *const CRUSH_PN[] = {"BITS", "RATE"};
+static const uint8_t CRUSH_LOG[] = {0, 0};
+static const char *const CRUSH_UNIT[] = {"", ""};
+static const char *const *const CRUSH_CH[] = {0, 0};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, FM1_CVBASE, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -399,4 +517,9 @@ static const def_t DEFS[N_TYPES] = {
     {OUTPUT_NIN, OUTPUT_NOUT, OUTPUT_NPAR, OUTPUT_CVBASE, OUTPUT_MIN, OUTPUT_MAX, OUTPUT_DEF, OUTPUT_INC, "OUTPUT", OUTPUT_PN, OUTPUT_INNAMES, OUTPUT_LOG, OUTPUT_UNIT, OUTPUT_CH},   /* output */
     {GLIDE_NIN, GLIDE_NOUT, GLIDE_NPAR, GLIDE_CVBASE, GLIDE_MIN, GLIDE_MAX, GLIDE_DEF, GLIDE_INC, "GLIDE", GLIDE_PN, GLIDE_INNAMES, GLIDE_LOG, GLIDE_UNIT, GLIDE_CH},   /* glide */
     {SHAPE_NIN, SHAPE_NOUT, SHAPE_NPAR, SHAPE_CVBASE, SHAPE_MIN, SHAPE_MAX, SHAPE_DEF, SHAPE_INC, "SHAPER", SHAPE_PN, SHAPE_INNAMES, SHAPE_LOG, SHAPE_UNIT, SHAPE_CH},   /* shape */
+    {PAN_NIN, PAN_NOUT, PAN_NPAR, PAN_CVBASE, PAN_MIN, PAN_MAX, PAN_DEF, PAN_INC, "PAN", PAN_PN, PAN_INNAMES, PAN_LOG, PAN_UNIT, PAN_CH},   /* pan */
+    {XFADE_NIN, XFADE_NOUT, XFADE_NPAR, XFADE_CVBASE, XFADE_MIN, XFADE_MAX, XFADE_DEF, XFADE_INC, "CROSSFADE", XFADE_PN, XFADE_INNAMES, XFADE_LOG, XFADE_UNIT, XFADE_CH},   /* xfade */
+    {VOWEL_NIN, VOWEL_NOUT, VOWEL_NPAR, VOWEL_CVBASE, VOWEL_MIN, VOWEL_MAX, VOWEL_DEF, VOWEL_INC, "VOWEL", VOWEL_PN, VOWEL_INNAMES, VOWEL_LOG, VOWEL_UNIT, VOWEL_CH},   /* vowel */
+    {PHASER_NIN, PHASER_NOUT, PHASER_NPAR, PHASER_CVBASE, PHASER_MIN, PHASER_MAX, PHASER_DEF, PHASER_INC, "PHASER", PHASER_PN, PHASER_INNAMES, PHASER_LOG, PHASER_UNIT, PHASER_CH},   /* phaser */
+    {CRUSH_NIN, CRUSH_NOUT, CRUSH_NPAR, CRUSH_CVBASE, CRUSH_MIN, CRUSH_MAX, CRUSH_DEF, CRUSH_INC, "DIGITIZER", CRUSH_PN, CRUSH_INNAMES, CRUSH_LOG, CRUSH_UNIT, CRUSH_CH},   /* crush */
 };
