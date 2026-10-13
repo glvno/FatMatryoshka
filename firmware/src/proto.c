@@ -16,7 +16,7 @@
 #define M1_PATCH_MAX 3072u
 #define M1_VERSION 1
 
-enum { C_HELLO = 0x01, C_CHUNK = 0x10, C_COMMIT = 0x11, C_STORE = 0x12, C_PARAM = 0x20, C_ATT = 0x21, C_BYPASS = 0x22, C_SLOT = 0x13, C_SLOT_ERASE = 0x14, C_SLOT_INFO = 0x15, R_ACK = 0x40, R_INFO = 0x41, R_SLOT = 0x42 };
+enum { C_HELLO = 0x01, C_CHUNK = 0x10, C_COMMIT = 0x11, C_STORE = 0x12, C_PARAM = 0x20, C_ATT = 0x21, C_BYPASS = 0x22, C_RANGE = 0x23, C_SLOT = 0x13, C_SLOT_ERASE = 0x14, C_SLOT_INFO = 0x15, R_ACK = 0x40, R_INFO = 0x41, R_SLOT = 0x42 };
 #define M1_SLOTS 32u
 #define M1_NAME 20u
 enum { S_OK, S_RANGE, S_CRC, S_LOAD, S_FLASH, S_CMD, S_NONE };
@@ -176,7 +176,76 @@ static int m1_valid(const uint8_t *p, uint32_t len)
         at += 1u + 4u * d->npar + (d->cvbase >= 0 ? 20u : 0u);
         npar += d->npar;
     }
-    return at + 4u * ncab + ((p[6] & 1u) ? 4u * npar : 0u) == len;   /* flag bit 0: the morph B set after the cables */
+    at += 4u * ncab + ((p[6] & 1u) ? 4u * npar : 0u);           /* flag bit 0: the morph B set after the cables */
+    if (p[6] & 2u) {                                            /* flag bit 1: the macro ranges after that */
+        if (at >= len)
+            return 0;
+        at += 1u + 5u * p[at];
+    }
+    return at == len;
+}
+
+/* the offset of the macro range section (its count byte) in the current patch, 0 if the patch has none */
+static uint32_t m1_range_section(void)
+{
+    uint32_t at = 8, i, nmod, ncab, npar = 0;
+    if (m1_cur_len < 8u || !(m1_cur[6] & 2u))
+        return 0;
+    nmod = m1_cur[2];
+    ncab = (uint32_t)m1_cur[4] | (uint32_t)m1_cur[5] << 8;
+    for (i = 0; i < nmod; i++) {
+        const def_t *d;
+        if (at >= m1_cur_len || M1_TYPE(m1_cur[at]) >= N_TYPES)
+            return 0;
+        d = &DEFS[M1_TYPE(m1_cur[at])];
+        at += 1u + 4u * d->npar + (d->cvbase >= 0 ? 20u : 0u);
+        npar += d->npar;
+    }
+    at += 4u * ncab + ((m1_cur[6] & 1u) ? 4u * npar : 0u);
+    return at < m1_cur_len ? at : 0;
+}
+
+/* the stored copy follows a macro range edit: update, append or remove the entry (the section is last in the binary) */
+static void m1_patch_range(uint32_t mod, uint32_t pin, uint32_t par, int on, uint32_t lo, uint32_t hi)
+{
+    uint32_t sec = m1_range_section(), i, n, at;
+    if (!sec) {
+        if (!on || m1_cur_len + 6u > M1_PATCH_MAX || m1_cur_len < 8u)
+            return;
+        sec = m1_cur_len;
+        m1_cur[6] |= 2u;
+        m1_cur[sec] = 0;
+        m1_cur_len = sec + 1u;
+    }
+    n = m1_cur[sec];
+    for (i = 0, at = sec + 1u; i < n; i++, at += 5)
+        if (m1_cur[at] == mod && m1_cur[at + 1] == pin && m1_cur[at + 2] == par)
+            break;
+    if (i < n && !on) {                                         /* remove: the last entry moves into its place */
+        uint32_t last = sec + 1u + 5u * (n - 1u), k;
+        for (k = 0; k < 5u; k++)
+            m1_cur[at + k] = m1_cur[last + k];
+        m1_cur[sec] = (uint8_t)(n - 1u);
+        m1_cur_len = last;
+        if (n == 1u) {                                          /* the section is empty: drop it */
+            m1_cur[6] &= (uint8_t)~2u;
+            m1_cur_len = sec;
+        }
+        return;
+    }
+    if (!on)
+        return;
+    if (i == n) {
+        if (m1_cur_len + 5u > M1_PATCH_MAX || n >= 255u)
+            return;
+        m1_cur[sec] = (uint8_t)(n + 1u);
+        m1_cur_len += 5u;
+    }
+    m1_cur[at] = (uint8_t)mod;
+    m1_cur[at + 1] = (uint8_t)pin;
+    m1_cur[at + 2] = (uint8_t)par;
+    m1_cur[at + 3] = (uint8_t)lo;
+    m1_cur[at + 4] = (uint8_t)hi;
 }
 
 /* f: the bytes between F0 and F7. Returns 1 if the frame was ours (and is consumed). */
@@ -331,6 +400,13 @@ static int m1_handle(const uint8_t *f, uint32_t n)
             int32_t v = (int32_t)((uint32_t)d[2] | (uint32_t)d[3] << 8 | (uint32_t)d[4] << 16 | (uint32_t)d[5] << 24);
             eng_set_att(d[0], d[1], v);
             m1_patch_att(d[0], d[1], v);
+        }
+        break;
+    case C_RANGE:
+        if (len >= 6u) {
+            if (eng_set_range(d[0], d[1], d[2], d[3] != 0, d[4], d[5]))
+                m1_patch_range(d[0], d[1], d[2], d[3] != 0, d[4], d[5]);
+            m1_ui_changed();
         }
         break;
     case C_BYPASS:

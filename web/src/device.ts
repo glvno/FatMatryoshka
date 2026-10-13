@@ -3,7 +3,7 @@
 import { DEFS } from './modules';
 import type { Patch } from './patch';
 import { encodePatch, toQ16 } from './patchbin';
-import { attFrame, bypassFrame, chunkFrames, CMD, parseSlot, slotEraseFrame, slotFrame, slotInfoFrame, SLOTS, type SlotInfo, commitFrame, helloFrame, paramFrame, parse, parseAck, parseInfo, STATUS_TEXT, storeFrame, type Ack, type Info } from './protocol';
+import { attFrame, bypassFrame, chunkFrames, CMD, parseSlot, rangeFrame, slotEraseFrame, slotFrame, slotInfoFrame, SLOTS, type SlotInfo, commitFrame, helloFrame, paramFrame, parse, parseAck, parseInfo, STATUS_TEXT, storeFrame, type Ack, type Info } from './protocol';
 
 const NAME = /felucca|fm-?1|modular/i;
 const ACK_TIMEOUT = 700;
@@ -167,6 +167,15 @@ export class DeviceLink {
     if (!this.connected) return;
     const mi = patch.modules.findIndex((m) => m.id === moduleId);
     if (mi >= 0) this.out!.send(attFrame(mi, index, toQ16(value)));
+  }
+
+  /** a macro range of p1 / p2 (index 0 / 1) on a parameter, or its removal */
+  range(patch: Patch, moduleId: number, index: number, name: string, range: [number, number] | null): void {
+    if (!this.connected) return;
+    const mi = patch.modules.findIndex((m) => m.id === moduleId);
+    if (mi < 0) return;
+    const pi = DEFS[patch.modules[mi].type].params.findIndex((q) => q.name === name);
+    if (pi >= 0) this.out!.send(rangeFrame(mi, index, pi, range));
   }
 
   /** a module's bypass switch */

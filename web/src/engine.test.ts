@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { Engine } from './engine';
 import { DEFS, DELAY_TIME_MAX, DELAY_TIME_MIN } from './modules';
-import { addModule, clearMorph, connect, disconnect, emptyPatch, fromUnit, hasMorph, modulate, morphValue, processingOrder, removeModule, sameStructure, setMorphTarget, toUnit, validatePatch, voiceSplit, type Patch } from './patch';
+import { addModule, clearMorph, connect, disconnect, emptyPatch, fromUnit, hasMorph, modulate, morphValue, paramUnit, paramValue, processingOrder, removeModule, sameStructure, setMorphTarget, toUnit, validatePatch, voiceSplit, type Patch } from './patch';
 import { PRESETS } from './presets';
 import { encodePatch, recordSize } from './patchbin';
 
@@ -424,6 +424,62 @@ describe('filter', () => {
     const cable = q.cables.find((c: { from: { module: number } }) => c.from.module === flt);
     cable.from.port = 'lp'; // what an old patch calls the 12 dB output
     expect(validatePatch(q, DEFS).cables.find((c) => c.from.module === flt)!.from.port).toBe('lp12');
+  });
+});
+
+describe('macro ranges', () => {
+  /** a constant into the filter's p1 (-> cutoff), noise through the filter's lp12; returns the effective cutoff the engine used */
+  function rig(k: number, range: [number, number] | null, base = 1200, att = 1): number {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const c = addModule(p, DEFS.const, 0, 0);
+    c.params.value = k;
+    const n = addModule(p, DEFS.noise, 0, 0);
+    const f = addModule(p, DEFS.filter, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    f.params.cutoff = base;
+    f.map!.p1 = ['cutoff'];
+    f.att = [att, 1];
+    if (range) f.range = { p1: { cutoff: range } };
+    connect(p, DEFS, { module: c.id, port: 'out' }, { module: f.id, port: 'p1' });
+    connect(p, DEFS, { module: n.id, port: 'out' }, { module: f.id, port: 'in' });
+    connect(p, DEFS, { module: f.id, port: 'lp12' }, { module: out.id, port: 'l' });
+    e.load(p);
+    render(e, 256);
+    return (e as unknown as { nodes: Map<number, { inst: { eff: Record<string, number> }[] }> }).nodes.get(f.id)!.inst[0].eff.cutoff;
+  }
+  const cutoff = DEFS.filter.params.find((q) => q.name === 'cutoff')!;
+
+  it('the pin lands between the two ends in octave space instead of adding to the base', () => {
+    expect(rig(0, null)).toBeCloseTo(1200, 6); // no range, no input: the base
+    expect(rig(0.5, null)).toBeCloseTo(modulate(cutoff, 1200, 0.5), 3); // the old behaviour
+    const lo = paramUnit(cutoff, 200), hi = paramUnit(cutoff, 8000);
+    expect(rig(0, [lo, hi])).toBeCloseTo(200, 2);
+    expect(rig(1, [lo, hi])).toBeCloseTo(8000, 1);
+    expect(rig(0.5, [lo, hi])).toBeCloseTo(Math.sqrt(200 * 8000), 1); // the midpoint in octaves: 1265 Hz, not 4100
+    expect(rig(0.5, [lo, hi], 20)).toBeCloseTo(Math.sqrt(200 * 8000), 1); // the base no longer matters
+    expect(rig(1, [hi, lo])).toBeCloseTo(200, 2); // ends swapped: the knob goes down
+    expect(rig(2, [lo, hi])).toBeCloseTo(8000, 1); // the pin is clamped to 0..1
+    expect(rig(1, [lo, hi], 1200, 0.5)).toBeCloseTo(paramValue(cutoff, lo + 0.5 * (hi - lo)), 1); // the attenuverter scales the travel
+  });
+
+  it('is kept by validation only on parameters the pin controls, and encodes as the range section', () => {
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const f = addModule(p, DEFS.filter, 0, 0);
+    f.map!.p1 = ['cutoff'];
+    f.range = { p1: { cutoff: [0.2, 0.9], res: [0, 1] }, p2: { cutoff: [0, 1] } };
+    const v = validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
+    expect(v.modules[1].range).toEqual({ p1: { cutoff: [0.2, 0.9] } }); // res is not a p1 destination, cutoff not a p2 one
+    const plain = encodePatch(emptyPatch());
+    expect(plain[6]).toBe(0);
+    const b = encodePatch(v);
+    expect(b[6] & 2).toBe(2);
+    const n = b.length;
+    expect(Array.from(b.subarray(n - 6))).toEqual([1, 1, 0, 0, Math.round(0.2 * 255), Math.round(0.9 * 255)]); // count, module 1, p1, cutoff (param 0), ends
+    delete v.modules[1].range;
+    expect(encodePatch(v).length).toBe(n - 6);
   });
 });
 

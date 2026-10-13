@@ -444,7 +444,8 @@ static int knob_target(uint32_t panel, uint32_t k, char *out)
 
 /* the selected module, laid out like the arpeggiator pages: name, then per knob a small label, the value and a bar; the
  * picture of the patch stands at the right (TH_X..) */
-static void module_row(uint32_t k, const char *label, const char *val, int active, int32_t bar)
+/* a knob row: name, value, a value bar; blo / bhi >= 0 draw a bracket over the bar (the travel of a macro range) */
+static void module_row_b(uint32_t k, const char *label, const char *val, int active, int32_t bar, int32_t blo, int32_t bhi)
 {
     char line[40], v[24], *p = line;
     uint32_t y = 56u + 36u * k;
@@ -464,7 +465,19 @@ static void module_row(uint32_t k, const char *label, const char *val, int activ
     } else {
         lcd_fill(12, y + 24u, LEFT_W, 2, C_BG);
     }
+    if (blo >= 0 && bhi >= 0) {                     /* the bracket: a tick at each end, a thin line between them above the bar */
+        uint32_t a = (uint32_t)(blo < bhi ? blo : bhi), b = (uint32_t)(blo < bhi ? bhi : blo);
+        if (b > LEFT_W - 1u)
+            b = LEFT_W - 1u;
+        if (a > b)
+            a = b;
+        lcd_fill(12 + a, y + 22u, b - a + 1u, 1, C_FG);
+        lcd_fill(12 + a, y + 22u, 1, 5, C_FG);
+        lcd_fill(12 + b, y + 22u, 1, 5, C_FG);
+    }
 }
+
+static void module_row(uint32_t k, const char *label, const char *val, int active, int32_t bar) { module_row_b(k, label, val, active, bar, -1, -1); }
 
 static void module_draw(int full)
 {
@@ -526,7 +539,17 @@ static void module_draw(int full)
                 } else
                     put_param(val, d, first, eff);
                 val[15] = 0;
-                module_row(k, nm, val, 1, (int32_t)param_bar(d, first, eff, LEFT_W));
+                {                                   /* a macro range of p1 / p2 on this parameter: its travel as a bracket */
+                    uint32_t lo, hi, pin;
+                    int32_t blo = -1, bhi = -1;
+                    for (pin = 0; pin < 2u; pin++)
+                        if (eng_range(sel, pin, first, &lo, &hi)) {
+                            blo = (int32_t)(lo * LEFT_W / 255u);
+                            bhi = (int32_t)(hi * LEFT_W / 255u);
+                            break;
+                        }
+                    module_row_b(k, nm, val, 1, (int32_t)param_bar(d, first, eff, LEFT_W), blo, bhi);
+                }
             }
         }
     }

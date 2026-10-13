@@ -8,7 +8,7 @@
 // FM-1 panel is shared but its pitch / gate / vel outputs are per voice. With one voice this is exactly the mono engine.
 
 import { IMPLS, type Ctx, type ModuleImpl, type Voice } from './modules';
-import { defaultMap, modulate, morphValue, processingOrder, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Cable, type Patch, type Source, thruInput } from './patch';
+import { defaultMap, modulate, morphValue, paramValue, processingOrder, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Cable, type Patch, type Range, type Source, thruInput } from './patch';
 
 export const BLOCK = 128;
 
@@ -37,6 +37,8 @@ interface Node {
   thru: string | undefined;
   /** the B side of the morph (patch.ts paramsB), null without one */
   paramsB: Record<string, number> | null;
+  /** macro ranges per pin (patch.ts ModuleInst.range) */
+  range: [Record<string, Range>, Record<string, Range>];
   inst: Inst[];
   /** the FM-1 panel with several voices: its pitch / gate / vel, one buffer per voice */
   vout: Record<string, Float32Array[]> | null;
@@ -131,6 +133,7 @@ export class Engine {
             bypass: false,
             thru: thruInput(impl.def),
             paramsB: null,
+            range: [{}, {}],
             inst: Array.from({ length: ninst }, () => this.newInst(impl)),
             vout: panelVoices ? Object.fromEntries([...VOICE_PORTS].map((p) => [p, Array.from({ length: panelVoices }, () => new Float32Array(BLOCK))])) : null,
           };
@@ -139,6 +142,7 @@ export class Engine {
       node.map = Object.fromEntries(SOURCES.map((s) => [s, [...(m.map?.[s] ?? [])]])) as Record<Source, string[]>;
       node.bypass = !!m.bypass;
       node.paramsB = m.paramsB && m.type !== 'fm1' ? { ...m.paramsB } : null;
+      node.range = [{ ...(m.range?.p1 ?? {}) }, { ...(m.range?.p2 ?? {}) }];
       node.sources = [];
       node.connected = {};
       next.set(m.id, node);
@@ -186,6 +190,14 @@ export class Engine {
     if (n && (index === 0 || index === 1)) n.att[index] = value;
   }
 
+  /** a macro range of pin `index` (0 p1, 1 p2) on a parameter, or none */
+  setRange(id: number, index: number, name: string, range: Range | null): void {
+    const n = this.nodes.get(id);
+    if (!n || (index !== 0 && index !== 1)) return;
+    if (range) n.range[index][name] = [range[0], range[1]];
+    else delete n.range[index][name];
+  }
+
   /** bypass a module (its state is kept: it resumes where it stopped) */
   setBypass(id: number, on: boolean): void {
     const n = this.nodes.get(id);
@@ -231,15 +243,28 @@ export class Engine {
       });
     for (const pd of node.impl.def.params) {
       const a = node.params[pd.name] ?? pd.default;
-      const base = node.paramsB && this.morphT > 0 ? morphValue(pd, a, node.paramsB[pd.name] ?? a, this.morphT) : a;
+      let base = node.paramsB && this.morphT > 0 ? morphValue(pd, a, node.paramsB[pd.name] ?? a, this.morphT) : a;
       let mod = 0;
       let touched = false;
+      // a pin with a macro range on this parameter sets it: its value 0..1 lands between the two ends (replacing the base);
+      // the other pin still adds as usual
+      let ranged: Range | null = null;
+      let rv = 0;
       (['p1', 'p2'] as const).forEach((name, s) => {
-        if (pins[s] !== null && node.map[name].includes(pd.name)) {
+        if (pins[s] === null || !node.map[name].includes(pd.name)) return;
+        const r = node.range[s][pd.name];
+        if (r) {
+          ranged = r;
+          rv += pins[s]!;
+        } else {
           mod += pins[s]!;
           touched = true;
         }
       });
+      if (ranged) {
+        const [lo, hi] = ranged as Range;
+        base = paramValue(pd, lo + Math.min(1, Math.max(0, rv)) * (hi - lo));
+      }
       inst.eff[pd.name] = touched ? modulate(pd, base, mod) : base;
     }
   }

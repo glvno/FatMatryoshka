@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Compact binary patch format, read by firmware/src/engine.c (eng_load).
 //
-//   u8  magic 0xA1, u8 version 14, u8 module count, u8 voices (1..8; 0 = 1, what older files hold), u16 LE cable count, u16 LE flags
-//       (bit 0: a morph B set follows the cables)
+//   u8  magic 0xA1, u8 version 15, u8 module count, u8 voices (1..8; 0 = 1, what older files hold), u16 LE cable count, u16 LE flags
+//       (bit 0: a morph B set follows the cables; bit 1: a macro range list follows that)
 //   per module:  u8 type index (bit 7 set: the module is bypassed), then one i32 LE per parameter (Q16.16), in the order of the definition;
 //                modules with parameter inputs (paramInputs) then add i32 att1, i32 att2 (Q16.16, -1..1) and
 //                six u16 LE matrix masks for the sources p1, p2, k1, k2, k3, k4 (bit n = the n-th parameter)
 //   per cable:   u8 from module index, u8 from output index, u8 to module index, u8 to input index
 //   with flag bit 0, per module: one i32 LE per parameter (Q16.16), the B side of the morph (the Main module's morph
 //                parameter and input fade every parameter from the record's value to this one)
+//   with flag bit 1: u8 count, then per macro range: u8 module index, u8 pin (0 p1, 1 p2), u8 parameter index, u8 low end,
+//                u8 high end (0..255 of the parameter's range, octaves for a log one): the pin's value lands between the ends
 //
 // Type indices are the position in TYPE_ORDER (append only: the firmware has the same list in defs.h).
 // Port indices are positions in ModuleDef.outputs / inputs (explicit ports first, then the `<param>_cv` inputs).
@@ -18,7 +20,7 @@ import { hasMorph, MAX_MODULES, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type
 
 export const TYPE_ORDER: string[] = Object.keys(DEFS);
 export const MAX_CABLES = 192;
-export const VERSION = 14; // 14: the Main module got the morph input and parameter, header flag bit 0 = a morph B set follows the cables; 13: the shaper and the digitizer got the os (oversampling) parameter, the sequencer glide and gate; 12: bit 7 of the type byte marks a bypassed module; 11: the oscillator got the unison and detune parameters; 10: the merge of the two lines below: the Main module's clock output comes before spread, the lfo's inputs are clk, reset (the restart input was sync), the delay as in 8b, modules of the second and third batch; 9: the matrix masks are u16 (modules with more than 8 parameters), the modules of the second module batch; 8a: osc and lfo got the sync input (p1 / p2 moved), glide and shape modules, the panel's spread output; 8b: the delay has the clk input, r output and sync, pingpong parameters, the lfo got the clk and reset inputs and the sync, div, bpm parameters, the Main module's clock output; 7: the oscillator got the fb parameter; 6: the filter's outputs are lp24, lp12, bp, hp, mix; 5: the filter got the morph input (ports after cv moved), track and morph parameters; 4: the reverb module was added before the output
+export const VERSION = 15; // 15: macro ranges (flag bit 1); 14: the Main module got the morph input and parameter, header flag bit 0 = a morph B set follows the cables; 13: the shaper and the digitizer got the os (oversampling) parameter, the sequencer glide and gate; 12: bit 7 of the type byte marks a bypassed module; 11: the oscillator got the unison and detune parameters; 10: the merge of the two lines below: the Main module's clock output comes before spread, the lfo's inputs are clk, reset (the restart input was sync), the delay as in 8b, modules of the second and third batch; 9: the matrix masks are u16 (modules with more than 8 parameters), the modules of the second module batch; 8a: osc and lfo got the sync input (p1 / p2 moved), glide and shape modules, the panel's spread output; 8b: the delay has the clk input, r output and sync, pingpong parameters, the lfo got the clk and reset inputs and the sync, div, bpm parameters, the Main module's clock output; 7: the oscillator got the fb parameter; 6: the filter's outputs are lp24, lp12, bp, hp, mix; 5: the filter got the morph input (ports after cv moved), track and morph parameters; 4: the reverb module was added before the output
 /** bytes of a module record */
 export const recordSize = (type: string): number => 1 + 4 * DEFS[type].params.length + (DEFS[type].paramInputs ? 20 : 0);
 export const Q = 65536;
@@ -27,6 +29,21 @@ export const Q = 65536;
 export const BYPASS_BIT = 0x80;
 /** header flags (u16 at offset 6) */
 export const FLAG_MORPH = 1;
+export const FLAG_RANGE = 2;
+/** the macro ranges of a patch as the binary lists them (module index, pin, parameter index, ends 0..255) */
+export function rangeList(p: Patch): { mod: number; pin: number; par: number; lo: number; hi: number }[] {
+  const out: { mod: number; pin: number; par: number; lo: number; hi: number }[] = [];
+  p.modules.forEach((m, mod) => {
+    const def = DEFS[m.type];
+    (['p1', 'p2'] as const).forEach((s, pin) => {
+      for (const [name, r] of Object.entries(m.range?.[s] ?? {})) {
+        const par = def.params.findIndex((q) => q.name === name);
+        if (par >= 0 && m.map?.[s].includes(name)) out.push({ mod, pin, par, lo: Math.round(r[0] * 255), hi: Math.round(r[1] * 255) });
+      }
+    });
+  });
+  return out;
+}
 
 export const toQ16 = (v: number): number => Math.max(-0x80000000, Math.min(0x7fffffff, Math.round(v * Q)));
 
@@ -35,10 +52,12 @@ export function encodePatch(p: Patch): Uint8Array {
   if (p.cables.length > MAX_CABLES) throw new Error(`more than ${MAX_CABLES} cables`);
   const index = new Map(p.modules.map((m, i) => [m.id, i]));
   const morph = hasMorph(p);
+  const ranges = rangeList(p);
   let size = 8;
   for (const m of p.modules) size += recordSize(m.type);
   size += 4 * p.cables.length;
   if (morph) for (const m of p.modules) size += 4 * DEFS[m.type].params.length;
+  if (ranges.length) size += 1 + 5 * ranges.length;
   const out = new Uint8Array(size);
   const dv = new DataView(out.buffer);
   out[0] = 0xa1;
@@ -46,7 +65,7 @@ export function encodePatch(p: Patch): Uint8Array {
   out[2] = p.modules.length;
   out[3] = voicesOf(p);
   dv.setUint16(4, p.cables.length, true);
-  dv.setUint16(6, morph ? FLAG_MORPH : 0, true);
+  dv.setUint16(6, (morph ? FLAG_MORPH : 0) | (ranges.length ? FLAG_RANGE : 0), true);
   let at = 8;
   for (const m of p.modules) {
     const def = DEFS[m.type];
@@ -85,11 +104,15 @@ export function encodePatch(p: Patch): Uint8Array {
         dv.setInt32(at, toQ16(m.paramsB?.[pd.name] ?? m.params[pd.name] ?? pd.default), true);
         at += 4;
       }
+  if (ranges.length) {
+    out[at++] = ranges.length;
+    for (const r of ranges) out.set([r.mod, r.pin, r.par, r.lo, r.hi], (at += 5) - 5);
+  }
   return out;
 }
 
 /** the FM-1's pools (firmware/src/engine.c, the one-voice build: ENG_NBUF, ENG_MAX_INST, ENG_MAX_POLY); the four-voice
- * build (-DENG_VOICES=4) has 108 buffers and 80 instances shared by its four patches */
+ * build (-DENG_VOICES=4) has 108 buffers and 72 instances shared by its four patches */
 export const DEVICE = { buffers: 255, instances: 128, voices: 8 } as const;
 
 /**

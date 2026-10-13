@@ -57,6 +57,21 @@ export function modulate(pd: ParamDef, base: number, mod: number): number {
   return fromUnit(pd, toUnit(pd, base) + mod);
 }
 
+/** a parameter's position in its range without the slider's bend (octaves for a log parameter): the space macro ranges and the morph move in */
+export function paramUnit(pd: ParamDef, v: number): number {
+  const x = Math.min(pd.max, Math.max(pd.min, v));
+  return pd.log ? Math.log(x / pd.min) / Math.log(pd.max / pd.min) : (x - pd.min) / (pd.max - pd.min);
+}
+
+export function paramValue(pd: ParamDef, u: number): number {
+  const x = Math.min(1, Math.max(0, u));
+  return pd.log ? pd.min * Math.pow(pd.max / pd.min, x) : pd.min + x * (pd.max - pd.min);
+}
+
+/** the macro range of pin `s` on parameter `name`: the pin's value 0..1 lands between these two unit positions instead of adding to the base */
+export type Range = [number, number];
+export const rangeOf = (m: ModuleInst, s: 'p1' | 'p2', name: string): Range | undefined => m.range?.[s]?.[name];
+
 export interface ModuleDef {
   type: string;
   label: string;
@@ -98,6 +113,9 @@ export interface ModuleInst {
   /** the B side of a morph: the same parameters as `params`, taken from another patch of the same structure (setMorphTarget); the
    * Main module's `morph` (plus its morph input) fades every parameter from `params` to these. Not on the Main module. */
   paramsB?: Record<string, number>;
+  /** macro ranges: for a parameter that p1 / p2 controls (map), the input's value 0..1 lands between these two positions of the
+   * parameter's range (0..1, octaves for a log parameter; paramUnit) instead of adding to the base value */
+  range?: { p1?: Record<string, [number, number]>; p2?: Record<string, [number, number]> };
 }
 
 export interface Patch {
@@ -150,9 +168,7 @@ export const hasMorph = (p: Patch): boolean => p.modules.some((m) => m.paramsB);
  * slider's bend: the midpoint of 200 and 3200 Hz is 800 Hz); a choice or switch snaps at 0.5 */
 export function morphValue(pd: ParamDef, a: number, b: number, t: number): number {
   if (pd.choices || pd.toggle) return t < 0.5 ? a : b;
-  const clamp = (v: number): number => Math.min(pd.max, Math.max(pd.min, v));
-  if (!pd.log) return clamp(a + (b - a) * t);
-  return clamp(clamp(a) * Math.pow(clamp(b) / clamp(a), t));
+  return paramValue(pd, paramUnit(pd, a) + (paramUnit(pd, b) - paramUnit(pd, a)) * t);
 }
 
 export const MAX_MODULES = 32;
@@ -229,6 +245,21 @@ export function fixMatrix(m: ModuleInst, def: ModuleDef): void {
   const map = {} as Record<Source, string[]>;
   for (const s of SOURCES) map[s] = Array.isArray(m.map?.[s]) ? m.map![s].filter((n) => names.has(n)) : dm[s];
   m.map = map;
+  // macro ranges: only on parameters the pin controls, both ends 0..1
+  if (m.range && typeof m.range === 'object') {
+    const out: NonNullable<ModuleInst['range']> = {};
+    for (const s of ['p1', 'p2'] as const) {
+      const r = m.range[s];
+      if (!r || typeof r !== 'object') continue;
+      for (const name of map[s]) {
+        const v = r[name];
+        if (!Array.isArray(v) || v.length !== 2 || !v.every((x) => Number.isFinite(Number(x)))) continue;
+        (out[s] ??= {})[name] = [Math.min(1, Math.max(0, Number(v[0]))), Math.min(1, Math.max(0, Number(v[1])))];
+      }
+    }
+    if (Object.keys(out).length) m.range = out;
+    else delete m.range;
+  } else delete m.range;
 }
 
 export function addModule(p: Patch, def: ModuleDef, x: number, y: number): ModuleInst {

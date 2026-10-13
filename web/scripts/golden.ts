@@ -8,7 +8,7 @@ import { encodePatch, toQ16 } from '../src/patchbin';
 import { DEFS } from '../src/modules';
 import { attFrame, chunkFrames, commitFrame, paramFrame, slotEraseFrame, slotFrame, slotInfoFrame } from '../src/protocol';
 import { make, PRESETS, type Build } from '../src/presets';
-import { setMorphTarget, type Patch } from '../src/patch';
+import { paramUnit, setMorphTarget, type Patch } from '../src/patch';
 
 const SR = 44100;
 const OUT = new URL('../../build/golden/', import.meta.url);
@@ -800,6 +800,35 @@ const morphVoice = (b: boolean): Build => (add, wire) => {
   wire(dly, 'out', out, 'l');
 };
 kit('morph', morphVoice(false));
+// macro ranges: one triangle LFO into the filter's p1 (cutoff between 150 Hz and 6 kHz in octaves) and the ADSR's p1
+// (decay between 0.6 s and 30 ms, the ends swapped), the Main's K2 into the oscillator's p2 (pulse width 0.2..0.5)
+kit('macro', (add, wire) => {
+  const kb = add('fm1', 0, 0, { k2: 0.7 });
+  const lfo = add('lfo', 0, 0, { wave: 1, rate: 0.5, depth: 1 });
+  const sc = add('scale', 0, 0, { gain: 0.5, offset: 0.5 });
+  const osc = add('osc', 0, 0, { wave: 3, level: 0.7 }, { map: { p2: ['pw'] } });
+  const env = add('adsr', 0, 0, { a: 0.005, d: 0.2, s: 0.3, r: 0.1 }, { map: { p1: ['d'] } });
+  const flt = add('filter', 0, 0, { cutoff: 1200, res: 0.6 }, { map: { p1: ['cutoff'] } });
+  const vca = add('vca', 0, 0);
+  const out = add('output', 0, 0, { level: 0.8 });
+  wire(lfo, 'out', sc, 'in');
+  wire(sc, 'out', flt, 'p1');
+  wire(sc, 'out', env, 'p1');
+  wire(kb, 'k2', osc, 'p2');
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(kb, 'gate', env, 'gate');
+  wire(osc, 'out', flt, 'in');
+  wire(flt, 'lp24', vca, 'in');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', out, 'l');
+});
+{
+  const m = tests.macro.modules;
+  const unit = (type: string, name: string, v: number): number => paramUnit(DEFS[type].params.find((q) => q.name === name)!, v);
+  m[5].range = { p1: { cutoff: [unit('filter', 'cutoff', 150), unit('filter', 'cutoff', 6000)] } };
+  m[4].range = { p1: { d: [unit('adsr', 'd', 0.6), unit('adsr', 'd', 0.03)] } };
+  m[3].range = { p2: { pw: [unit('osc', 'pw', 0.2), unit('osc', 'pw', 0.5)] } };
+}
 setMorphTarget(tests.morph, make('morph-b', morphVoice(true)), DEFS);
 kit('crush-color', (add, wire) => {
   const nz = add('noise', 0, 0, { level: 0.6, color: 0.6 });

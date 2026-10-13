@@ -22,6 +22,7 @@
  * buffers and instances and keeps one delay and one reverb (docs/HANDOFF.md); the four-voice build has the sizes of
  * the 1.0.2 panel. Keep DEVICE in web/src/patchbin.ts, the HELLO reply (proto.c) and the MEMORY lines of manual.c in step. */
 #define ENG_MAX_MODULES 32          /* per voice */
+#define ENG_MAX_RANGES 48           /* macro ranges per voice (patch.ts ModuleInst.range) */
 #define ENG_MAX_CABLES 192
 #define MAX_SUM 128                 /* summed inputs per voice (an input of an instance with two or more sources) */
 #define MAX_SRC 256                 /* their sources: a shared input reading a per-note output has one per note */
@@ -34,7 +35,7 @@
 #define ENG_NCHORUS 1               /* chorus lines (a shared module, like the delay) */
 #define ENG_NGRAIN 1                /* granular lines (a shared module): 1 s of int16 plus the grain records, 88 KB */
 #else
-#define ENG_MAX_INST 80             /* module instances, all voices: a shared module has one, a per-note module one per note */
+#define ENG_MAX_INST 72             /* module instances, all voices: a shared module has one, a per-note module one per note */
 #define ENG_NBUF 108u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
 #define ENG_NDELAY 4                /* delay lines, all voices (one each when every voice has a delay) */
 #define ENG_NREV 2                  /* reverb memories, all voices */
@@ -259,7 +260,12 @@ typedef struct {
     int32_t att[2];                  /* attenuverters of p1, p2: Q16, -1..1 */
     int32_t par[MAX_PAR];
     uint16_t parb[MAX_PAR];          /* the morph B side as unit positions (0..65535 of the range, octaves for a log parameter), when E.has_b */
+    uint16_t ranged[2];              /* bit j: input p1 / p2 has a macro range on parameter j (the entry is in E.ranges) */
 } node_t;
+
+/* a macro range: input `pin` (0 p1, 1 p2) of module `mod` moves parameter `par` between lo and hi (0..255 of the range,
+ * octaves for a log parameter, morph_unit space) instead of adding to its base */
+typedef struct { uint8_t mod, pin, par, lo, hi; } range_t;
 
 typedef struct {
     esig_t *dst;
@@ -290,6 +296,8 @@ typedef struct {
     uint32_t clk_seen, clk_pulse;    /* the Main module's clock output: ticks seen so far, the pulse length of this block */
     int32_t ctl[ENG_NCTL];           /* pitch bend, mod wheel, aftertouch (engine.h ENG_CTL_*), Q16 */
     uint8_t has_b;                   /* the patch carries a morph B set (node_t.parb) */
+    uint8_t nranges;
+    range_t ranges[ENG_MAX_RANGES];
     int8_t main;                     /* the Main module, -1 without one */
     int32_t morph;                   /* the morph position of this block, Q16 0..1: the Main's MORPH parameter plus the mean of its morph input */
 } eng_t;
@@ -471,6 +479,7 @@ int eng_load(const uint8_t *p, uint32_t len)
         return -2;
     E.ncab = (uint16_t)ncab;
     E.has_b = 0;
+    E.nranges = 0;
     E.main = -1;
     E.morph = 0;
     E.nbuf = 0;
@@ -530,6 +539,28 @@ int eng_load(const uint8_t *p, uint32_t len)
                 nd->parb[j] = (uint16_t)clampi(morph_unit(d, j, rd32(p + at)), 0, 65535);
         }
         E.has_b = 1;
+    }
+    if (p[6] & 2u) {                             /* the macro ranges: u8 count, then module / pin / parameter / lo / hi each */
+        uint32_t nr;
+        if (at >= len)
+            return -3;
+        nr = p[at++];
+        if (at + 5u * nr > len)
+            return -3;
+        for (i = 0; i < nr; i++, at += 5) {
+            uint32_t mod = p[at], pin = p[at + 1], par = p[at + 2];
+            if (mod >= E.nmod || pin > 1u || par >= DEFS[E.node[mod].type].npar || !(E.node[mod].map[pin] >> par & 1u))
+                continue;                        /* not a destination of that pin: ignored */
+            if (E.nranges >= ENG_MAX_RANGES)
+                return -3;
+            E.ranges[E.nranges].mod = (uint8_t)mod;
+            E.ranges[E.nranges].pin = (uint8_t)pin;
+            E.ranges[E.nranges].par = (uint8_t)par;
+            E.ranges[E.nranges].lo = p[at + 3];
+            E.ranges[E.nranges].hi = p[at + 4];
+            E.nranges++;
+            E.node[mod].ranged[pin] |= (uint16_t)(1u << par);
+        }
     }
     /* which modules run once per voice (patch.ts voiceSplit): with several voices the panel's pitch / gate / vel are per
      * voice, and so is everything downstream of them except delay, reverb and output */
@@ -785,6 +816,55 @@ void eng_set_param(uint32_t module, uint32_t param, int32_t q16)
 }
 
 int eng_has_morph(void) { return E.loaded && E.has_b; }
+
+static range_t *range_find(uint32_t module, uint32_t input, uint32_t param)
+{
+    uint32_t i;
+    for (i = 0; i < E.nranges; i++)
+        if (E.ranges[i].mod == module && E.ranges[i].pin == input && E.ranges[i].par == param)
+            return &E.ranges[i];
+    return 0;
+}
+
+int eng_range(uint32_t module, uint32_t input, uint32_t param, uint32_t *lo, uint32_t *hi)
+{
+    const range_t *r;
+    if (module >= E.nmod || input > 1u || !(E.node[module].ranged[input] >> param & 1u))
+        return 0;
+    r = range_find(module, input, param);
+    if (!r)
+        return 0;
+    *lo = r->lo;
+    *hi = r->hi;
+    return 1;
+}
+
+int eng_set_range(uint32_t module, uint32_t input, uint32_t param, int on, uint32_t lo, uint32_t hi)
+{
+    range_t *r;
+    if (module >= E.nmod || input > 1u || param >= DEFS[E.node[module].type].npar)
+        return 0;
+    r = range_find(module, input, param);
+    if (!on) {
+        if (r) {
+            *r = E.ranges[--E.nranges];
+            E.node[module].ranged[input] &= (uint16_t)~(1u << param);
+        }
+        return 1;
+    }
+    if (!r) {
+        if (E.nranges >= ENG_MAX_RANGES)
+            return 0;
+        r = &E.ranges[E.nranges++];
+        r->mod = (uint8_t)module;
+        r->pin = (uint8_t)input;
+        r->par = (uint8_t)param;
+    }
+    r->lo = (uint8_t)(lo > 255u ? 255u : lo);
+    r->hi = (uint8_t)(hi > 255u ? 255u : hi);
+    E.node[module].ranged[input] |= (uint16_t)(1u << param);
+    return 1;
+}
 
 /* the morph position of the coming block (engine.ts morphPosition): the Main module's MORPH parameter plus the block mean
  * of its morph input, which holds what the input summed in the previous block (one block late), clamped to 0..1 */
@@ -2548,12 +2628,25 @@ static void apply_cv(const node_t *nd, inst_t *it, uint32_t n)
     for (j = 0; j < d->npar; j++) {
         int32_t v = E.has_b && E.morph > 0 && nd->type != T_FM1 ? morph_of(d, j, nd->par[j], nd->parb[j], E.morph) : nd->par[j];
         uint32_t touched = 0;
-        int32_t mod = 0;
+        int32_t mod = 0, rv = 0;
+        const range_t *rg = 0;
         for (s = 0; s < 2u; s++)
             if ((have >> s & 1u) && (nd->map[s] >> j & 1u)) {
+                if (nd->ranged[s] >> j & 1u) {   /* a macro range: the input's value lands between its ends (replacing the base) */
+                    const range_t *r = range_find((uint32_t)(nd - E.node), s, j);
+                    if (r) {
+                        rg = r;
+                        rv += mean[s];
+                        continue;
+                    }
+                }
                 mod += mean[s];
                 touched = 1;
             }
+        if (rg) {
+            int32_t lo = (int32_t)rg->lo * 257, hi = (int32_t)rg->hi * 257;   /* 0..255 -> Q16 0..1 */
+            v = morph_value(d, j, lo + mul16(clampi(rv, 0, ENG_ONE), hi - lo));
+        }
         if (!touched)
             it->eff[j] = v;
         else if (d->plog && d->plog[j])

@@ -9,7 +9,7 @@
 #define ENG_SR 44100u
 #define ENG_BLOCK 128u
 #define ENG_ONE 65536
-#define ENG_PATCH_VERSION 14
+#define ENG_PATCH_VERSION 15
 #define ENG_MAX_POLY 8                /* notes a patch plays at once (its header byte 3) */
 
 /* Install a patch from its binary form (web/src/patchbin.ts) into the selected voice. 0 on success, negative on error
@@ -21,6 +21,11 @@ int32_t eng_get_param(uint32_t module, uint32_t param);
 int32_t eng_get_eff(uint32_t module, uint32_t param);               /* what the last block used: base + modulation */
 void eng_set_att(uint32_t module, uint32_t input, int32_t q16);      /* attenuverter of p1 / p2, Q16 */
 int32_t eng_att(uint32_t module, uint32_t input);
+/* a macro range of input 0 / 1 (p1 / p2) on a parameter: the input's value lands between lo and hi (0..255 of the
+ * parameter's range, octaves for a log one) instead of adding to the base; on 0 removes it. 0 = no room / bad arguments */
+int eng_set_range(uint32_t module, uint32_t input, uint32_t param, int on, uint32_t lo, uint32_t hi);
+/* the range of input 0 / 1 on a parameter, 1 if there is one (lo / hi as above) */
+int eng_range(uint32_t module, uint32_t input, uint32_t param, uint32_t *lo, uint32_t *hi);
 void eng_set_bypass(uint32_t module, int on);                        /* bypass: the outputs carry the through input (defs.h thru) or silence; the state is kept */
 int eng_bypass(uint32_t module);
 /* the patch has a morph B set (the Main module's MORPH parameter fades every parameter from A to B) */

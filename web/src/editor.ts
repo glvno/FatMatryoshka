@@ -26,6 +26,8 @@ import {
   setMorphTarget,
   clearMorph,
   hasMorph,
+  rangeOf,
+  paramValue,
 } from './patch';
 import {
   addChild,
@@ -90,6 +92,8 @@ export interface EditorEvents {
   onAtt(id: number, index: number, value: number): void;
   /** a module's bypass switch (the structure is unchanged: the engine keeps its state) */
   onBypass(id: number, on: boolean): void;
+  /** a macro range of p1 / p2 (index 0 / 1) on a parameter changed or was removed (null) */
+  onRange(id: number, index: number, name: string, range: [number, number] | null): void;
   /** cards were moved: positions changed, nothing the engine needs */
   onLayout(p: Patch): void;
   /** a message for the status line */
@@ -101,6 +105,8 @@ export interface EditorEvents {
 }
 
 type Pt = { x: number; y: number };
+/** a parameter value as the cards print it: the choice's name, or the number with its unit */
+const fmtValue = (pd: ParamDef, v: number): string => (pd.choices ? pd.choices[Math.round(v)] : `${Number(v.toFixed(3))}${pd.unit ? ' ' + pd.unit : ''}`);
 /** the footprint of a new card for the free-spot search: a grid cell less its gutters */
 const CARD_W = 250;
 const CARD_H = 540;
@@ -553,13 +559,66 @@ export class Editor {
           this.change(() => {
             const list = m.map![s].filter((n) => n !== pd.name);
             if (box.checked) list.push(pd.name);
+            else if (m.range?.[s as 'p1' | 'p2']) delete m.range[s as 'p1' | 'p2']![pd.name];
             m.map![s] = list;
           });
         };
-        row.insertCell().append(box);
+        const cell = row.insertCell();
+        cell.append(box);
+        // p1 / p2: a macro range on an assigned parameter (the pin's value lands between two ends instead of adding to the base)
+        if ((s === 'p1' || s === 'p2') && box.checked && !rangeOf(m, s, pd.name)) {
+          const btn = document.createElement('button');
+          btn.className = 'rng';
+          btn.textContent = '↔';
+          btn.title = `Macro range: ${s} moves ${pd.name} between two ends of its range instead of adding to the slider`;
+          btn.setAttribute('aria-label', `${def.label}: macro range of ${s} on ${pd.name}`);
+          btn.onclick = () => this.change(() => (((m.range ??= {})[s] ??= {})[pd.name] = [0, 1]));
+          cell.append(btn);
+        }
+      }
+      for (const s of ['p1', 'p2'] as const) {
+        const r = rangeOf(m, s, pd.name);
+        if (r) body.append(this.rangeRow(m, def, pd, s, r));
       }
     }
     return t;
+  }
+
+  /** the two ends of a macro range (0..1 of the parameter's range, octaves for a log one), live like an attenuverter */
+  private rangeRow(m: ModuleInst, def: ModuleDef, pd: ParamDef, s: 'p1' | 'p2', r: [number, number]): HTMLTableRowElement {
+    const row = document.createElement('tr');
+    row.className = 'rangerow';
+    const cell = row.insertCell();
+    cell.colSpan = SOURCES.length + 1;
+    const label = document.createElement('span');
+    label.textContent = `${s} → ${pd.name}`;
+    const vals = document.createElement('output');
+    const fmt = (): void => {
+      vals.textContent = `${fmtValue(pd, paramValue(pd, r[0]))} … ${fmtValue(pd, paramValue(pd, r[1]))}`;
+    };
+    const slider = (i: 0 | 1): HTMLInputElement => {
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = '0';
+      input.max = '1';
+      input.step = '0.01';
+      input.value = String(r[i]);
+      input.title = i === 0 ? `${pd.name} when ${s} is 0` : `${pd.name} when ${s} is 1`;
+      input.setAttribute('aria-label', `${def.label}: ${s} on ${pd.name}, ${i === 0 ? 'low' : 'high'} end`);
+      input.oninput = () => {
+        r[i] = Number(input.value);
+        fmt();
+        this.ev.onRange(m.id, s === 'p1' ? 0 : 1, pd.name, [r[0], r[1]]);
+      };
+      return input;
+    };
+    const del = document.createElement('button');
+    del.textContent = '×';
+    del.title = 'remove the macro range (the pin adds to the slider again)';
+    del.onclick = () => this.change(() => delete m.range![s]![pd.name]);
+    fmt();
+    cell.append(label, slider(0), slider(1), vals, del);
+    return row;
   }
 
   /**

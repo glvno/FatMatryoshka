@@ -60,6 +60,14 @@ select.over { border-color: #c0392b; color: #c0392b; }
 .matrix td { text-align: center; padding: 0; height: 18px; }
 .matrix td:first-child { text-align: left; color: var(--muted); padding-right: 4px; }
 .matrix input { margin: 0; accent-color: var(--accent); }
+.matrix button.rng { margin-left: 2px; padding: 0 3px; font-size: 10px; line-height: 14px; border: 1px solid var(--line); border-radius: 3px; background: none; color: var(--muted); cursor: pointer; }
+.matrix button.rng:hover { color: var(--ink); border-color: var(--accent); }
+.matrix tr.rangerow td { text-align: left; padding: 2px 0 4px; }
+.matrix tr.rangerow td > * { vertical-align: middle; }
+.matrix tr.rangerow span { color: var(--accent); margin-right: 4px; }
+.matrix tr.rangerow input[type='range'] { width: 28%; margin: 0 2px; }
+.matrix tr.rangerow output { color: var(--muted); margin: 0 4px; }
+.matrix tr.rangerow button { padding: 0 4px; font-size: 11px; background: none; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); cursor: pointer; }
 .param input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
 .param output { color: var(--muted); }
 .hint { margin-top: 8px; }
