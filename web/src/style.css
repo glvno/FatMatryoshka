@@ -237,9 +237,10 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .patching .slider-port { pointer-events: auto; }
 .dot.connected { background: currentColor; box-shadow: inset 0 0 0 3px var(--panel); }
 .dot.armed { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 40%, transparent); }
-.ports .dot { position: relative; z-index: 2; }
+.ports .dot, .pins .dot { position: relative; z-index: 2; }
 .cables { z-index: 1; }
-.cable.alias { stroke-width: 1.5; stroke-dasharray: 3 4; opacity: .45; pointer-events: none; }
+.cable.alias { stroke-width: 3; stroke-dasharray: 3 4; opacity: .6; pointer-events: stroke; }
+.cable.alias:hover, .cable.alias:focus { stroke-width: 6; opacity: 1; }
 .parameter-routing { position: relative; justify-self: end; font-size: 11px; }
 .parameter-routing[open] { z-index: 5; }
 .parameter-routing summary { list-style: none; cursor: pointer; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; color: var(--muted); }

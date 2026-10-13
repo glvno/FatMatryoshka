@@ -17,6 +17,23 @@ describe('binary patch format', () => {
     expect(grouped).toBeGreaterThanOrEqual(25); // 29 of 33 open as a few cards; subtractive saw, snare, organ and drone stay flat
   });
 
+  it('encodes disabled fixed links separately from cables and keeps macro ranges last', () => {
+    const p = PRESETS['Wobble 2']();
+    const filter = p.modules.find((m) => m.type === 'filter')!;
+    const before = encodePatch(p);
+    const cables = structuredClone(p.cables);
+    filter.disabledInputs = ['cv'];
+    filter.range = { p1: { cutoff: [.2, .8] } };
+    filter.map!.p1 = ['cutoff'];
+    const b = encodePatch(p);
+    expect(b[1]).toBe(17);
+    expect(b[6]).toBe(6);
+    expect(b.length).toBe(before.length + p.modules.length + 6);
+    expect(b[before.length + p.modules.indexOf(filter)]).toBe(1 << DEFS.filter.inputs.findIndex((i) => i.name === 'cv'));
+    expect(b[before.length + p.modules.length]).toBe(1); // macro range count
+    expect(p.cables).toEqual(cables);
+  });
+
   it('encodes every preset with the documented layout', () => {
     for (const [name, make] of Object.entries(PRESETS)) {
       const p = make();

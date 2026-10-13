@@ -13,6 +13,7 @@ import {
   addModule,
   defaultParams,
   fixMatrix,
+  fixInputRoutes,
   MAX_MODULES,
   removeModule,
   sameEnd,
@@ -663,6 +664,8 @@ export function insertAssembly(p: Patch, defs: Record<string, ModuleDef>, def: A
     m.params = { ...m.params, ...clone(src.params) };
     if (src.att) m.att = [...src.att];
     if (src.map) m.map = clone(src.map);
+    if (src.disabledInputs) m.disabledInputs = [...src.disabledInputs];
+    fixInputRoutes(m, defs[src.type]);
     fixMatrix(m, defs[src.type]);
     stripKnobs(m);
     fresh.set(src.id, m.id);
@@ -753,6 +756,7 @@ export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef
     m.x = Number(m.x) || 0;
     m.y = Number(m.y) || 0;
     fixMatrix(m, def);
+    fixInputRoutes(m, def);
     stripKnobs(m);
   }
   const typeOf = (id: number): string | undefined => d.modules.find((m) => m.id === id)?.type;

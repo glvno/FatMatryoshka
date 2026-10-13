@@ -2196,6 +2196,16 @@ describe('dedicated CV parameter displays', () => {
     render(e, 128);
     expect(e.parameterValues().find((m) => m.id === target.id)!.params[param]).toBeCloseTo(expected);
     expect(target.params[param]).toBe(base);
+    const cables = structuredClone(p.cables);
+    target.disabledInputs = [port];
+    e.load(p);
+    render(e, 128);
+    expect(e.parameterValues().find((m) => m.id === target.id)!.params[param]).toBeCloseTo(base);
+    expect(p.cables).toEqual(cables);
+    delete target.disabledInputs;
+    e.load(p);
+    render(e, 128);
+    expect(e.parameterValues().find((m) => m.id === target.id)!.params[param]).toBeCloseTo(expected);
     e.setParam(source.id, 'value', 0);
     render(e, 128);
     expect(e.parameterValues().find((m) => m.id === target.id)!.params[param]).toBeCloseTo(type === 'vca' ? 0 : base);
@@ -2221,4 +2231,19 @@ it('animates the Wobble 2 factory filter and VCA displays through their dedicate
   render(e, SR);
   expect(e.parameterValues().find((m) => m.id === amp.id)!.params.gain).toBeLessThan(0.001);
   expect(JSON.stringify(p)).toBe(original);
+});
+
+it('switches the Main morph input independently of its physical cable', () => {
+  const p = emptyPatch();
+  const main = addModule(p, DEFS.fm1, 0, 0); main.params.morph = .1;
+  const source = addModule(p, DEFS.const, 0, 0); source.params.value = .5;
+  const amp = addModule(p, DEFS.vca, 0, 0); amp.paramsB = { ...amp.params, gain: .2 };
+  connect(p, DEFS, { module: source.id, port: 'out' }, { module: main.id, port: 'morph' });
+  const engine = new Engine(SR);
+  engine.load(p); render(engine, 512); expect(engine.morph).toBeCloseTo(.6);
+  main.disabledInputs = ['morph'];
+  engine.load(p); render(engine, 512); expect(engine.morph).toBeCloseTo(.1);
+  delete main.disabledInputs;
+  engine.load(p); render(engine, 512); expect(engine.morph).toBeCloseTo(.6);
+  expect(p.cables).toHaveLength(1);
 });

@@ -113,6 +113,8 @@ export interface ModuleInst {
   map?: Record<Source, string[]>;
   /** bypassed: the module does not run; its outputs carry its through input (thruInput) or silence. Not on the panel or the output. */
   bypass?: boolean;
+  /** Dedicated input-to-parameter links switched off; incoming cables remain plugged in. */
+  disabledInputs?: string[];
   /** the B side of a morph: the same parameters as `params`, taken from another patch of the same structure (setMorphTarget); the
    * Main module's `morph` (plus its morph input) fades every parameter from `params` to these. Not on the Main module. */
   paramsB?: Record<string, number>;
@@ -245,6 +247,14 @@ export function defaultMap(def: ModuleDef): Record<Source, string[]> {
   return { p1: at(0), p2: at(1), k1: at(0), k2: at(1), k3: at(2), k4: at(3) };
 }
 
+/** Keep only switchable dedicated inputs; old patches have every fixed link enabled. */
+export function fixInputRoutes(m: ModuleInst, def: ModuleDef): void {
+  const valid = new Set(def.params.flatMap((pd) => pd.input ? [pd.input] : []));
+  const disabled = Array.isArray(m.disabledInputs) ? [...new Set(m.disabledInputs.filter((name) => valid.has(name)))] : [];
+  if (disabled.length) m.disabledInputs = disabled;
+  else delete m.disabledInputs;
+}
+
 /** att and map for a module that has parameter inputs, filled in or repaired */
 export function fixMatrix(m: ModuleInst, def: ModuleDef): void {
   if (!def.paramInputs) {
@@ -365,6 +375,7 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
       m.paramsB = out;
     } else delete m.paramsB;
     fixMatrix(m, def);
+    fixInputRoutes(m, def);
   }
   if (p.version === 1) {
     // a cable into `<param>_cv` becomes a cable into p1 (first such parameter of the module) or p2 (second)

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
+import { makeAssembly, toDef, validateAssemblyDef, insertAssembly } from './assembly';
 import { DEFS } from './modules';
 import { addModule, connect, emptyPatch, validatePatch } from './patch';
-import { connectParameter, parameterInputs } from './parameter-routing';
+import { connectParameter, parameterInputs, setParameterInput, setFixedInput } from './parameter-routing';
 
 function setup() {
   const p = emptyPatch();
@@ -14,6 +15,50 @@ function setup() {
 }
 
 describe('slider jack routing', () => {
+  it('disconnects one internal route without touching its incoming cable or other destinations', () => {
+    const { p, target, from } = setup();
+    target.map!.p1 = ['cutoff', 'res'];
+    target.range = { p1: { cutoff: [.1, .9], res: [.2, .8] } };
+    connect(p, DEFS, from, { module: target.id, port: 'p1' });
+    const cables = structuredClone(p.cables);
+    const knobs = [...target.map!.k1];
+    setParameterInput(target, 'p1', 'res', false);
+    expect(target.map!.p1).toEqual(['cutoff']);
+    expect(target.range!.p1).toEqual({ cutoff: [.1, .9] });
+    expect(target.map!.k1).toEqual(knobs);
+    expect(p.cables).toEqual(cables);
+    setParameterInput(target, 'p1', 'res', true);
+    setParameterInput(target, 'p1', 'res', true);
+    expect(target.map!.p1).toEqual(['cutoff', 'res']);
+    expect(p.cables).toEqual(cables);
+  });
+
+  it('round-trips disabled fixed links through patches and reusable assemblies', () => {
+    const { p, target, from } = setup();
+    const pd = DEFS.filter.params.find((pd) => pd.name === 'cutoff')!;
+    connectParameter(p, DEFS, from, target.id, pd.name);
+    setFixedInput(target, pd, false);
+    const saved = validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
+    expect(saved.modules.find((m) => m.id === target.id)!.disabledInputs).toEqual(['cv']);
+    expect(saved.cables).toEqual(p.cables);
+    const a = makeAssembly(p, [target.id], 'Filter');
+    const prefab = validateAssemblyDef(toDef(p, a), DEFS);
+    const copy = emptyPatch();
+    insertAssembly(copy, DEFS, prefab, 0, 0);
+    expect(copy.modules[0].disabledInputs).toEqual(['cv']);
+    connectParameter(p, DEFS, from, target.id, pd.name);
+    expect(target.disabledInputs).toBeUndefined();
+    expect(p.cables).toHaveLength(1);
+  });
+
+  it('ignores invalid disabled inputs while loading and leaves old patches fully connected', () => {
+    const { p, target } = setup();
+    target.disabledInputs = ['cv', 'cv', 'in', 'p1', 'missing'];
+    expect(validatePatch(p, DEFS).modules.find((m) => m.id === target.id)!.disabledInputs).toEqual(['cv']);
+    delete target.disabledInputs;
+    expect(parameterInputs(target, DEFS.filter.params[0])).toContain('cv');
+  });
+
   it('aliases dedicated CV jacks and makes duplicate drops a no-op', () => {
     const { p, target, from } = setup();
     const original = structuredClone(target);

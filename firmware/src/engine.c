@@ -252,7 +252,7 @@ typedef struct {
 } inst_t;
 
 typedef struct {
-    uint8_t type, conn;
+    uint8_t type, conn, disabled_inputs;
     uint8_t bypass;                  /* 1: process() is skipped, the outputs copy the through input (DEFS[].thru) or are silent */
     uint8_t inst0, ninst;            /* its instances in inst_pool[]: ninst > 1 = it runs once per voice (the panel too: its
                                         pitch / gate / vel are per voice, its knob outputs one buffer shared by its instances) */
@@ -467,7 +467,9 @@ int eng_load(const uint8_t *p, uint32_t len)
 #if ENG_NGRAIN > 0
     pool_free(gr_own, ENG_NGRAIN);
 #endif
-    if (len < 8u || p[0] != 0xA1 || p[1] != ENG_PATCH_VERSION)
+    if (len < 8u || p[0] != 0xA1 || (p[1] != ENG_PATCH_VERSION && p[1] != ENG_PATCH_COMPAT_VERSION))
+        return -1;
+    if ((p[6] & ~7u) || p[7] || (p[1] == ENG_PATCH_COMPAT_VERSION && (p[6] & 4u)))
         return -1;
     E.nmod = p[2];
     nv = p[3] ? p[3] : 1u;                       /* 0: a patch from before polyphony */
@@ -539,6 +541,18 @@ int eng_load(const uint8_t *p, uint32_t len)
                 nd->parb[j] = (uint16_t)clampi(morph_unit(d, j, rd32(p + at)), 0, 65535);
         }
         E.has_b = 1;
+    }
+    if (p[6] & 4u) {                             /* fixed input links: one disabled-input mask per module */
+        if (at + E.nmod > len)
+            return -3;
+        for (i = 0; i < E.nmod; i++) {
+            node_t *nd = &E.node[i];
+            uint8_t mask = p[at++];
+            if (mask & ~DEFS[nd->type].fixed_inputs)
+                return -3;
+            nd->disabled_inputs = mask;
+            nd->conn &= (uint8_t)~mask;
+        }
     }
     if (p[6] & 2u) {                             /* the macro ranges: u8 count, then module / pin / parameter / lo / hi each */
         uint32_t nr;
@@ -684,6 +698,10 @@ int eng_load(const uint8_t *p, uint32_t len)
             for (j = 0; j < DEFS[nd->type].nin; j++) {
                 uint32_t n = 0, first = E.nsrc;
                 const esig_t *one = 0;
+                if (nd->disabled_inputs & (1u << j)) {
+                    it->in[j] = zero_buf;
+                    continue;
+                }
                 for (c = 0; c < ncab; c++) {
                     if (E.to_m[c] != i || E.to_p[c] != j)
                         continue;

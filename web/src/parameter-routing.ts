@@ -5,7 +5,26 @@ const PINS = ['p1', 'p2'] as const;
 
 /** Physical inputs whose signals affect this parameter. The thumb is an alias, never a new patch port. */
 export function parameterInputs(m: ModuleInst, pd: ParamDef): string[] {
-  return [...(pd.input ? [pd.input] : []), ...PINS.filter((pin) => m.map?.[pin].includes(pd.name))];
+  return [...(pd.input && !m.disabledInputs?.includes(pd.input) ? [pd.input] : []), ...PINS.filter((pin) => m.map?.[pin].includes(pd.name))];
+}
+
+/** The editable p1/p2 branch; removing it also removes that destination's macro range. */
+export function setParameterInput(m: ModuleInst, pin: 'p1' | 'p2', param: string, on: boolean): void {
+  if (!m.map) throw new Error('This module has no parameter inputs.');
+  if (on && m.map[pin].includes(param)) return;
+  const names = m.map[pin].filter((name) => name !== param);
+  if (on) names.push(param);
+  else delete m.range?.[pin]?.[param];
+  m.map[pin] = names;
+}
+
+/** Switch a dedicated input link independently of any cables plugged into that jack. */
+export function setFixedInput(m: ModuleInst, pd: ParamDef, on: boolean): void {
+  if (!pd.input) throw new Error('This parameter has no fixed input.');
+  const disabled = (m.disabledInputs ?? []).filter((name) => name !== pd.input);
+  if (!on) disabled.push(pd.input);
+  if (disabled.length) m.disabledInputs = disabled;
+  else delete m.disabledInputs;
 }
 
 /** Connect to a slider without changing the signal heard by other parameters sharing a pin. */
@@ -31,6 +50,7 @@ export function connectParameter(p: Patch, defs: Record<string, ModuleDef>, from
     }
   }
   if (!port) throw new Error('This control has no modulation input.');
+  if (pd.input) setFixedInput(m, pd, true);
   const to = { module, port };
   if (!p.cables.some((c) => sameEnd(c.from, from) && sameEnd(c.to, to)) && !connect(p, defs, from, to))
     throw new Error('Cannot connect these ports.');

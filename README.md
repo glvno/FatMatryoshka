@@ -16,9 +16,9 @@ FatMatryoshka-1 is an independent project grown from Modular-1, which builds on 
 
 [Open the FatMatryoshka-1 editor](https://glvno.github.io/FatMatryoshka-1/) to make patches and upload them to the FM-1. The editor currently deploys from branch `dev`; its firmware package has not been installed on a device. The [original Modular-1 editor](https://wiggismodular.github.io/Modular-1/) is also available.
 
-Slider thumbs are input jacks: **drag normally to adjust, Alt-drag to patch**, or drop an output cable onto a thumb. The side jacks still work; faint branches show their connections to the moving thumbs. Thumb positions pause while patching so the targets stay still.
+Slider thumbs are input jacks: **drag normally to adjust, Alt-drag to patch**, or drop an output cable onto a thumb. External cables plug into side jacks, which route to the moving thumbs through internal cables. **Click an internal cable to disconnect that parameter**, leaving the incoming cable and other destinations intact. Drag a side input to its thumb to reconnect it (or Alt-drag from the thumb to the side input). Thumb positions pause while patching so the targets stay still.
 
-Open the **⋯** menu beside a parameter for p1/p2 routing, modulation depth, macro ranges and K1–K4 hardware assignments. The matrix grid is gone; saved patches and FM-1 routing remain compatible. Dedicated controls use their own input (for example, Filter cutoff uses `cv`). Other thumbs reuse a suitable p1/p2 route or allocate an unused input; the editor reports when both are occupied. Depth is shared by every parameter assigned to that input. K1–K4 assignments apply while that module is selected on the FM-1.
+Open the **⋯** menu beside a parameter for p1/p2 routing, modulation depth, macro ranges and K1–K4 hardware assignments. The matrix grid is gone. Existing patches retain their routing; fixed input links such as `cv → cutoff` can also be switched off independently, saved and restored. Using disabled fixed links on an FM-1 requires the updated bundled firmware. Dedicated controls use their own input (for example, Filter cutoff uses `cv`). Other thumbs reuse a suitable p1/p2 route or allocate an unused input; the editor reports when both are occupied. Depth is shared by every parameter assigned to that input. K1–K4 assignments apply while that module is selected on the FM-1.
 
 ### Voices
 

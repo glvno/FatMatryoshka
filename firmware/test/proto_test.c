@@ -177,6 +177,34 @@ int main(int argc, char **argv)
         CHECK(memcmp(last_data, patch, (size_t)np) == 0 && strcmp(last_name, "303 ACID") == 0);
         printf("slot commands ok: %u acks, %u refused\n", nack_ok, nack_bad);
     }
+    /* Version 17 fixed links survive framing, load and live macro-range edits; v16 still loads. */
+    {
+        uint32_t base = (uint32_t)np, count = patch[2];
+        CHECK(!(patch[6] & 6u)); /* this fixture has no ranges or fixed-link masks */
+        memcpy(m1_cur, patch, base);
+        memset(m1_cur + base, 0, count);
+        m1_cur[1] = ENG_PATCH_VERSION;
+        m1_cur[6] |= 4u;
+        m1_cur[base + mod] = 1u << FILTER_I_CV;
+        m1_cur_len = base + count;
+        CHECK(m1_valid(m1_cur, m1_cur_len));
+        CHECK(!m1_valid(m1_cur, m1_cur_len - 1));
+        CHECK(eng_load(m1_cur, m1_cur_len) == 0);
+        CHECK(!(E.node[mod].conn & (1u << FILTER_I_CV)));
+        CHECK(inst_pool[E.node[mod].inst0].in[FILTER_I_CV] == zero_buf);
+        CHECK(E.ncab == (uint32_t)(patch[4] | patch[5] << 8));
+        m1_patch_range(mod, 0, par, 1, 20, 220);
+        CHECK(m1_range_section() == base + count);
+        CHECK(m1_valid(m1_cur, m1_cur_len));
+        CHECK(m1_cur[base + mod] == (1u << FILTER_I_CV));
+        CHECK(eng_load(m1_cur, m1_cur_len) == 0);
+        m1_patch_range(mod, 0, par, 0, 0, 0);
+        CHECK(m1_cur_len == base + count && m1_valid(m1_cur, m1_cur_len));
+        m1_cur[base + mod] = 0x80; /* not a fixed input */
+        CHECK(eng_load(m1_cur, m1_cur_len) != 0);
+        CHECK(eng_load(patch, base) == 0);
+        printf("fixed input routing and legacy patch framing ok\n");
+    }
     printf("proto ok: %u acks, %ld patch bytes, render identical\n", acks_ok, np);
     return 0;
 }

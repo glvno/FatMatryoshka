@@ -849,6 +849,37 @@ kit('crush-color', (add, wire) => {
   wire(cr, 'out', out, 'l');
 });
 
+// A switched-off fixed link keeps its physical cable but renders exactly as an unplugged input.
+kit('fixed-links-disabled', (add, wire) => {
+  const main = add('fm1', 0, 0, { morph: 0 });
+  const osc = add('osc', 0, 0, { wave: 0, level: .3 });
+  const cv = add('const', 0, 0, { value: .8 });
+  const filter = add('filter', 0, 0, { cutoff: 1200, morph: .2 });
+  const ladder = add('ladder', 0, 0, { cutoff: 1600, res: .1 });
+  const pan = add('pan', 0, 0, { pan: -.2 });
+  const xfade = add('xfade', 0, 0, { mix: .3 });
+  const shift = add('shift', 0, 0, { shift: 50, cvamt: 100 });
+  const vowel = add('vowel', 0, 0, { vowel: 1 });
+  const amp = add('vca', 0, 0, { gain: .8 });
+  const out = add('output', 0, 0);
+  wire(main, 'pitch', osc, 'pitch');
+  wire(osc, 'out', filter, 'in'); wire(filter, 'mix', ladder, 'in');
+  wire(ladder, 'lp12', pan, 'in'); wire(pan, 'l', xfade, 'a'); wire(pan, 'r', xfade, 'b');
+  wire(xfade, 'out', shift, 'in'); wire(shift, 'up', vowel, 'in'); wire(vowel, 'out', amp, 'in'); wire(amp, 'out', out, 'l');
+  for (const [id, port] of [[main, 'morph'], [filter, 'cv'], [filter, 'morph'], [ladder, 'cv'], [pan, 'pos'], [xfade, 'pos'], [shift, 'cv'], [vowel, 'vowel'], [amp, 'cv']] as const)
+    wire(cv, 'out', id, port);
+});
+{
+  const p = tests['fixed-links-disabled'];
+  for (const m of p.modules) {
+    const fixed = DEFS[m.type].params.flatMap((pd) => pd.input ? [pd.input] : []);
+    if (fixed.length) m.disabledInputs = fixed;
+  }
+  const filter = p.modules.find((m) => m.type === 'filter')!;
+  filter.paramsB = { ...filter.params, cutoff: 4000 };
+  filter.range = { p1: { cutoff: [.2, .8] } }; // exercises all optional sections together
+}
+
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 for (const [name, patch] of Object.entries(tests)) {
   const e = new Engine(SR);

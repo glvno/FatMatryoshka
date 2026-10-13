@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Patch editor: module cards on a canvas, SVG cables, drag-to-connect, a selection, assemblies and undo.
 import { DEFS } from './modules';
-import { parameterInputs, connectParameter } from './parameter-routing';
+import { parameterInputs, connectParameter, setParameterInput, setFixedInput } from './parameter-routing';
 import { parameterMenu } from './parameter-menu';
 import { sliderJack } from './slider-jack';
 import type { ParameterValues } from './engine';
@@ -746,6 +746,7 @@ export class Editor {
         if (m.map) copy.map = JSON.parse(JSON.stringify(m.map));
         if (m.range) copy.range = JSON.parse(JSON.stringify(m.range));
         if (m.bypass) copy.bypass = true;
+        if (m.disabledInputs) copy.disabledInputs = [...m.disabledInputs];
         map.set(id, copy.id);
       }
       for (const c of [...this.patch.cables]) if (map.has(c.from.module) && map.has(c.to.module)) connect(this.patch, DEFS, { module: map.get(c.from.module)!, port: c.from.port }, { module: map.get(c.to.module)!, port: c.to.port });
@@ -1478,22 +1479,35 @@ export class Editor {
       dot.dataset.also && (JSON.parse(dot.dataset.also) as Target[]).some((t) => sameEnd(t, to)));
   }
 
-  /** Physical jacks keep their cables; a light branch shows the same input at each moving thumb. */
+  /** Outside cables end at side jacks; internal branches are editable input-to-parameter routes. */
   drawCables(): void {
     for (const { path } of this.cablePaths) path.remove();
     this.cablePaths = [];
     for (const dot of [...this.ports.values(), ...this.sliderPorts.map((p) => p.jack)]) dot.classList.remove('connected');
-    const add = (c: Cable, from: HTMLElement, to: HTMLElement, kind: string, alias = false): void => {
+    const add = (from: HTMLElement, to: HTMLElement, kind: string, remove: () => void, title: string, internal = false): void => {
       const path = document.createElementNS(SVGNS, 'path');
-      path.setAttribute('class', `cable ${kind}${alias ? ' alias' : ''}`);
-      if (!alias) {
-        path.addEventListener('click', () => this.removeCable(c));
-        const title = document.createElementNS(SVGNS, 'title'); title.textContent = 'Click to remove'; path.append(title);
-      }
+      path.setAttribute('class', `cable ${kind}${internal ? ' alias' : ''}`);
+      path.setAttribute('role', 'button');
+      path.setAttribute('tabindex', '0');
+      path.setAttribute('aria-label', title);
+      path.addEventListener('pointerdown', (e) => e.stopPropagation());
+      path.addEventListener('click', (e) => { e.stopPropagation(); remove(); });
+      path.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); remove(); }
+      });
+      const hint = document.createElementNS(SVGNS, 'title'); hint.textContent = title; path.append(hint);
       this.svg.prepend(path);
       this.cablePaths.push({ path, from, to });
     };
-    const branches = new Set<string>();
+    // Show the assignment even without an upstream cable, so it can be edited before patching a source.
+    for (const { m, pd, jack } of this.sliderPorts) for (const port of parameterInputs(m, pd)) {
+      const side = this.inputJack({ module: m.id, port });
+      if (!side) continue;
+      add(side, jack, 'control', () => this.change(() => {
+        if (port === pd.input) setFixedInput(m, pd, false);
+        else setParameterInput(m, port as 'p1' | 'p2', pd.name, false);
+      }), `Disconnect ${DEFS[m.type].label} ${port} → ${pd.name}`, true);
+    }
     const physicalCables = new Set<string>();
     for (const c of this.patch.cables) {
       const a = this.ports.get(this.key(c.from.module, c.from.port, 'out'));
@@ -1505,15 +1519,9 @@ export class Editor {
       const kind = DEFS[this.patch.modules.find((m) => m.id === c.from.module)!.type].outputs.find((o) => o.name === c.from.port)!.kind;
       if (b) {
         const key = `${c.from.module}:${c.from.port}:${b.dataset.mod}:${b.dataset.port}`;
-        if (!physicalCables.has(key)) add(c, a, b, kind);
+        if (!physicalCables.has(key)) add(a, b, kind, () => this.removeCable(c), 'Disconnect cable');
         physicalCables.add(key);
-      }
-      for (const { pd, jack } of thumbs) {
-        const key = `${c.to.module}:${c.to.port}:${pd.name}`;
-        if (b && branches.has(key)) continue;
-        add(c, b ?? a, jack, kind, !!b);
-        branches.add(key);
-      }
+      } else for (const { jack } of thumbs) add(a, jack, kind, () => this.removeCable(c), 'Disconnect cable');
     }
     this.positionCables();
   }
@@ -1533,7 +1541,28 @@ export class Editor {
     });
   }
 
+  private internalPair(a: HTMLElement, b: HTMLElement): [HTMLElement, HTMLElement] | null {
+    if (a.dataset.dir !== 'in' || b.dataset.dir !== 'in' || !!a.dataset.param === !!b.dataset.param) return null;
+    return a.dataset.param ? [b, a] : [a, b]; // side jack, parameter thumb
+  }
+
   private connectJacks(a: HTMLElement, b: HTMLElement): void {
+    const internal = this.internalPair(a, b);
+    if (internal) {
+      const [side, thumb] = internal;
+      this.change(() => {
+        const m = this.patch.modules.find((m) => m.id === Number(thumb.dataset.mod))!;
+        const pd = DEFS[m.type].params.find((pd) => pd.name === thumb.dataset.param)!;
+        const targets: Target[] = [{ module: Number(side.dataset.mod), port: side.dataset.port! },
+          ...(side.dataset.also ? JSON.parse(side.dataset.also) as Target[] : [])];
+        const target = targets.find((t) => t.module === m.id);
+        if (!target) throw new Error('Use a side input belonging to this parameter’s module.');
+        if (target.port === 'p1' || target.port === 'p2') setParameterInput(m, target.port, pd.name, true);
+        else if (target.port === pd.input) setFixedInput(m, pd, true);
+        else throw new Error('That input has a different fixed destination. Use p1 / p2 for assignable routing.');
+      });
+      return;
+    }
     if (a.dataset.dir === b.dataset.dir) return this.ev.onError('connect an output to an input');
     const [out, input] = a.dataset.dir === 'out' ? [a, b] : [b, a];
     const from = { module: Number(out.dataset.mod), port: out.dataset.port! };
@@ -1561,7 +1590,7 @@ export class Editor {
     e.stopPropagation();
     const armed = this.armed;
     this.cancelArm();
-    if (armed && armed.dataset.dir !== start.dataset.dir) {
+    if (armed && (armed.dataset.dir !== start.dataset.dir || this.internalPair(armed, start))) {
       this.connectJacks(armed, start);
       return;
     }

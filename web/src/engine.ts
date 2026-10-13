@@ -153,7 +153,9 @@ export class Engine {
       node.connected = {};
       next.set(m.id, node);
     }
+    const disabled = new Map(patch.modules.map((m) => [m.id, new Set(m.disabledInputs)]));
     for (const c of patch.cables) {
+      if (disabled.get(c.to.module)?.has(c.to.port)) continue;
       const to = next.get(c.to.module)!;
       const from = next.get(c.from.module)!;
       to.sources.push({ port: c.to.port, from, fromPort: c.from.port });

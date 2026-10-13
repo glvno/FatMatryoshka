@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import { setFixedInput, setParameterInput } from './parameter-routing';
 import { paramValue, rangeOf, type ModuleDef, type ModuleInst, type ParamDef, type Source } from './patch';
 
 interface Events {
@@ -35,7 +36,7 @@ export function parameterMenu(m: ModuleInst, def: ModuleDef, pd: ParamDef, ev: E
     content.append(p);
   };
   if (pd.toggle) hint('Use p1 / p2 below to modulate this switch.');
-  else if (pd.input) hint(`Thumb → ${pd.input} input. Drag to adjust; Alt-drag to patch.`);
+  else if (pd.input) hint(`${pd.input} input → thumb. Drag a side input to the thumb to reconnect a route.`);
   else hint('Drop a cable on the thumb, or Alt-drag to patch.');
 
   const assignment = (source: Source, parent: HTMLElement): void => {
@@ -45,14 +46,22 @@ export function parameterMenu(m: ModuleInst, def: ModuleDef, pd: ParamDef, ev: E
     box.checked = !!m.map?.[source].includes(pd.name);
     box.setAttribute('aria-label', `${def.label}: ${source} controls ${pd.name}`);
     box.onchange = () => ev.change(() => {
+      if (source === 'p1' || source === 'p2') return setParameterInput(m, source, pd.name, box.checked);
       const list = m.map![source].filter((name) => name !== pd.name);
       if (box.checked) list.push(pd.name);
-      else if (source === 'p1' || source === 'p2') delete m.range?.[source]?.[pd.name];
       m.map![source] = list;
     });
     label.append(box, source.toUpperCase());
     parent.append(label);
   };
+  if (pd.input) {
+    const label = document.createElement('label');
+    const box = document.createElement('input'); box.type = 'checkbox';
+    box.checked = !m.disabledInputs?.includes(pd.input);
+    box.setAttribute('aria-label', `${def.label}: ${pd.input} input controls ${pd.name}`);
+    box.onchange = () => ev.change(() => setFixedInput(m, pd, box.checked));
+    label.append(box, `${pd.input} → ${pd.name}`); content.append(label);
+  }
   if (def.paramInputs) {
     for (const [index, pin] of (['p1', 'p2'] as const).entries()) {
       const group = document.createElement('div');
