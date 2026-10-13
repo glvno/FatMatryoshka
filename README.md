@@ -76,6 +76,10 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 - **Phaser** sweeps four allpass stages ±2 `depth` octaves around `center` at `rate`, with `fb` and `mix`.
 - **Digitizer** reduces the bit depth (`bits`) and the sample rate (`rate` = every sample held that many times).
 - **Noise** has a `color` parameter: 0 is white, 1 rolls the top off from about 220 Hz.
+## Ladder filter
+
+- **Ladder** is a four-pole low pass of the Moog kind with `drive`: four one-pole stages in a feedback loop with a soft saturator inside it, so `res` goes up to self-oscillation (at 1) and `drive` (1..8) pushes the signal into the saturator for grit. Outputs `lp24` and `lp12`; `cv` with `cvamt` and `track` as on the Filter. Its cutoff modulation is updated once per block (fine for envelopes and LFOs; the Filter is the one for audio-rate cutoff).
+
 ## Assemblies: merged ports, placement, nesting
 
 - **Merged ports.** On an open assembly, every exposed input has a `merge…` list of the card's other inputs of the same kind. Merging turns two jacks into one that feeds both (the factory `voice` has one `gate` for its two envelopes); the card shows `×2` and a `split` button. A cable into a merged jack goes to every input behind it, and removing it takes them all.

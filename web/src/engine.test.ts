@@ -394,6 +394,56 @@ describe('filter', () => {
   });
 });
 
+describe('ladder filter', () => {
+  /** noise -> ladder -> output left, taken from the given output */
+  function rig(port: string, params: Record<string, number>, note?: number, level = 0.3): Float32Array {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const n = addModule(p, DEFS.noise, 0, 0);
+    n.params.level = level;
+    const f = addModule(p, DEFS.ladder, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    Object.assign(f.params, { res: 0, ...params });
+    connect(p, DEFS, { module: n.id, port: 'out' }, { module: f.id, port: 'in' });
+    connect(p, DEFS, { module: f.id, port: port }, { module: out.id, port: 'l' });
+    e.load(p);
+    if (note !== undefined) e.noteOn(note);
+    render(e, 4800);
+    return render(e, SR).l;
+  }
+  const highs = (a: Float32Array): number => rms(a.slice(2).map((v, i) => v - 2 * a[i + 1] + a[i]));
+
+  it('is a 24 dB low pass at lp24 and a 12 dB one at lp12', () => {
+    const lp12 = highs(rig('lp12', { cutoff: 500 }));
+    const lp24 = highs(rig('lp24', { cutoff: 500 }));
+    expect(lp12).toBeGreaterThan(1e-5);
+    expect(lp24).toBeLessThan(lp12 * 0.3);
+  });
+
+  it('rings at the cutoff with full resonance and stays within +-1', () => {
+    const flat = rig('lp24', { cutoff: 1000, res: 0 });
+    const ring = rig('lp24', { cutoff: 1000, res: 1 });
+    expect(rms(ring)).toBeGreaterThan(rms(flat) * 2);
+    expect(Math.abs(freq(ring) - 1000)).toBeLessThan(250);
+    expect(Math.max(...ring.map(Math.abs))).toBeLessThanOrEqual(1);
+  });
+
+  it('drive makes it louder and the saturator keeps the peak at 1', () => {
+    const soft = rig('lp24', { cutoff: 2000, drive: 1 }, undefined, 0.6);
+    const hot = rig('lp24', { cutoff: 2000, drive: 8 }, undefined, 0.6);
+    expect(rms(hot)).toBeGreaterThan(rms(soft) * 1.5);
+    expect(Math.max(...hot.map(Math.abs))).toBeLessThanOrEqual(1);
+  });
+
+  it('key tracking moves the cutoff with the pitch of the played note', () => {
+    const off = rms(rig('lp24', { cutoff: 300, track: 0 }, 84));
+    const on = rms(rig('lp24', { cutoff: 300, track: 1 }, 84));
+    expect(on).toBeGreaterThan(off * 1.5);
+    expect(rms(rig('lp24', { cutoff: 300, track: 1 }, 60))).toBeCloseTo(rms(rig('lp24', { cutoff: 300, track: 0 }, 60)), 6);
+  });
+});
+
 describe('polyphony', () => {
   /** panel -> osc -> filter -> vca (adsr) -> delay -> output, plus a free LFO into the filter's p1 and an LFO driven by the envelope */
   function polyPatch(voices: number): { p: Patch; ids: Record<string, number> } {

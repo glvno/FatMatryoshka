@@ -119,6 +119,20 @@ kit('filter-morph', (add, wire) => {
   wire(flt, 'lp24', mix, 'in2');
   wire(mix, 'out', out, 'l');
 });
+kit('ladder', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.8 });
+  const lfo = add('lfo', 0, 0, { wave: 1, rate: 2, depth: 0.6 });
+  const lad = add('ladder', 0, 0, { cutoff: 500, res: 0.85, drive: 3, cvamt: 2, track: 1 });
+  const mix = add('mixer', 0, 0, { l1: 0.5, l2: 0.3 });
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(osc, 'out', lad, 'in');
+  wire(lfo, 'out', lad, 'cv');
+  wire(lad, 'lp24', mix, 'in1');
+  wire(lad, 'lp12', mix, 'in2');
+  wire(mix, 'out', out, 'l');
+});
 kit('fm1-panel', (add, wire) => {
   const pn = add('fm1', 0, 0, { k1: 0.2, k3: 0.4 });
   const osc = add('osc', 0, 0, { wave: 2 }, { map: { p1: ['level'], p2: ['fine'] } });

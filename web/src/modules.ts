@@ -473,6 +473,62 @@ const filter: ModuleImpl<{ ic1: number; ic2: number; jc1: number; jc2: number }>
   },
 };
 
+/**
+ * Ladder filter (four one-pole stages in a feedback loop, the Moog shape) with drive. Zero-delay feedback: the loop is
+ * solved linearly (y4 = (G^4 x + S) / (1 + k G^4) with the stage states S), then the loop input u = sat(drive x - k y4)
+ * runs through the four stages, so the saturator sits in the loop (self-oscillation at res 1 limits itself). sat is
+ * v - v^3 / 6.75 up to |v| = 1.5 and +-1 beyond (slope 1 at 0, peak 1). The coefficients (G = g / (1 + g),
+ * g = tan(pi fc / sr)) are computed once per block from the block mean of the cv input, cvamt and key tracking: cheaper
+ * than the SVF's per-sample update, which the Filter module keeps for audio-rate cutoff modulation. Outputs: lp24 (stage
+ * 4) and lp12 (stage 2). No resonance compensation: the passband drops with res as on the original.
+ */
+const ladder: ModuleImpl<{ s: Float64Array }> = {
+  def: {
+    type: 'ladder',
+    label: 'Ladder',
+    inputs: [audio('in'), control('cv')],
+    outputs: [audio('lp24'), audio('lp12')],
+    params: [
+      param('cutoff', 20, 4000, 1200, { unit: 'Hz', step: 1, log: true, bend: true }),
+      param('res', 0, 1, 0.2, { step: 0.01 }),
+      param('drive', 1, 8, 1, { step: 0.01, log: true }),
+      param('cvamt', 0, 4, 1, { unit: 'oct', step: 0.01 }),
+      param('track', 0, 1, 0, { step: 1, choices: ['off', 'on'], toggle: true }),
+    ],
+  },
+  init: () => ({ s: new Float64Array(4) }),
+  process(c, st) {
+    const s = st.s;
+    let cvm = 0;
+    for (let i = 0; i < c.n; i++) cvm += c.inp.cv[i];
+    cvm /= c.n;
+    const tr = (c.p.track ?? 0) >= 0.5 ? c.voice.pitch : 0;
+    const fc = Math.min((c.p.cutoff ?? 1000) * Math.pow(2, cvm * (c.p.cvamt ?? 1) + tr), c.sr * 0.45);
+    const g = Math.tan((Math.PI * fc) / c.sr);
+    const G = g / (1 + g);
+    const G2 = G * G, G3 = G2 * G, G4 = G3 * G, hG = 1 - G;
+    const k = 4 * (c.p.res ?? 0);
+    const drive = c.p.drive ?? 1;
+    const F = 1 / (1 + k * G4);
+    for (let i = 0; i < c.n; i++) {
+      const x = c.inp.in[i];
+      const S = (G3 * s[0] + G2 * s[1] + G * s[2] + s[3]) * hG;
+      const y4 = (G4 * x + S) * F;
+      let u = drive * x - k * y4;
+      u = u >= 1.5 ? 1 : u <= -1.5 ? -1 : u - (u * u * u) / 6.75;
+      let y2 = 0;
+      for (let j = 0; j < 4; j++) {
+        const v = G * (u - s[j]);
+        u = v + s[j];
+        s[j] = u + v;
+        if (j === 1) y2 = u;
+      }
+      c.out.lp24[i] = u;
+      c.out.lp12[i] = y2;
+    }
+  },
+};
+
 const mixer: ModuleImpl<null> = {
   def: {
     type: 'mixer',
@@ -1328,7 +1384,7 @@ const crush: ModuleImpl<{ held: number; cnt: number }> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush];
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an

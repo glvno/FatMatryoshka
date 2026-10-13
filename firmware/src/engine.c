@@ -218,6 +218,7 @@ typedef struct {
         struct { int32_t held, cnt; } crush;
         struct { int32_t v; uint8_t stage, prev; } adsr;
         struct { int32_t ic1, ic2, jc1, jc2; } flt;   /* stage 1 and stage 2 integrators */
+        struct { int32_t s[4]; } lad;                 /* the four one-pole states, Q20 */
         struct { int16_t *buf; uint32_t w, t, seen, beat; uint32_t ring[DELAY_CLK_PPQN]; uint8_t prev; } dly;   /* t, ring, seen, beat: the clock tempo */
         struct { int16_t *buf; uint16_t ci[4], ai[2]; int32_t lp[4]; } rev;
         struct { int32_t v; uint32_t t; uint8_t stage, prev; } env;  /* Q30, like the ADSR; t: samples in the segment */
@@ -1271,6 +1272,63 @@ static void m_filter(const node_t *nd, inst_t *it, uint32_t n)
     it->s.flt.jc2 = jc2;
 }
 
+#define LAD_SAT_KNEE (3 << 19)      /* 1.5 in Q20: the saturator's knee */
+#define LAD_SAT_CUBE 2485513        /* 1 / 6.75 in Q24 */
+
+/* Ladder filter with drive (modules.ts `ladder`): four TPT one-poles (G = g / (1 + g), Q24) in a loop with k = 4 res.
+ * The loop is solved linearly per sample (y4 = F (G^4 x + S), S the states' share, F = 1 / (1 + k G^4)), the loop input
+ * u = sat(drive x - k y4) then runs through the stages; sat is v - v^3 / 6.75 up to |v| = 1.5, +-1 beyond. The
+ * coefficients come once per block from the block mean of cv, cvamt and key tracking (no per-sample recip24: the SVF
+ * keeps that for audio-rate cutoff). States Q20, products rounded; the saturator bounds the states, so no clamps. */
+static void m_ladder(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[LADDER_I_IN], *cv = it->in[LADDER_I_CV];
+    esig_t *lp24 = it->out[LADDER_O_LP24], *lp12 = it->out[LADDER_O_LP12];
+    int32_t *s = it->s.lad.s;
+    int32_t drive = EF(it, LADDER_P_DRIVE), cvamt = EF(it, LADDER_P_CVAMT);
+    int32_t k24 = EF(it, LADDER_P_RES) << 10;                                     /* 4 res, Q24 */
+    int32_t tr = EF(it, LADDER_P_TRACK) >= 32768 ? E.vc[cur_v].pitch : 0, x = tr;
+    uint32_t base = (uint32_t)(((uint64_t)(uint32_t)EF(it, LADDER_P_CUTOFF) << 16) / ENG_SR), i;
+    int32_t g, G, G2, G3, G4, hG, F;
+    if (nd->conn & (1u << LADDER_I_CV)) {
+        int64_t sum = 0;
+        for (i = 0; i < n; i++)
+            sum += cv[i];
+        x += mul16((int32_t)(sum / (int32_t)n), cvamt);
+    }
+    if (x)
+        base = exp2_scale(base, x);
+    g = svf_g(base);
+    G = mulq(g, recip24((1 << 24) + g), 24);
+    G2 = mulq(G, G, 24);
+    G3 = mulq(G2, G, 24);
+    G4 = mulq(G3, G, 24);
+    hG = (1 << 24) - G;
+    F = recip24((1 << 24) + mulq(k24, G4, 24));
+    for (i = 0; i < n; i++) {
+        int32_t x20 = in[i] << 4, S, y4, u, y2 = 0, j;
+        S = mulr(G3, s[0], 24) + mulr(G2, s[1], 24) + mulr(G, s[2], 24) + s[3];
+        S = mulr(S, hG, 24);
+        y4 = mulr(F, mulr(G4, x20, 24) + S, 24);
+        u = mulq(x20, drive, 16) - mulq(k24, y4, 24);
+        if (u >= LAD_SAT_KNEE)
+            u = 1 << 20;
+        else if (u <= -LAD_SAT_KNEE)
+            u = -(1 << 20);
+        else
+            u -= mulq(mulq(mulq(u, u, 20), u, 20), LAD_SAT_CUBE, 24);
+        for (j = 0; j < 4; j++) {
+            int32_t v = mulr(G, u - s[j], 24);
+            u = v + s[j];
+            s[j] = u + v;
+            if (j == 1)
+                y2 = u;
+        }
+        lp24[i] = (u + 8) >> 4;
+        lp12[i] = (y2 + 8) >> 4;
+    }
+}
+
 static void m_mixer(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *a = it->in[MIXER_I_IN1], *b = it->in[MIXER_I_IN2], *c = it->in[MIXER_I_IN3], *d = it->in[MIXER_I_IN4];
@@ -1938,6 +1996,7 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     case T_XFADE: m_xfade(nd, it, n); break;
     case T_VOWEL: m_vowel(nd, it, n); break;
     case T_PHASER: m_phaser(nd, it, n); break;
+    case T_LADDER: m_ladder(nd, it, n); break;
     case T_CRUSH: m_crush(nd, it, n); break;
     default: break;                      /* output: read by eng_render */
     }
