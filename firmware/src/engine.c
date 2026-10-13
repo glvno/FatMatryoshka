@@ -219,6 +219,7 @@ typedef struct {
         struct { int32_t v; uint8_t stage, prev; } adsr;
         struct { int32_t ic1, ic2, jc1, jc2; } flt;   /* stage 1 and stage 2 integrators */
         struct { int32_t s[4]; } lad;                 /* the four one-pole states, Q20 */
+        struct { int32_t env; } dyn;                  /* the peak follower, Q24 */
         struct { int16_t *buf; uint32_t w, t, seen, beat; uint32_t ring[DELAY_CLK_PPQN]; uint8_t prev; } dly;   /* t, ring, seen, beat: the clock tempo */
         struct { int16_t *buf; uint16_t ci[4], ai[2]; int32_t lp[4]; } rev;
         struct { int32_t v; uint32_t t; uint8_t stage, prev; } env;  /* Q30, like the ADSR; t: samples in the segment */
@@ -1350,6 +1351,35 @@ static void m_ladder(const node_t *nd, inst_t *it, uint32_t n)
     }
 }
 
+#define DB_TO_LOG2 10885            /* 1 / 6.0206 in Q16: dB -> octaves (log2) */
+
+/* Envelope follower and compressor (modules.ts `dyn`): a peak follower (Q24, attack / release rates Q30 as the glide) of
+ * |side| (or |in|), out = in x gain with gain = 2^(makeup - slope (log2 env - log2 thresh)) above the threshold, the
+ * makeup alone below it; env output Q16. One log2_q16 + exp2_q16 per sample while above the threshold. */
+static void m_dyn(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[DYN_I_IN], *det = nd->conn & (1u << DYN_I_SIDE) ? it->in[DYN_I_SIDE] : in;
+    esig_t *out = it->out[DYN_O_OUT], *eo = it->out[DYN_O_ENV];
+    int32_t ka = env_rate(EF(it, DYN_P_ATTACK)), kr = env_rate(EF(it, DYN_P_RELEASE)), env = it->s.dyn.env;
+    int32_t thr_log = mul16(EF(it, DYN_P_THRESH), DB_TO_LOG2), makeup_log = mul16(EF(it, DYN_P_GAIN), DB_TO_LOG2);
+    int32_t ratio = EF(it, DYN_P_RATIO) < ENG_ONE ? ENG_ONE : EF(it, DYN_P_RATIO);
+    int32_t slope = ENG_ONE - (int32_t)((1ull << 32) / (uint32_t)ratio);                 /* 1 - 1 / ratio */
+    int32_t thr24 = (int32_t)exp2_q16(thr_log + (24 << 16)), makeup = (int32_t)exp2_q16(makeup_log + (16 << 16));   /* (exp2_q16 gives a plain integer: + 16 octaves for Q16, + 24 for Q24) */
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        int32_t a = det[i] < 0 ? -det[i] : det[i], g;
+        a = (a > (1 << 23) - 1 ? (1 << 23) - 1 : a) << 8;
+        env += mulq(a > env ? ka : kr, a - env, 30);
+        if (env > thr24)
+            g = (int32_t)exp2_q16((16 << 16) + makeup_log - mul16(slope, log2_q16((uint32_t)env) - (24 << 16) - thr_log));
+        else
+            g = makeup;
+        out[i] = mul16(in[i], g);
+        eo[i] = (env + 128) >> 8;
+    }
+    it->s.dyn.env = env;
+}
+
 static void m_mixer(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *a = it->in[MIXER_I_IN1], *b = it->in[MIXER_I_IN2], *c = it->in[MIXER_I_IN3], *d = it->in[MIXER_I_IN4];
@@ -2018,6 +2048,7 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     case T_VOWEL: m_vowel(nd, it, n); break;
     case T_PHASER: m_phaser(nd, it, n); break;
     case T_LADDER: m_ladder(nd, it, n); break;
+    case T_DYN: m_dyn(nd, it, n); break;
     case T_CRUSH: m_crush(nd, it, n); break;
     default: break;                      /* output: read by eng_render */
     }

@@ -556,6 +556,49 @@ const ladder: ModuleImpl<{ s: Float64Array }> = {
   },
 };
 
+/** 20 log10(x) = DB_PER_OCT log2(x) */
+const DB_PER_OCT = 6.0205999;
+
+/**
+ * Envelope follower and compressor. The detector is a peak follower of |side| (or of |in| when side is not connected): one
+ * pole that reaches 99 % in `attack` on the way up and in `release` on the way down (the ADSR's rate formula). `env` outputs
+ * it (0..1, a control). Above `thresh` (dB) the signal is compressed by `ratio`: gain = (thresh / env)^(1 - 1/ratio), in the
+ * log domain, then `gain` dB of makeup. Below the threshold only the makeup applies.
+ */
+const dyn: ModuleImpl<{ env: number }> = {
+  def: {
+    type: 'dyn',
+    label: 'Compressor',
+    inputs: [audio('in'), audio('side')],
+    outputs: [audio('out'), control('env')],
+    params: [
+      param('thresh', -40, 0, -12, { unit: 'dB', step: 0.5 }),
+      param('ratio', 1, 20, 4, { step: 0.1 }),
+      param('attack', 0.001, 0.2, 0.01, { unit: 's', step: 0.001, log: true }),
+      param('release', 0.01, 1, 0.1, { unit: 's', step: 0.01, log: true }),
+      param('gain', 0, 24, 0, { unit: 'dB', step: 0.5 }),
+    ],
+  },
+  init: () => ({ env: 0 }),
+  process(c, s) {
+    const ka = 1 - Math.exp(-4.6 / Math.max((c.p.attack ?? 0.01) * c.sr, 1));
+    const kr = 1 - Math.exp(-4.6 / Math.max((c.p.release ?? 0.1) * c.sr, 1));
+    const det = c.connected.side ? c.inp.side : c.inp.in;
+    const thrLog = (c.p.thresh ?? -12) / DB_PER_OCT;
+    const thr = Math.pow(2, thrLog);
+    const slope = 1 - 1 / Math.max(1, c.p.ratio ?? 4);
+    const makeupLog = (c.p.gain ?? 0) / DB_PER_OCT;
+    const makeup = Math.pow(2, makeupLog);
+    for (let i = 0; i < c.n; i++) {
+      const a = Math.abs(det[i]);
+      s.env += (a > s.env ? ka : kr) * (a - s.env);
+      const g = s.env > thr ? Math.pow(2, makeupLog - slope * (Math.log2(s.env) - thrLog)) : makeup;
+      c.out.out[i] = c.inp.in[i] * g;
+      c.out.env[i] = s.env;
+    }
+  },
+};
+
 const mixer: ModuleImpl<null> = {
   def: {
     type: 'mixer',
@@ -1411,7 +1454,7 @@ const crush: ModuleImpl<{ held: number; cnt: number }> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder];
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an

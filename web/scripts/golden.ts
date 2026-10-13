@@ -131,6 +131,28 @@ kit('unison', (add, wire) => {
   wire(osc2, 'out', mix, 'in2');
   wire(mix, 'out', out, 'l');
 });
+kit('dyn', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.9 });
+  const adsr = add('adsr', 0, 0, { a: 0.005, d: 0.2, s: 0.3, r: 0.1 });
+  const vca = add('vca', 0, 0);
+  const dyn = add('dyn', 0, 0, { thresh: -18, ratio: 8, attack: 0.003, release: 0.08, gain: 6 });
+  const osc2 = add('osc', 0, 0, { wave: 0, level: 0.5, coarse: 12 });
+  const vca2 = add('vca', 0, 0);
+  const mix = add('mixer', 0, 0, { l1: 0.6, l2: 0.4 });
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(kb, 'pitch', osc2, 'pitch');
+  wire(kb, 'gate', adsr, 'gate');
+  wire(osc, 'out', vca, 'in');
+  wire(adsr, 'env', vca, 'cv');
+  wire(vca, 'out', dyn, 'in');
+  wire(dyn, 'out', mix, 'in1');
+  wire(osc2, 'out', vca2, 'in');
+  wire(dyn, 'env', vca2, 'cv');
+  wire(vca2, 'out', mix, 'in2');
+  wire(mix, 'out', out, 'l');
+});
 kit('ladder', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.8 });

@@ -158,7 +158,7 @@ static const uint16_t TYPE_COLOR[N_TYPES] = {
     [T_ENV] = 0x2FEA, [T_STRING] = 0xFD75, [T_WAVETABLE] = 0xFE60, [T_CHORUS] = 0x9C7F,
     [T_SEQ] = 0xF7A0, [T_CLKDIV] = 0xCE79, [T_SH] = 0xAEDF, [T_QUANT] = 0x7FF5, [T_PULSE] = 0xFEF5,
     [T_PAN] = 0xAFE5, [T_XFADE] = 0xC618, [T_VOWEL] = 0xF5B6, [T_PHASER] = 0x8C7F, [T_CRUSH] = 0xBC40,
-    [T_LADDER] = 0x04DF,
+    [T_LADDER] = 0x04DF, [T_DYN] = 0xFD8F,
 };
 
 static void th_px(int32_t x, int32_t y, uint16_t c)

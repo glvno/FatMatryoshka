@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 30
+#define N_TYPES 31
 enum {
     T_FM1,
     T_OSC,
@@ -35,6 +35,7 @@ enum {
     T_PHASER,
     T_CRUSH,
     T_LADDER,
+    T_DYN,
 };
 
 /* fm1: Main */
@@ -477,6 +478,23 @@ enum {
 #define LADDER_NPAR 5
 #define LADDER_CVBASE 2
 
+/* dyn: Compressor */
+#define DYN_I_IN 0
+#define DYN_I_SIDE 1
+#define DYN_I_P1 2
+#define DYN_I_P2 3
+#define DYN_O_OUT 0
+#define DYN_O_ENV 1
+#define DYN_P_THRESH 0
+#define DYN_P_RATIO 1
+#define DYN_P_ATTACK 2
+#define DYN_P_RELEASE 3
+#define DYN_P_GAIN 4
+#define DYN_NIN 4
+#define DYN_NOUT 2
+#define DYN_NPAR 5
+#define DYN_CVBASE 2
+
 #define DELAY_NDIV 11
 #define DELAY_CLK_PPQN 24
 static const uint8_t DELAY_DIV_NUM[DELAY_NDIV] = {1, 1, 1, 3, 1, 3, 1, 3, 2, 5, 4};
@@ -784,6 +802,15 @@ static const uint8_t LADDER_LOG[] = {2, 0, 1, 0, 0};
 static const char *const LADDER_UNIT[] = {"HZ", "", "", "OCT", ""};
 static const char *const LADDER_CH4[] = {"OFF", "ON", 0};
 static const char *const *const LADDER_CH[] = {0, 0, 0, 0, LADDER_CH4};
+static const char *const DYN_INNAMES[] = {"IN", "SIDE", "P1", "P2"};
+static const int32_t DYN_MIN[] = {-2621440, 65536, 66, 655, 0};
+static const int32_t DYN_MAX[] = {0, 1310720, 13107, 65536, 1572864};
+static const int32_t DYN_DEF[] = {-786432, 262144, 655, 6554, 0};
+static const int32_t DYN_INC[] = {32768, 12452, 130, 655, 32768};
+static const char *const DYN_PN[] = {"THRESH", "RATIO", "ATTACK", "RELEASE", "GAIN"};
+static const uint8_t DYN_LOG[] = {0, 0, 1, 1, 0};
+static const char *const DYN_UNIT[] = {"DB", "", "S", "S", "DB"};
+static const char *const *const DYN_CH[] = {0, 0, 0, 0, 0};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, FM1_CVBASE, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -816,4 +843,5 @@ static const def_t DEFS[N_TYPES] = {
     {PHASER_NIN, PHASER_NOUT, PHASER_NPAR, PHASER_CVBASE, PHASER_MIN, PHASER_MAX, PHASER_DEF, PHASER_INC, "PHASER", PHASER_PN, PHASER_INNAMES, PHASER_LOG, PHASER_UNIT, PHASER_CH},   /* phaser */
     {CRUSH_NIN, CRUSH_NOUT, CRUSH_NPAR, CRUSH_CVBASE, CRUSH_MIN, CRUSH_MAX, CRUSH_DEF, CRUSH_INC, "DIGITIZER", CRUSH_PN, CRUSH_INNAMES, CRUSH_LOG, CRUSH_UNIT, CRUSH_CH},   /* crush */
     {LADDER_NIN, LADDER_NOUT, LADDER_NPAR, LADDER_CVBASE, LADDER_MIN, LADDER_MAX, LADDER_DEF, LADDER_INC, "LADDER", LADDER_PN, LADDER_INNAMES, LADDER_LOG, LADDER_UNIT, LADDER_CH},   /* ladder */
+    {DYN_NIN, DYN_NOUT, DYN_NPAR, DYN_CVBASE, DYN_MIN, DYN_MAX, DYN_DEF, DYN_INC, "COMPRESSOR", DYN_PN, DYN_INNAMES, DYN_LOG, DYN_UNIT, DYN_CH},   /* dyn */
 };

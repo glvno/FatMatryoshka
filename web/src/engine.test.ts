@@ -447,6 +447,50 @@ describe('unison', () => {
   });
 });
 
+describe('compressor', () => {
+  /** sine at `amp` -> dyn -> output left (or its env output); a silent sidechain when `side` */
+  function rig(params: Record<string, number>, amp: number, port = 'out', side = false): Float32Array {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    const d = addModule(p, DEFS.dyn, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    Object.assign(o.params, { wave: 0, level: amp });
+    out.params.level = 1;
+    Object.assign(d.params, { thresh: -20, ratio: 4, attack: 0.005, release: 0.05, gain: 0, ...params });
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: d.id, port: 'in' });
+    if (side) {
+      const k = addModule(p, DEFS.const, 0, 0);
+      k.params.value = 0;
+      connect(p, DEFS, { module: k.id, port: 'out' }, { module: d.id, port: 'side' });
+    }
+    connect(p, DEFS, { module: d.id, port }, { module: out.id, port: 'l' });
+    e.load(p);
+    render(e, 9600);
+    return render(e, 4800).l;
+  }
+  const db = (x: number): number => 20 * Math.log10(x);
+
+  it('leaves a signal below the threshold alone and compresses one above it by the ratio', () => {
+    const quiet = rig({}, 0.05);
+    expect(rms(quiet)).toBeCloseTo(0.05 / Math.SQRT2, 3);
+    const loud = rig({}, 0.5); // -6 dB; the follower sits a little under the peak, so 11..13 dB over: 8..10 dB of reduction at 4:1
+    expect(db(rms(loud) / (0.5 / Math.SQRT2))).toBeGreaterThan(-12);
+    expect(db(rms(loud) / (0.5 / Math.SQRT2))).toBeLessThan(-6);
+    expect(rms(rig({ ratio: 1 }, 0.5))).toBeCloseTo(0.5 / Math.SQRT2, 3);
+  });
+
+  it('the env output follows the peak, makeup gain raises the output, a silent sidechain stops the compression', () => {
+    const env = rig({}, 0.5, 'env'); // a one-pole peak follower: it rides a little under the peak and ripples
+    expect(Math.min(...env)).toBeGreaterThan(0.25);
+    expect(Math.max(...env)).toBeLessThan(0.55);
+    expect(env.reduce((a, b) => a + b, 0) / env.length).toBeGreaterThan(0.3);
+    expect(rms(rig({ gain: 6 }, 0.05))).toBeCloseTo((0.05 / Math.SQRT2) * 2, 2);
+    expect(rms(rig({}, 0.5, 'out', true))).toBeCloseTo(0.5 / Math.SQRT2, 3);
+  });
+});
+
 describe('ladder filter', () => {
   /** noise -> ladder -> output left, taken from the given output */
   function rig(port: string, params: Record<string, number>, note?: number, level = 0.3): Float32Array {
