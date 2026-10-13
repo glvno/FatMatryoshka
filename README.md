@@ -80,6 +80,11 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - The **Oscillator** has `unison` (1..5 copies) and `detune` (cents, spread from −detune to +detune): a supersaw or a thick pulse from one module, summed so the peak stays at `level`. Sync restarts all copies. With `pm` connected or `fb` above 0 the oscillator runs its FM path, which plays one copy.
 
+## Comb filter and modal resonator
+
+- **Comb** is a tuned feedback comb: a delay of one period of the `pitch` (plus `coarse`) with `fb` (positive: a peak at every harmonic; negative: the odd ones, hollow) and `damp`, mixed by `mix`. A flanger with an LFO on `pitch`, a resonator on noise, a Karplus string without the pluck.
+- **Modal** is a resonator of six partials at the `pitch`: harmonic at `struct` 0, a metal bar at 1; `decay` is the ring time, `damp` shortens the upper partials, `bright` their level. Hit it with a short burst (a pulse, a gated noise, a plucked string) for bells, bars and drums; a steady input makes it howl.
+
 ## Granular
 
 - **Granular** records whatever is patched into it (one second, `freeze` stops the recording) and plays grains from it: `density` grains per second or one per rising edge on `trig`, each reading `size` seconds from `position` back in the buffer (0 = the newest audio) scattered by `spray`, at `pitch` semitones, under a smooth window, up to eight at once, mixed with the input by `mix`. A frozen chord into a cloud, a stutter from a square LFO on `trig`, a pitch-shifted echo. One per patch on the FM-1 (not in the four-voice build).

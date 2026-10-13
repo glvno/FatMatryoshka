@@ -88,6 +88,14 @@ static int32_t sin_turn(uint32_t ph)
     return (s0 + (int32_t)(((int64_t)(s1 - s0) * fr) >> 16)) >> 14;
 }
 
+/* the same in Q30 (the modal resonator needs cos near 1 to better than Q16) */
+static int32_t sin_turn30(uint32_t ph)
+{
+    uint32_t i = ph >> 22, fr = (ph >> 6) & 0xFFFFu;
+    int32_t s0 = SIN_T[i], s1 = SIN_T[i + 1u];
+    return s0 + (int32_t)(((int64_t)(s1 - s0) * fr) >> 16);
+}
+
 /* 1 / (d / 2^24) in Q24 for d (Q24) in [2^24, 2^30): 32-bit divide for a first estimate, one Newton step */
 static int32_t recip24(int32_t d)
 {
@@ -225,6 +233,7 @@ typedef struct {
         struct { int32_t ic1, ic2, jc1, jc2; } flt;   /* stage 1 and stage 2 integrators */
         struct { int32_t s[4]; } lad;                 /* the four one-pole states, Q20 */
         struct { int32_t env; } dyn;                  /* the peak follower, Q24 */
+        struct { int32_t y1[6], y2[6]; } mod;         /* the modal resonators, Q20 */
         struct { struct grain_line *ln; uint32_t w, acc, seed; uint8_t prev; } gr;   /* acc: grains per sample, Q24 */
         struct { int16_t *buf; uint32_t w, t, seen, beat; uint32_t ring[DELAY_CLK_PPQN]; uint8_t prev; } dly;   /* t, ring, seen, beat: the clock tempo */
         struct { int16_t *buf; uint16_t ci[4], ai[2]; int32_t lp[4]; } rev;
@@ -546,7 +555,7 @@ int eng_load(const uint8_t *p, uint32_t len)
                 for (j = 0; j < DELAY_LEN; j++)
                     it->s.dly.buf[j] = 0;
             }
-            if (nd->type == T_STRING) {
+            if (nd->type == T_STRING || nd->type == T_COMB) {         /* (the comb uses a string line, it->s.str) */
                 int s = slot_take(str_own, ENG_NSTRING);
                 if (s < 0)
                     return -4;
@@ -1813,6 +1822,98 @@ static void m_string(const node_t *nd, inst_t *it, uint32_t n)
     it->s.str.blen = blen;
 }
 
+/* The comb filter (modules.ts comb): the string's line and loop (it->s.str: buf, w, lp, err) with signed feedback and
+ * no burst; out = in (1 - mix) + y mix. */
+static void m_comb(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[COMB_I_IN], *pitch = it->in[COMB_I_PITCH];
+    esig_t *out = it->out[0];
+    int16_t *buf = it->s.str.buf;
+    uint32_t dt = exp2_scale(INC_C4, pitch[0] + EF(it, COMB_P_COARSE) / 12), w = it->s.str.w, i, di;
+    int32_t per, cl, dl, d, fr, fb = EF(it, COMB_P_FB), mix = EF(it, COMB_P_MIX), dry = ENG_ONE - mix;
+    int32_t lp = it->s.str.lp, err = it->s.str.err;
+    if (dt == 0u)
+        dt = 1u;
+    per = (int32_t)clampi((int64_t)((1ull << 48) / dt) > 0x7FFFFFFF ? 0x7FFFFFFF : (int32_t)((1ull << 48) / dt), 2 << 16, (int32_t)(STR_LEN - 2u) << 16);
+    cl = ENG_ONE - mul16(EF(it, COMB_P_DAMP), 58982);
+    dl = (int32_t)(((int64_t)(ENG_ONE - cl) << 16) / cl);
+    d = per - dl;
+    if (d < ENG_ONE)
+        d = ENG_ONE;
+    di = (uint32_t)d >> 16;
+    fr = d & 0xFFFF;
+    for (i = 0; i < n; i++) {
+        int32_t x = in[i], r0, r1, y, wq;
+        int16_t q;
+        uint32_t p0 = w >= di ? w - di : w + STR_LEN - di, p1 = p0 ? p0 - 1u : STR_LEN - 1u;
+        r0 = (int32_t)buf[p0] * 8;
+        r1 = (int32_t)buf[p1] * 8;
+        lp += mulr(r0 + mulr(r1 - r0, fr, 16) - lp, cl, 16);
+        y = clampi(x + mulr(lp, fb, 16), -2 * ENG_ONE, 2 * ENG_ONE);
+        wq = y + err;
+        q = dly_pack(wq);
+        err = wq - (int32_t)q * 8;
+        buf[w] = q;
+        if (++w == STR_LEN)
+            w = 0;
+        out[i] = mul16(x, dry) + mul16(y, mix);
+    }
+    it->s.str.w = w;
+    it->s.str.lp = lp;
+    it->s.str.err = err;
+    (void)nd;
+}
+
+#define MODAL_N 6
+static const int32_t MODAL_BAR_Q16[MODAL_N] = {65536, 180617, 354157, 585433, 874250, 1221591};   /* a free bar's partial ratios */
+
+/* The modal resonator (modules.ts modal): six two-pole resonators y = g x + c1 y1 - c2 y2 with g = a sin(th) (Q30),
+ * c1 = 2 r cos(th), c2 = r^2 (Q30), states Q20 held to +-8; coefficients once per block from the block's first pitch. */
+static void m_modal(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[MODAL_I_IN], *pitch = it->in[MODAL_I_PITCH];
+    esig_t *out = it->out[0];
+    int32_t *y1 = it->s.mod.y1, *y2 = it->s.mod.y2;
+    int32_t st = EF(it, MODAL_P_STRUCT), damp = EF(it, MODAL_P_DAMP), decay = EF(it, MODAL_P_DECAY);
+    int32_t bw = 19661 + mul16(EF(it, MODAL_P_BRIGHT), 45875), amp[MODAL_N], g[MODAL_N], c1[MODAL_N], c2[MODAL_N], sum = 0, a = ENG_ONE;
+    int32_t base = pitch[0] + EF(it, MODAL_P_COARSE) / 12;
+    uint32_t i, k;
+    for (i = 0; i < MODAL_N; i++) {
+        amp[i] = a;
+        sum += a;
+        a = mul16(a, bw);
+    }
+    for (i = 0; i < MODAL_N; i++) {
+        int32_t ratio = ((int32_t)(i + 1u) << 16) + mul16(st, MODAL_BAR_Q16[i] - ((int32_t)(i + 1u) << 16));
+        uint32_t dt = exp2_scale(INC_C4, base + log2_q16((uint32_t)ratio) - (16 << 16));   /* f0 x ratio as a phase increment */
+        int32_t r30, s30, sh, co30, dec_i;
+        int64_t e;
+        g[i] = c1[i] = c2[i] = 0;
+        if (dt >= DT_MAX)
+            continue;
+        dec_i = (int32_t)(((int64_t)decay << 16) / (ENG_ONE + 2 * (int32_t)i * damp));      /* decay / (1 + 2 damp i) */
+        e = -(((int64_t)LOG2_1000_Q16 << 16) / ((int64_t)dec_i * ENG_SR));                   /* octaves per sample, Q16 */
+        r30 = (int32_t)exp2_scale(1u << 30, (int32_t)(e < -(60 << 16) ? -(60 << 16) : e));
+        s30 = sin_turn30(dt);
+        sh = sin_turn30(dt >> 1);                                                            /* cos th = 1 - 2 sin^2(th / 2): the pole's */
+        co30 = (1 << 30) - mulq(sh, sh, 29);                                                 /* frequency needs cos accurate near 1 */
+        g[i] = mulq((int32_t)(((int64_t)amp[i] << 16) / sum), s30, 16);
+        c1[i] = 2 * mulq(r30, co30, 30);
+        c2[i] = mulq(r30, r30, 30);
+    }
+    for (k = 0; k < n; k++) {
+        int32_t x20 = in[k] << 4, y = 0;
+        for (i = 0; i < MODAL_N; i++) {
+            int32_t v = clampi(mulr(g[i], x20, 30) + mulr(c1[i], y1[i], 30) - mulr(c2[i], y2[i], 30), -(8 << 20), 8 << 20);
+            y2[i] = y1[i];
+            y1[i] = v;
+            y += v;
+        }
+        out[k] = (y + 8) >> 4;
+    }
+    (void)nd;
+}
+
 /* The wavetable oscillator (modules.ts wavetable): two neighbouring frames of a bank read with linear interpolation and
  * crossfaded by pos; the mip level (32 / 16 / 8 harmonics) from the block's first pitch. Phase modulation as the plain
  * oscillator's (no oversampling). */
@@ -2216,6 +2317,8 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     case T_MATH: m_math(nd, it, n); break;
     case T_LOGIC: m_logic(nd, it, n); break;
     case T_GRAIN: m_grain(nd, it, n); break;
+    case T_COMB: m_comb(nd, it, n); break;
+    case T_MODAL: m_modal(nd, it, n); break;
     case T_CRUSH: m_crush(nd, it, n); break;
     default: break;                      /* output: read by eng_render */
     }

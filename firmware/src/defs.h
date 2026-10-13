@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 34
+#define N_TYPES 36
 enum {
     T_FM1,
     T_OSC,
@@ -39,6 +39,8 @@ enum {
     T_MATH,
     T_LOGIC,
     T_GRAIN,
+    T_COMB,
+    T_MODAL,
 };
 
 /* fm1: Main */
@@ -551,6 +553,37 @@ enum {
 #define GRAIN_NPAR 7
 #define GRAIN_CVBASE 2
 
+/* comb: Comb */
+#define COMB_I_IN 0
+#define COMB_I_PITCH 1
+#define COMB_I_P1 2
+#define COMB_I_P2 3
+#define COMB_O_OUT 0
+#define COMB_P_COARSE 0
+#define COMB_P_FB 1
+#define COMB_P_DAMP 2
+#define COMB_P_MIX 3
+#define COMB_NIN 4
+#define COMB_NOUT 1
+#define COMB_NPAR 4
+#define COMB_CVBASE 2
+
+/* modal: Modal */
+#define MODAL_I_IN 0
+#define MODAL_I_PITCH 1
+#define MODAL_I_P1 2
+#define MODAL_I_P2 3
+#define MODAL_O_OUT 0
+#define MODAL_P_COARSE 0
+#define MODAL_P_DECAY 1
+#define MODAL_P_STRUCT 2
+#define MODAL_P_BRIGHT 3
+#define MODAL_P_DAMP 4
+#define MODAL_NIN 4
+#define MODAL_NOUT 1
+#define MODAL_NPAR 5
+#define MODAL_CVBASE 2
+
 #define DELAY_NDIV 11
 #define DELAY_CLK_PPQN 24
 static const uint8_t DELAY_DIV_NUM[DELAY_NDIV] = {1, 1, 1, 3, 1, 3, 1, 3, 2, 5, 4};
@@ -895,6 +928,24 @@ static const uint8_t GRAIN_LOG[] = {0, 1, 0, 0, 0, 0, 0};
 static const char *const GRAIN_UNIT[] = {"", "S", "HZ", "ST", "", "", ""};
 static const char *const GRAIN_CH5[] = {"OFF", "ON", 0};
 static const char *const *const GRAIN_CH[] = {0, 0, 0, 0, 0, GRAIN_CH5, 0};
+static const char *const COMB_INNAMES[] = {"IN", "PITCH", "P1", "P2"};
+static const int32_t COMB_MIN[] = {-1572864, -64225, 0, 0};
+static const int32_t COMB_MAX[] = {1572864, 64225, 65536, 65536};
+static const int32_t COMB_DEF[] = {0, 45875, 13107, 65536};
+static const int32_t COMB_INC[] = {65536, 1285, 655, 655};
+static const char *const COMB_PN[] = {"COARSE", "FB", "DAMP", "MIX"};
+static const uint8_t COMB_LOG[] = {0, 0, 0, 0};
+static const char *const COMB_UNIT[] = {"ST", "", "", ""};
+static const char *const *const COMB_CH[] = {0, 0, 0, 0};
+static const char *const MODAL_INNAMES[] = {"IN", "PITCH", "P1", "P2"};
+static const int32_t MODAL_MIN[] = {-1572864, 3277, 0, 0, 0};
+static const int32_t MODAL_MAX[] = {1572864, 327680, 65536, 65536, 65536};
+static const int32_t MODAL_DEF[] = {0, 65536, 0, 32768, 19661};
+static const int32_t MODAL_INC[] = {65536, 3244, 655, 655, 655};
+static const char *const MODAL_PN[] = {"COARSE", "DECAY", "STRUCT", "BRIGHT", "DAMP"};
+static const uint8_t MODAL_LOG[] = {0, 1, 0, 0, 0};
+static const char *const MODAL_UNIT[] = {"ST", "S", "", "", ""};
+static const char *const *const MODAL_CH[] = {0, 0, 0, 0, 0};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, FM1_CVBASE, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -931,4 +982,6 @@ static const def_t DEFS[N_TYPES] = {
     {MATH_NIN, MATH_NOUT, MATH_NPAR, MATH_CVBASE, MATH_MIN, MATH_MAX, MATH_DEF, MATH_INC, "MATH", MATH_PN, MATH_INNAMES, MATH_LOG, MATH_UNIT, MATH_CH},   /* math */
     {LOGIC_NIN, LOGIC_NOUT, LOGIC_NPAR, LOGIC_CVBASE, LOGIC_MIN, LOGIC_MAX, LOGIC_DEF, LOGIC_INC, "LOGIC", LOGIC_PN, LOGIC_INNAMES, LOGIC_LOG, LOGIC_UNIT, LOGIC_CH},   /* logic */
     {GRAIN_NIN, GRAIN_NOUT, GRAIN_NPAR, GRAIN_CVBASE, GRAIN_MIN, GRAIN_MAX, GRAIN_DEF, GRAIN_INC, "GRANULAR", GRAIN_PN, GRAIN_INNAMES, GRAIN_LOG, GRAIN_UNIT, GRAIN_CH},   /* grain */
+    {COMB_NIN, COMB_NOUT, COMB_NPAR, COMB_CVBASE, COMB_MIN, COMB_MAX, COMB_DEF, COMB_INC, "COMB", COMB_PN, COMB_INNAMES, COMB_LOG, COMB_UNIT, COMB_CH},   /* comb */
+    {MODAL_NIN, MODAL_NOUT, MODAL_NPAR, MODAL_CVBASE, MODAL_MIN, MODAL_MAX, MODAL_DEF, MODAL_INC, "MODAL", MODAL_PN, MODAL_INNAMES, MODAL_LOG, MODAL_UNIT, MODAL_CH},   /* modal */
 };

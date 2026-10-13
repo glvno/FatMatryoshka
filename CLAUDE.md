@@ -233,5 +233,6 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 ## New modules after the switch (host-tested: vitest 100, golden 70; not built with the JieLi toolchain, not flashed)
 
 - `ladder` (4-pole ZDF ladder with a saturator in the loop, cv per block), osc `unison` / `detune` (patch format 11, `inst_t.s.osc.ph[4]`), `dyn` (peak follower + compressor; note `exp2_q16` returns a plain integer: add `16 << 16` for Q16), `math`, `logic`, `grain` (shared; `gr_pool` of `grain_line_t` = 1 s int16 + 8 grain records, `ENG_NGRAIN` 1 in the one-voice build, 0 with four voices). Formulas in docs/ARCHITECTURE.md, each with a golden kit.
+- `comb` (the string's line and `it->s.str`, shares `ENG_NSTRING`) and `modal` (six 2-pole resonators, Q30 coefficients; cos θ via `sin_turn30` and the half angle, a Q16 cosine detuned it by 1 %). Golden kits `comb`, `modal`.
 - Golden lessons: anything that spawns events from an accumulator must use the same quantized increment in both engines (the grain's density increment is floored to 2^-24 in TS); a spawn inside a block must see the per-sample write index, not the block's start value.
 - Stand-in pool (`tools/pool_sizes.sh`): 390,730 B of 417,792 B with the granular line (27 KB free). The four-voice build is unchanged apart from +4 B.

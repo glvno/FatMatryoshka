@@ -194,6 +194,30 @@ kit('grain', (add, wire) => {
   wire(lfo, 'out', gr, 'trig');
   wire(gr, 'out', out, 'l');
 });
+kit('comb', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.5 });
+  const cb = add('comb', 0, 0, { fb: -0.85, damp: 0.3, mix: 0.8, coarse: 7 });
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(kb, 'pitch', cb, 'pitch');
+  wire(osc, 'out', cb, 'in');
+  wire(cb, 'out', out, 'l');
+});
+kit('modal', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const pl = add('pulse', 0, 0, { time: 0.002 });
+  const nz = add('noise', 0, 0, { level: 0.8 });
+  const vca = add('vca', 0, 0);
+  const md = add('modal', 0, 0, { decay: 1.2, struct: 0.4, bright: 0.6, damp: 0.4 });
+  const out = add('output', 0, 0);
+  wire(kb, 'gate', pl, 'trig');
+  wire(nz, 'out', vca, 'in');
+  wire(pl, 'out', vca, 'cv');
+  wire(vca, 'out', md, 'in');
+  wire(kb, 'pitch', md, 'pitch');
+  wire(md, 'out', out, 'l');
+});
 kit('ladder', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.8 });

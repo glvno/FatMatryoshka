@@ -596,6 +596,71 @@ describe('granular', () => {
   });
 });
 
+describe('comb and modal', () => {
+  it('comb: positive feedback rings at the pitch, mix 0 passes the input', () => {
+    const run = (params: Record<string, number>): { out: Float32Array; inp: Float32Array } => {
+      const e = new Engine(SR);
+      const p = emptyPatch();
+      addModule(p, DEFS.fm1, 0, 0);
+      const nz = addModule(p, DEFS.noise, 0, 0);
+      const cb = addModule(p, DEFS.comb, 0, 0);
+      const out = addModule(p, DEFS.output, 0, 0);
+      nz.params.level = 0.2;
+      out.params.level = 1;
+      Object.assign(cb.params, params);
+      connect(p, DEFS, { module: nz.id, port: 'out' }, { module: cb.id, port: 'in' });
+      connect(p, DEFS, { module: cb.id, port: 'out' }, { module: out.id, port: 'l' });
+      connect(p, DEFS, { module: nz.id, port: 'out' }, { module: out.id, port: 'r' });
+      e.load(p);
+      render(e, 4800);
+      const r = render(e, SR);
+      return { out: r.l, inp: r.r };
+    };
+    const power = (a: Float32Array, f: number): number => {
+      let re = 0, im = 0;
+      for (let i = 0; i < a.length; i++) {
+        re += a[i] * Math.cos((2 * Math.PI * f * i) / SR);
+        im += a[i] * Math.sin((2 * Math.PI * f * i) / SR);
+      }
+      return re * re + im * im;
+    };
+    const ring = run({ fb: 0.95, damp: 0.3, mix: 1, coarse: 12 });
+    expect(rms(ring.out)).toBeGreaterThan(rms(ring.inp) * 1.3);
+    expect(power(ring.out, 523.2) / power(ring.out, 523.2 * 1.5)).toBeGreaterThan(5); // a peak at the pitch, a dip between its harmonics
+    const dry = run({ fb: 0.95, mix: 0 });
+    expect(rms(dry.out)).toBeCloseTo(rms(dry.inp), 6);
+  });
+
+  it('modal: a burst rings at the pitch and dies away in about the decay time', () => {
+    const run = (params: Record<string, number>): Float32Array => {
+      const e = new Engine(SR);
+      const p = emptyPatch();
+      const kb = addModule(p, DEFS.fm1, 0, 0);
+      const pl = addModule(p, DEFS.pulse, 0, 0);
+      const md = addModule(p, DEFS.modal, 0, 0);
+      const out = addModule(p, DEFS.output, 0, 0);
+      pl.params.time = 0.001;
+      out.params.level = 1;
+      Object.assign(md.params, { struct: 0, bright: 0, damp: 0.5, ...params });
+      connect(p, DEFS, { module: kb.id, port: 'gate' }, { module: pl.id, port: 'trig' });
+      connect(p, DEFS, { module: pl.id, port: 'out' }, { module: md.id, port: 'in' });
+      connect(p, DEFS, { module: kb.id, port: 'pitch' }, { module: md.id, port: 'pitch' });
+      connect(p, DEFS, { module: md.id, port: 'out' }, { module: out.id, port: 'l' });
+      e.load(p);
+      e.noteOn(69);
+      return render(e, SR * 2).l;
+    };
+    const a = run({ decay: 1 });
+    const first = a.subarray(2400, SR / 2), second = a.subarray(SR, SR + SR / 2);
+    expect(rms(first)).toBeGreaterThan(0.01);
+    expect(Math.abs(freq(first) - 440)).toBeLessThan(30);
+    expect(rms(second)).toBeLessThan(rms(first) * 0.2);
+    expect(rms(second)).toBeGreaterThan(rms(first) * 0.003);
+    const b = run({ decay: 0.1 });
+    expect(rms(b.subarray(SR, SR + SR / 2))).toBeLessThan(rms(second) * 0.01);
+  });
+});
+
 describe('ladder filter', () => {
   /** noise -> ladder -> output left, taken from the given output */
   function rig(port: string, params: Record<string, number>, note?: number, level = 0.3): Float32Array {

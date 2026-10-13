@@ -768,6 +768,109 @@ const grain: ModuleImpl<GrainState> = {
   },
 };
 
+/**
+ * Comb filter: a delay line of one period (pitch + coarse, like the string) with signed feedback and a one-pole damping
+ * in the loop: y = in + fb lp(y[n - period]), clamped to +-2; out = in (1 - mix) + y mix. Positive feedback peaks at the
+ * harmonics of the pitch, negative at the odd ones. Lowest note 40 Hz (the string's line length).
+ */
+const comb: ModuleImpl<{ buf: Float32Array; w: number; lp: number }> = {
+  def: {
+    type: 'comb',
+    label: 'Comb',
+    inputs: [audio('in'), control('pitch')],
+    outputs: [audio('out')],
+    params: [
+      param('coarse', -24, 24, 0, { step: 1, unit: 'st' }),
+      param('fb', -0.98, 0.98, 0.7, { step: 0.01 }),
+      param('damp', 0, 1, 0.2, { step: 0.01 }),
+      param('mix', 0, 1, 1, { step: 0.01 }),
+    ],
+  },
+  init: (sr) => ({ buf: new Float32Array(Math.ceil(sr / STR_LOW) + 1), w: 0, lp: 0 }),
+  process(c, s) {
+    const len = s.buf.length;
+    const f = C4 * Math.pow(2, c.inp.pitch[0] + (c.p.coarse ?? 0) / 12);
+    const period = Math.min(len - 2, Math.max(2, c.sr / f));
+    const cl = 1 - 0.9 * (c.p.damp ?? 0.2);
+    const d = Math.max(1, period - (1 - cl) / cl);
+    const di = Math.floor(d);
+    const fr = d - di;
+    const fb = c.p.fb ?? 0;
+    const mix = c.p.mix ?? 1;
+    for (let i = 0; i < c.n; i++) {
+      const x = c.inp.in[i];
+      const r0 = s.buf[(s.w - di + len) % len];
+      const r1 = s.buf[(s.w - di - 1 + len) % len];
+      s.lp += (r0 + (r1 - r0) * fr - s.lp) * cl;
+      const y = Math.max(-2, Math.min(2, x + s.lp * fb));
+      s.buf[s.w] = y;
+      s.w = (s.w + 1) % len;
+      c.out.out[i] = x * (1 - mix) + y * mix;
+    }
+  },
+};
+
+/** the modal resonator's partials: harmonic ratios and the ratios of a free bar, `struct` morphs between them */
+const MODAL_N = 6;
+const MODAL_BAR = [1, 2.756, 5.404, 8.933, 13.34, 18.64];
+
+/**
+ * Modal resonator: six two-pole resonators y = a sin(th) x + 2 r cos(th) y1 - r^2 y2 (impulse response r^n sin(th n): the
+ * ring of an impulse has the input's amplitude) at the ratios of the harmonics (struct 0) to a free bar (struct 1) of the
+ * pitch; `decay` is the fundamental's time to -60 dB, partial i decays in decay / (1 + 2 damp i); the amplitudes fall as
+ * (0.3 + 0.7 bright)^i and are normalised to a sum of 1. Partials above 0.45 sr are left out. The states are held to +-8:
+ * excite it with short bursts (a pulse, a plucked string, a gated noise); a steady input builds up to the clamp.
+ */
+const modal: ModuleImpl<{ y1: Float64Array; y2: Float64Array }> = {
+  def: {
+    type: 'modal',
+    label: 'Modal',
+    inputs: [audio('in'), control('pitch')],
+    outputs: [audio('out')],
+    params: [
+      param('coarse', -24, 24, 0, { step: 1, unit: 'st' }),
+      param('decay', 0.05, 5, 1, { unit: 's', step: 0.01, log: true }),
+      param('struct', 0, 1, 0, { step: 0.01 }),
+      param('bright', 0, 1, 0.5, { step: 0.01 }),
+      param('damp', 0, 1, 0.3, { step: 0.01 }),
+    ],
+  },
+  init: () => ({ y1: new Float64Array(MODAL_N), y2: new Float64Array(MODAL_N) }),
+  process(c, s) {
+    const f0 = C4 * Math.pow(2, c.inp.pitch[0] + (c.p.coarse ?? 0) / 12);
+    const st = c.p.struct ?? 0, damp = c.p.damp ?? 0.3, decay = c.p.decay ?? 1;
+    const bw = 0.3 + 0.7 * (c.p.bright ?? 0.5);
+    const g = new Float64Array(MODAL_N), c1 = new Float64Array(MODAL_N), c2 = new Float64Array(MODAL_N);
+    let sum = 0, a = 1;
+    const amp = new Float64Array(MODAL_N);
+    for (let i = 0; i < MODAL_N; i++) {
+      amp[i] = a;
+      sum += a;
+      a *= bw;
+    }
+    for (let i = 0; i < MODAL_N; i++) {
+      const f = f0 * (i + 1 + st * (MODAL_BAR[i] - (i + 1)));
+      if (f >= c.sr * 0.45) continue;
+      const th = (2 * Math.PI * f) / c.sr;
+      const r = Math.pow(2, -LOG2_1000 / ((decay / (1 + 2 * damp * i)) * c.sr));
+      g[i] = (amp[i] / sum) * Math.sin(th);
+      c1[i] = 2 * r * Math.cos(th);
+      c2[i] = r * r;
+    }
+    for (let n = 0; n < c.n; n++) {
+      const x = c.inp.in[n];
+      let y = 0;
+      for (let i = 0; i < MODAL_N; i++) {
+        const v = Math.max(-8, Math.min(8, g[i] * x + c1[i] * s.y1[i] - c2[i] * s.y2[i]));
+        s.y2[i] = s.y1[i];
+        s.y1[i] = v;
+        y += v;
+      }
+      c.out.out[n] = y;
+    }
+  },
+};
+
 const mixer: ModuleImpl<null> = {
   def: {
     type: 'mixer',
@@ -1623,7 +1726,7 @@ const crush: ModuleImpl<{ held: number; cnt: number }> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic, grain];
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic, grain, comb, modal];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an
