@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Patch editor: module cards on a canvas, SVG cables, drag-to-connect, a selection, assemblies and undo.
 import { DEFS } from './modules';
+import { parameterInputs, connectParameter } from './parameter-routing';
+import { parameterMenu } from './parameter-menu';
+import { sliderJack } from './slider-jack';
 import type { ParameterValues } from './engine';
 import { deviceBudget, DEVICE } from './patchbin';
 import {
   addModule,
   fromUnit,
   toUnit,
-  SOURCES,
-  type Source,
   connect,
   disconnect,
   removeModule,
@@ -27,8 +28,6 @@ import {
   setMorphTarget,
   clearMorph,
   hasMorph,
-  rangeOf,
-  paramValue,
 } from './patch';
 import { ARP_DEFAULT, ARP_MODES, ARP_RATES, ARP_SCALES, ARP_MAX_STEPS, fixArp, noteName, type ArpCfg } from './arp';
 import { EXCLUDED_TYPES,
@@ -115,8 +114,6 @@ export interface EditorEvents {
 /** the key of a scope probe on an output */
 export const probeKey = (id: number, port: string): string => `${id}:${port}`;
 type Pt = { x: number; y: number };
-/** a parameter value as the cards print it: the choice's name, or the number with its unit */
-const fmtValue = (pd: ParamDef, v: number): string => (pd.choices ? pd.choices[Math.round(v)] : `${Number(v.toFixed(3))}${pd.unit ? ' ' + pd.unit : ''}`);
 /** the footprint of a new card for the free-spot search: a grid cell less its gutters */
 const CARD_W = 250;
 const CARD_H = 540;
@@ -134,15 +131,20 @@ export class Editor {
   private frames = new Map<number, HTMLElement>();
   /** the collapsed assembly cards on the canvas */
   private containers = new Map<number, HTMLElement>();
-  private drag: { from: Endpoint; kind: 'out' | 'in'; path: SVGPathElement } | null = null;
+  private drag: { path: SVGPathElement; cancel: () => void } | null = null;
+  private sliderPorts: { m: ModuleInst; pd: ParamDef; jack: HTMLElement }[] = [];
+  private cablePaths: { path: SVGPathElement; from: HTMLElement; to: HTMLElement }[] = [];
+  private routingOpen = new Set<string>();
   private history: string[] = [];
   private future: string[] = [];
   private parameterDisplays: { id: number; update: (values: Record<string, number> | null) => void }[] = [];
 
   /** Display only: never write telemetry into the patch, undo history, or parameter callbacks. */
   showParameterValues(values: ParameterValues | null): void {
+    if (values && (this.drag || this.armed)) return; // Keep drop targets still while patching.
     const byId = new Map(values?.map((m) => [m.id, m.params]));
     for (const display of this.parameterDisplays) display.update(byId.get(display.id) ?? null);
+    this.positionCables();
   }
 
   constructor(private canvas: HTMLElement, patch: Patch, private ev: EditorEvents) {
@@ -169,6 +171,7 @@ export class Editor {
     this.report(fixAssemblies(this.patch, DEFS));
     this.history = [];
     this.future = [];
+    this.routingOpen.clear();
     this.selected.clear();
     this.rebuild();
     this.ev.onStructure(p);
@@ -274,7 +277,11 @@ export class Editor {
   // ---- building the canvas
 
   rebuild(): void {
+    this.cancelArm();
     this.parameterDisplays = [];
+    this.sliderPorts = [];
+    this.cablePaths = [];
+    this.svg.replaceChildren();
     this.modulesEl.replaceChildren();
     this.ports.clear();
     this.cards.clear();
@@ -369,7 +376,7 @@ export class Editor {
     params.className = 'params';
     for (const pd of def.params) params.append(this.paramRow(m, def, pd, { open }));
     body.append(io);
-    if (def.paramInputs) body.append(this.pins(m, def, open), this.matrix(m, def));
+    if (def.paramInputs) body.append(this.pins(m, def, open));
     if (def.type === 'fm1') params.append(this.voicesRow(), this.morphRow(), this.arpPanel());
     body.append(params);
     el.append(head, body);
@@ -398,7 +405,7 @@ export class Editor {
   private refreshers = new WeakMap<HTMLElement, () => void>();
 
   private paramRow(m: ModuleInst, def: ModuleDef, pd: ParamDef, o: { open?: AssemblyInst; label?: string; rename?: () => void } = {}): HTMLElement {
-    const row = document.createElement('label');
+    const row = document.createElement('div');
     row.className = 'param';
     const name = document.createElement('span');
     name.textContent = o.label ?? pd.name;
@@ -443,6 +450,7 @@ export class Editor {
     // Pointer capture also releases the edit lock when a drag ends outside the card.
     let editing = false;
     input.onpointerdown = (e) => {
+      if (e.altKey && (pd.input || def.paramInputs) && !pd.toggle) return;
       editing = true;
       input.setPointerCapture(e.pointerId);
     };
@@ -468,6 +476,18 @@ export class Editor {
         this.ev.onParam(m.id, pd.name, v);
       };
     }
+    const canPatch = !!(pd.input || def.paramInputs);
+    const thumb = canPatch && !pd.toggle ? sliderJack(input, (e, jack) => this.beginDrag(e, jack)) : null;
+    const gesture = thumb ? 'Drag to adjust; Alt-drag to patch. Drop a cable on the thumb to connect.' : '';
+    input.title = gesture;
+    if (thumb) {
+      thumb.jack.dataset.mod = String(m.id);
+      thumb.jack.dataset.param = pd.name;
+      thumb.jack.dataset.dir = 'in';
+      thumb.jack.title = `${def.label} ${pd.name}: ${parameterInputs(m, pd).join(' / ') || 'parameter input'}. ${gesture}`;
+      this.sliderPorts.push({ m, pd, jack: thumb.jack });
+      input.addEventListener('input', () => this.positionCables());
+    }
     this.parameterDisplays.push({ id: m.id, update: (values) => {
       if (editing) return;
       const base = m.params[pd.name];
@@ -476,14 +496,28 @@ export class Editor {
       const position = String(pd.log ? Math.round(toUnit(pd, v) * 1000) : v);
       if (pd.toggle) input.checked = v >= 0.5;
       else if (input.value !== position) input.value = position;
+      thumb?.update();
       const text = fmt(v, values ?? m.params);
       if (val.textContent !== text) val.textContent = text;
       input.setAttribute('aria-valuetext', text);
       const automated = Math.abs(v - base) > 1e-6;
       row.classList.toggle('automated', automated);
-      input.title = automated ? `Live: ${text}. Base: ${fmt(base)}. Drag to edit the base value.` : '';
+      input.title = automated ? `Live: ${text}. Base: ${fmt(base)}. ${gesture || 'Drag to edit the base value.'}` : gesture;
     } });
-    row.append(name, val, input);
+    row.append(name, val);
+    if (canPatch) {
+      const key = `${m.id}:${pd.name}`;
+      row.append(parameterMenu(m, def, pd, { ...this.ev, change: (fn) => this.change(fn) }, this.routingOpen.has(key), (on) => {
+        if (on) {
+          this.routingOpen.clear();
+          this.routingOpen.add(key);
+          for (const other of this.modulesEl.querySelectorAll<HTMLDetailsElement>('.parameter-routing[open]'))
+            if (other.parentElement !== row) other.open = false;
+        } else this.routingOpen.delete(key);
+        this.drawCables();
+      }));
+    }
+    row.append(thumb?.element ?? input);
     return row;
   }
 
@@ -722,12 +756,13 @@ export class Editor {
 
   // ---- click-to-connect: a click on a jack arms it, a click on a jack of the other direction connects; Esc cancels
 
-  private armed: { from: Endpoint; kind: 'out' | 'in' } | null = null;
+  private armed: HTMLElement | null = null;
 
   cancelArm(): void {
-    if (!this.armed) return;
-    this.ports.get(this.key(this.armed.from.module, this.armed.from.port, this.armed.kind))?.classList.remove('armed');
+    this.armed?.classList.remove('armed');
     this.armed = null;
+    this.canvas.classList.remove('patching');
+    this.drag?.cancel();
   }
 
   // ---- A / B: two snapshots; the toggle swaps them, as a parameter-only update when the structure matches
@@ -883,125 +918,12 @@ export class Editor {
     return box;
   }
 
-  /** the two parameter inputs, each with an attenuverter (-1..1: scale and invert) */
+  /** Keep physical parameter jacks available; depth and ranges live beside each destination. */
   private pins(m: ModuleInst, def: ModuleDef, open?: AssemblyInst): HTMLElement {
     const box = document.createElement('div');
     box.className = 'pins';
-    def.inputs
-      .filter((p) => p.pin)
-      .forEach((p, i) => {
-        const row = document.createElement('div');
-        row.className = 'pin';
-        const jack = this.port(m, p, 'in', { open });
-        const val = document.createElement('output');
-        const att = m.att ?? [1, 1];
-        val.textContent = att[i].toFixed(2);
-        const input = document.createElement('input');
-        input.type = 'range';
-        input.min = '-1';
-        input.max = '1';
-        input.step = '0.01';
-        input.value = String(att[i]);
-        input.title = `${p.name} attenuverter: -1 inverts, 0 mutes`;
-        input.setAttribute('aria-label', `${def.label} ${p.name} attenuverter`);
-        input.oninput = () => {
-          const v = Number(input.value);
-          m.att![i] = v;
-          val.textContent = v.toFixed(2);
-          this.ev.onAtt(m.id, i, v);
-        };
-        row.append(jack, input, val);
-        box.append(row);
-      });
+    for (const p of def.inputs) if (p.pin) box.append(this.port(m, p, 'in', { open }));
     return box;
-  }
-
-  /** which parameter each source controls: columns p1 p2 and the knobs k1..k4, one row per parameter */
-  private matrix(m: ModuleInst, def: ModuleDef): HTMLElement {
-    const t = document.createElement('table');
-    t.className = 'matrix';
-    t.title = 'p1 / p2: the parameter inputs. k1..k4: the FM-1 knobs, which change these parameters while the module is selected on the device.';
-    const head = t.createTHead().insertRow();
-    head.insertCell();
-    for (const s of SOURCES) {
-      const th = document.createElement('th');
-      th.textContent = s;
-      head.append(th);
-    }
-    const body = t.createTBody();
-    for (const pd of def.params) {
-      const row = body.insertRow();
-      const name = row.insertCell();
-      name.textContent = pd.name;
-      for (const s of SOURCES as Source[]) {
-        const box = document.createElement('input');
-        box.type = 'checkbox';
-        box.checked = m.map![s].includes(pd.name);
-        box.setAttribute('aria-label', `${def.label}: ${s} controls ${pd.name}`);
-        box.onchange = () => {
-          this.change(() => {
-            const list = m.map![s].filter((n) => n !== pd.name);
-            if (box.checked) list.push(pd.name);
-            else if (m.range?.[s as 'p1' | 'p2']) delete m.range[s as 'p1' | 'p2']![pd.name];
-            m.map![s] = list;
-          });
-        };
-        const cell = row.insertCell();
-        cell.append(box);
-        // p1 / p2: a macro range on an assigned parameter (the pin's value lands between two ends instead of adding to the base)
-        if ((s === 'p1' || s === 'p2') && box.checked && !rangeOf(m, s, pd.name)) {
-          const btn = document.createElement('button');
-          btn.className = 'rng';
-          btn.textContent = '↔';
-          btn.title = `Macro range: ${s} moves ${pd.name} between two ends of its range instead of adding to the slider`;
-          btn.setAttribute('aria-label', `${def.label}: macro range of ${s} on ${pd.name}`);
-          btn.onclick = () => this.change(() => (((m.range ??= {})[s] ??= {})[pd.name] = [0, 1]));
-          cell.append(btn);
-        }
-      }
-      for (const s of ['p1', 'p2'] as const) {
-        const r = rangeOf(m, s, pd.name);
-        if (r) body.append(this.rangeRow(m, def, pd, s, r));
-      }
-    }
-    return t;
-  }
-
-  /** the two ends of a macro range (0..1 of the parameter's range, octaves for a log one), live like an attenuverter */
-  private rangeRow(m: ModuleInst, def: ModuleDef, pd: ParamDef, s: 'p1' | 'p2', r: [number, number]): HTMLTableRowElement {
-    const row = document.createElement('tr');
-    row.className = 'rangerow';
-    const cell = row.insertCell();
-    cell.colSpan = SOURCES.length + 1;
-    const label = document.createElement('span');
-    label.textContent = `${s} → ${pd.name}`;
-    const vals = document.createElement('output');
-    const fmt = (): void => {
-      vals.textContent = `${fmtValue(pd, paramValue(pd, r[0]))} … ${fmtValue(pd, paramValue(pd, r[1]))}`;
-    };
-    const slider = (i: 0 | 1): HTMLInputElement => {
-      const input = document.createElement('input');
-      input.type = 'range';
-      input.min = '0';
-      input.max = '1';
-      input.step = '0.01';
-      input.value = String(r[i]);
-      input.title = i === 0 ? `${pd.name} when ${s} is 0` : `${pd.name} when ${s} is 1`;
-      input.setAttribute('aria-label', `${def.label}: ${s} on ${pd.name}, ${i === 0 ? 'low' : 'high'} end`);
-      input.oninput = () => {
-        r[i] = Number(input.value);
-        fmt();
-        this.ev.onRange(m.id, s === 'p1' ? 0 : 1, pd.name, [r[0], r[1]]);
-      };
-      return input;
-    };
-    const del = document.createElement('button');
-    del.textContent = '×';
-    del.title = 'remove the macro range (the pin adds to the slider again)';
-    del.onclick = () => this.change(() => delete m.range![s]![pd.name]);
-    fmt();
-    cell.append(label, slider(0), slider(1), vals, del);
-    return row;
   }
 
   /**
@@ -1062,7 +984,7 @@ export class Editor {
       parts.splice(dir === 'in' ? 2 : 1, 0, n);
     }
     row.append(...parts);
-    dot.addEventListener('pointerdown', (e) => this.beginDrag(e, { module: m.id, port: p.name }, dir));
+    dot.addEventListener('pointerdown', (e) => this.beginDrag(e, dot));
     this.ports.set(this.key(m.id, p.name, dir), dot);
     return row;
   }
@@ -1546,23 +1468,54 @@ export class Editor {
     return `M${a.x},${a.y} C${a.x + dx},${a.y} ${b.x - dx},${b.y} ${b.x},${b.y}`;
   }
 
-  /** cables between visible ports; a cable inside a collapsed assembly has no dots and is not drawn */
+  /** Cable paths are retained so animation only moves their endpoints. */
+  private positionCables(): void {
+    for (const { path, from, to } of this.cablePaths) path.setAttribute('d', this.curve(this.center(from), this.center(to)));
+  }
+
+  private inputJack(to: Endpoint): HTMLElement | undefined {
+    return this.ports.get(this.key(to.module, to.port, 'in')) ?? [...this.ports.values()].find((dot) =>
+      dot.dataset.also && (JSON.parse(dot.dataset.also) as Target[]).some((t) => sameEnd(t, to)));
+  }
+
+  /** Physical jacks keep their cables; a light branch shows the same input at each moving thumb. */
   drawCables(): void {
-    this.svg.replaceChildren();
+    for (const { path } of this.cablePaths) path.remove();
+    this.cablePaths = [];
+    for (const dot of [...this.ports.values(), ...this.sliderPorts.map((p) => p.jack)]) dot.classList.remove('connected');
+    const add = (c: Cable, from: HTMLElement, to: HTMLElement, kind: string, alias = false): void => {
+      const path = document.createElementNS(SVGNS, 'path');
+      path.setAttribute('class', `cable ${kind}${alias ? ' alias' : ''}`);
+      if (!alias) {
+        path.addEventListener('click', () => this.removeCable(c));
+        const title = document.createElementNS(SVGNS, 'title'); title.textContent = 'Click to remove'; path.append(title);
+      }
+      this.svg.prepend(path);
+      this.cablePaths.push({ path, from, to });
+    };
+    const branches = new Set<string>();
+    const physicalCables = new Set<string>();
     for (const c of this.patch.cables) {
       const a = this.ports.get(this.key(c.from.module, c.from.port, 'out'));
-      const b = this.ports.get(this.key(c.to.module, c.to.port, 'in'));
-      if (!a || !b) continue;
-      const path = document.createElementNS(SVGNS, 'path');
-      path.setAttribute('d', this.curve(this.center(a), this.center(b)));
+      const b = this.inputJack(c.to);
+      const thumbs = this.sliderPorts.filter(({ m, pd }) => m.id === c.to.module && parameterInputs(m, pd).includes(c.to.port));
+      a?.classList.add('connected'); b?.classList.add('connected');
+      for (const { jack } of thumbs) jack.classList.add('connected');
+      if (!a) continue;
       const kind = DEFS[this.patch.modules.find((m) => m.id === c.from.module)!.type].outputs.find((o) => o.name === c.from.port)!.kind;
-      path.setAttribute('class', `cable ${kind}`);
-      path.addEventListener('click', () => this.removeCable(c));
-      const title = document.createElementNS(SVGNS, 'title');
-      title.textContent = 'Click to remove';
-      path.append(title);
-      this.svg.append(path);
+      if (b) {
+        const key = `${c.from.module}:${c.from.port}:${b.dataset.mod}:${b.dataset.port}`;
+        if (!physicalCables.has(key)) add(c, a, b, kind);
+        physicalCables.add(key);
+      }
+      for (const { pd, jack } of thumbs) {
+        const key = `${c.to.module}:${c.to.port}:${pd.name}`;
+        if (b && branches.has(key)) continue;
+        add(c, b ?? a, jack, kind, !!b);
+        branches.add(key);
+      }
     }
+    this.positionCables();
   }
 
   /** remove a cable; one drawn to a merged jack whose other inputs are hidden takes their cables (from the same output) with it */
@@ -1580,65 +1533,71 @@ export class Editor {
     });
   }
 
-  private beginDrag(e: PointerEvent, from: Endpoint, kind: 'out' | 'in'): void {
+  private connectJacks(a: HTMLElement, b: HTMLElement): void {
+    if (a.dataset.dir === b.dataset.dir) return this.ev.onError('connect an output to an input');
+    const [out, input] = a.dataset.dir === 'out' ? [a, b] : [b, a];
+    const from = { module: Number(out.dataset.mod), port: out.dataset.port! };
+    this.change(() => {
+      let to: Endpoint;
+      if (input.dataset.param) {
+        to = connectParameter(this.patch, DEFS, from, Number(input.dataset.mod), input.dataset.param);
+      } else {
+        to = { module: Number(input.dataset.mod), port: input.dataset.port! };
+        if (!this.patch.cables.some((c) => sameEnd(c.from, from) && sameEnd(c.to, to)) && !connect(this.patch, DEFS, from, to))
+          throw new Error('cannot connect these ports');
+      }
+      // A thumb alias of a merged assembly jack feeds the same group of inputs.
+      const physical = this.inputJack(to);
+      const also = input.dataset.also ?? physical?.dataset.also;
+      if (also) {
+        if (physical) connect(this.patch, DEFS, from, { module: Number(physical.dataset.mod), port: physical.dataset.port! });
+        for (const target of JSON.parse(also) as Target[]) connect(this.patch, DEFS, from, target);
+      }
+    });
+  }
+
+  private beginDrag(e: PointerEvent, start: HTMLElement): void {
     e.preventDefault();
     e.stopPropagation();
-    const start = this.ports.get(this.key(from.module, from.port, kind))!;
-    if (this.armed) {
-      // the second click of a click-to-connect
-      const a = this.armed;
-      this.cancelArm();
-      if (a.kind !== kind) {
-        const [o, i] = kind === 'out' ? [from, a.from] : [a.from, from];
-        const ins = [i, ...(start.dataset.also && kind === 'in' ? (JSON.parse(start.dataset.also) as Target[]) : [])];
-        this.change(() => {
-          let any = false;
-          for (const t of ins) any = connect(this.patch, DEFS, o, t) || any;
-          if (!any) throw new Error('cannot connect these ports');
-        });
-        return;
-      }
+    const armed = this.armed;
+    this.cancelArm();
+    if (armed && armed.dataset.dir !== start.dataset.dir) {
+      this.connectJacks(armed, start);
+      return;
     }
+    const kind = start.dataset.dir;
     const path = document.createElementNS(SVGNS, 'path');
     path.setAttribute('class', 'cable pending');
     this.svg.append(path);
-    this.drag = { from, kind, path };
+    this.canvas.classList.add('patching');
     const move = (ev: PointerEvent): void => {
       const c = this.canvas.getBoundingClientRect();
       const p = { x: (ev.clientX - c.left) / this.zoom, y: (ev.clientY - c.top) / this.zoom };
       const s = this.center(start);
       path.setAttribute('d', kind === 'out' ? this.curve(s, p) : this.curve(p, s));
     };
-    const up = (ev: PointerEvent): void => {
+    const cancel = (): void => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
       path.remove();
       this.drag = null;
-      const t = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
-      const dot = t?.closest?.('.dot') as HTMLElement | null;
-      if (dot === start) {
-        // released on the jack it started on: arm it, the next click on a jack of the other kind connects (Esc cancels)
-        this.armed = { from, kind };
-        start.classList.add('armed');
-        return;
-      }
-      if (!dot || !dot.dataset.mod) return;
-      const other: Endpoint = { module: Number(dot.dataset.mod), port: dot.dataset.port! };
-      const otherDir = dot.dataset.dir as 'out' | 'in';
-      if (otherDir === kind) return this.ev.onError('connect an output to an input');
-      const [o, i] = kind === 'out' ? [from, other] : [other, from];
-      // a merged jack: the cable goes to every input behind it
-      const alsoOf = (el: HTMLElement | null): Target[] => (el?.dataset.also ? (JSON.parse(el.dataset.also) as Target[]) : []);
-      const ins = [i, ...alsoOf(kind === 'out' ? dot : start)];
-      if (ins.every((t) => this.patch.cables.some((c) => sameEnd(c.from, o) && sameEnd(c.to, t)))) return;
-      this.change(() => {
-        let any = false;
-        for (const t of ins) any = connect(this.patch, DEFS, o, t) || any;
-        if (!any) throw new Error('cannot connect these ports');
-      });
+      this.canvas.classList.remove('patching');
     };
+    const up = (ev: PointerEvent): void => {
+      const t = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+      const dot = t?.closest('.dot') as HTMLElement | null;
+      cancel();
+      if (dot === start) {
+        this.armed = start;
+        start.classList.add('armed');
+        this.canvas.classList.add('patching');
+      } else if (dot?.dataset.mod) this.connectJacks(start, dot);
+    };
+    this.drag = { path, cancel };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
     move(e);
   }
 }

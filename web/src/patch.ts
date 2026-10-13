@@ -20,6 +20,8 @@ export const SOURCES: Source[] = ['p1', 'p2', 'k1', 'k2', 'k3', 'k4'];
 
 export interface ParamDef {
   name: string;
+  /** Dedicated signal input controlling this value; also exposed on the editor's slider thumb. */
+  input?: string;
   min: number;
   max: number;
   default: number;

@@ -41,7 +41,7 @@ export function diffPatches(a: Patch, b: Patch, defs: Record<string, ModuleDef>)
     if (!!o.bypass !== !!m.bypass) d.other.push(`${label}: ${m.bypass ? 'bypassed' : 'on'}`);
     const att = (x: typeof m): string => (x.att ?? [1, 1]).map(fmt).join('/');
     if (att(o) !== att(m)) d.other.push(`${label}: attenuverters ${att(o)} → ${att(m)}`);
-    if (JSON.stringify(o.map ?? null) !== JSON.stringify(m.map ?? null)) d.other.push(`${label}: matrix changed`);
+    if (JSON.stringify(o.map ?? null) !== JSON.stringify(m.map ?? null)) d.other.push(`${label}: parameter routing changed`);
     if (JSON.stringify(o.range ?? null) !== JSON.stringify(m.range ?? null)) d.other.push(`${label}: macro ranges changed`);
     if (JSON.stringify(o.paramsB ?? null) !== JSON.stringify(m.paramsB ?? null)) d.other.push(`${label}: morph B side changed`);
   }

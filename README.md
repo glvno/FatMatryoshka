@@ -16,9 +16,9 @@ FatMatryoshka-1 is an independent project grown from Modular-1, which builds on 
 
 [Open the FatMatryoshka-1 editor](https://glvno.github.io/FatMatryoshka-1/) to make patches and upload them to the FM-1. The editor currently deploys from branch `dev`; its firmware package has not been installed on a device. The [original Modular-1 editor](https://wiggismodular.github.io/Modular-1/) is also available.
 
-Modules have two parameter inputs: p1 and p2 with an attenuverter
+Slider thumbs are input jacks: **drag normally to adjust, Alt-drag to patch**, or drop an output cable onto a thumb. The side jacks still work; faint branches show their connections to the moving thumbs. Thumb positions pause while patching so the targets stay still.
 
-Then there's a matrix for to map p1 and p2 as well as k1-4 to some parameter of the module. p1 and p2 are global. k1-4 only when you're on that module (see later) 
+Open the **⋯** menu beside a parameter for p1/p2 routing, modulation depth, macro ranges and K1–K4 hardware assignments. The matrix grid is gone; saved patches and FM-1 routing remain compatible. Dedicated controls use their own input (for example, Filter cutoff uses `cv`). Other thumbs reuse a suitable p1/p2 route or allocate an unused input; the editor reports when both are occupied. Depth is shared by every parameter assigned to that input. K1–K4 assignments apply while that module is selected on the FM-1.
 
 ### Voices
 
@@ -133,7 +133,7 @@ During browser playback, sliders and their readouts follow dedicated CV inputs (
 
 ## Diff and A/B
 
-- **Diff** (toolbar) lists what changed since the patch was last loaded, uploaded or stored on the FM-1: parameters as old → new, modules and cables added or removed, and switches, attenuverters, matrix, macro ranges, voices and arpeggiator changes as one line each.
+- **Diff** (toolbar) lists what changed since the patch was last loaded, uploaded or stored on the FM-1: parameters as old → new, modules and cables added or removed, and switches, attenuverters, parameter routing, macro ranges, voices and arpeggiator changes as one line each.
 - **A/B**: "Set A" and "Set B" keep two versions of the patch; the A/B button (or Tab) flips between them while you play. When both versions have the same modules and cables only the values move, so notes keep sounding through the flip (the side you leave keeps whatever you changed on it); otherwise the other version is loaded whole.
 
 ## Keyboard
@@ -151,7 +151,7 @@ During browser playback, sliders and their readouts follow dedicated CV inputs (
 
 ## Macro ranges
 
-- A parameter input normally *adds* to a parameter: p1 at 1 moves it up by the attenuverter's share of its range. A **macro range** makes the input *set* it between two ends instead: in the matrix, a `↔` next to a checked p1 / p2 box opens a row with the two ends (as values; for a logarithmic parameter the travel is in octaves). One Main knob into p1 of the filter and of the envelope then opens the cutoff from 200 Hz to 8 kHz while it shortens the decay from 0.5 s to 50 ms, each over its own travel; swapped ends make a knob go down. The slider's own value is ignored while a range is set; the attenuverter scales the travel, the input is clamped to 0..1 (for a bipolar LFO put a Scale with offset 0.5 in front). The ranges travel with the patch (binary format 15) and live edits reach the FM-1 (RANGE command); the LCD draws the travel as a bracket over the knob row's bar.
+- A parameter input normally *adds* to a parameter: p1 at 1 moves it up by the attenuverter's share of its range. A **macro range** makes the input *set* it between two ends instead: in the parameter’s **⋯** routing menu, enable **Map between two values** under p1 or p2 to show the two ends (as values; for a logarithmic parameter the travel is in octaves). One Main knob into p1 of the filter and of the envelope then opens the cutoff from 200 Hz to 8 kHz while it shortens the decay from 0.5 s to 50 ms, each over its own travel; swapped ends make a knob go down. The slider's own value is ignored while a range is set; the attenuverter scales the travel, the input is clamped to 0..1 (for a bipolar LFO put a Scale with offset 0.5 in front). The ranges travel with the patch (binary format 15) and live edits reach the FM-1 (RANGE command); the LCD draws the travel as a bracket over the knob row's bar.
 
 ## Patch morphing
 

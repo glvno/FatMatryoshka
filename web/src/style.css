@@ -79,15 +79,7 @@ select.over { border-color: var(--danger); color: var(--danger); }
 .dot:hover { background: currentColor; }
 .params { padding: 4px 8px 8px; display: grid; gap: 4px; border-top: 1px solid var(--line); }
 .param { display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: 6px; font-size: 12px; }
-.pins { padding: 2px 8px 6px; display: grid; gap: 2px; border-top: 1px solid var(--line); }
-.pin { display: grid; grid-template-columns: 52px 1fr 38px; align-items: center; column-gap: 6px; font-size: 12px; }
-.pin input { width: 100%; accent-color: var(--accent); }
-.pin output { color: var(--muted); text-align: right; }
-.matrix { margin: 0 8px 6px; border-collapse: collapse; font-size: 11px; width: calc(100% - 16px); }
-.matrix th { color: var(--muted); font-weight: 500; padding: 1px 0; }
-.matrix td { text-align: center; padding: 0; height: 18px; }
-.matrix td:first-child { text-align: left; color: var(--muted); padding-right: 4px; }
-.matrix input { margin: 0; accent-color: var(--accent); }
+.pins { padding: 2px 8px 6px; display: flex; gap: 12px; border-top: 1px solid var(--line); }
 .dot.armed { background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 40%, transparent); }
 .ab { display: inline-flex; gap: 2px; }
 .ab button#ab-toggle { min-width: 28px; font-weight: 600; }
@@ -144,14 +136,6 @@ details.arp { margin: 4px 8px 6px; border-top: 1px solid var(--line); padding-to
 details.arp summary { cursor: pointer; color: var(--muted); font-size: 11px; padding: 2px 0; }
 details.arp .param select { grid-column: 1 / -1; width: 100%; }
 details.arp .hint { font-size: 10px; color: var(--muted); margin: 2px 0 0; }
-.matrix button.rng { margin-left: 2px; padding: 0 3px; font-size: 10px; line-height: 14px; border: 1px solid var(--line); border-radius: 3px; background: none; color: var(--muted); cursor: pointer; }
-.matrix button.rng:hover { color: var(--ink); border-color: var(--accent); }
-.matrix tr.rangerow td { text-align: left; padding: 2px 0 4px; }
-.matrix tr.rangerow td > * { vertical-align: middle; }
-.matrix tr.rangerow span { color: var(--accent); margin-right: 4px; }
-.matrix tr.rangerow input[type='range'] { width: 28%; margin: 0 2px; }
-.matrix tr.rangerow output { color: var(--muted); margin: 0 4px; }
-.matrix tr.rangerow button { padding: 0 4px; font-size: 11px; background: none; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); cursor: pointer; }
 .param input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
 .param output { color: var(--muted); }
 .param.automated output { color: var(--secondary); }
@@ -241,3 +225,33 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .about-brand h2 { font-size: 28px; letter-spacing: -.04em; margin-bottom: 12px; }
 .credits { border-top: 3px solid var(--secondary); }
 .credits h2 { color: var(--accent); }
+
+/* Native range interaction, with a visible jack following its thumb. */
+.slider-jack { --jack-size: 18px; grid-column: 1 / -1; position: relative; height: 24px; z-index: 2; }
+.param .jack-range { appearance: none; -webkit-appearance: none; width: 100%; height: 24px; margin: 0; padding: 0; border: 0; background: transparent; cursor: ew-resize; touch-action: none; }
+.jack-range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--line); }
+.jack-range::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
+.jack-range::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: var(--jack-size); height: var(--jack-size); margin-top: calc((4px - var(--jack-size)) / 2); border: 0; background: transparent; }
+.jack-range::-moz-range-thumb { width: var(--jack-size); height: var(--jack-size); border: 0; background: transparent; }
+.slider-port { position: absolute; box-sizing: border-box; width: var(--jack-size); height: var(--jack-size); top: 50%; left: calc(var(--position) * (100% - var(--jack-size))); transform: translateY(-50%); pointer-events: none; border-width: 3px; box-shadow: inset 0 0 0 2px var(--panel); }
+.patching .slider-port { pointer-events: auto; }
+.dot.connected { background: currentColor; box-shadow: inset 0 0 0 3px var(--panel); }
+.dot.armed { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 40%, transparent); }
+.ports .dot { position: relative; z-index: 2; }
+.cables { z-index: 1; }
+.cable.alias { stroke-width: 1.5; stroke-dasharray: 3 4; opacity: .45; pointer-events: none; }
+.parameter-routing { position: relative; justify-self: end; font-size: 11px; }
+.parameter-routing[open] { z-index: 5; }
+.parameter-routing summary { list-style: none; cursor: pointer; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; color: var(--muted); }
+.parameter-routing summary::-webkit-details-marker { display: none; }
+.parameter-routing summary:hover, .parameter-routing[open] summary { color: var(--secondary); border-color: var(--secondary); }
+.routing-controls { position: absolute; top: 100%; right: 0; width: 240px; padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 3px 12px var(--shadow); cursor: default; }
+.routing-controls p { margin: 0 0 8px; color: var(--muted); line-height: 1.4; }
+.routing-controls label { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 4px 0; }
+.routing-controls input[type=checkbox] { width: auto; margin: 0; }
+.routing-controls input[type=range] { width: 100%; }
+.routing-controls output { margin-left: auto; }
+.routing-controls fieldset { display: flex; gap: 8px; border: 0; padding: 5px 0 0; margin: 5px 0 0; border-top: 1px solid var(--line); }
+.routing-controls legend { color: var(--muted); }
+.routing-source + .routing-source { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 4px; }
+@media (pointer: coarse) { .slider-jack { --jack-size: 26px; height: 28px; } .parameter-routing summary { padding: 5px 8px; } }
