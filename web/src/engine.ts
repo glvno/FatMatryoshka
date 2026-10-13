@@ -48,7 +48,7 @@ interface VoiceState extends Voice {
   retrig: boolean;
 }
 
-const newVoice = (): VoiceState => ({ pitch: 0, gate: 0, velocity: 0, spread: 0, clock: false, note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false });
+const newVoice = (): VoiceState => ({ pitch: 0, gate: 0, velocity: 0, spread: 0, clock: false, bend: 0, mod: 0, at: 0, note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false });
 /** the panel's spread output of voice i of n: -1 .. 1 in equal steps, 0 alone */
 export const spreadOf = (i: number, n: number): number => (n > 1 ? (2 * i - (n - 1)) / (n - 1) : 0);
 
@@ -61,6 +61,8 @@ export class Engine {
   private stamp = 0;
   private ticks = 0;
   private clockOn = true;
+  /** the performance controls (pitch bend -1..1, mod wheel 0..1, channel aftertouch 0..1): one set, every voice sees it */
+  private ctl = { bend: 0, mod: 0, at: 0 };
 
   constructor(readonly sampleRate: number) {}
 
@@ -249,6 +251,23 @@ export class Engine {
     this.clockOn = on;
   }
 
+  /** pitch bend, -1..1: +-2 semitones on the Main module's pitch output, and its bend output */
+  bend(v: number): void {
+    this.ctl.bend = Math.max(-1, Math.min(1, v));
+  }
+
+  /** channel aftertouch, 0..1: the Main module's at output */
+  aftertouch(v: number): void {
+    this.ctl.at = Math.max(0, Math.min(1, v));
+  }
+
+  /** a control change: CC 1 (mod wheel) is the Main module's mod output, CC 16..19 turn its knobs k1..k4; others are ignored */
+  cc(n: number, v: number): void {
+    const x = Math.max(0, Math.min(1, v / 127));
+    if (n === 1) this.ctl.mod = x;
+    else if (n >= 16 && n <= 19) for (const node of this.nodes.values()) if (node.type === 'fm1') node.params[`k${n - 15}`] = x;
+  }
+
   allNotesOff(): void {
     this.held = [];
     for (const x of this.voices) {
@@ -311,7 +330,12 @@ export class Engine {
       const n = Math.min(BLOCK, total - off);
       const clock = this.ticks > 0; // the Main module's clock output: one pulse per block that saw a tick, the same for every voice
       this.ticks = 0;
-      for (const x of vs) x.clock = clock;
+      for (const x of vs) {
+        x.clock = clock;
+        x.bend = this.ctl.bend;
+        x.mod = this.ctl.mod;
+        x.at = this.ctl.at;
+      }
       for (const node of this.order) {
         if (node.poly) {
           for (let v = 0; v < vs.length; v++) {

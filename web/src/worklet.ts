@@ -17,6 +17,9 @@ export type HostMsg =
   | { t: 'off'; note: number }
   | { t: 'clock' }
   | { t: 'clockrun'; on: boolean }
+  | { t: 'bend'; v: number }
+  | { t: 'cc'; n: number; v: number }
+  | { t: 'at'; v: number }
   | { t: 'panic' };
 
 class ModularProcessor extends AudioWorkletProcessor {
@@ -37,6 +40,9 @@ class ModularProcessor extends AudioWorkletProcessor {
         else if (m.t === 'off') this.engine.noteOff(m.note);
         else if (m.t === 'clock') this.engine.clockTick();
         else if (m.t === 'clockrun') this.engine.clockRun(m.on);
+        else if (m.t === 'bend') this.engine.bend(m.v);
+        else if (m.t === 'cc') this.engine.cc(m.n, m.v);
+        else if (m.t === 'at') this.engine.aftertouch(m.v);
         else if (m.t === 'panic') this.engine.allNotesOff();
       } catch (e) {
         this.port.postMessage({ error: String(e) });

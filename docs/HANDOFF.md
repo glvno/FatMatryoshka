@@ -42,7 +42,8 @@ oscillator (patch format 11), the compressor / envelope follower (`dyn`), `math`
 (`grain`, `gr_pool`, `ENG_NGRAIN`), the comb filter (`comb`, a string line) and the modal resonator (`modal`). Each has a
 section in docs/ARCHITECTURE.md and README.md and a golden kit. Stand-in pool after all of it: 390,730 B of 417,792
 (27 KB free; build.py wants 8 KB, the stand-in overestimated by ~7 KB before).
-Not started: pitch bend / mod wheel / aftertouch as Main outputs + CC to knobs, frequency shifter, drum samples from
+Also done: pitch bend / mod wheel / aftertouch as Main outputs (`bend`, `mod`, `at`; the pitch includes the bend) and
+CC 16..19 to the Main knobs (`eng_ctl_v`, `midi_drain`, `input.ts`). Not started: frequency shifter, drum samples from
 flash (needs the flash-map decision). The next big item on the device side is still the first real build and flash.
 
 ## Step 1: the `ENG_VOICES` build switch (DONE 2026-10-13, host-tested; not built with the JieLi toolchain)

@@ -48,6 +48,9 @@ export async function attachMidi(host: Pick<AudioHost, 'send'>, status: (s: stri
           if (cmd === 0x90 && b > 0) host.send({ t: 'on', note: a, vel: b / 127 });
           else if (cmd === 0x80 || (cmd === 0x90 && b === 0)) host.send({ t: 'off', note: a });
           else if (cmd === 0xb0 && a === 123) host.send({ t: 'panic' });
+          else if (cmd === 0xb0) host.send({ t: 'cc', n: a, v: b }); // CC 1 = mod wheel, 16..19 = the Main module's knobs
+          else if (cmd === 0xe0) host.send({ t: 'bend', v: (((b << 7) | a) - 8192) / 8192 });
+          else if (cmd === 0xd0) host.send({ t: 'at', v: a / 127 });
         };
       }
       status(`${access.inputs.size} MIDI input(s)`);

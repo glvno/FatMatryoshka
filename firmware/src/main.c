@@ -521,6 +521,24 @@ static void midi_drain(void)                    /* USB-MIDI events -> the engine
                     eng_note_off_v(mv, n);
                 } else if (st == 0xB0u && n == 123u) {
                     eng_all_notes_off_v(mv);
+                } else if (st == 0xB0u && n == 1u) {        /* mod wheel: the Main module's mod output */
+                    eng_ctl_v(mv, ENG_CTL_MOD, (int32_t)(v * 65536u / 127u));
+                } else if (st == 0xB0u && n >= 16u && n <= 19u) {   /* CC 16..19: the Main module's knobs K1..K4 */
+                    uint32_t keep = eng_voice();
+                    int m;
+                    eng_voice_select(mv);
+                    m = eng_find(T_FM1);
+                    if (m >= 0) {
+                        eng_set_param((uint32_t)m, n - 16u, (int32_t)(v * 65536u / 127u));
+                        m1_patch_param((uint32_t)m, n - 16u, (int32_t)(v * 65536u / 127u));
+                        if (mv == keep && !ui_dirty)
+                            ui_dirty = 1;
+                    }
+                    eng_voice_select(keep);
+                } else if (st == 0xE0u) {                   /* pitch bend: +-2 semitones on the pitch, and the bend output */
+                    eng_ctl_v(mv, ENG_CTL_BEND, ((int32_t)(v << 7 | n) - 8192) << 3);
+                } else if (st == 0xD0u) {                   /* channel aftertouch: the at output */
+                    eng_ctl_v(mv, ENG_CTL_AT, (int32_t)(n * 65536u / 127u));
                 } else if (st == 0xC0u && cfg.prog_chg) {   /* program change: a preset of the list, on that voice */
                     uint32_t keep = eng_voice();
                     eng_voice_select(mv);

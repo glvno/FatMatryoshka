@@ -13,7 +13,14 @@ export interface Voice {
   spread: number;
   /** a clock tick (24 per quarter note) falls in this block */
   clock: boolean;
+  /** the performance controls, the same for every voice: pitch bend -1..1, mod wheel 0..1, channel aftertouch 0..1 */
+  bend: number;
+  mod: number;
+  at: number;
 }
+
+/** the pitch bend range: +-2 semitones on the Main module's pitch output */
+export const BEND_OCT = 2 / 12;
 
 export interface Ctx {
   sr: number;
@@ -87,15 +94,18 @@ const fm1: ModuleImpl<null> = {
     type: 'fm1',
     label: 'Main',
     inputs: [],
-    outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), gate('clock'), control('spread')],
+    outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), gate('clock'), control('spread'), control('bend'), control('mod'), control('at')],
     params: [...knobNames.map((n) => param(n, 0, 1, 0.5, { step: 0.01 }))],
   },
   init: () => null,
   process(c) {
-    c.out.pitch.fill(c.voice.pitch, 0, c.n);
+    c.out.pitch.fill(c.voice.pitch + c.voice.bend * BEND_OCT, 0, c.n); // the bend is already in the pitch (+-2 st)
     c.out.gate.fill(c.voice.gate, 0, c.n);
     c.out.vel.fill(c.voice.velocity, 0, c.n);
     c.out.spread.fill(c.voice.spread, 0, c.n); // -1..1 across the voices: detune or pan them with one cable
+    c.out.bend.fill(c.voice.bend, 0, c.n); // the raw wheel, for other uses
+    c.out.mod.fill(c.voice.mod, 0, c.n);
+    c.out.at.fill(c.voice.at, 0, c.n);
     for (const n of knobNames) c.out[n].fill(c.p[n] ?? 0, 0, c.n);
     // clock: 24 ppqn from the arpeggiator or MIDI in, a pulse of half a block per tick; nothing without a source
     const hi = c.voice.clock ? Math.ceil(c.n / 2) : 0;

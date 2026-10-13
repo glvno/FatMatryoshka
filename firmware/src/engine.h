@@ -71,5 +71,9 @@ void eng_note_off_v(uint32_t v, uint32_t note);
 void eng_all_notes_off_v(uint32_t v);
 /* one clock tick (24 per quarter note); the Main module's clock output pulses once per block that saw one */
 void eng_clock_tick(void);
+/* the performance controls of a voice: ENG_CTL_BEND (-1..1 Q16: +-2 semitones on the Main module's pitch and its bend
+ * output), ENG_CTL_MOD (the mod wheel, 0..1, the mod output), ENG_CTL_AT (channel aftertouch, 0..1, the at output) */
+enum { ENG_CTL_BEND, ENG_CTL_MOD, ENG_CTL_AT, ENG_NCTL };
+void eng_ctl_v(uint32_t v, uint32_t which, int32_t q16);
 /* n frames of stereo, Q16, clamped to +-1.0; any n, processed in blocks of ENG_BLOCK */
 void eng_render(int32_t *l, int32_t *r, uint32_t n);

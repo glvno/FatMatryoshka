@@ -53,12 +53,15 @@ enum {
 #define FM1_O_K4 6
 #define FM1_O_CLOCK 7
 #define FM1_O_SPREAD 8
+#define FM1_O_BEND 9
+#define FM1_O_MOD 10
+#define FM1_O_AT 11
 #define FM1_P_K1 0
 #define FM1_P_K2 1
 #define FM1_P_K3 2
 #define FM1_P_K4 3
 #define FM1_NIN 0
-#define FM1_NOUT 9
+#define FM1_NOUT 12
 #define FM1_NPAR 4
 #define FM1_CVBASE -1
 
@@ -591,7 +594,7 @@ static const uint8_t DELAY_DIV_DEN[DELAY_NDIV] = {6, 4, 3, 8, 2, 4, 1, 2, 1, 2, 
 static const char *const DELAY_DIV_NAME[DELAY_NDIV] = {"1/16T", "1/16", "1/8T", "1/16.", "1/8", "1/8.", "1/4", "3/8", "1/2", "5/8", "1/1"};
 
 #define MAX_IN 6
-#define MAX_OUT 9
+#define MAX_OUT 12
 #define MAX_PAR 10
 
 typedef struct {

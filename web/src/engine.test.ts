@@ -661,6 +661,47 @@ describe('comb and modal', () => {
   });
 });
 
+describe('bend, mod wheel, aftertouch, cc', () => {
+  function rig(port: string): { e: Engine; out: () => number; kb: number } {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    const kb = addModule(p, DEFS.fm1, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    out.params.level = 1;
+    connect(p, DEFS, { module: kb.id, port }, { module: out.id, port: 'l' });
+    e.load(p);
+    return { e, out: () => render(e, 128).l[100], kb: kb.id };
+  }
+
+  it('bend moves the pitch output by up to two semitones and shows on the bend output', () => {
+    const { e, out } = rig('pitch'); // (middle C: the engine clamps its output to +-1, so a high note would hide the bend)
+    e.noteOn(60);
+    expect(out()).toBeCloseTo(0, 6);
+    e.bend(1);
+    expect(out()).toBeCloseTo(2 / 12, 6);
+    e.bend(-0.5);
+    expect(out()).toBeCloseTo(-1 / 12, 6);
+    const b = rig('bend');
+    b.e.bend(0.25);
+    expect(b.out()).toBeCloseTo(0.25, 6);
+  });
+
+  it('cc 1 is the mod output, aftertouch the at output, cc 16..19 turn the knobs', () => {
+    const m = rig('mod');
+    m.e.cc(1, 127);
+    expect(m.out()).toBeCloseTo(1, 6);
+    const a = rig('at');
+    a.e.aftertouch(0.5);
+    expect(a.out()).toBeCloseTo(0.5, 6);
+    const k = rig('k3');
+    expect(k.out()).toBeCloseTo(0.5, 6);
+    k.e.cc(18, 0);
+    expect(k.out()).toBeCloseTo(0, 6);
+    k.e.cc(74, 127); // an unmapped CC does nothing
+    expect(k.out()).toBeCloseTo(0, 6);
+  });
+});
+
 describe('ladder filter', () => {
   /** noise -> ladder -> output left, taken from the given output */
   function rig(port: string, params: Record<string, number>, note?: number, level = 0.3): Float32Array {

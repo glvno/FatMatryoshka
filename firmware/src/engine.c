@@ -284,6 +284,7 @@ typedef struct {
     pv_t vc[ENG_MAX_POLY];
     uint32_t stamp;
     uint32_t clk_seen, clk_pulse;    /* the Main module's clock output: ticks seen so far, the pulse length of this block */
+    int32_t ctl[ENG_NCTL];           /* pitch bend, mod wheel, aftertouch (engine.h ENG_CTL_*), Q16 */
 } eng_t;
 
 /* the voices: one engine per patch that plays. E is the one the API calls act on (eng_voice_select; the panel code), the
@@ -407,7 +408,7 @@ static void init_state(const node_t *nd, inst_t *it)
 static int port_poly(uint32_t m, uint32_t p)
 {
     const node_t *nd = &E.node[m];
-    return nd->ninst > 1 && !(nd->type == T_FM1 && ((p >= FM1_O_K1 && p <= FM1_O_K4) || p == FM1_O_CLOCK));
+    return nd->ninst > 1 && !(nd->type == T_FM1 && ((p >= FM1_O_K1 && p <= FM1_O_K4) || p == FM1_O_CLOCK || p >= FM1_O_BEND));
 }
 
 /* the buffer of output p of module m as voice v sees it */
@@ -906,7 +907,10 @@ static void m_fm1(const node_t *nd, inst_t *it, uint32_t n)
         E.clk_pulse = E.clk_seen != clk_ticks ? (n + 1u) / 2u : 0u;
         E.clk_seen = clk_ticks;
     }
-    fill(it->out[FM1_O_PITCH], x->pitch, n);
+    fill(it->out[FM1_O_PITCH], x->pitch + mulq(E.ctl[ENG_CTL_BEND], 10923, 16), n);   /* + bend x 2 semitones */
+    fill(it->out[FM1_O_BEND], E.ctl[ENG_CTL_BEND], n);
+    fill(it->out[FM1_O_MOD], E.ctl[ENG_CTL_MOD], n);
+    fill(it->out[FM1_O_AT], E.ctl[ENG_CTL_AT], n);
     fill(it->out[FM1_O_GATE], x->gate, n);
     fill(it->out[FM1_O_VEL], x->vel, n);
     if (x->retrig) {
@@ -2413,6 +2417,12 @@ void eng_render(int32_t *left, int32_t *right, uint32_t total)
         }
     }
     eng_p = keep;
+}
+
+void eng_ctl_v(uint32_t v, uint32_t which, int32_t q16)
+{
+    if (v < ENG_VOICES && which < ENG_NCTL)
+        EV[v].ctl[which] = clampi(q16, which == ENG_CTL_BEND ? -ENG_ONE : 0, ENG_ONE);
 }
 
 void eng_note_on_v(uint32_t v, uint32_t note, int32_t vel_q16)     /* a note on one voice, whichever the panel has selected */
