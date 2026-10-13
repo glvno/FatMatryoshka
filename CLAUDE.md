@@ -122,3 +122,10 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 - Web MIDI + SysEx needs Chrome/Edge and https or localhost.
 - Engine buffers are 128 frames; modules read `ctx.n` (≤128), not `BLOCK`.
 - Keep patch-format changes in `patch.ts` and update `validatePatch`, presets and tests together.
+
+## FM oscillator (host-tested, golden 47 patches pass; not flashed)
+
+- `osc` parameter `fb` (0..1, operator feedback, pi per unit of the two-sample average at 1) and an FM mode: with `pm` connected (index > 0) or `fb` > 0 the oscillator runs 2x oversampled with a polyphase allpass half-band decimator (same Q16 coefficients in `modules.ts` and `engine.c`, see docs/ARCHITECTURE.md "FM oscillator"). The plain path is untouched.
+- Binary patch format is now 7 (the osc record has 7 parameters, `MAX_PAR` 7); old stored patches fall back to factory patch 0. Golden adds `osc-feedback` and `fm-2op`.
+- Measured in the reference engine: aliasing of bright FM notes down 9..13 dB to about -41 dB; the decimated signal overshoots the level by up to ~1.4x, so a carrier at level 1 straight into the output can clip. `inst_t.s.osc` grew to 13 words (feedback history, pm interpolation, decimator states).
+

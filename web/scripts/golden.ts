@@ -139,6 +139,47 @@ kit('feedback-pm', (add, wire) => {
   wire(vca, 'out', osc, 'pm');
   wire(vca, 'out', out, 'l');
 });
+kit('osc-feedback', (add, wire) => {
+  // operator feedback on a sine (saw-like), a square with feedback, both through the envelope
+  const kb = add('fm1', 0, 0);
+  const a = add('osc', 0, 0, { wave: 0, fb: 0.5 });
+  const b = add('osc', 0, 0, { wave: 3, fb: 0.3, coarse: -12, level: 0.4 });
+  const vca = add('vca', 0, 0, { gain: 0.6 });
+  const env = add('adsr', 0, 0, { a: 0.005, d: 0.3, s: 0.5, r: 0.2 });
+  const mix = add('mixer', 0, 0);
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', a, 'pitch');
+  wire(kb, 'pitch', b, 'pitch');
+  wire(kb, 'gate', env, 'gate');
+  wire(a, 'out', mix, 'in1');
+  wire(b, 'out', mix, 'in2');
+  wire(mix, 'out', vca, 'in');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', out, 'l');
+});
+kit('fm-2op', (add, wire) => {
+  // two operators: modulator (ratio 2, its own envelope, velocity on the index) into the carrier's pm, carrier feedback 0.2
+  const kb = add('fm1', 0, 0);
+  const mod = add('osc', 0, 0, { wave: 0, coarse: 12, level: 1 });
+  const car = add('osc', 0, 0, { wave: 0, pm: 3, fb: 0.2 });
+  const menv = add('adsr', 0, 0, { a: 0.002, d: 0.25, s: 0.2, r: 0.2 });
+  const aenv = add('adsr', 0, 0, { a: 0.002, d: 0.8, s: 0.4, r: 0.3 });
+  const mvca = add('vca', 0, 0, { gain: 0.4 }, { map: { p1: ['gain'] }, att: [1, 1] });
+  const avca = add('vca', 0, 0, { gain: 0.7 });
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', mod, 'pitch');
+  wire(kb, 'pitch', car, 'pitch');
+  wire(kb, 'gate', menv, 'gate');
+  wire(kb, 'gate', aenv, 'gate');
+  wire(kb, 'vel', mvca, 'p1');
+  wire(mod, 'out', mvca, 'in');
+  wire(menv, 'env', mvca, 'cv');
+  wire(mvca, 'out', car, 'pm');
+  wire(car, 'out', avca, 'in');
+  wire(aenv, 'env', avca, 'cv');
+  wire(avca, 'out', out, 'l');
+  wire(avca, 'out', out, 'r');
+});
 kit('summed-inputs', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const a = add('osc', 0, 0, { wave: 2, coarse: -12, level: 0.4 });

@@ -188,7 +188,7 @@ typedef struct {
     const esig_t *in[MAX_IN];
     esig_t *out[MAX_OUT];
     union {
-        struct { uint32_t phase; } osc;
+        struct { uint32_t phase; int32_t y1, y2, pm1, xb, ap[8]; } osc;   /* FM mode: feedback history, pm interpolation, decimator */
         struct { uint32_t phase, seed; int32_t held; } lfo;
         struct { uint32_t seed; } noise;
         struct { int32_t v; uint8_t stage, prev; } adsr;
@@ -740,6 +740,20 @@ static void m_fm1(const node_t *nd, inst_t *it, uint32_t n)
     fill(it->out[FM1_O_K4], EF(it, FM1_P_K4), n);
 }
 
+/* The FM oscillator (pm connected with pm > 0, or feedback) runs at twice the rate: two waves per frame, the pm input
+ * interpolated between frames, then a polyphase half-band decimator of four first-order allpass sections (two per path),
+ * flat to 19.4 kHz, 41 dB down above 24.7 kHz (what would fold onto the passband). The same Q16 coefficients as modules.ts.
+ * Feedback: fb = 1 moves the phase by pi per unit of the two-sample average of the raw wave (the DX7's level 7). */
+static const int32_t HB_A[4] = {5376, 17567, 35764, 55599};
+
+static inline int32_t allpass16(int32_t *s, int32_t a, int32_t x)      /* y = a (x - y1) + x1; s[0] = x1, s[1] = y1 */
+{
+    int32_t y = mulr(a, x - s[1], 16) + s[0];
+    s[0] = x;
+    s[1] = y;
+    return y;
+}
+
 static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *pitch = it->in[OSC_I_PITCH], *pm = it->in[OSC_I_PM];
@@ -747,18 +761,57 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
     int32_t pw_q = clampi(EF(it, OSC_P_PW), 3277, 62259);                  /* 0.05 .. 0.95 */
     uint32_t pw = (uint32_t)pw_q << 16, phase = it->s.osc.phase, i;
     int32_t base = EF(it, OSC_P_COARSE) / 12 + EF(it, OSC_P_FINE) / 1200;
-    int32_t kind = round_q16(EF(it, OSC_P_WAVE)), idx = EF(it, OSC_P_PM), lvl = EF(it, OSC_P_LEVEL);
+    int32_t kind = round_q16(EF(it, OSC_P_WAVE)), lvl = EF(it, OSC_P_LEVEL), fb = EF(it, OSC_P_FB);
+    int32_t idx = nd->conn & (1u << OSC_I_PM) ? EF(it, OSC_P_PM) : 0;
+    int32_t y1, y2, pm1, xb, *ap = it->s.osc.ap;
+    if (idx <= 0 && fb <= 0) {                                             /* the plain oscillator: one wave per frame */
+        for (i = 0; i < n; i++) {
+            uint32_t dt = exp2_scale(INC_C4, pitch[i] + base);
+            if (dt > DT_MAX)
+                dt = DT_MAX;
+            phase += dt;
+            out[i] = mul16(wave(kind, phase, dt, pw), lvl);
+        }
+        it->s.osc.phase = phase;
+        it->s.osc.y1 = it->s.osc.y2 = it->s.osc.pm1 = it->s.osc.xb = 0;
+        for (i = 0; i < 8; i++)
+            ap[i] = 0;
+        return;
+    }
+    y1 = it->s.osc.y1;
+    y2 = it->s.osc.y2;
+    pm1 = it->s.osc.pm1;
+    xb = it->s.osc.xb;
     for (i = 0; i < n; i++) {
-        uint32_t dt = exp2_scale(INC_C4, pitch[i] + base), ph;
+        uint32_t dt = exp2_scale(INC_C4, pitch[i] + base), sub;
+        int32_t pm_now = idx > 0 ? pm[i] : 0, pm_mid = (pm1 + pm_now) >> 1, ya = 0;
         if (dt > DT_MAX)
             dt = DT_MAX;
-        phase += dt;
-        ph = phase;
-        if (idx > 0)
-            ph += (uint32_t)(((int64_t)mul16(idx, pm[i]) * TURN_PER_RAD) >> 16);
-        out[i] = mul16(wave(kind, ph, dt, pw), lvl);
+        dt >>= 1;
+        pm1 = pm_now;
+        for (sub = 0; sub < 2; sub++) {
+            uint32_t ph;
+            int32_t y;
+            phase += dt;
+            ph = phase + (uint32_t)(((int64_t)mul16(idx, sub ? pm_now : pm_mid) * TURN_PER_RAD) >> 16)
+                       + (uint32_t)((int64_t)mul16(fb, (y1 + y2) >> 1) << 15);   /* fb: Q16 of pi = half a turn */
+            y = wave(kind, ph, dt, pw);
+            y2 = y1;
+            y1 = y;
+            if (sub) {        /* path 0 takes the even sub-sample, path 1 the odd one of the previous frame (the z^-1) */
+                int32_t p0 = allpass16(ap + 4, HB_A[2], allpass16(ap, HB_A[0], ya));
+                int32_t p1 = allpass16(ap + 6, HB_A[3], allpass16(ap + 2, HB_A[1], xb));
+                xb = y;
+                out[i] = mul16((p0 + p1) >> 1, lvl);
+            } else
+                ya = y;
+        }
     }
     it->s.osc.phase = phase;
+    it->s.osc.y1 = y1;
+    it->s.osc.y2 = y2;
+    it->s.osc.pm1 = pm1;
+    it->s.osc.xb = xb;
 }
 
 static void m_lfo(const node_t *nd, inst_t *it, uint32_t n)

@@ -4,6 +4,7 @@ import { Engine } from './engine';
 import { DEFS } from './modules';
 import { addModule, connect, disconnect, emptyPatch, fromUnit, modulate, processingOrder, removeModule, toUnit, validatePatch, voiceSplit, type Patch } from './patch';
 import { PRESETS } from './presets';
+import { encodePatch, recordSize } from './patchbin';
 
 const SR = 48000;
 
@@ -550,5 +551,74 @@ describe('polyphony', () => {
     expect(r.voices).toBe(8);
     const m = validatePatch(JSON.parse(JSON.stringify({ ...p, voices: undefined })), DEFS);
     expect(m.voices).toBeUndefined();
+  });
+});
+
+describe('FM oscillator', () => {
+  /** panel -> sine carrier -> output; with ratio > 0 a sine modulator (coarse = ratio in semitones) into the carrier's pm */
+  function fm(car: Record<string, number>, mod?: Record<string, number>): { p: Patch; osc: number } {
+    const p = emptyPatch();
+    const kb = addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    Object.assign(o.params, { wave: 0, level: 1 }, car);
+    const out = addModule(p, DEFS.output, 0, 0);
+    connect(p, DEFS, { module: kb.id, port: 'pitch' }, { module: o.id, port: 'pitch' });
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: out.id, port: 'l' });
+    if (mod) {
+      const m = addModule(p, DEFS.osc, 0, 0);
+      Object.assign(m.params, { wave: 0, level: 1 }, mod);
+      connect(p, DEFS, { module: kb.id, port: 'pitch' }, { module: m.id, port: 'pitch' });
+      connect(p, DEFS, { module: m.id, port: 'out' }, { module: o.id, port: 'pm' });
+    }
+    return { p, osc: o.id };
+  }
+  const play = (p: Patch, note = 69): Float32Array => {
+    const e = new Engine(SR);
+    e.load(p);
+    e.noteOn(note);
+    render(e, SR / 4); // settle
+    return render(e, SR).l;
+  };
+  /** high-frequency content: rms of the first difference over the rms */
+  const bright = (a: Float32Array): number => {
+    let s = 0;
+    for (let i = 1; i < a.length; i++) s += (a[i] - a[i - 1]) ** 2;
+    return Math.sqrt(s / a.length) / rms(a);
+  };
+
+  it('feedback brightens a sine without moving its pitch', () => {
+    const plain = play(fm({}).p);
+    const fed = play(fm({ fb: 0.6 }).p);
+    expect(freq(plain)).toBeCloseTo(440, -1);
+    expect(freq(fed)).toBeCloseTo(440, -1);
+    expect(bright(fed)).toBeGreaterThan(bright(plain) * 1.5);
+    expect(rms(fed)).toBeGreaterThan(0.3);
+  });
+
+  it('FM mode with no modulation matches the plain oscillator in pitch and level', () => {
+    const plain = play(fm({}).p);
+    const over = play(fm({ pm: 4 }, { level: 0 }).p); // pm connected, index 4, but the modulator is silent
+    expect(Math.abs(freq(over) - freq(plain))).toBeLessThan(3);
+    expect(rms(over)).toBeCloseTo(rms(plain), 2);
+    const hi = play(fm({ pm: 4 }, { level: 0 }).p, 108); // C8: the decimator must still pass the fundamental
+    expect(rms(hi)).toBeCloseTo(rms(play(fm({}).p, 108)), 1);
+  });
+
+  it('phase modulation adds sidebands, and the index is the pm parameter', () => {
+    const plain = play(fm({}).p);
+    const low = play(fm({ pm: 1 }, { coarse: 12 }).p);
+    const high = play(fm({ pm: 4 }, { coarse: 12 }).p);
+    expect(bright(low)).toBeGreaterThan(bright(plain) * 1.2);
+    expect(bright(high)).toBeGreaterThan(bright(low) * 1.3);
+  });
+
+  it('keeps fb in JSON and writes it to the binary record', () => {
+    const { p, osc } = fm({ fb: 0.25 });
+    const r = validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
+    expect(r.modules.find((m) => m.id === osc)!.params.fb).toBe(0.25);
+    const b = encodePatch(p);
+    const rec = 8 + recordSize('fm1'); // the oscillator's record follows the panel's
+    const at = rec + 1 + 4 * DEFS.osc.params.findIndex((q) => q.name === 'fb');
+    expect(new DataView(b.buffer).getInt32(at, true)).toBe(Math.round(0.25 * 65536));
   });
 });

@@ -88,3 +88,14 @@ A patch carries `voices` (1..8, `MAX_VOICES`; the JSON field is absent for mono,
 **Controls.** Editor: a `voices` row on the Main module's card (mono, 2..8) with the FM-1 buffer count next to it (red when the firmware would refuse the patch). Device: the GLO button (id 7) opens page 4 (`glo_ui.c`), K1 steps the voice count; `voices_set` in main.c writes header byte 3 of the current patch binary and reloads it with `eng_load` (module state restarts, held notes end); if the firmware has no room for that count the old one is reloaded and the bar says `NO ROOM FOR n`. SAVE stores the patch with the count. The Main module's page shows `MAIN  4 VOICES`. `tools/ui_preview.sh OUT PRESET MODULE OCTAVE PAGE STEP VOICES` previews both.
 
 Not done: the HELLO / INFO reply does not report `ENG_MAX_VOICES`; unison / detune.
+
+## FM oscillator
+
+The oscillator has two ways to make FM-style timbres: the `pm` input (phase modulation by another signal, the `pm` parameter is the index in radians per unit of input, 0..8) and the `fb` parameter (operator feedback: the raw wave modulates its own phase, by pi radians per unit of the average of the last two samples at `fb` = 1, the DX7's level 7). Feedback inside the module replaces the one-block-late feedback cable for this purpose.
+
+**FM mode.** When `pm` is connected with an index above 0, or `fb` is above 0, the oscillator runs at twice the sample rate: two waves per frame (the `pm` input interpolated linearly between frames), then a polyphase half-band decimator of four first-order allpass sections, two per path (coefficients Q16 `5376 17567 35764 55599`, flat to 0.22 fs, 41 dB down above 0.28 fs: 19.4 kHz and 24.7 kHz at 44.1 kHz). Sidebands between the old Nyquist and the oversampled one are filtered out instead of folding back; on bright high notes the non-harmonic (aliased) energy drops from -27..-33 dB to about -41 dB, the decimator's floor. Both engines use the same coefficients; the fixed-point one keeps the allpass states in Q16 (`inst_t.s.osc`). Cost: about 2.3 oscillators. The plain path (no pm, no feedback) is unchanged, so patches without FM render exactly as before.
+
+Two things to know when patching: the band-limited signal overshoots the level (up to about 1.4x on very bright settings), so leave headroom before the output; and the feedback loop runs at the oversampled rate, so the sound for a given `fb` is a little brighter than the same number on a 44.1 kHz implementation.
+
+Binary patch format 7: the oscillator record grew by the `fb` parameter.
+

@@ -49,9 +49,10 @@ enum {
 #define OSC_P_FINE 3
 #define OSC_P_PM 4
 #define OSC_P_LEVEL 5
+#define OSC_P_FB 6
 #define OSC_NIN 4
 #define OSC_NOUT 1
-#define OSC_NPAR 6
+#define OSC_NPAR 7
 #define OSC_CVBASE 2
 
 /* lfo: LFO */
@@ -199,7 +200,7 @@ enum {
 
 #define MAX_IN 6
 #define MAX_OUT 7
-#define MAX_PAR 6
+#define MAX_PAR 7
 
 typedef struct {
     uint8_t nin, nout, npar;
@@ -223,15 +224,15 @@ static const uint8_t FM1_LOG[] = {0, 0, 0, 0};
 static const char *const FM1_UNIT[] = {"", "", "", ""};
 static const char *const *const FM1_CH[] = {0, 0, 0, 0};
 static const char *const OSC_INNAMES[] = {"PITCH", "PM", "P1", "P2"};
-static const int32_t OSC_MIN[] = {0, 3277, -3145728, -6553600, 0, 0};
-static const int32_t OSC_MAX[] = {196608, 62259, 3145728, 6553600, 524288, 65536};
-static const int32_t OSC_DEF[] = {0, 32768, 0, 0, 0, 52429};
-static const int32_t OSC_INC[] = {65536, 655, 65536, 131072, 5243, 655};
-static const char *const OSC_PN[] = {"WAVE", "PW", "COARSE", "FINE", "PM", "LEVEL"};
-static const uint8_t OSC_LOG[] = {0, 0, 0, 0, 0, 0};
-static const char *const OSC_UNIT[] = {"", "", "ST", "CT", "", ""};
+static const int32_t OSC_MIN[] = {0, 3277, -3145728, -6553600, 0, 0, 0};
+static const int32_t OSC_MAX[] = {196608, 62259, 3145728, 6553600, 524288, 65536, 65536};
+static const int32_t OSC_DEF[] = {0, 32768, 0, 0, 0, 52429, 0};
+static const int32_t OSC_INC[] = {65536, 655, 65536, 131072, 5243, 655, 655};
+static const char *const OSC_PN[] = {"WAVE", "PW", "COARSE", "FINE", "PM", "LEVEL", "FB"};
+static const uint8_t OSC_LOG[] = {0, 0, 0, 0, 0, 0, 0};
+static const char *const OSC_UNIT[] = {"", "", "ST", "CT", "", "", ""};
 static const char *const OSC_CH0[] = {"SINE", "TRIANGLE", "SAW", "SQUARE", 0};
-static const char *const *const OSC_CH[] = {OSC_CH0, 0, 0, 0, 0, 0};
+static const char *const *const OSC_CH[] = {OSC_CH0, 0, 0, 0, 0, 0, 0};
 static const char *const LFO_INNAMES[] = {"P1", "P2"};
 static const int32_t LFO_MIN[] = {0, 1311, 0};
 static const int32_t LFO_MAX[] = {262144, 2621440, 65536};

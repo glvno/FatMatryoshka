@@ -94,7 +94,32 @@ const fm1: ModuleImpl<null> = {
   },
 };
 
-const osc: ModuleImpl<{ phase: number }> = {
+/** operator feedback: fb = 1 moves the phase by pi radians per unit of the two-sample average of the raw wave (the DX7's level 7) */
+const FB_RAD = Math.PI;
+/** the 2x decimator of the FM oscillator: a polyphase half-band of four first-order allpass sections (two per path), Q16 like the
+ *  firmware: flat to 0.22 fs_os (19.4 kHz), 41 dB down above 0.28 fs_os (24.7 kHz, what folds onto 19.4 kHz) */
+const HB = [5376, 17567, 35764, 55599].map((q) => q / 65536);
+
+interface OscState {
+  phase: number;
+  /** the last two raw wave values (feedback) and the previous pm sample (interpolation), only in FM mode */
+  y1: number;
+  y2: number;
+  pm1: number;
+  /** the decimator: the odd sub-sample waiting for the next frame and x1 / y1 of the four allpass sections */
+  xb: number;
+  ap: number[];
+}
+
+/** one first-order allpass section of the decimator: y = a (x - y1) + x1 */
+function allpass(s: number[], k: number, a: number, x: number): number {
+  const y = a * (x - s[k + 1]) + s[k];
+  s[k] = x;
+  s[k + 1] = y;
+  return y;
+}
+
+const osc: ModuleImpl<OscState> = {
   def: {
     type: 'osc',
     label: 'Oscillator',
@@ -107,28 +132,58 @@ const osc: ModuleImpl<{ phase: number }> = {
       param('fine', -100, 100, 0, { step: 1, unit: 'ct' }),
       param('pm', 0, 8, 0, { step: 0.01 }),
       param('level', 0, 1, 0.8, { step: 0.01 }),
+      param('fb', 0, 1, 0, { step: 0.01 }),
     ],
   },
-  init: () => ({ phase: 0 }),
+  init: () => ({ phase: 0, y1: 0, y2: 0, pm1: 0, xb: 0, ap: [0, 0, 0, 0, 0, 0, 0, 0] }),
   process(c, s) {
     const { pitch, pm } = c.inp;
     const pw = Math.min(0.95, Math.max(0.05, c.p.pw ?? 0.5));
     const base = (c.p.coarse ?? 0) / 12 + (c.p.fine ?? 0) / 1200;
     const kind = Math.round(c.p.wave ?? 0);
-    const idx = c.p.pm ?? 0;
+    const idx = c.connected.pm ? (c.p.pm ?? 0) : 0;
+    const fb = c.p.fb ?? 0;
     const lvl = c.p.level ?? 1;
     const out = c.out.out;
+    if (idx <= 0 && fb <= 0) {
+      // the plain oscillator: one wave per frame
+      for (let i = 0; i < c.n; i++) {
+        const f = C4 * Math.pow(2, pitch[i] + base);
+        const dt = Math.min(f / c.sr, 0.45);
+        s.phase += dt;
+        if (s.phase >= 1) s.phase -= 1;
+        out[i] = wave(kind, s.phase, dt, pw) * lvl;
+      }
+      s.y1 = s.y2 = s.pm1 = s.xb = 0;
+      s.ap.fill(0);
+      return;
+    }
+    // FM mode (phase modulation or feedback): two waves per frame, pm interpolated between frames, then the half-band
+    // decimator, so sidebands up to the old sample rate are filtered out instead of folding back
+    const K = 1 / (2 * Math.PI);
     for (let i = 0; i < c.n; i++) {
       const f = C4 * Math.pow(2, pitch[i] + base);
-      const dt = Math.min(f / c.sr, 0.45);
-      s.phase += dt;
-      if (s.phase >= 1) s.phase -= 1;
-      let ph = s.phase;
-      if (idx > 0) {
-        ph += (idx * pm[i]) / (2 * Math.PI);
+      const dt = Math.min(f / c.sr, 0.45) / 2;
+      const pmNow = idx > 0 ? pm[i] : 0;
+      const pmMid = (s.pm1 + pmNow) / 2;
+      s.pm1 = pmNow;
+      let ya = 0;
+      for (let sub = 0; sub < 2; sub++) {
+        s.phase += dt;
+        if (s.phase >= 1) s.phase -= 1;
+        let ph = s.phase + (idx * (sub ? pmNow : pmMid) + fb * FB_RAD * (s.y1 + s.y2) * 0.5) * K;
         ph -= Math.floor(ph);
+        const y = wave(kind, ph, dt, pw);
+        s.y2 = s.y1;
+        s.y1 = y;
+        if (sub) {
+          // path 0 takes the even sub-sample, path 1 the odd one of the previous frame (the z^-1 of the half-band)
+          const p0 = allpass(s.ap, 4, HB[2], allpass(s.ap, 0, HB[0], ya));
+          const p1 = allpass(s.ap, 6, HB[3], allpass(s.ap, 2, HB[1], s.xb));
+          s.xb = y;
+          out[i] = (p0 + p1) * 0.5 * lvl;
+        } else ya = y;
       }
-      out[i] = wave(kind, ph, dt, pw) * lvl;
     }
   },
 };
