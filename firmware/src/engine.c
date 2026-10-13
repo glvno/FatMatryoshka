@@ -34,8 +34,8 @@
 #define ENG_NCHORUS 1               /* chorus lines (a shared module, like the delay) */
 #define ENG_NGRAIN 1                /* granular lines (a shared module): 1 s of int16 plus the grain records, 88 KB */
 #else
-#define ENG_MAX_INST 96             /* module instances, all voices: a shared module has one, a per-note module one per note */
-#define ENG_NBUF 128u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
+#define ENG_MAX_INST 92             /* module instances, all voices: a shared module has one, a per-note module one per note */
+#define ENG_NBUF 126u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
 #define ENG_NDELAY 4                /* delay lines, all voices (one each when every voice has a delay) */
 #define ENG_NREV 2                  /* reverb memories, all voices */
 #define ENG_NSTRING 6               /* string lines, all voices (a per-note module: one per note) */
@@ -234,7 +234,7 @@ typedef struct {
         struct { int32_t s[4]; } lad;                 /* the four one-pole states, Q20 */
         struct { int32_t env; } dyn;                  /* the peak follower, Q24 */
         struct { int32_t y1[6], y2[6]; } mod;         /* the modal resonators, Q20 */
-        struct { int32_t a[16], b[16], ia; uint32_t phase; } fs;   /* the Hilbert chains (x1 x2 y1 y2 per section), chain A's delayed sample, the quadrature oscillator */
+        struct { int32_t a[8], b[8], ia; uint32_t phase; } fs;   /* the Hilbert chains (w1 w2 per section), chain A's delayed sample, the quadrature oscillator */
         struct { struct grain_line *ln; uint32_t w, acc, seed; uint8_t prev; } gr;   /* acc: grains per sample, Q24 */
         struct { int16_t *buf; uint32_t w, t, seen, beat; uint32_t ring[DELAY_CLK_PPQN]; uint8_t prev; } dly;   /* t, ring, seen, beat: the clock tempo */
         struct { int16_t *buf; uint16_t ci[4], ai[2]; int32_t lp[4]; } rev;
@@ -1569,17 +1569,15 @@ static void m_grain(const node_t *nd, inst_t *it, uint32_t n)
 static const int32_t HILB_A2[4] = {514754545, 940817629, 1048585287, 1071056860};
 static const int32_t HILB_B2[4] = {173707895, 787158236, 1015003234, 1063657107};
 
-static inline int32_t hilbert16(int32_t *s, const int32_t *a2, int32_t x)      /* one chain: s = x1 x2 y1 y2 per section */
+static inline int32_t hilbert16(int32_t *s, const int32_t *a2, int32_t x)      /* one chain: w = x + a^2 w2, y = a^2 w - w2; s = w1 w2 per section */
 {
     uint32_t k;
     for (k = 0; k < 4u; k++) {
-        int32_t *o = s + 4 * k;
-        int32_t y = mulr(a2[k], x + o[3], 30) - o[1];
+        int32_t *o = s + 2 * k;
+        int32_t w = x + mulr(a2[k], o[1], 30);
+        x = mulr(a2[k], w, 30) - o[1];
         o[1] = o[0];
-        o[0] = x;
-        o[3] = o[2];
-        o[2] = y;
-        x = y;
+        o[0] = w;
     }
     return x;
 }

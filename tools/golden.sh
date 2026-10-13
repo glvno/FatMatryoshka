@@ -16,6 +16,7 @@ fail=0
 build/proto_test build/golden/303-acid.m1p build/golden/proto.syx $(cat build/golden/proto.args) build/golden/proto-slot.syx || fail=1
 for p in build/golden/*.m1p; do
   n="${p%.m1p}"
+  if [ "$M1_VOICES" = 4 ] && [ "$n" = build/golden/grain ]; then echo "skip grain: the four-voice build has no granular line"; continue; fi
   out="$(build/host_test "$p" "$n.ev" "$n.f32")" || { echo "FAIL $(basename "$n"): $out"; fail=1; continue; }
   err="$(echo "$out" | sed 's/.*rel_rms \([0-9.]*\).*/\1/')"
   if awk "BEGIN{exit !($err > $TOL)}"; then echo "FAIL $(basename "$n"): $out"; fail=1; else echo "ok   $(basename "$n"): $out"; fi

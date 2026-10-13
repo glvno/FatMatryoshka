@@ -35,13 +35,13 @@ Proposed one-voice sizes: `ENG_NBUF` 255, `ENG_MAX_INST` 128, `ENG_NSTRING` 8, `
 `ENG_NCHORUS` 1, plus the grain buffer. Keep `DEVICE` in `web/src/patchbin.ts` and the MEMORY lines of
 `firmware/src/manual.c` in step with the defines at the top of `firmware/src/engine.c`.
 
-## Progress (2026-10-13, all host-tested only: vitest 100, golden 70; never built with the JieLi toolchain, not flashed)
+## Progress (2026-10-13, all host-tested only: vitest 105, golden 73; never built with the JieLi toolchain, not flashed)
 
 Done, in the priority order: the `ENG_VOICES` switch (step 1 below), the ladder filter (`ladder`), unison / detune on the
 oscillator (patch format 11), the compressor / envelope follower (`dyn`), `math` and `logic`, the granular module
 (`grain`, `gr_pool`, `ENG_NGRAIN`), the comb filter (`comb`, a string line) and the modal resonator (`modal`). Each has a
-section in docs/ARCHITECTURE.md and README.md and a golden kit. Stand-in pool after all of it: 390,730 B of 417,792
-(27 KB free; build.py wants 8 KB, the stand-in overestimated by ~7 KB before).
+section in docs/ARCHITECTURE.md and README.md and a golden kit. Stand-in pool after all of it: 392,278 B of 417,792
+(25 KB free; the four-voice build 407,712 B, 10 KB free; build.py wants 8 KB, the stand-in overestimated by ~7 KB before).
 Also done: pitch bend / mod wheel / aftertouch as Main outputs (`bend`, `mod`, `at`; the pitch includes the bend) and
 CC 16..19 to the Main knobs (`eng_ctl_v`, `midi_drain`, `input.ts`). The frequency shifter (`shift`) is done too. Not started: drum samples from
 flash (needs the flash-map decision). The next big item on the device side is still the first real build and flash.

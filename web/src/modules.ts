@@ -886,16 +886,14 @@ const modal: ModuleImpl<{ y1: Float64Array; y2: Float64Array }> = {
 const HILBERT_A = [0.6923878, 0.9360654322959, 0.988229522686, 0.9987488452737];
 const HILBERT_B = [0.4021921162426, 0.856171088242, 0.9722909545651, 0.9952884791278];
 
-/** one chain: s holds x1, x2, y1, y2 per section */
+/** one chain, each section in the form w = x + a^2 w2, y = a^2 w - w2 (two states per section: s holds w1, w2) */
 function hilbert(s: Float64Array, a: number[], x: number): number {
   for (let k = 0; k < 4; k++) {
-    const o = 4 * k;
-    const y = a[k] * a[k] * (x + s[o + 3]) - s[o + 1];
+    const o = 2 * k;
+    const w = x + a[k] * a[k] * s[o + 1];
+    x = a[k] * a[k] * w - s[o + 1];
     s[o + 1] = s[o];
-    s[o] = x;
-    s[o + 3] = s[o + 2];
-    s[o + 2] = y;
-    x = y;
+    s[o] = w;
   }
   return x;
 }
@@ -918,7 +916,7 @@ const shift: ModuleImpl<{ a: Float64Array; b: Float64Array; ia: number; phase: n
       param('mix', 0, 1, 1, { step: 0.01 }),
     ],
   },
-  init: () => ({ a: new Float64Array(16), b: new Float64Array(16), ia: 0, phase: 0 }),
+  init: () => ({ a: new Float64Array(8), b: new Float64Array(8), ia: 0, phase: 0 }),
   process(c, s) {
     let cvm = 0;
     for (let i = 0; i < c.n; i++) cvm += c.inp.cv[i];
