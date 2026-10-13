@@ -1,0 +1,114 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "echo",
+  "modules": [
+    {
+      "id": 1,
+      "type": "delay",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "time": 375,
+        "fb": 0.45,
+        "mix": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "time"
+        ],
+        "p2": [
+          "fb"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "reverb",
+      "x": 2,
+      "y": 0,
+      "params": {
+        "size": 0.5,
+        "damp": 0.4,
+        "mix": 0.25
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "size"
+        ],
+        "p2": [
+          "damp"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "in"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "in",
+      "label": "in"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 2,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "time",
+      "label": "time"
+    },
+    {
+      "module": 1,
+      "param": "fb",
+      "label": "feedback"
+    },
+    {
+      "module": 1,
+      "param": "mix",
+      "label": "echo mix"
+    },
+    {
+      "module": 2,
+      "param": "size",
+      "label": "size"
+    },
+    {
+      "module": 2,
+      "param": "mix",
+      "label": "reverb mix"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import type { HostMsg } from './worklet';
 import { DeviceLink } from './device';
 import { Editor } from './editor';
 import { buildBankTab } from './bank';
+import { buildAssembliesTab, storeAssembly } from './assemblies';
 import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi } from './input';
 import { DEFS } from './modules';
@@ -83,6 +84,7 @@ const sink = {
   },
 };
 
+let refreshAssemblies: () => void = () => {};
 const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw'](), {
   onStructure(p) {
     host.setPatch(p);
@@ -102,8 +104,16 @@ const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw']
     if (live() && !uploading) device.param(editor.patch, id, name, value);
     else if (live()) dirty = true;
   },
+  onLayout(p) {
+    queueSave(p);
+  },
   onError(msg) {
     status.textContent = msg;
+  },
+  onSaveAssembly(def) {
+    const r = storeAssembly(def);
+    status.textContent = r === 'cancelled' ? 'not saved' : `"${def.name}" ${r === 'replaced' ? 'replaced in' : 'saved to'} the assembly library`;
+    refreshAssemblies();
   },
 });
 host.setPatch(editor.patch);
@@ -131,6 +141,9 @@ const showVoices = (): void => {
 const typeSel = $<HTMLSelectElement>('add-type');
 typeSel.append(...Object.values(DEFS).map((d) => new Option(d.label, d.type)));
 $('add-btn').onclick = () => editor.add(typeSel.value);
+$('asm-btn').onclick = () => editor.makeAssembly();
+$('undo-btn').onclick = () => editor.undo();
+$('redo-btn').onclick = () => editor.redo();
 $('panic-btn').onclick = () => sink.send({ t: 'panic' });
 
 // FM-1 link
@@ -208,6 +221,15 @@ $('dev-release').onclick = () => {
 buildBankTab($('tab-presets'), device, () => editor.patch, (msg) => {
   devStatus(msg);
   for (const id of ['dev-live', 'dev-send', 'dev-store']) $<HTMLInputElement>(id).disabled = false;
+});
+refreshAssemblies = buildAssembliesTab($('tab-assemblies'), {
+  insert(def) {
+    document.querySelector<HTMLButtonElement>('#tabs button[data-tab="patch"]')?.click();
+    editor.insert(def);
+  },
+  status(msg) {
+    status.textContent = msg;
+  },
 });
 buildFlashTab($('tab-flash'));
 $('tab-about').innerHTML = `

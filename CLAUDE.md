@@ -129,3 +129,9 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 - Binary patch format is now 7 (the osc record has 7 parameters, `MAX_PAR` 7); old stored patches fall back to factory patch 0. Golden adds `osc-feedback` and `fm-2op`.
 - Measured in the reference engine: aliasing of bright FM notes down 9..13 dB to about -41 dB; the decimated signal overshoots the level by up to ~1.4x, so a carrier at level 1 straight into the output can clip. `inst_t.s.osc` grew to 13 words (feedback history, pm interpolation, decimator states).
 
+## Assemblies (editor only, browser-tested)
+
+- `web/src/assembly.ts` (model, no DOM), `web/src/assemblies.ts` (library page, localStorage `modular-1.assemblies`, factory set from `web/src/assemblies/*.json` via `import.meta.glob`), `editor.ts` (selection: shift-click / rubber band; container cards; open frames; membership by drag; snapshot undo). `Patch.assemblies` is an optional overlay; the engine, encoder, protocol and firmware ignore it, old editors keep it as an unknown field. Tests: `assembly.test.ts` (12).
+- Factory assemblies are exported files: to add one, build it in the editor, "save", export, commit the file; a test checks every factory file loads, inserts and plays. The three shipped were generated with a throwaway script (see git history of this section if needed).
+- Class names: `.pin` is the parameter-input row (pins), the expose / promote toggle button is `.tog`.
+

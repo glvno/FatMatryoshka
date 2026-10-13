@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import type { AssemblyInst } from './assembly';
 // Patch data model, shared by the editor, the WebAudio engine and (later) the firmware encoder.
 
 export type SignalKind = 'audio' | 'control' | 'gate';
@@ -92,6 +93,8 @@ export interface Patch {
   cables: Cable[];
   /** number of voices, 1 (mono, the default) .. MAX_VOICES. See voiceSplit() for what a voice is. */
   voices?: number;
+  /** groups of modules shown as one card (an editor-only overlay, see assembly.ts); the engine and the FM-1 ignore it */
+  assemblies?: AssemblyInst[];
 }
 
 export const MAX_MODULES = 32;

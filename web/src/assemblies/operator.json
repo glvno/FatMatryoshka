@@ -1,0 +1,187 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "operator",
+  "modules": [
+    {
+      "id": 1,
+      "type": "osc",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 0,
+        "pw": 0.5,
+        "coarse": 0,
+        "fine": 0,
+        "pm": 0,
+        "level": 1,
+        "fb": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "pw"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "adsr",
+      "x": 0,
+      "y": 1,
+      "params": {
+        "a": 0.002,
+        "d": 0.6,
+        "s": 0.4,
+        "r": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "a"
+        ],
+        "p2": [
+          "d"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "vca",
+      "x": 1,
+      "y": 0,
+      "params": {
+        "gain": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "env"
+      },
+      "to": {
+        "module": 3,
+        "port": "cv"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "pitch",
+      "label": "pitch"
+    },
+    {
+      "module": 2,
+      "port": "gate",
+      "label": "gate"
+    },
+    {
+      "module": 1,
+      "port": "pm",
+      "label": "pm"
+    },
+    {
+      "module": 3,
+      "port": "p1",
+      "label": "level cv"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 3,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "coarse",
+      "label": "ratio"
+    },
+    {
+      "module": 1,
+      "param": "fine",
+      "label": "detune"
+    },
+    {
+      "module": 1,
+      "param": "pm",
+      "label": "index"
+    },
+    {
+      "module": 1,
+      "param": "fb",
+      "label": "feedback"
+    },
+    {
+      "module": 3,
+      "param": "gain",
+      "label": "level"
+    },
+    {
+      "module": 2,
+      "param": "a",
+      "label": "a"
+    },
+    {
+      "module": 2,
+      "param": "d",
+      "label": "d"
+    },
+    {
+      "module": 2,
+      "param": "s",
+      "label": "s"
+    },
+    {
+      "module": 2,
+      "param": "r",
+      "label": "r"
+    }
+  ]
+}

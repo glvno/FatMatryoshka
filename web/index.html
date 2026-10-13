@@ -13,6 +13,7 @@
     <nav id="tabs" role="tablist">
       <button role="tab" data-tab="patch" aria-selected="true">Patch</button>
       <button role="tab" data-tab="presets" aria-selected="false">Presets</button>
+      <button role="tab" data-tab="assemblies" aria-selected="false">Assemblies</button>
       <button role="tab" data-tab="flash" aria-selected="false">Flash</button>
       <button role="tab" data-tab="about" aria-selected="false">About</button>
     </nav>
@@ -27,6 +28,9 @@
         <input id="patch-name" aria-label="Patch name" />
         <select id="add-type" aria-label="Module type"></select>
         <button id="add-btn">Add module</button>
+        <button id="asm-btn" title="Group the selected modules (shift-click or drag a box to select) into one card">Make assembly</button>
+        <button id="undo-btn" title="Undo (Ctrl/Cmd+Z)">Undo</button>
+        <button id="redo-btn" title="Redo (Shift+Ctrl/Cmd+Z)">Redo</button>
         <span class="spacer"></span>
         <button id="save-btn">Save .json</button>
         <label class="btn">Load .json<input id="load-file" type="file" accept="application/json,.json" hidden /></label>
@@ -42,9 +46,10 @@
         <span id="dev-status" class="muted"></span>
       </div>
       <div id="canvas" class="canvas"><svg id="cables" class="cables"></svg><div id="modules"></div></div>
-      <p class="muted hint">Play with the computer keyboard (A W S E D F T G Y H U J K, Z / X = octave) or a MIDI keyboard. Drag from a port to a port to patch; click a cable to remove it.</p>
+      <p class="muted hint">Play with the computer keyboard (A W S E D F T G Y H U J K, Z / X = octave) or a MIDI keyboard. Drag from a port to a port to patch; click a cable to remove it. Shift-click cards or drag a box on the canvas to select; "Make assembly" turns the selection into one card.</p>
     </section>
     <section id="tab-presets" class="tab" hidden></section>
+    <section id="tab-assemblies" class="tab" hidden></section>
     <section id="tab-flash" class="tab" hidden></section>
     <section id="tab-about" class="tab" hidden></section>
   </main>
