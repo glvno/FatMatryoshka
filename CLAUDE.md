@@ -151,3 +151,6 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 
 - Modules `seq` (10 params: s1..s8, len, dir; rest = step at −1), `clkdiv` (out / d2 / d4 / d8, reset), `sh` (hold / track), `quant` (scales in `SCALES` in modules.ts and engine.c: keep both lists in the same order), `pulse`. Appended to `ALL`; MAX_PAR is 10 now (inst_t.eff grew by 3 words).
 - A square LFO is the clock in tests and golden kits (rising edge at sample 0 because the square starts high); a reset edge on the same sample as a clock edge wins.
+## Pan, crossfade, vowel, phaser, digitizer, noise colour (host-tested, golden 52 patches pass; not flashed)
+
+- Modules `pan` (in, pos → l, r; equal power), `xfade` (a, b, pos → out), `vowel` (three formant band passes, position per block), `phaser` (four allpasses, triangle sweep per block, feedback), `crush` (bits / rate reduction); `noise` got a `color` parameter after `level` (color 0 = unchanged output). Appended to `ALL`; formulas in docs/ARCHITECTURE.md. `inst_t` union grew: `vow` (6 words), `phs` (10 words); `MAX_IN` / `MAX_OUT` / `MAX_PAR` are unchanged (6 / 8 / 7). Golden adds `pan-xfade` (3 voices), `vowel-phaser`, `crush-color`.

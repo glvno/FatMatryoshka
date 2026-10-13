@@ -229,13 +229,16 @@ const lfo: ModuleImpl<{ phase: number; seed: number; held: number; s1: number }>
   },
 };
 
-const noise: ModuleImpl<{ seed: number }> = {
-  def: { type: 'noise', label: 'Noise', inputs: [], outputs: [audio('out')], params: [param('level', 0, 1, 0.5, { step: 0.01 })] },
-  init: () => ({ seed: 0x1234567 }),
+const noise: ModuleImpl<{ seed: number; y: number }> = {
+  def: { type: 'noise', label: 'Noise', inputs: [], outputs: [audio('out')], params: [param('level', 0, 1, 0.5, { step: 0.01 }), param('color', 0, 1, 0, { step: 0.01 })] },
+  init: () => ({ seed: 0x1234567, y: 0 }),
   process(c, s) {
+    const lvl = c.p.level ?? 1;
+    const k = Math.pow(2, -5 * (c.p.color ?? 0));
     for (let i = 0; i < c.n; i++) {
       s.seed = (Math.imul(s.seed, 1664525) + 1013904223) >>> 0;
-      c.out.out[i] = ((s.seed / 0x80000000) - 1) * (c.p.level ?? 1);
+      s.y += k * ((s.seed / 0x80000000) - 1 - s.y);
+      c.out.out[i] = s.y * lvl;
     }
   },
 };
@@ -1006,7 +1009,175 @@ const pulse: ModuleImpl<{ rem: number; t1: number }> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse];
+
+/** equal-power pan: l = cos, r = sin of (position + 1) pi / 4; the `pos` input adds to the parameter (the panel's spread, an LFO) */
+const pan: ModuleImpl<null> = {
+  def: {
+    type: 'pan',
+    label: 'Pan',
+    inputs: [audio('in'), control('pos')],
+    outputs: [audio('l'), audio('r')],
+    params: [param('pan', -1, 1, 0, { step: 0.01 })],
+  },
+  init: () => null,
+  process(c) {
+    const base = c.p.pan ?? 0;
+    for (let i = 0; i < c.n; i++) {
+      const p = Math.min(1, Math.max(-1, base + c.inp.pos[i]));
+      const a = ((p + 1) * Math.PI) / 4;
+      c.out.l[i] = c.inp.in[i] * Math.cos(a);
+      c.out.r[i] = c.inp.in[i] * Math.sin(a);
+    }
+  },
+};
+
+/** linear crossfade a -> b by mix + pos */
+const xfade: ModuleImpl<null> = {
+  def: {
+    type: 'xfade',
+    label: 'Crossfade',
+    inputs: [audio('a'), audio('b'), control('pos')],
+    outputs: [audio('out')],
+    params: [param('mix', 0, 1, 0.5, { step: 0.01 })],
+  },
+  init: () => null,
+  process(c) {
+    const base = c.p.mix ?? 0.5;
+    for (let i = 0; i < c.n; i++) {
+      const m = Math.min(1, Math.max(0, base + c.inp.pos[i]));
+      c.out.out[i] = c.inp.a[i] * (1 - m) + c.inp.b[i] * m;
+    }
+  },
+};
+
+/** the formants (Hz) of A E I O U and their gains: three parallel band passes, the position morphs between neighbours */
+const FORMANTS = [
+  [730, 1090, 2440],
+  [530, 1840, 2480],
+  [390, 1990, 2550],
+  [570, 840, 2410],
+  [440, 1020, 2240],
+];
+const FORMANT_GAIN = [1, 0.5, 0.25];
+
+interface VowelState {
+  ic1: number[];
+  ic2: number[];
+}
+
+/** a vowel filter: three SVF band passes (normalized band, peak 1) at the formants of the vowel `vowel` + input, once per block */
+const vowel: ModuleImpl<VowelState> = {
+  def: {
+    type: 'vowel',
+    label: 'Vowel',
+    inputs: [audio('in'), control('vowel')],
+    outputs: [audio('out')],
+    params: [param('vowel', 0, 4, 0, { step: 0.01 }), param('res', 0, 1, 0.5, { step: 0.01 }), param('level', 0, 1, 0.7, { step: 0.01 })],
+  },
+  init: () => ({ ic1: [0, 0, 0], ic2: [0, 0, 0] }),
+  process(c, s) {
+    const v = Math.min(4, Math.max(0, (c.p.vowel ?? 0) + c.inp.vowel[0]));
+    const vi = Math.min(3, Math.floor(v));
+    const t = v - vi;
+    const k = 1 / (2 + 18 * (c.p.res ?? 0.5));
+    const lvl = c.p.level ?? 0.7;
+    const a1: number[] = [];
+    const a2: number[] = [];
+    const a3: number[] = [];
+    for (let f = 0; f < 3; f++) {
+      const hz = FORMANTS[vi][f] + (FORMANTS[vi + 1][f] - FORMANTS[vi][f]) * t;
+      const g = Math.tan((Math.PI * Math.min(hz, c.sr * 0.45)) / c.sr);
+      a1[f] = 1 / (1 + g * (g + k));
+      a2[f] = g * a1[f];
+      a3[f] = g * a2[f];
+    }
+    for (let i = 0; i < c.n; i++) {
+      const v0 = c.inp.in[i];
+      let sum = 0;
+      for (let f = 0; f < 3; f++) {
+        const v3 = v0 - s.ic2[f];
+        const v1 = a1[f] * s.ic1[f] + a2[f] * v3;
+        const v2 = s.ic2[f] + a2[f] * s.ic1[f] + a3[f] * v3;
+        s.ic1[f] = 2 * v1 - s.ic1[f];
+        s.ic2[f] = 2 * v2 - s.ic2[f];
+        sum += FORMANT_GAIN[f] * k * v1;
+      }
+      c.out.out[i] = sum * lvl;
+    }
+  },
+};
+
+interface PhaserState {
+  /** the sweep LFO's phase, 0..1 */
+  ph: number;
+  /** x1 / y1 of the four allpass stages */
+  ap: number[];
+  /** the last output of stage 4 (feedback) */
+  fbv: number;
+}
+
+/** a four-stage phaser: one allpass coefficient for all stages from a triangle sweep of +-2 depth octaves around center, set once per block */
+const phaser: ModuleImpl<PhaserState> = {
+  def: {
+    type: 'phaser',
+    label: 'Phaser',
+    inputs: [audio('in')],
+    outputs: [audio('out')],
+    params: [
+      param('rate', 0.02, 10, 0.5, { unit: 'Hz', step: 0.01, log: true }),
+      param('depth', 0, 1, 0.7, { step: 0.01 }),
+      param('center', 100, 4000, 800, { unit: 'Hz', step: 1, log: true }),
+      param('fb', 0, 0.9, 0.3, { step: 0.01 }),
+      param('mix', 0, 1, 0.5, { step: 0.01 }),
+    ],
+  },
+  init: () => ({ ph: 0, ap: [0, 0, 0, 0, 0, 0, 0, 0], fbv: 0 }),
+  process(c, s) {
+    const rate = c.p.rate ?? 0.5;
+    const tri = wave(1, s.ph, 0);
+    const f = Math.min(c.sr * 0.45, Math.max(20, (c.p.center ?? 800) * Math.pow(2, 2 * (c.p.depth ?? 0) * tri)));
+    const g = Math.tan((Math.PI * f) / c.sr);
+    const a = (g - 1) / (g + 1);
+    const fb = c.p.fb ?? 0;
+    const mix = c.p.mix ?? 0.5;
+    for (let i = 0; i < c.n; i++) {
+      const x0 = c.inp.in[i];
+      let x = Math.min(8, Math.max(-8, x0 + fb * s.fbv));
+      for (let k = 0; k < 4; k++) x = allpass(s.ap, 2 * k, a, x);
+      s.fbv = x;
+      c.out.out[i] = x0 * (1 - mix) + x * mix;
+    }
+    s.ph += (c.n * rate) / c.sr;
+    s.ph -= Math.floor(s.ph);
+  },
+};
+
+/** bit depth and sample rate reduction: 2^bits levels over -1..1, every taken sample held for `rate` samples */
+const crush: ModuleImpl<{ held: number; cnt: number }> = {
+  def: {
+    type: 'crush',
+    label: 'Digitizer',
+    inputs: [audio('in')],
+    outputs: [audio('out')],
+    params: [param('bits', 1, 16, 8, { step: 1 }), param('rate', 1, 64, 1, { step: 1 })],
+  },
+  init: () => ({ held: 0, cnt: 0 }),
+  process(c, s) {
+    const bits = Math.round(c.p.bits ?? 8);
+    const rate = Math.round(c.p.rate ?? 1);
+    const q = Math.pow(2, bits - 1);
+    for (let i = 0; i < c.n; i++) {
+      if (s.cnt <= 0) {
+        s.held = Math.floor(c.inp.in[i] * q + 0.5) / q;
+        s.cnt = rate;
+      }
+      s.cnt--;
+      c.out.out[i] = s.held;
+    }
+  },
+};
+
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an

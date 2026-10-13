@@ -196,7 +196,10 @@ typedef struct {
         struct { uint32_t phase; int32_t s1, y1, y2, pm1, xb, ap[8]; } osc;   /* s1: last sync sample; FM mode: feedback history, pm interpolation, decimator */
         struct { uint32_t phase, seed; int32_t held, s1; } lfo;
         struct { int32_t y; } gld;         /* Q24 */
-        struct { uint32_t seed; } noise;
+        struct { uint32_t seed; int32_t y; } noise;   /* y: the colour one-pole, Q24 */
+        struct { int32_t ic1[3], ic2[3]; } vow;       /* three band passes, Q20 */
+        struct { uint32_t phase; int32_t ap[8], fbv; } phs;   /* the sweep LFO, x1 / y1 of the four allpasses, the feedback sample */
+        struct { int32_t held, cnt; } crush;
         struct { int32_t v; uint8_t stage, prev; } adsr;
         struct { int32_t ic1, ic2, jc1, jc2; } flt;   /* stage 1 and stage 2 integrators */
         struct { int16_t *buf; uint32_t w; } dly;
@@ -890,16 +893,20 @@ static void m_lfo(const node_t *nd, inst_t *it, uint32_t n)
     it->s.lfo.s1 = s1;
 }
 
+/* white noise through a one-pole with c = 2^(-5 color): color 0 is c = 1, the plain noise bit for bit. y is Q24. */
 static void m_noise(const node_t *nd, inst_t *it, uint32_t n)
 {
     esig_t *out = it->out[0];
     uint32_t seed = it->s.noise.seed, i;
-    int32_t lvl = EF(it, 0);
+    int32_t lvl = EF(it, NOISE_P_LEVEL), y = it->s.noise.y;
+    int32_t k = (int32_t)exp2_q16((16 << 16) - 5 * EF(it, NOISE_P_COLOR));
     for (i = 0; i < n; i++) {
         seed = seed * 1664525u + 1013904223u;
-        out[i] = mul16((int32_t)(seed >> 15) - ENG_ONE, lvl);
+        y += mulq(k, (((int32_t)(seed >> 15) - ENG_ONE) << 8) - y, 16);
+        out[i] = mul16((y + 128) >> 8, lvl);
     }
     it->s.noise.seed = seed;
+    it->s.noise.y = y;
 }
 
 static void m_const(const node_t *nd, inst_t *it, uint32_t n) { fill(it->out[0], EF(it, 0), n); }
@@ -1565,6 +1572,119 @@ static void m_pulse(const node_t *nd, inst_t *it, uint32_t n)
     it->s.pls.t1 = t1;
 }
 
+/* equal-power pan: (p + 1) / 8 of a turn, r = sin, l = cos */
+static void m_pan(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[PAN_I_IN], *pos = it->in[PAN_I_POS];
+    esig_t *l = it->out[PAN_O_L], *r = it->out[PAN_O_R];
+    int32_t base = EF(it, PAN_P_PAN);
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        int32_t p = clampi(base + pos[i], -ENG_ONE, ENG_ONE);
+        uint32_t turn = (uint32_t)(p + ENG_ONE) << 13;
+        l[i] = mul16(in[i], sin_turn(turn + 0x40000000u));
+        r[i] = mul16(in[i], sin_turn(turn));
+    }
+}
+
+static void m_xfade(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *a = it->in[XFADE_I_A], *b = it->in[XFADE_I_B], *pos = it->in[XFADE_I_POS];
+    esig_t *out = it->out[0];
+    int32_t base = EF(it, XFADE_P_MIX);
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        int32_t m = clampi(base + pos[i], 0, ENG_ONE);
+        out[i] = mul16(a[i], ENG_ONE - m) + mul16(b[i], m);
+    }
+}
+
+/* the formants (Hz) of A E I O U; gains 1, 1/2, 1/4 */
+static const int16_t FORMANT_HZ[5][3] = {{730, 1090, 2440}, {530, 1840, 2480}, {390, 1990, 2550}, {570, 840, 2410}, {440, 1020, 2240}};
+
+/* three parallel SVF band passes (normalized band k v1, peak 1) at the formants of vowel + input, set once per block */
+static void m_vowel(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[VOWEL_I_IN], *vin = it->in[VOWEL_I_VOWEL];
+    esig_t *out = it->out[0];
+    int32_t v = clampi(EF(it, VOWEL_P_VOWEL) + vin[0], 0, 4 << 16), vi = v >> 16, t, lvl = EF(it, VOWEL_P_LEVEL);
+    int32_t q16 = (2 << 16) + 18 * EF(it, VOWEL_P_RES), k24 = (int32_t)(((int64_t)1 << 40) / q16);
+    svf_coef_t c[3];
+    uint32_t i, f;
+    if (vi > 3)
+        vi = 3;
+    t = v - (vi << 16);
+    for (f = 0; f < 3u; f++) {
+        int32_t hz = ((int32_t)FORMANT_HZ[vi][f] << 16) + (int32_t)((int64_t)(FORMANT_HZ[vi + 1][f] - FORMANT_HZ[vi][f]) * t);
+        svf_stage(&c[f], svf_g((uint32_t)(((uint64_t)(uint32_t)hz << 16) / ENG_SR)), k24);
+    }
+    for (i = 0; i < n; i++) {
+        int32_t v0 = in[i] << 4, sum = 0;
+        for (f = 0; f < 3u; f++) {
+            int32_t ic1 = it->s.vow.ic1[f], ic2 = it->s.vow.ic2[f];
+            int32_t v3 = v0 - ic2;
+            int32_t v1 = mulr(c[f].a1, ic1, 24) + mulr(c[f].a2, v3, 24);
+            int32_t v2 = ic2 + mulr(c[f].a2, ic1, 24) + mulr(c[f].a3, v3, 24);
+            it->s.vow.ic1[f] = clampi(2 * v1 - ic1, -(1 << 30), 1 << 30);
+            it->s.vow.ic2[f] = clampi(2 * v2 - ic2, -(1 << 30), 1 << 30);
+            sum += mulr(v1, k24, 24) >> f;
+        }
+        out[i] = mul16((sum + 8) >> 4, lvl);
+    }
+}
+
+#define INC_20HZ 1948006u            /* 20 Hz as a phase increment */
+
+/* four first-order allpasses in series with one coefficient a = (g - 1) / (g + 1), g = tan(pi f / sr), f = center *
+ * 2^(2 depth tri) from a triangle sweep, once per block; feedback from stage 4 into stage 1 */
+static void m_phaser(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[PHASER_I_IN];
+    esig_t *out = it->out[0];
+    uint32_t dt = (uint32_t)(((uint64_t)(uint32_t)EF(it, PHASER_P_RATE) << 16) / ENG_SR), phase = it->s.phs.phase, i, k;
+    int32_t tri = wave(1, phase, dt, 0), oct = mul16(2 * EF(it, PHASER_P_DEPTH), tri);
+    uint32_t rinc = exp2_scale((uint32_t)(((uint64_t)(uint32_t)EF(it, PHASER_P_CENTER) << 16) / ENG_SR), oct);
+    int32_t g, a, fb = EF(it, PHASER_P_FB), mix = EF(it, PHASER_P_MIX), dry = ENG_ONE - mix, fbv = it->s.phs.fbv, *ap = it->s.phs.ap;
+    if (rinc < INC_20HZ)
+        rinc = INC_20HZ;
+    g = svf_g(rinc);
+    a = (int32_t)(((int64_t)(g - (1 << 24)) << 24) / (g + (1 << 24)));
+    for (i = 0; i < n; i++) {
+        int32_t x0 = in[i], x = clampi(x0 + mul16(fb, fbv), -(8 << 16), 8 << 16);
+        for (k = 0; k < 4u; k++) {
+            int32_t y = mulq(a, x - ap[2 * k + 1], 24) + ap[2 * k];
+            ap[2 * k] = x;
+            ap[2 * k + 1] = y;
+            x = y;
+        }
+        fbv = x;
+        out[i] = mul16(x0, dry) + mul16(x, mix);
+    }
+    it->s.phs.fbv = fbv;
+    it->s.phs.phase = phase + n * dt;
+}
+
+/* 2^bits levels over -1..1 (a step of 2^(17 - bits) in Q16), every taken sample held for `rate` samples */
+static void m_crush(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[CRUSH_I_IN];
+    esig_t *out = it->out[0];
+    int32_t bits = clampi(round_q16(EF(it, CRUSH_P_BITS)), 1, 16), rate = clampi(round_q16(EF(it, CRUSH_P_RATE)), 1, 64);
+    int32_t held = it->s.crush.held, cnt = it->s.crush.cnt;
+    unsigned sh = (unsigned)(17 - bits);
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        if (cnt <= 0) {
+            held = ((in[i] + (1 << (sh - 1))) >> sh) << sh;
+            cnt = rate;
+        }
+        cnt--;
+        out[i] = held;
+    }
+    it->s.crush.held = held;
+    it->s.crush.cnt = cnt;
+}
+
 /* ------------------------------------------------------------------ rendering */
 
 /* Block-rate parameter modulation (engine.ts applyCv): the mean of p1 / p2 over the block, times the attenuverter, is
@@ -1630,6 +1750,11 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     case T_SH: m_sh(nd, it, n); break;
     case T_QUANT: m_quant(nd, it, n); break;
     case T_PULSE: m_pulse(nd, it, n); break;
+    case T_PAN: m_pan(nd, it, n); break;
+    case T_XFADE: m_xfade(nd, it, n); break;
+    case T_VOWEL: m_vowel(nd, it, n); break;
+    case T_PHASER: m_phaser(nd, it, n); break;
+    case T_CRUSH: m_crush(nd, it, n); break;
     default: break;                      /* output: read by eng_render */
     }
 }

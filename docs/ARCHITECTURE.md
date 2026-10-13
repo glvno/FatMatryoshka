@@ -126,3 +126,12 @@ Rules: `reconcile` keeps an assembly consistent after every structural change (d
 
 - All five act on rising edges through 0.5 (Q16 32768), like `sync`. `seq`: ten parameters (the first module above eight, hence the u16 masks of format 9); `out` is `s[pos]` every sample, so the step's knob is live; the random direction uses the LCG of the LFO's S&H. `clkdiv` counts edges modulo 16 · div (a common multiple of div, 2, 4, 8) and starts at −1 so the first edge is a downbeat. `quant`: semitones = 12 · in − root, octave by floor division, the nearest of the scale's degrees or the next root; ties go down (the two engines can differ at an exact float tie, which modulation never hits). `pulse`: a sample countdown of round(time · sr).
 - Golden `seq-clock` (clock -> divider -> pendulum sequencer -> quantizer -> oscillator, sequencer gate -> pulse -> ADSR, d4 -> sync) and `sh-random` (clocked S&H on noise -> pentatonic quantizer, a tracking S&H on the filter, a random sequencer on pulse width; 2 voices) pass at 1.5 % and 0.2 %: the edge decisions line up sample for sample.
+## Pan, crossfade, vowel, phaser, digitizer, noise colour
+
+- `pan`: l = in·cos((p+1)π/4), r = in·sin((p+1)π/4) with p = clamp(pan + pos, −1, 1), per sample (C: sin_turn at (p+1)/8 of a turn).
+- `xfade`: out = a·(1−m) + b·m, m = clamp(mix + pos, 0, 1).
+- `vowel`: three SVF stages (the normalized band output k·v1, peak 1) at the formant frequencies of A (730, 1090, 2440), E (530, 1840, 2480), I (390, 1990, 2550), O (570, 840, 2410), U (440, 1020, 2240) Hz with gains 1, ½, ¼; the position v = clamp(vowel + input[0], 0, 4) interpolates the frequencies linearly between neighbours once per block; k = 1/Q, Q = 2 + 18·res. The C version reuses svf_g / svf_stage and Q20 states like the filter.
+- `phaser`: four first-order allpasses y = a(x − y₁) + x₁ with one coefficient a = (g−1)/(g+1), g = tan(πf/sr), f = center·2^(2·depth·tri), tri a triangle LFO at `rate` read once per block; the input of stage 1 is in + fb·(stage 4's previous output), clamped to ±8; out = in·(1−mix) + wet·mix. In C the coefficient is Q24 from one 64-bit division per block.
+- `crush`: step 2^(1−bits), y = floor(x/step + ½)·step on the taken sample, held for `rate` samples (C: shift by 17 − bits).
+- `noise` `color`: y += c·(white − y), c = 2^(−5·color) (color 0 is c = 1: the old noise bit for bit); the state is Q24 in C.
+- Golden kits: `pan-xfade` (3 voices), `vowel-phaser`, `crush-color`.

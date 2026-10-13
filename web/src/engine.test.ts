@@ -1066,3 +1066,147 @@ describe('sequencer, clock divider, S&H, quantizer, pulse', () => {
     expect(Math.min(...Array.from(render(e2, CLK * 3).l))).toBe(1);
   });
 });
+
+describe('pan, crossfade, vowel, phaser, digitizer, noise colour', () => {
+  const wire = (p: Patch, a: number, ap: string, b: number, bp: string): void => {
+    expect(connect(p, DEFS, { module: a, port: ap }, { module: b, port: bp })).toBe(true);
+  };
+  /** a patch with an Output at level 1; returns the helpers */
+  const start = (): { p: Patch; out: number; add: (type: string, params?: Record<string, number>) => number } => {
+    const p = emptyPatch();
+    const outM = addModule(p, DEFS.output, 0, 0);
+    outM.params.level = 1;
+    return {
+      p,
+      out: outM.id,
+      add: (type, params = {}) => {
+        const m = addModule(p, DEFS[type], 0, 0);
+        Object.assign(m.params, params);
+        return m.id;
+      },
+    };
+  };
+  const hz = (f: number): number => Math.log2(f / 261.6255653);
+  const play = (p: Patch, frames = SR / 4): { l: Float32Array; r: Float32Array } => {
+    const e = new Engine(SR);
+    e.load(p);
+    render(e, SR / 8); // settle
+    return render(e, frames);
+  };
+
+  it('pan: hard left is silent on the right, centre is cos(pi/4) on both', () => {
+    const run = (pan: number): { l: Float32Array; r: Float32Array } => {
+      const { p, out, add } = start();
+      const o = add('osc', { wave: 0, level: 1 });
+      const pn = add('pan', { pan });
+      wire(p, o, 'out', pn, 'in');
+      wire(p, pn, 'l', out, 'l');
+      wire(p, pn, 'r', out, 'r');
+      return play(p);
+    };
+    const left = run(-1);
+    expect(rms(left.l)).toBeCloseTo(Math.SQRT1_2, 2);
+    expect(rms(left.r)).toBeLessThan(1e-4);
+    const mid = run(0);
+    expect(rms(mid.l)).toBeCloseTo(0.5, 2);
+    expect(rms(mid.r)).toBeCloseTo(0.5, 2);
+  });
+
+  it('crossfade: mix 0 is a, 1 is b, 0.5 the average', () => {
+    const run = (mix: number): number => {
+      const { p, out, add } = start();
+      const a = add('const', { value: 0.4 });
+      const b = add('const', { value: -0.2 });
+      const x = add('xfade', { mix });
+      wire(p, a, 'out', x, 'a');
+      wire(p, b, 'out', x, 'b');
+      wire(p, x, 'out', out, 'l');
+      return play(p, 256).l[100];
+    };
+    expect(run(0)).toBeCloseTo(0.4, 5);
+    expect(run(1)).toBeCloseTo(-0.2, 5);
+    expect(run(0.5)).toBeCloseTo(0.1, 5);
+  });
+
+  it('vowel: the A vowel passes its first formant and not 3 kHz; finite at full resonance', () => {
+    const run = (f: number, res: number): Float32Array => {
+      const { p, out, add } = start();
+      const c = add('const', { value: hz(f) });
+      const o = add('osc', { wave: 0, level: 1 });
+      const v = add('vowel', { vowel: 0, res, level: 1 });
+      wire(p, c, 'out', o, 'pitch');
+      wire(p, o, 'out', v, 'in');
+      wire(p, v, 'out', out, 'l');
+      return play(p).l;
+    };
+    expect(rms(run(730, 0.5))).toBeGreaterThan(rms(run(3000, 0.5)) * 3);
+    const hot = run(730, 1);
+    expect(hot.every(Number.isFinite)).toBe(true);
+    expect(rms(hot)).toBeGreaterThan(0.3);
+  });
+
+  it('phaser: dry at mix 0, a notch at 0.414 center with mix 0.5, finite with full feedback', () => {
+    const run = (f: number, params: Record<string, number>): Float32Array => {
+      const { p, out, add } = start();
+      const c = add('const', { value: hz(f) });
+      const o = add('osc', { wave: 0, level: 0.5 });
+      const ph = add('phaser', { rate: 0.02, depth: 0, center: 800, fb: 0, ...params });
+      wire(p, c, 'out', o, 'pitch');
+      wire(p, o, 'out', ph, 'in');
+      wire(p, ph, 'out', out, 'l');
+      return play(p).l;
+    };
+    expect(rms(run(440, { mix: 0 }))).toBeCloseTo(0.5 * Math.SQRT1_2, 3);
+    const notch = run(800 * Math.tan(Math.PI / 8), { mix: 0.5 }); // the four stages turn the phase by pi there
+    const peak = run(800, { mix: 0.5 }); // and by 2 pi at the center: wet = dry
+    expect(rms(notch)).toBeLessThan(rms(peak) * 0.1);
+    expect(rms(peak)).toBeCloseTo(0.5 * Math.SQRT1_2, 2);
+    const swept = run(440, { mix: 0.5, depth: 1, rate: 3, fb: 0.9 });
+    expect(swept.every(Number.isFinite)).toBe(true);
+    expect(rms(swept)).toBeGreaterThan(0.05);
+  });
+
+  it('digitizer: one bit leaves -1, 0, 1; rate 8 holds every value for 8 samples', () => {
+    const run = (bits: number, rate: number): Float32Array => {
+      const { p, out, add } = start();
+      const nz = add('noise', { level: 1 });
+      const cr = add('crush', { bits, rate });
+      wire(p, nz, 'out', cr, 'in');
+      wire(p, cr, 'out', out, 'l');
+      const e = new Engine(SR);
+      e.load(p);
+      return render(e, 2048).l;
+    };
+    const one = run(1, 1);
+    for (const v of one) expect([-1, 0, 1]).toContain(Math.round(v * 1e6) / 1e6);
+    expect(new Set(Array.from(one)).size).toBe(3);
+    const held = run(8, 8);
+    for (let i = 0; i < held.length; i++) expect(held[i]).toBe(held[i - (i % 8)]);
+    expect(new Set(Array.from(held)).size).toBeGreaterThan(50);
+  });
+
+  it('noise colour: 0 is the white noise as before, 1 is darker', () => {
+    const run = (color: number): Float32Array => {
+      const { p, out, add } = start();
+      const nz = add('noise', { level: 0.5, color });
+      wire(p, nz, 'out', out, 'l');
+      const e = new Engine(SR);
+      e.load(p);
+      return render(e, 4096).l;
+    };
+    const white = run(0);
+    let seed = 0x1234567;
+    for (let i = 0; i < 64; i++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      expect(white[i]).toBeCloseTo((seed / 0x80000000 - 1) * 0.5, 6);
+    }
+    const dark = run(1);
+    const hf = (a: Float32Array): number => {
+      let s = 0;
+      for (let i = 1; i < a.length; i++) s += (a[i] - a[i - 1]) ** 2;
+      return Math.sqrt(s / a.length) / rms(a);
+    };
+    expect(hf(dark)).toBeLessThan(hf(white) * 0.3);
+    expect(rms(dark)).toBeGreaterThan(0.01);
+  });
+});

@@ -65,3 +65,11 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 - **S&H**: `out` takes `in` on a clock edge (`hold`) or follows it while the clock is up (`track`). Noise into a clocked S&H into a Quantizer is a random melody.
 - **Quantizer**: snaps a pitch to the nearest note of a scale on a root (chromatic, major, minor, pentatonics, dorian, mixolydian, blues, whole tone, fifths, octaves). Put it after a Sequencer, an S&H, a Glide or an LFO into `pitch`.
 - **Pulse**: a trigger in, a gate of `time` out; a new trigger restarts it. It turns a short clock tick into a gate long enough for an envelope's attack, or a long gate into a short one.
+## Pan, crossfade, vowel, phaser, digitizer, noise colour
+
+- **Pan** places a signal with an equal-power law; its `pos` input adds to the `pan` knob, so Main `spread` into it spreads the voices across the stereo field and an LFO autopans.
+- **Crossfade** fades between `a` and `b` by `mix` + `pos` (an envelope or an LFO on `pos`).
+- **Vowel** is three band passes at the formants of A E I O U; `vowel` morphs between them (0..4), the input adds to it, `res` is the sharpness.
+- **Phaser** sweeps four allpass stages ±2 `depth` octaves around `center` at `rate`, with `fb` and `mix`.
+- **Digitizer** reduces the bit depth (`bits`) and the sample rate (`rate` = every sample held that many times).
+- **Noise** has a `color` parameter: 0 is white, 1 rolls the top off from about 220 Hz.
