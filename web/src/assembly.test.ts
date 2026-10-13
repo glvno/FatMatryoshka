@@ -1,8 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
+  addChild,
   addMember,
+  allModules,
   boundary,
+  childProblem,
+  depthOf,
+  freeSpot,
+  hiddenAssemblies,
+  mergePorts,
+  moveAssembly,
+  parentOf,
+  removeChild,
+  targetsOf,
+  unmergePort,
   deleteAssembly,
   exposePort,
   fixAssemblies,
@@ -250,5 +262,194 @@ describe('assemblies', () => {
       expect(overlapping(q, insertAssembly(q, DEFS, d, 0, 0))).toBe(false);
     }
   });
-});
 
+  // ---- merged ports, placement, nesting
+
+  /** panel, two envelopes on one VCA, output */
+  function twoEnv(): { p: Patch; kb: number; e1: number; e2: number; vca: number; osc: number } {
+    const p = emptyPatch('t');
+    const kb = addModule(p, DEFS.fm1, 0, 0).id;
+    const osc = addModule(p, DEFS.osc, 300, 0).id;
+    const e1 = addModule(p, DEFS.adsr, 300, 300).id;
+    const e2 = addModule(p, DEFS.adsr, 600, 300).id;
+    const vca = addModule(p, DEFS.vca, 600, 0).id;
+    const c = (a: number, ap: string, b: number, bp: string): void => {
+      expect(connect(p, DEFS, { module: a, port: ap }, { module: b, port: bp })).toBe(true);
+    };
+    c(kb, 'pitch', osc, 'pitch');
+    c(osc, 'out', vca, 'in');
+    c(e1, 'env', vca, 'cv');
+    c(e2, 'env', vca, 'p1');
+    return { p, kb, e1, e2, vca, osc };
+  }
+
+  it('merges two exposed inputs into one jack, keeps it through save / insert, and splits it again', () => {
+    const { p, kb, e1, e2, vca, osc } = twoEnv();
+    const a = makeAssembly(p, [osc, e1, e2, vca], 'voice');
+    exposePort(a, 'in', e1, 'gate');
+    exposePort(a, 'in', e2, 'gate');
+    expect(a.inputs.map((r) => r.label)).toEqual(['pitch', 'gate', 'gate 2']);
+    mergePorts(p, a, DEFS, { module: e1, port: 'gate' }, { module: e2, port: 'gate' });
+    expect(a.inputs.map((r) => r.label)).toEqual(['pitch', 'gate']);
+    expect(targetsOf(a.inputs[1])).toEqual([{ module: e1, port: 'gate' }, { module: e2, port: 'gate' }]);
+    // a different kind cannot merge
+    expect(() => mergePorts(p, a, DEFS, { module: osc, port: 'pitch' }, { module: e1, port: 'gate' })).toThrow(/cannot merge/);
+    // a cable to every target: the group stays one port, and it cannot be hidden while wired
+    for (const t of targetsOf(a.inputs[1])) connect(p, DEFS, { module: kb, port: 'gate' }, t);
+    reconcileAll(p, DEFS);
+    expect(a.inputs).toHaveLength(2);
+    expect(() => hidePort(p, a, 'in', e2, 'gate')).toThrow(/cable from outside/);
+    // save and insert carry the merge, with remapped ids
+    const def = validateAssemblyDef(JSON.parse(JSON.stringify(toDef(p, a))), DEFS);
+    expect(def.inputs[1].also).toEqual([{ module: 3, port: 'gate' }]);
+    const q = emptyPatch('q');
+    const b = insertAssembly(q, DEFS, def, 0, 0);
+    const ts = targetsOf(b.inputs[1]);
+    expect(ts).toHaveLength(2);
+    expect(ts.every((t) => q.modules.some((m) => m.id === t.module && m.type === 'adsr'))).toBe(true);
+    // split
+    unmergePort(b, ts[0].module, 'gate');
+    expect(b.inputs.map((r) => r.label)).toEqual(['pitch', 'gate', 'gate 2']);
+    expect(b.inputs[1].also).toBeUndefined();
+    // a member leaving takes its target out of the group; the group survives
+    mergePorts(q, b, DEFS, ts[0], ts[1]);
+    removeMember(q, b, ts[1].module);
+    expect(b.inputs.find((r) => r.label === 'gate')!.also).toBeUndefined();
+    // the factory voice has one merged gate
+    const voiceDef = FACTORY.find((d) => d.name === 'voice')!;
+    expect(voiceDef.inputs.map((r) => r.label)).toEqual(['pitch', 'gate', 'cutoff cv']);
+    expect(voiceDef.inputs[1].also).toHaveLength(1);
+  });
+
+  it('finds the first free grid cell for an inserted card', () => {
+    expect(freeSpot([], 250, 540)).toEqual({ x: 20, y: 20 });
+    const row = [0, 1, 2, 3].map((i) => ({ x: 20 + 270 * i, y: 20, w: 250, h: 300 }));
+    expect(freeSpot(row, 250, 540)).toEqual({ x: 20, y: 580 });
+    expect(freeSpot(row.slice(0, 2), 250, 540)).toEqual({ x: 560, y: 20 });
+    // a card sitting off the grid blocks the cells it touches
+    expect(freeSpot([{ x: 100, y: 100, w: 250, h: 300 }], 250, 540)).toEqual({ x: 560, y: 20 });
+  });
+
+  it('nests: a selection inside an open assembly becomes a child, with members, boundary and hiding through the levels', () => {
+    const { p, kb, e1, e2, vca, osc } = twoEnv();
+    const outer = makeAssembly(p, [osc, e1, e2, vca], 'voice');
+    outer.open = true;
+    const inner = makeAssembly(p, [e1, e2], 'envs');
+    expect(parentOf(p, inner.id)).toBe(outer);
+    expect(outer.modules).toEqual([osc, vca]);
+    expect(outer.children).toEqual([inner.id]);
+    expect(allModules(p, outer).sort()).toEqual([osc, e1, e2, vca].sort());
+    expect(depthOf(p, inner)).toBe(2);
+    // the child's boundary: both env outputs leave it (into the vca); the outer's boundary is unchanged
+    expect(inner.outputs.map((r) => `${r.module}.${r.port}`)).toEqual([`${e1}.env`, `${e2}.env`]);
+    expect(outer.outputs).toEqual([]);
+    expect(outer.inputs.map((r) => r.port)).toEqual(['pitch']);
+    // the parent may only show what the child exposes
+    exposePort(outer, 'in', e1, 'gate');
+    reconcileAll(p, DEFS);
+    expect(outer.inputs.map((r) => r.port)).toEqual(['pitch']);
+    exposePort(inner, 'in', e1, 'gate');
+    exposePort(outer, 'in', e1, 'gate');
+    reconcileAll(p, DEFS);
+    expect(outer.inputs.map((r) => r.port)).toEqual(['pitch', 'gate']);
+    // an outside cable to a deep module exposes it on both levels
+    connect(p, DEFS, { module: kb, port: 'gate' }, { module: e2, port: 'gate' });
+    reconcileAll(p, DEFS);
+    expect(outer.inputs.map((r) => `${r.module}.${r.port}`)).toContain(`${e2}.gate`);
+    expect(inner.inputs.map((r) => `${r.module}.${r.port}`)).toContain(`${e2}.gate`);
+    // hiding: a collapsed parent hides everything, an open parent with a collapsed child hides the child's modules
+    outer.open = false;
+    expect(hiddenModules(p)).toEqual(new Set([osc, e1, e2, vca]));
+    expect(hiddenAssemblies(p)).toEqual(new Set([inner.id]));
+    outer.open = true;
+    expect(hiddenModules(p)).toEqual(new Set([e1, e2]));
+    expect(hiddenAssemblies(p).size).toBe(0);
+    // cycles, double parents and the depth cap are refused
+    expect(childProblem(p, inner, outer.id)).toMatch(/already inside/);
+    expect(childProblem(p, outer, outer.id)).toMatch(/itself/);
+    const third = makeAssembly(p, [vca], 'amp');
+    expect(parentOf(p, third.id)).toBe(outer);
+    expect(() => makeAssembly(p, [e1], 'deep')).not.toThrow(); // level 3
+    expect(() => makeAssembly(p, [e1], 'deeper')).toThrow(/at most 3/);
+    expect(() => addChild(p, third, inner.id)).toThrow(/at most 3/); // inner spans two levels, under "amp" that would be four
+  });
+
+  it('nests by addChild / removeChild, moves, saves and inserts the tree, and ungroup / delete keep the children', () => {
+    const { p, kb, e1, e2, vca, osc } = twoEnv();
+    const envs = makeAssembly(p, [e1, e2], 'envs');
+    const voice = makeAssembly(p, [osc, vca], 'voice');
+    expect(voice.inputs.map((r) => r.port)).toEqual(['pitch', 'cv', 'p1']);
+    addChild(p, voice, envs.id);
+    expect(voice.children).toEqual([envs.id]);
+    expect(voice.inputs.map((r) => r.port)).toEqual(['pitch']); // cv and p1 are fed from inside now
+    expect(() => addChild(p, envs, voice.id)).toThrow(/already inside/);
+    // moving the parent moves the child and its modules
+    const before = p.modules.map((m) => [m.x, m.y]);
+    moveAssembly(p, voice, 10, 20);
+    expect([envs.x, envs.y]).toEqual([310, 320]);
+    p.modules.forEach((m, i) => {
+      if (m.id !== kb) expect([m.x, m.y]).toEqual([before[i][0] + 10, before[i][1] + 20]);
+    });
+    // save: nested assemblies with local ids
+    exposePort(envs, 'in', e1, 'gate', [{ module: e2, port: 'gate' }]);
+    exposePort(voice, 'in', e1, 'gate', envs.inputs[0].also);
+    promote(envs, e1, 'a');
+    promote(voice, e1, 'a');
+    const def = validateAssemblyDef(JSON.parse(JSON.stringify(toDef(p, voice))), DEFS);
+    expect(def.modules).toHaveLength(4);
+    expect(def.assemblies).toHaveLength(1);
+    expect(def.children).toEqual([1]);
+    expect(def.assemblies![0].modules.sort()).toEqual([3, 4]);
+    expect(def.inputs.find((r) => r.port === 'gate')!.also).toEqual([{ module: 4, port: 'gate' }]);
+    expect(def.params).toEqual([{ module: 3, param: 'a', label: 'a' }]);
+    // insert: fresh ids, the tree rebuilt
+    const q = emptyPatch('q');
+    addModule(q, DEFS.fm1, 0, 0);
+    const v2 = insertAssembly(q, DEFS, def, 300, 0);
+    expect(q.assemblies).toHaveLength(2);
+    const child = parentOf(q, q.assemblies!.find((a) => a.name === 'envs')!.id);
+    expect(child).toBe(v2);
+    expect(v2.inputs.map((r) => r.port)).toEqual(['pitch', 'gate']);
+    expect(v2.params).toHaveLength(1);
+    expect(hiddenModules(q).size).toBe(4);
+    // a second insert gets unique labels for the nested one too
+    insertAssembly(q, DEFS, def, 600, 0);
+    expect(q.assemblies!.map((a) => a.label).sort()).toEqual(['envs', 'envs 2', 'voice', 'voice 2']);
+    // a bad tree is refused
+    expect(() => validateAssemblyDef({ ...def, children: [7] }, DEFS)).toThrow(/does not exist/);
+    expect(() => validateAssemblyDef({ ...def, children: [] }, DEFS)).toThrow(/in no assembly/);
+    // removeChild frees the child; ungroup of a parent hands its members to the grandparent; delete keeps children
+    removeChild(p, voice, envs.id);
+    expect(parentOf(p, envs.id)).toBeUndefined();
+    expect(voice.inputs.map((r) => r.port)).toEqual(['pitch', 'cv', 'p1']);
+    addChild(p, voice, envs.id);
+    const amp = makeAssembly(p, [vca], 'amp'); // child of voice
+    ungroup(p, voice.id);
+    expect(p.assemblies!.map((a) => a.name).sort()).toEqual(['amp', 'envs']);
+    expect(parentOf(p, amp.id)).toBeUndefined();
+    const v3 = makeAssembly(p, [osc], 'voice');
+    addChild(p, v3, envs.id);
+    deleteAssembly(p, v3.id);
+    expect(p.modules.some((m) => m.id === osc)).toBe(false);
+    expect(p.assemblies!.some((a) => a.id === envs.id)).toBe(true);
+    expect(allModules(p, envs)).toEqual([e1, e2]);
+  });
+
+  it('repairs a bad nesting on load: missing children, two parents, loops and depth', () => {
+    const { p, e1, e2, vca, osc } = twoEnv();
+    const envs = makeAssembly(p, [e1, e2], 'envs');
+    const voice = makeAssembly(p, [osc, vca], 'voice');
+    addChild(p, voice, envs.id);
+    const raw = JSON.parse(JSON.stringify(p)) as Patch;
+    const ok = validatePatch(JSON.parse(JSON.stringify(raw)), DEFS);
+    expect(fixAssemblies(ok, DEFS)).toEqual([]);
+    expect(parentOf(ok, envs.id)!.id).toBe(voice.id);
+    const loop = JSON.parse(JSON.stringify(raw)) as Patch;
+    loop.assemblies!.find((a) => a.id === envs.id)!.children = [voice.id];
+    const msgs = fixAssemblies(validatePatch(loop, DEFS), DEFS);
+    expect(msgs.join(' ')).toMatch(/loop undone/);
+    const missing = JSON.parse(JSON.stringify(raw)) as Patch;
+    missing.assemblies!.find((a) => a.id === voice.id)!.children = [99];
+    expect(fixAssemblies(validatePatch(missing, DEFS), DEFS).join(' ')).toMatch(/missing/);
+  });
+});

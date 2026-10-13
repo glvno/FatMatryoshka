@@ -24,29 +24,45 @@ import {
   voicesOf,
 } from './patch';
 import {
+  addChild,
   addMember,
+  allModules,
   assembliesOf,
   assemblyOf,
+  childrenOf,
   deleteAssembly,
   demote,
+  depthOf,
+  descendants,
   exposePort,
+  findRef,
   fixAssemblies,
+  freeSpot,
+  hiddenAssemblies,
   hiddenModules,
   hidePort,
   insertAssembly,
   isExposed,
   isPromoted,
   makeAssembly,
+  mergePorts,
   moveAssembly,
   overlapping,
+  parentOf,
   promote,
   reconcileAll,
+  removeChild,
   removeMember,
+  targetsOf,
   tileMembers,
   toDef,
   ungroup,
+  unmergePort,
   type AssemblyDef,
   type AssemblyInst,
+  type PortRef,
+  type Rect,
+  type Target,
 } from './assembly';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -71,7 +87,11 @@ export interface EditorEvents {
 }
 
 type Pt = { x: number; y: number };
-type Rect = { x: number; y: number; w: number; h: number };
+/** the footprint of a new card for the free-spot search: a grid cell less its gutters */
+const CARD_W = 250;
+const CARD_H = 540;
+/** a drop is judged by the card's header (where it is held), this far below its top */
+const HEAD_Y = 15;
 
 export class Editor {
   patch: Patch;
@@ -82,6 +102,8 @@ export class Editor {
   private ports = new Map<string, HTMLElement>();
   private cards = new Map<number, HTMLElement>();
   private frames = new Map<number, HTMLElement>();
+  /** the collapsed assembly cards on the canvas */
+  private containers = new Map<number, HTMLElement>();
   private drag: { from: Endpoint; kind: 'out' | 'in'; path: SVGPathElement } | null = null;
   private history: string[] = [];
   private future: string[] = [];
@@ -118,10 +140,19 @@ export class Editor {
     if (msgs.length) this.ev.onError(msgs.join('; '));
   }
 
-  /** where the next card goes: a grid by the number of cards */
+  /** where the next card goes: the first grid cell that no visible card, container or frame touches */
   private slot(): Pt {
-    const n = this.patch.modules.length - hiddenModules(this.patch).size + assembliesOf(this.patch).filter((a) => !a.open).length;
-    return { x: 20 + (n % 4) * 270, y: 20 + Math.floor(n / 4) * 560 };
+    const rect = (el: HTMLElement): Rect => ({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+    const occupied = [...this.cards.values(), ...this.containers.values(), ...this.frames.values()].map(rect);
+    // before the first layout the elements have no size: fall back to the model's positions
+    if (occupied.some((r) => !r.w)) {
+      const hidden = hiddenModules(this.patch);
+      const hiddenAsm = hiddenAssemblies(this.patch);
+      occupied.length = 0;
+      for (const m of this.patch.modules) if (!hidden.has(m.id)) occupied.push({ x: m.x, y: m.y, w: CARD_W, h: CARD_H });
+      for (const a of assembliesOf(this.patch)) if (!a.open && !hiddenAsm.has(a.id)) occupied.push({ x: a.x, y: a.y, w: CARD_W, h: CARD_H });
+    }
+    return freeSpot(occupied, CARD_W, CARD_H);
   }
 
   add(type: string): void {
@@ -204,16 +235,21 @@ export class Editor {
     this.ports.clear();
     this.cards.clear();
     this.frames.clear();
+    this.containers.clear();
     const poly = voiceSplit(this.patch);
     const hidden = hiddenModules(this.patch);
+    const hiddenAsm = hiddenAssemblies(this.patch);
+    const perVoice = (a: AssemblyInst): boolean => allModules(this.patch, a).some((id) => poly.has(id));
     for (const id of this.selected) if (!this.patch.modules.some((m) => m.id === id) || hidden.has(id)) this.selected.delete(id);
-    for (const a of assembliesOf(this.patch)) if (a.open) this.modulesEl.append(this.frame(a, a.modules.some((id) => poly.has(id))));
+    // frames of the outer assemblies first: a nested frame is drawn on top of its parent's
+    const visible = assembliesOf(this.patch).filter((a) => !hiddenAsm.has(a.id));
+    for (const a of [...visible].sort((u, v) => depthOf(this.patch, u) - depthOf(this.patch, v))) if (a.open) this.modulesEl.append(this.frame(a, perVoice(a)));
     for (const m of this.patch.modules) {
       if (hidden.has(m.id)) continue;
       const a = assemblyOf(this.patch, m.id);
       this.modulesEl.append(this.card(m, DEFS[m.type], poly.has(m.id), a));
     }
-    for (const a of assembliesOf(this.patch)) if (!a.open) this.modulesEl.append(this.container(a, a.modules.some((id) => poly.has(id))));
+    for (const a of visible) if (!a.open) this.modulesEl.append(this.container(a, perVoice(a), parentOf(this.patch, a.id)));
     this.sizeCanvas();
     requestAnimationFrame(() => {
       this.layoutFrames();
@@ -455,7 +491,7 @@ export class Editor {
    * A port row. On a member card of an open assembly it gets the expose toggle; on an assembly card (`label`) the dot
    * still belongs to the inner module, so cables and drags work the same, and the label renames on click.
    */
-  private port(m: ModuleInst, p: PortDef, dir: 'out' | 'in', o: { open?: AssemblyInst; label?: string; rename?: () => void } = {}): HTMLElement {
+  private port(m: ModuleInst, p: PortDef, dir: 'out' | 'in', o: { open?: AssemblyInst; label?: string; rename?: () => void; also?: Target[] } = {}): HTMLElement {
     const row = document.createElement('div');
     row.className = `port ${dir}`;
     const dot = document.createElement('span');
@@ -475,16 +511,61 @@ export class Editor {
     if (o.open) {
       const a = o.open;
       const on = isExposed(a, dir, m.id, p.name);
-      const t = this.button(on ? '●' : '○', on ? `${p.name} is on the "${a.label}" card: click to hide it` : `show ${p.name} on the "${a.label}" card`, () =>
-        this.change(() => (on ? hidePort(this.patch, a, dir, m.id, p.name) : exposePort(a, dir, m.id, p.name))),
+      const ref = findRef(a, dir, m.id, p.name);
+      const t = this.button(on ? '●' : '○', on ? `${ref!.label} is on the "${a.label}" card: click to hide it` : `show ${p.name} on the "${a.label}" card`, () =>
+        this.change(() => (on ? hidePort(this.patch, a, dir, m.id, p.name) : exposePort(a, dir, m.id, p.name, o.also))),
       'tog');
-      if (dir === 'in') parts.push(t);
+      if (dir === 'in') parts.push(t, ...this.mergeTools(a, m, p, ref));
       else parts.unshift(t);
+    }
+    if (o.also?.length) dot.dataset.also = JSON.stringify(o.also);
+    if (o.also?.length && !o.open) {
+      const n = document.createElement('span');
+      n.className = 'merged';
+      n.textContent = `×${o.also.length + 1}`;
+      n.title = `one jack for ${o.also.length + 1} inputs: ${[{ module: m.id, port: p.name }, ...o.also].map((t) => `${DEFS[this.patch.modules.find((x) => x.id === t.module)!.type].label} ${t.port}`).join(', ')}`;
+      parts.splice(dir === 'in' ? 2 : 1, 0, n);
     }
     row.append(...parts);
     dot.addEventListener('pointerdown', (e) => this.beginDrag(e, { module: m.id, port: p.name }, dir));
     this.ports.set(this.key(m.id, p.name, dir), dot);
     return row;
+  }
+
+  /**
+   * On an exposed input inside an open assembly: a "merge into…" list of the other exposed inputs of the same kind, a
+   * badge with the count on a merged jack and a button to split it again.
+   */
+  private mergeTools(a: AssemblyInst, m: ModuleInst, p: PortDef, ref: PortRef | undefined): HTMLElement[] {
+    if (!ref) return [];
+    const out: HTMLElement[] = [];
+    const me: Target = { module: m.id, port: p.name };
+    const primary = ref.module === m.id && ref.port === p.name;
+    if (ref.also?.length) {
+      const n = document.createElement('span');
+      n.className = 'merged';
+      n.textContent = primary ? `×${ref.also.length + 1}` : `→ ${ref.label}`;
+      n.title = primary ? `"${ref.label}" is one jack for ${ref.also.length + 1} inputs` : `fed by the "${ref.label}" jack`;
+      out.push(n);
+      if (primary) out.push(this.button('split', `Split "${ref.label}": one jack per input again`, () => this.change(() => unmergePort(a, m.id, p.name))));
+    }
+    const kindOf = (t: Target): string => DEFS[this.patch.modules.find((x) => x.id === t.module)!.type].inputs.find((q) => q.name === t.port)!.kind;
+    const others = a.inputs.filter((r) => r !== ref && kindOf(r) === p.kind);
+    if (!others.length) return out;
+    const sel = document.createElement('select');
+    sel.className = 'merge';
+    sel.title = `Merge "${ref.label}" into another jack of the "${a.label}" card: one jack feeds both`;
+    sel.setAttribute('aria-label', `merge ${ref.label} into`);
+    sel.append(new Option('merge…', ''));
+    for (const r of others) sel.append(new Option(r.label, `${r.module}:${r.port}`));
+    sel.onchange = () => {
+      const [mod, port] = sel.value.split(':');
+      if (!mod) return;
+      this.change(() => mergePorts(this.patch, a, DEFS, { module: Number(mod), port }, me));
+    };
+    sel.onpointerdown = (e) => e.stopPropagation();
+    out.push(sel);
+    return out;
   }
 
   // ---- assemblies on the canvas
@@ -525,13 +606,17 @@ export class Editor {
     return title;
   }
 
-  /** the collapsed assembly: one card with the exposed ports and the promoted parameters */
-  private container(a: AssemblyInst, perVoice: boolean): HTMLElement {
+  /**
+   * The collapsed assembly: one card with the exposed ports and the promoted parameters. Inside an open parent (`open`)
+   * its rows get the parent's expose / pin toggles, like a member card's.
+   */
+  private container(a: AssemblyInst, perVoice: boolean, open?: AssemblyInst): HTMLElement {
     const el = document.createElement('div');
-    el.className = 'module assembly';
+    el.className = 'module assembly' + (open ? ' member' : '');
     el.style.left = `${a.x}px`;
     el.style.top = `${a.y}px`;
     el.dataset.asm = String(a.id);
+    this.containers.set(a.id, el);
     const head = document.createElement('div');
     head.className = 'mhead';
     const tools = document.createElement('span');
@@ -548,14 +633,14 @@ export class Editor {
     for (const r of a.inputs) {
       const m = mod(r.module);
       const pd = DEFS[m.type].inputs.find((q) => q.name === r.port)!;
-      ins.append(this.port(m, pd, 'in', { label: r.label, rename: () => this.renameRef(r, 'input') }));
+      ins.append(this.port(m, pd, 'in', { label: r.label, rename: () => this.renameRef(r, 'input'), also: r.also, open }));
     }
     const outs = document.createElement('div');
     outs.className = 'ports out';
     for (const r of a.outputs) {
       const m = mod(r.module);
       const pd = DEFS[m.type].outputs.find((q) => q.name === r.port)!;
-      outs.append(this.port(m, pd, 'out', { label: r.label, rename: () => this.renameRef(r, 'output') }));
+      outs.append(this.port(m, pd, 'out', { label: r.label, rename: () => this.renameRef(r, 'output'), open }));
     }
     const io = document.createElement('div');
     io.className = 'io';
@@ -567,7 +652,7 @@ export class Editor {
       for (const r of a.params) {
         const m = mod(r.module);
         const def = DEFS[m.type];
-        params.append(this.paramRow(m, def, def.params.find((q) => q.name === r.param)!, { label: r.label, rename: () => this.renameRef(r, 'parameter') }));
+        params.append(this.paramRow(m, def, def.params.find((q) => q.name === r.param)!, { label: r.label, rename: () => this.renameRef(r, 'parameter'), open }));
       }
       body.append(params);
     }
@@ -603,30 +688,45 @@ export class Editor {
     return el;
   }
 
-  /** the box around the member cards of an open assembly, in canvas coordinates; `exclude` leaves cards out (while they are dragged) */
-  private frameRect(a: AssemblyInst, exclude?: Set<number>): Rect | null {
+  /**
+   * The box around what an open assembly shows: its member cards, its children's cards (collapsed) or frames (open), in
+   * canvas coordinates; `exclude` leaves cards out and `excludeAsm` children (while they are dragged)
+   */
+  private frameRect(a: AssemblyInst, exclude?: Set<number>, excludeAsm?: number): Rect | null {
     let x0 = Infinity;
     let y0 = Infinity;
     let x1 = -Infinity;
     let y1 = -Infinity;
+    const take = (r: Rect): void => {
+      x0 = Math.min(x0, r.x);
+      y0 = Math.min(y0, r.y);
+      x1 = Math.max(x1, r.x + r.w);
+      y1 = Math.max(y1, r.y + r.h);
+    };
+    const box = (c: HTMLElement): Rect => ({ x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight });
     for (const id of a.modules) {
       if (exclude?.has(id)) continue;
       const c = this.cards.get(id);
-      if (!c) continue;
-      x0 = Math.min(x0, c.offsetLeft);
-      y0 = Math.min(y0, c.offsetTop);
-      x1 = Math.max(x1, c.offsetLeft + c.offsetWidth);
-      y1 = Math.max(y1, c.offsetTop + c.offsetHeight);
+      if (c) take(box(c));
+    }
+    for (const ch of childrenOf(this.patch, a)) {
+      if (ch.id === excludeAsm) continue;
+      const c = this.containers.get(ch.id);
+      if (c) take(box(c));
+      else if (ch.open) {
+        const r = this.frameRect(ch, exclude, excludeAsm);
+        if (r) take(r);
+      }
     }
     if (x0 === Infinity) return null;
     return { x: x0 - FRAME_PAD, y: y0 - FRAME_PAD - FRAME_HEAD, w: x1 - x0 + 2 * FRAME_PAD, h: y1 - y0 + 2 * FRAME_PAD + FRAME_HEAD };
   }
 
-  private layoutFrames(exclude?: Set<number>): void {
+  private layoutFrames(exclude?: Set<number>, excludeAsm?: number): void {
     for (const a of assembliesOf(this.patch)) {
       const el = this.frames.get(a.id);
       if (!el) continue;
-      const r = this.frameRect(a, exclude) ?? this.frameRect(a);
+      const r = this.frameRect(a, exclude, excludeAsm) ?? this.frameRect(a);
       if (!r) continue;
       el.style.left = `${Math.max(0, r.x)}px`;
       el.style.top = `${Math.max(0, r.y)}px`;
@@ -703,7 +803,7 @@ export class Editor {
     const movedIds = new Set(moved.map((m) => m.id));
     const inside = (c: HTMLElement, r: Rect): boolean => {
       const cx = c.offsetLeft + c.offsetWidth / 2;
-      const cy = c.offsetTop + c.offsetHeight / 2;
+      const cy = c.offsetTop + HEAD_Y;
       return cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
     };
     const ops: (() => void)[] = [];
@@ -715,14 +815,13 @@ export class Editor {
         const r = this.frameRect(mine, movedIds);
         if (r && !inside(c, r)) ops.push(() => removeMember(this.patch, mine, m.id));
       } else {
+        let target: AssemblyInst | undefined;
         for (const a of assembliesOf(this.patch)) {
-          if (!a.open) continue;
+          if (!a.open || !this.frames.has(a.id)) continue;
           const r = this.frameRect(a, movedIds);
-          if (r && inside(c, r)) {
-            ops.push(() => addMember(this.patch, a, m.id));
-            break;
-          }
+          if (r && inside(c, r) && (!target || depthOf(this.patch, a) > depthOf(this.patch, target))) target = a;
         }
+        if (target) ops.push(() => addMember(this.patch, target!, m.id));
       }
     }
     if (!ops.length) {
@@ -733,34 +832,64 @@ export class Editor {
     if (this.change(() => ops.forEach((op) => op()))) this.select(keep);
   }
 
+  /** move an assembly with everything inside it, model and elements */
+  private moveTree(a: AssemblyInst, dx: number, dy: number): void {
+    moveAssembly(this.patch, a, dx, dy);
+    const asms = [a, ...descendants(this.patch, a)];
+    const ids = new Set(asms.flatMap((x) => x.modules));
+    for (const m of this.patch.modules) {
+      const el = this.cards.get(m.id);
+      if (!ids.has(m.id) || !el) continue;
+      el.style.left = `${m.x}px`;
+      el.style.top = `${m.y}px`;
+    }
+    for (const x of asms) {
+      const el = this.containers.get(x.id);
+      if (!el) continue;
+      el.style.left = `${x.x}px`;
+      el.style.top = `${x.y}px`;
+    }
+    this.layoutFrames(undefined, a.id);
+    this.drawCables();
+  }
+
   private assemblyDrag(el: HTMLElement, handle: HTMLElement, a: AssemblyInst): void {
     this.dragOn(
       handle,
       () => true,
-      (dx, dy) => {
-        moveAssembly(this.patch, a, dx, dy);
-        el.style.left = `${a.x}px`;
-        el.style.top = `${a.y}px`;
-        this.drawCables();
-      },
+      (dx, dy) => this.moveTree(a, dx, dy),
       () => {
         this.sizeCanvas();
         this.ev.onLayout(this.patch);
+        this.nesting(a, el);
       },
     );
+  }
+
+  /** after a container drag: dropped into an open frame it becomes a child of that assembly; dragged out of its parent's frame it leaves */
+  private nesting(a: AssemblyInst, el: HTMLElement): void {
+    const cx = el.offsetLeft + el.offsetWidth / 2;
+    const cy = el.offsetTop + HEAD_Y; // where the hand is: the card's header, not its middle (cards are tall)
+    const inside = (r: Rect): boolean => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
+    const parent = parentOf(this.patch, a.id);
+    const below = new Set(descendants(this.patch, a).map((d) => d.id));
+    // the innermost open frame under the card that is not the assembly itself or one of its own
+    let target: AssemblyInst | undefined;
+    for (const b of assembliesOf(this.patch)) {
+      if (!b.open || b.id === a.id || below.has(b.id) || !this.frames.has(b.id)) continue;
+      const r = this.frameRect(b, undefined, a.id);
+      if (r && inside(r) && (!target || depthOf(this.patch, b) > depthOf(this.patch, target))) target = b;
+    }
+    if (target && target !== parent) this.change(() => addChild(this.patch, target!, a.id));
+    else if (!target && parent) this.change(() => removeChild(this.patch, parent, a.id));
+    else this.layoutFrames();
   }
 
   private frameDrag(handle: HTMLElement, a: AssemblyInst): void {
     this.dragOn(
       handle,
       () => true,
-      (dx, dy) => {
-        a.x = Math.max(0, a.x + dx);
-        a.y = Math.max(0, a.y + dy);
-        for (const m of this.patch.modules) if (a.modules.includes(m.id)) this.place(m, dx, dy);
-        this.layoutFrames();
-        this.drawCables();
-      },
+      (dx, dy) => this.moveTree(a, dx, dy),
       () => {
         this.sizeCanvas();
         this.ev.onLayout(this.patch);
@@ -852,8 +981,19 @@ export class Editor {
     }
   }
 
+  /** remove a cable; one drawn to a merged jack whose other inputs are hidden takes their cables (from the same output) with it */
   private removeCable(c: Cable): void {
-    this.change(() => disconnect(this.patch, c));
+    const hidden = hiddenModules(this.patch);
+    const more: Endpoint[] = [];
+    for (const a of assembliesOf(this.patch)) {
+      const ref = findRef(a, 'in', c.to.module, c.to.port);
+      if (!ref?.also?.length) continue;
+      for (const t of targetsOf(ref)) if (hidden.has(t.module) && !sameEnd(t, c.to) && !more.some((x) => sameEnd(x, t))) more.push(t);
+    }
+    this.change(() => {
+      disconnect(this.patch, c);
+      for (const t of more) disconnect(this.patch, { from: c.from, to: t });
+    });
   }
 
   private beginDrag(e: PointerEvent, from: Endpoint, kind: 'out' | 'in'): void {
@@ -882,9 +1022,14 @@ export class Editor {
       const otherDir = dot.dataset.dir as 'out' | 'in';
       if (otherDir === kind) return this.ev.onError('connect an output to an input');
       const [o, i] = kind === 'out' ? [from, other] : [other, from];
-      if (this.patch.cables.some((c) => sameEnd(c.from, o) && sameEnd(c.to, i))) return;
+      // a merged jack: the cable goes to every input behind it
+      const alsoOf = (el: HTMLElement | null): Target[] => (el?.dataset.also ? (JSON.parse(el.dataset.also) as Target[]) : []);
+      const ins = [i, ...alsoOf(kind === 'out' ? dot : start)];
+      if (ins.every((t) => this.patch.cables.some((c) => sameEnd(c.from, o) && sameEnd(c.to, t)))) return;
       this.change(() => {
-        if (!connect(this.patch, DEFS, o, i)) throw new Error('cannot connect these ports');
+        let any = false;
+        for (const t of ins) any = connect(this.patch, DEFS, o, t) || any;
+        if (!any) throw new Error('cannot connect these ports');
       });
     };
     window.addEventListener('pointermove', move);

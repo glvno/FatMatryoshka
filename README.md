@@ -50,3 +50,9 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 - **Shaper** drives a signal into a soft clip (smooth up to the knee), a hard clip or a triangle fold, with the peak kept at 1 and a `level` after it. It is the drive for a bass and the safety for a hot FM carrier.
 - The Main panel has a `spread` output: a constant per voice from -1 (first voice) to 1 (last), 0 in mono. Into an oscillator's `p1` with `fine` ticked it detunes the voices into a unison pad; into two VCAs with opposite attenuverters it pans them.
 
+
+## Assemblies: merged ports, placement, nesting
+
+- **Merged ports.** On an open assembly, every exposed input has a `merge…` list of the card's other inputs of the same kind. Merging turns two jacks into one that feeds both (the factory `voice` has one `gate` for its two envelopes); the card shows `×2` and a `split` button. A cable into a merged jack goes to every input behind it, and removing it takes them all.
+- **Placement.** "Add module" and "Insert" put the new card on the first free grid cell instead of on top of what is there.
+- **Nesting.** An assembly can hold assemblies, three levels deep: select modules inside an open assembly and "Make assembly", or drop a collapsed card into an open frame. The parent's card may show whatever its children expose; closing the parent hides everything inside. Ungroup dissolves one level, delete keeps the nested ones. Saved assemblies carry their nested ones.
