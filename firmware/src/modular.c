@@ -8,7 +8,7 @@
 #define FELUCCA_ID "FM-1_800"    /* package identity (build.py: the .fwsc marker string) */
 #endif
 #ifndef FELUCCA_VERSION
-#define FELUCCA_VERSION "M1-0.9"
+#define FELUCCA_VERSION "M1-1.1.0-dev"
 #endif
 #define FELUCCA_FLASH 1
 #define FELUCCA_OTA 1
@@ -64,5 +64,5 @@ static int m1_slot_info(uint32_t slot, char *name, uint32_t *len);
 #define UI_POOL __attribute__((section(".pool")))
 #include "ui.c"
 #include "arp_ui.c"
-#include "glo_ui.c"
+#include "menu.c"
 #include "main.c"

@@ -14,20 +14,24 @@
 #define ENG_POOL
 #endif
 
-#define ENG_MAX_MODULES 32
+/* Per voice (a patch): modules, cables, summed inputs. The memories below them are one pool for all ENG_VOICES voices:
+ * each slot has an owner, a load frees the loading voice's slots and takes free ones (slot_take), so a big polyphonic
+ * patch on one voice and small ones on the others share what the FM-1 has. A patch that finds no free slot does not load
+ * (-4 lines, -6 buffers, -7 instances): NO ROOM on the panel, the voice falls back to its old patch. */
+#define ENG_MAX_MODULES 32          /* per voice */
 #define ENG_MAX_CABLES 192
-#define ENG_MAX_INST 128            /* module instances: a shared module has one, a per-voice module one per voice */
-#define ENG_NBUF 160u               /* signal buffers of ENG_BLOCK samples (a connected output, a summed input), per instance */
-#define ENG_NDELAY 2                /* delay modules per patch */
-#define ENG_NREV 2                  /* reverb modules per patch */
+#define MAX_SUM 128                 /* summed inputs per voice (an input of an instance with two or more sources) */
+#define MAX_SRC 256                 /* their sources: a shared input reading a per-note output has one per note */
+#define ENG_MAX_INST 96             /* module instances, all voices: a shared module has one, a per-note module one per note */
+#define ENG_NBUF 128u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
+#define ENG_NDELAY 4                /* delay lines, all voices (one each when every voice has a delay) */
+#define ENG_NREV 2                  /* reverb memories, all voices */
 #define RV_LEN 5934u                /* the four combs (1116 1188 1277 1356) and two allpasses (556 441), int16 Q13 */
-#define DELAY_LEN 46305u            /* ceil(ENG_SR * 1.05) samples, as the reference */
-#define ENG_NSTRING 8               /* string instances per patch (a per-voice module: one per voice) */
+#define DELAY_LEN 23000u            /* 521 ms (the reference engine, web/src/modules.ts, has the same length; ping-pong halves it) */
+#define ENG_NSTRING 6               /* string lines, all voices (a per-note module: one per note) */
 #define STR_LEN 1104u               /* ceil(ENG_SR / 40) + 1: the lowest string is 40 Hz, as the reference */
-#define ENG_NCHORUS 1               /* chorus modules per patch (shared, like the delay) */
+#define ENG_NCHORUS 1               /* chorus lines, all voices (a shared module, like the delay) */
 #define CH_LEN 927u                 /* ceil(ENG_SR * 0.021): 12 ms +- 8 ms of sweep */
-#define MAX_SUM 192                 /* summed inputs (an input of an instance with two or more sources) */
-#define MAX_SRC 512                 /* their sources: a shared input reading a per-voice output has one per voice */
 #define MAX_HELD 16
 
 #define INC_C4 25480119u            /* 261.6255653 Hz at ENG_SR, u32 phase per sample */
@@ -194,7 +198,7 @@ typedef struct {
     esig_t *out[MAX_OUT];
     union {
         struct { uint32_t phase; int32_t s1, y1, y2, pm1, xb, ap[8]; } osc;   /* s1: last sync sample; FM mode: feedback history, pm interpolation, decimator */
-        struct { uint32_t phase, seed; int32_t held, s1; } lfo;
+        struct { uint32_t phase, seed; int32_t held; uint32_t since; int32_t interval; uint16_t ticks; uint8_t clk_hi, rst_hi; } lfo;   /* interval: clock edge distance in samples, Q8 */
         struct { int32_t y; } gld;         /* Q24 */
         struct { uint32_t seed; int32_t y; } noise;   /* y: the colour one-pole, Q24 */
         struct { int32_t ic1[3], ic2[3]; } vow;       /* three band passes, Q20 */
@@ -202,7 +206,7 @@ typedef struct {
         struct { int32_t held, cnt; } crush;
         struct { int32_t v; uint8_t stage, prev; } adsr;
         struct { int32_t ic1, ic2, jc1, jc2; } flt;   /* stage 1 and stage 2 integrators */
-        struct { int16_t *buf; uint32_t w; } dly;
+        struct { int16_t *buf; uint32_t w, t, seen, beat; uint32_t ring[DELAY_CLK_PPQN]; uint8_t prev; } dly;   /* t, ring, seen, beat: the clock tempo */
         struct { int16_t *buf; uint16_t ci[4], ai[2]; int32_t lp[4]; } rev;
         struct { int32_t v; uint32_t t; uint8_t stage, prev; } env;  /* Q30, like the ADSR; t: samples in the segment */
         struct { int16_t *buf; uint32_t w, seed; int32_t lp, s1, err, burst, blen; } str;   /* Q13 line with error feedback */
@@ -229,14 +233,15 @@ typedef struct {
     uint16_t first, n;       /* sources in sum_src[] */
 } sum_t;
 
-/* a voice: what the panel outputs plus what the allocator needs (engine.ts: VoiceState) */
+/* a note of a polyphonic patch: what the panel outputs plus what the allocator needs (engine.ts: VoiceState). (A "voice"
+ * in the panel's words is a whole patch, eng_t; the notes within it are its polyphony.) */
 typedef struct {
     int32_t pitch, gate, vel;
     uint8_t note, on, retrig;        /* on: a key holds it; retrig: taken over while sounding, the next block's gate starts low */
     uint32_t on_stamp, off_stamp;
-} voice_t;
+} pv_t;
 
-static struct {
+typedef struct {
     uint8_t loaded, nmod, nsum, norder, nout, nv, ninst;
     uint16_t nsrc;
     uint8_t order[ENG_MAX_MODULES], outputs[ENG_MAX_MODULES];
@@ -247,19 +252,61 @@ static struct {
     const esig_t *sum_src[MAX_SRC];
     struct { uint8_t note; int32_t vel; } held[MAX_HELD];
     uint8_t nheld;
-    voice_t vc[ENG_MAX_VOICES];
+    pv_t vc[ENG_MAX_POLY];
     uint32_t stamp;
-} E;
+    uint32_t clk_seen, clk_pulse;    /* the Main module's clock output: ticks seen so far, the pulse length of this block */
+} eng_t;
 
+/* the voices: one engine per patch that plays. E is the one the API calls act on (eng_voice_select; the panel code), the
+ * audio ISR walks all of them and puts the pointer back. The clock is shared: ticks (24 ppqn) come from the arpeggiator
+ * or MIDI in (eng_clock_tick). */
+static eng_t EV[ENG_VOICES] ENG_POOL;
+static eng_t *eng_p = EV;
+#define E (*eng_p)
+#define VOICE_NO ((uint32_t)(eng_p - EV))
+static volatile uint32_t clk_ticks;
+
+/* the memories, shared by the voices: slot i of a pool belongs to voice own[i] - 1 (0: free) */
 static inst_t inst_pool[ENG_MAX_INST] ENG_POOL;
-static uint32_t cur_v;               /* the voice whose instance is being rendered (0 for a shared module) */
+static uint8_t inst_own[ENG_MAX_INST];
+static uint32_t cur_v;               /* the note whose instance is being rendered (0 for a shared module) */
 static esig_t buf_pool[ENG_NBUF][ENG_BLOCK] ENG_POOL;
+static uint8_t buf_own[ENG_NBUF];
 static int16_t dly_pool[ENG_NDELAY][DELAY_LEN] ENG_POOL;
+static uint8_t dly_own[ENG_NDELAY];
 static int16_t rev_pool[ENG_NREV][RV_LEN] ENG_POOL;
+static uint8_t rev_own[ENG_NREV];
 static int16_t str_pool[ENG_NSTRING][STR_LEN] ENG_POOL;
+static uint8_t str_own[ENG_NSTRING];
 static int16_t ch_pool[ENG_NCHORUS][CH_LEN] ENG_POOL;
+static uint8_t ch_own[ENG_NCHORUS];
 static const esig_t zero_buf[ENG_BLOCK];
 static esig_t dummy_out[ENG_BLOCK];
+
+static void pool_free(uint8_t *own, uint32_t n)          /* the slots of the selected voice back to the pool */
+{
+    uint32_t i;
+    for (i = 0; i < n; i++)
+        if (own[i] == VOICE_NO + 1u)
+            own[i] = 0;
+}
+
+static int slots_take(uint8_t *own, uint32_t n, uint32_t count)   /* `count` free slots in a row for the selected voice, -1 if none */
+{
+    uint32_t i, run = 0;
+    for (i = 0; i < n; i++) {
+        run = own[i] ? 0 : run + 1;
+        if (run == count) {
+            uint32_t k;
+            for (k = i + 1 - count; k <= i; k++)
+                own[k] = (uint8_t)(VOICE_NO + 1u);
+            return (int)(i + 1 - count);
+        }
+    }
+    return -1;
+}
+
+static int slot_take(uint8_t *own, uint32_t n) { return slots_take(own, n, 1); }
 
 /* ------------------------------------------------------------------ patch loading */
 
@@ -281,9 +328,11 @@ static esig_t *buf_alloc(void)
 {
     esig_t *b;
     uint32_t i;
-    if (E.nbuf >= ENG_NBUF)
+    int k = slot_take(buf_own, ENG_NBUF);
+    if (k < 0)
         return 0;
-    b = buf_pool[E.nbuf++];
+    E.nbuf++;
+    b = buf_pool[k];
     for (i = 0; i < ENG_BLOCK; i++)
         b[i] = 0;
     return b;
@@ -294,6 +343,7 @@ static void init_state(const node_t *nd, inst_t *it)
     switch (nd->type) {
     case T_LFO:
         it->s.lfo.seed = 0x2545f491u;
+        it->s.lfo.since = ENG_SR;
         break;
     case T_NOISE:
         it->s.noise.seed = 0x1234567u;
@@ -313,11 +363,11 @@ static void init_state(const node_t *nd, inst_t *it)
     }
 }
 
-/* does output port p of module m differ per voice? (the panel's knobs do not, its pitch / gate / vel do) */
+/* does output port p of module m differ per note? (the panel's knobs and clock do not, its pitch / gate / vel / spread do) */
 static int port_poly(uint32_t m, uint32_t p)
 {
     const node_t *nd = &E.node[m];
-    return nd->ninst > 1 && !(nd->type == T_FM1 && p >= FM1_O_K1 && p <= FM1_O_K4);
+    return nd->ninst > 1 && !(nd->type == T_FM1 && ((p >= FM1_O_K1 && p <= FM1_O_K4) || p == FM1_O_CLOCK));
 }
 
 /* the buffer of output p of module m as voice v sees it */
@@ -342,17 +392,25 @@ int eng_load(const uint8_t *p, uint32_t len)
     E.loaded = 0;
     E.nheld = 0;
     E.stamp = 0;
-    for (v = 0; v < ENG_MAX_VOICES; v++) {
+    E.clk_seen = clk_ticks;
+    E.clk_pulse = 0;
+    for (v = 0; v < ENG_MAX_POLY; v++) {
         uint8_t *z = (uint8_t *)&E.vc[v];
         for (j = 0; j < sizeof E.vc[v]; j++)
             z[j] = 0;
     }
+    pool_free(inst_own, ENG_MAX_INST);           /* what this voice's old patch held */
+    pool_free(buf_own, ENG_NBUF);
+    pool_free(dly_own, ENG_NDELAY);
+    pool_free(rev_own, ENG_NREV);
+    pool_free(str_own, ENG_NSTRING);
+    pool_free(ch_own, ENG_NCHORUS);
     if (len < 8u || p[0] != 0xA1 || p[1] != ENG_PATCH_VERSION)
         return -1;
     E.nmod = p[2];
     nv = p[3] ? p[3] : 1u;                       /* 0: a patch from before polyphony */
-    if (nv > ENG_MAX_VOICES)
-        nv = ENG_MAX_VOICES;
+    if (nv > ENG_MAX_POLY)
+        nv = ENG_MAX_POLY;
     E.nv = (uint8_t)nv;
     ncab = (uint32_t)p[4] | (uint32_t)p[5] << 8;
     if (E.nmod > ENG_MAX_MODULES || ncab > ENG_MAX_CABLES)
@@ -421,12 +479,13 @@ int eng_load(const uint8_t *p, uint32_t len)
             }
         } while (grew);
     }
-    /* the instances: state, the delay and reverb memories (those modules are always shared: one each) */
+    /* the instances: state, the delay / reverb / string / chorus memories from the shared pools */
     for (i = 0; i < E.nmod; i++) {
         node_t *nd = &E.node[i];
-        if (E.ninst + nd->ninst > ENG_MAX_INST)
+        int i0 = slots_take(inst_own, ENG_MAX_INST, nd->ninst);
+        if (i0 < 0)
             return -7;
-        nd->inst0 = E.ninst;
+        nd->inst0 = (uint8_t)i0;
         E.ninst = (uint8_t)(E.ninst + nd->ninst);
         for (k = 0; k < nd->ninst; k++) {
             inst_t *it = &inst_pool[nd->inst0 + k];
@@ -435,30 +494,39 @@ int eng_load(const uint8_t *p, uint32_t len)
                 z[j] = 0;
             init_state(nd, it);
             if (nd->type == T_REVERB) {
-                if (E.nrev >= ENG_NREV)
+                int s = slot_take(rev_own, ENG_NREV);
+                if (s < 0)
                     return -4;
-                it->s.rev.buf = rev_pool[E.nrev++];
+                E.nrev++;
+                it->s.rev.buf = rev_pool[s];
                 for (j = 0; j < RV_LEN; j++)
                     it->s.rev.buf[j] = 0;
             }
             if (nd->type == T_DELAY) {
-                if (E.ndly >= ENG_NDELAY)
+                int s = slot_take(dly_own, ENG_NDELAY);
+                if (s < 0)
                     return -4;
-                it->s.dly.buf = dly_pool[E.ndly++];
+                E.ndly++;
+                it->s.dly.buf = dly_pool[s];
+                it->s.dly.beat = ENG_SR / 2u;             /* 120 bpm until a clock has come in */
                 for (j = 0; j < DELAY_LEN; j++)
                     it->s.dly.buf[j] = 0;
             }
             if (nd->type == T_STRING) {
-                if (E.nstr >= ENG_NSTRING)
+                int s = slot_take(str_own, ENG_NSTRING);
+                if (s < 0)
                     return -4;
-                it->s.str.buf = str_pool[E.nstr++];
+                E.nstr++;
+                it->s.str.buf = str_pool[s];
                 for (j = 0; j < STR_LEN; j++)
                     it->s.str.buf[j] = 0;
             }
             if (nd->type == T_CHORUS) {
-                if (E.nch >= ENG_NCHORUS)
+                int s = slot_take(ch_own, ENG_NCHORUS);
+                if (s < 0)
                     return -4;
-                it->s.ch.buf = ch_pool[E.nch++];
+                E.nch++;
+                it->s.ch.buf = ch_pool[s];
                 for (j = 0; j < CH_LEN; j++)
                     it->s.ch.buf[j] = 0;
             }
@@ -548,7 +616,7 @@ int eng_load(const uint8_t *p, uint32_t len)
     return 0;
 }
 
-int eng_voices(void) { return E.loaded ? E.nv : 0; }
+int eng_poly(void) { return E.loaded ? E.nv : 0; }
 
 void eng_set_att(uint32_t module, uint32_t input, int32_t q16)
 {
@@ -670,7 +738,7 @@ static int32_t note_pitch(uint32_t note)
 /* mono: last note priority, legato (the gate stays up while any key is down) */
 static void update_voice(void)
 {
-    voice_t *x = &E.vc[0];
+    pv_t *x = &E.vc[0];
     if (E.nheld) {
         x->pitch = note_pitch(E.held[E.nheld - 1].note);
         x->vel = E.held[E.nheld - 1].vel;
@@ -702,14 +770,14 @@ void eng_note_off(uint32_t note)
     update_voice();
 }
 
-/* several voices: the voice that already plays the key, else the one free for the longest, else the oldest (stolen:
+/* several notes: the note that already plays the key, else the one free for the longest, else the oldest (stolen:
  * its gate dips for one sample so the envelopes restart) */
 void eng_note_on(uint32_t note, int32_t vel_q16)
 {
     if (E.nv > 1) {
         uint32_t i, stamp = ++E.stamp;
         int v = -1;
-        voice_t *x;
+        pv_t *x;
         for (i = 0; i < E.nv; i++)
             if (E.vc[i].on && E.vc[i].note == note)
                 v = (int)i;
@@ -747,11 +815,16 @@ void eng_note_on(uint32_t note, int32_t vel_q16)
     update_voice();
 }
 
+void eng_clock_tick(void)
+{
+    clk_ticks++;
+}
+
 void eng_all_notes_off(void)
 {
     uint32_t i;
     E.nheld = 0;
-    for (i = 0; i < ENG_MAX_VOICES; i++) {
+    for (i = 0; i < ENG_MAX_POLY; i++) {
         E.vc[i].on = 0;
         E.vc[i].gate = 0;
         E.vc[i].retrig = 0;
@@ -771,7 +844,11 @@ static void fill(esig_t *o, int32_t v, uint32_t n)
 
 static void m_fm1(const node_t *nd, inst_t *it, uint32_t n)
 {
-    voice_t *x = &E.vc[cur_v];
+    pv_t *x = &E.vc[cur_v];
+    if (cur_v == 0) {                   /* clock: a pulse of half a block per block that saw a tick; nothing without a source */
+        E.clk_pulse = E.clk_seen != clk_ticks ? (n + 1u) / 2u : 0u;
+        E.clk_seen = clk_ticks;
+    }
     fill(it->out[FM1_O_PITCH], x->pitch, n);
     fill(it->out[FM1_O_GATE], x->gate, n);
     fill(it->out[FM1_O_VEL], x->vel, n);
@@ -783,6 +860,12 @@ static void m_fm1(const node_t *nd, inst_t *it, uint32_t n)
     fill(it->out[FM1_O_K2], EF(it, FM1_P_K2), n);
     fill(it->out[FM1_O_K3], EF(it, FM1_P_K3), n);
     fill(it->out[FM1_O_K4], EF(it, FM1_P_K4), n);
+    {
+        esig_t *ck = it->out[FM1_O_CLOCK];
+        uint32_t i;
+        for (i = 0; i < n; i++)
+            ck[i] = i < E.clk_pulse ? ENG_ONE : 0;
+    }
     fill(it->out[FM1_O_SPREAD], E.nv > 1 ? (int32_t)((((int64_t)2 * (int32_t)cur_v - ((int32_t)E.nv - 1)) << 16) / ((int32_t)E.nv - 1)) : 0, n);
 }
 
@@ -868,29 +951,66 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
     it->s.osc.xb = xb;
 }
 
+static void lfo_cycle(inst_t *it)
+{
+    it->s.lfo.seed = it->s.lfo.seed * 1664525u + 1013904223u;
+    it->s.lfo.held = (int32_t)(it->s.lfo.seed >> 15) - ENG_ONE;
+}
+
+/* free: rate in Hz. sync: one cycle per note length (DELAY_DIV_NUM / DELAY_DIV_DEN, as the delay) that snaps to every n-th edge of clk
+ * (24 ppqn, n = ticks per cycle), runs at the measured clock speed in between and at bpm when there is no clock. */
 static void m_lfo(const node_t *nd, inst_t *it, uint32_t n)
 {
     esig_t *out = it->out[0];
-    const esig_t *sync = it->in[LFO_I_SYNC];
-    uint32_t dt = (uint32_t)(((uint64_t)(uint32_t)EF(it, LFO_P_RATE) << 16) / ENG_SR), phase = it->s.lfo.phase, i;
-    int32_t kind = round_q16(EF(it, LFO_P_WAVE)), depth = EF(it, LFO_P_DEPTH), s1 = it->s.lfo.s1;
+    const esig_t *clk = it->in[LFO_I_CLK], *rst = it->in[LFO_I_RESET];
+    uint32_t dtfree = (uint32_t)(((uint64_t)(uint32_t)EF(it, LFO_P_RATE) << 16) / ENG_SR), phase = it->s.lfo.phase, i, dt;
+    int32_t kind = round_q16(EF(it, LFO_P_WAVE)), depth = EF(it, LFO_P_DEPTH);
+    int sync = EF(it, LFO_P_SYNC) >= 32768;
+    int32_t div = clampi((EF(it, LFO_P_DIV) + 32768) >> 16, 0, DELAY_NDIV - 1), bpm = EF(it, LFO_P_BPM);
+    uint32_t per = 24u * DELAY_DIV_NUM[div] / DELAY_DIV_DEN[div], dtbpm;
+    if (bpm < 65536)
+        bpm = 65536;
+    dtbpm = (uint32_t)(((uint64_t)(uint32_t)bpm * DELAY_DIV_DEN[div] << 16) / (60u * DELAY_DIV_NUM[div] * ENG_SR));
     for (i = 0; i < n; i++) {
-        uint32_t prev;
+        uint32_t prev = phase;
         int32_t w;
-        if (sync[i] >= 32768 && s1 < 32768)                                /* a rising edge on sync restarts the cycle */
-            phase = 0;
-        s1 = sync[i];
-        prev = phase;
+        int c = clk[i] >= 32768, r = rst[i] >= 32768, live;
+        if (it->s.lfo.since < ENG_SR)
+            it->s.lfo.since++;
+        if (c && !it->s.lfo.clk_hi) {
+            int32_t d8 = (int32_t)(it->s.lfo.since << 8);
+            if (it->s.lfo.since >= ENG_SR / 2)
+                it->s.lfo.interval = 0;
+            else
+                it->s.lfo.interval = it->s.lfo.interval > 0 ? it->s.lfo.interval + (d8 - it->s.lfo.interval) / 8 : d8;
+            it->s.lfo.since = 0;
+            if (sync && ++it->s.lfo.ticks >= per) {
+                it->s.lfo.ticks = 0;
+                phase = prev = 0;
+                lfo_cycle(it);
+            }
+        }
+        it->s.lfo.clk_hi = (uint8_t)c;
+        if (r && !it->s.lfo.rst_hi) {
+            phase = prev = 0;
+            it->s.lfo.ticks = 0;
+            lfo_cycle(it);
+        }
+        it->s.lfo.rst_hi = (uint8_t)r;
+        live = sync && it->s.lfo.interval > 0 && it->s.lfo.since < ENG_SR / 2;
+        dt = !sync ? dtfree : live ? (uint32_t)((1ull << 40) / ((uint64_t)per * (uint32_t)it->s.lfo.interval)) : dtbpm;
         phase += dt;
-        if (phase < prev) {                 /* a new cycle: sample & hold takes a new random value */
-            it->s.lfo.seed = it->s.lfo.seed * 1664525u + 1013904223u;
-            it->s.lfo.held = (int32_t)(it->s.lfo.seed >> 15) - ENG_ONE;
+        if (phase < prev) {
+            if (live)
+                phase = 0xFFFFFFFFu;        /* wait for the clock's next cycle start */
+            else
+                lfo_cycle(it);              /* a new cycle: sample & hold takes a new random value */
         }
         w = kind == 4 ? it->s.lfo.held : wave(kind, phase, dt, 0x80000000u);
         out[i] = mul16(w, depth);
     }
     it->s.lfo.phase = phase;
-    it->s.lfo.s1 = s1;
+    (void)nd;
 }
 
 /* white noise through a one-pole with c = 2^(-5 color): color 0 is c = 1, the plain noise bit for bit. y is Q24. */
@@ -1156,22 +1276,74 @@ static inline int16_t dly_pack(int32_t v)
     return (int16_t)clampi(q, -32768, 32767);
 }
 
+#define DELAY_HALF (DELAY_LEN / 2u)
+
+/* the note length the time knob selects while the delay is synced: its range split into DELAY_NDIV steps (also used by the LCD) */
+uint32_t delay_div(int32_t time_q16)
+{
+    int64_t lo = DEFS[T_DELAY].pmin[DELAY_P_TIME], range = DEFS[T_DELAY].pmax[DELAY_P_TIME] - lo;
+    int64_t i = (((int64_t)time_q16 - lo) * (DELAY_NDIV - 1) * 2 + range) / (range * 2);
+    return (uint32_t)(i < 0 ? 0 : i > DELAY_NDIV - 1 ? DELAY_NDIV - 1 : i);
+}
+
+/* free or synced time (see modules.ts); ping-pong splits the buffer in two halves, A (input, left) and B (right), see modules.ts */
 static void m_delay(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *in = it->in[DELAY_I_IN];
-    esig_t *out = it->out[0];
+    esig_t *out = it->out[DELAY_O_OUT], *outr = it->out[DELAY_O_R];
     int16_t *buf = it->s.dly.buf;
     uint32_t w = it->s.dly.w, i, d;
     int32_t fb = EF(it, DELAY_P_FB), mix = EF(it, DELAY_P_MIX), dry = ENG_ONE - mix;
-    int64_t smp = ((int64_t)EF(it, DELAY_P_TIME) * ENG_SR + (int64_t)500 * 65536) / (1000 * 65536);   /* round(t_ms / 1000 * sr) */
-    d = (uint32_t)(smp < 1 ? 1 : smp > (int64_t)DELAY_LEN - 1 ? (int64_t)DELAY_LEN - 1 : smp);
-    for (i = 0; i < n; i++) {
-        uint32_t rp = w >= d ? w - d : w + DELAY_LEN - d;
-        int32_t r = (int32_t)buf[rp] * 8;
-        buf[w] = dly_pack(in[i] + mul16(r, fb));
-        if (++w == DELAY_LEN)
+    int pp = EF(it, DELAY_P_PINGPONG) >= 32768;
+    int64_t smp, top = pp ? (int64_t)DELAY_HALF - 1 : (int64_t)DELAY_LEN - 1;
+    if (nd->conn & (1u << DELAY_I_CLK)) {   /* tempo: the time of the last 24 clock pulses, smoothed */
+        const esig_t *clk = it->in[DELAY_I_CLK];
+        for (i = 0; i < n; i++) {
+            int hi = clk[i] >= 32768;
+            it->s.dly.t++;
+            if (hi && !it->s.dly.prev) {
+                uint32_t k = it->s.dly.seen % DELAY_CLK_PPQN;
+                if (it->s.dly.seen >= DELAY_CLK_PPQN) {
+                    uint32_t m = it->s.dly.t - it->s.dly.ring[k];
+                    if (m >= ENG_SR / 5u && m <= ENG_SR * 3u / 2u)
+                        it->s.dly.beat = it->s.dly.seen == DELAY_CLK_PPQN ? m : (uint32_t)((int32_t)it->s.dly.beat + ((int32_t)m - (int32_t)it->s.dly.beat) / 4);
+                }
+                it->s.dly.ring[k] = it->s.dly.t;
+                it->s.dly.seen++;
+            }
+            it->s.dly.prev = (uint8_t)hi;
+        }
+    }
+    if (EF(it, DELAY_P_SYNC) >= 32768) {
+        uint32_t div = delay_div(EF(it, DELAY_P_TIME));
+        smp = ((int64_t)DELAY_DIV_NUM[div] * it->s.dly.beat * 2 + DELAY_DIV_DEN[div]) / ((int64_t)DELAY_DIV_DEN[div] * 2);
+    } else
+        smp = ((int64_t)EF(it, DELAY_P_TIME) * ENG_SR + (int64_t)500 * 65536) / (1000 * 65536);   /* round(t_ms / 1000 * sr) */
+    d = (uint32_t)(smp < 1 ? 1 : smp > top ? top : smp);
+    if (!pp) {
+        for (i = 0; i < n; i++) {
+            uint32_t rp = w >= d ? w - d : w + DELAY_LEN - d;
+            int32_t r = (int32_t)buf[rp] * 8;
+            buf[w] = dly_pack(in[i] + mul16(r, fb));
+            if (++w == DELAY_LEN)
+                w = 0;
+            out[i] = mul16(in[i], dry) + mul16(r, mix);
+            outr[i] = out[i];
+        }
+    } else {
+        int16_t *bb = buf + DELAY_HALF;
+        if (w >= DELAY_HALF)
             w = 0;
-        out[i] = mul16(in[i], dry) + mul16(r, mix);
+        for (i = 0; i < n; i++) {
+            uint32_t rp = w >= d ? w - d : w + DELAY_HALF - d;
+            int32_t ea = (int32_t)buf[rp] * 8, eb = (int32_t)bb[rp] * 8, dr = mul16(in[i], dry);
+            bb[w] = dly_pack(mul16(ea, fb));
+            buf[w] = dly_pack(in[i] + mul16(eb, fb));
+            if (++w == DELAY_HALF)
+                w = 0;
+            out[i] = dr + mul16(ea, mix);
+            outr[i] = dr + mul16(eb, mix);
+        }
     }
     it->s.dly.w = w;
 }
@@ -1759,7 +1931,7 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     }
 }
 
-void eng_render(int32_t *left, int32_t *right, uint32_t total)
+static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the selected voice alone, clamped */
 {
     uint32_t off, i, k, s, v;
     for (i = 0; i < total; i++)
@@ -1803,4 +1975,73 @@ void eng_render(int32_t *left, int32_t *right, uint32_t total)
         left[i] = clampi(left[i], -ENG_ONE, ENG_ONE);
         right[i] = clampi(right[i], -ENG_ONE, ENG_ONE);
     }
+}
+
+void eng_voice_select(uint32_t v)
+{
+    if (v < ENG_VOICES)
+        eng_p = &EV[v];
+}
+
+uint32_t eng_voice(void) { return VOICE_NO; }
+
+static volatile int32_t vgain[ENG_VOICES] = {ENG_ONE, ENG_ONE, ENG_ONE, ENG_ONE};   /* the mixer: each voice's level, Q16 (0 = muted) */
+
+void eng_voice_gain(uint32_t v, int32_t q16)
+{
+    if (v < ENG_VOICES)
+        vgain[v] = q16 < 0 ? 0 : q16 > ENG_ONE ? ENG_ONE : q16;
+}
+
+/* the voices of the patch, mixed: voice 1 into left / right, the others added, then clamped */
+void eng_render(int32_t *left, int32_t *right, uint32_t total)
+{
+    eng_t *keep = eng_p;                /* the audio ISR may run in the middle of a panel call: give the pointer back */
+    uint32_t v, off, i;
+    int32_t tl[ENG_BLOCK], tr[ENG_BLOCK];
+    eng_p = &EV[0];
+    render_voice(left, right, total);
+    if (vgain[0] != ENG_ONE)
+        for (i = 0; i < total; i++) {
+            left[i] = mul16(left[i], vgain[0]);
+            right[i] = mul16(right[i], vgain[0]);
+        }
+    for (v = 1; v < ENG_VOICES; v++) {
+        eng_p = &EV[v];
+        if (!E.loaded)
+            continue;
+        for (off = 0; off < total; off += ENG_BLOCK) {
+            uint32_t n = total - off < ENG_BLOCK ? total - off : ENG_BLOCK;
+            render_voice(tl, tr, n);
+            for (i = 0; i < n; i++) {
+                left[off + i] = clampi(left[off + i] + mul16(tl[i], vgain[v]), -ENG_ONE, ENG_ONE);
+                right[off + i] = clampi(right[off + i] + mul16(tr[i], vgain[v]), -ENG_ONE, ENG_ONE);
+            }
+        }
+    }
+    eng_p = keep;
+}
+
+void eng_note_on_v(uint32_t v, uint32_t note, int32_t vel_q16)     /* a note on one voice, whichever the panel has selected */
+{
+    eng_t *keep = eng_p;
+    eng_voice_select(v);
+    eng_note_on(note, vel_q16);
+    eng_p = keep;
+}
+
+void eng_note_off_v(uint32_t v, uint32_t note)
+{
+    eng_t *keep = eng_p;
+    eng_voice_select(v);
+    eng_note_off(note);
+    eng_p = keep;
+}
+
+void eng_all_notes_off_v(uint32_t v)
+{
+    eng_t *keep = eng_p;
+    eng_voice_select(v);
+    eng_all_notes_off();
+    eng_p = keep;
 }

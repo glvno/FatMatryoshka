@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Compact binary patch format, read by firmware/src/engine.c (eng_load).
 //
-//   u8  magic 0xA1, u8 version 9, u8 module count, u8 voices (1..8; 0 = 1, what older files hold), u16 LE cable count, u16 reserved (0)
+//   u8  magic 0xA1, u8 version 10, u8 module count, u8 voices (1..8; 0 = 1, what older files hold), u16 LE cable count, u16 reserved (0)
 //   per module:  u8 type index, then one i32 LE per parameter (Q16.16), in the order of the definition;
 //                modules with parameter inputs (paramInputs) then add i32 att1, i32 att2 (Q16.16, -1..1) and
 //                six u16 LE matrix masks for the sources p1, p2, k1, k2, k3, k4 (bit n = the n-th parameter)
@@ -15,7 +15,7 @@ import { MAX_MODULES, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Patch } f
 
 export const TYPE_ORDER: string[] = Object.keys(DEFS);
 export const MAX_CABLES = 192;
-export const VERSION = 9; // 9: the matrix masks are u16 (modules with more than 8 parameters), the modules of the second module batch; 8: osc and lfo got the sync input (p1 / p2 moved), glide and shape modules, the panel's spread output; 7: the oscillator got the fb parameter; 6: the filter's outputs are lp24, lp12, bp, hp, mix; 5: the filter got the morph input (ports after cv moved), track and morph parameters; 4: the reverb module was added before the output
+export const VERSION = 10; // 10: the merge of the two lines below: the Main module's clock output comes before spread, the lfo's inputs are clk, reset (the restart input was sync), the delay as in 8b, modules of the second and third batch; 9: the matrix masks are u16 (modules with more than 8 parameters), the modules of the second module batch; 8a: osc and lfo got the sync input (p1 / p2 moved), glide and shape modules, the panel's spread output; 8b: the delay has the clk input, r output and sync, pingpong parameters, the lfo got the clk and reset inputs and the sync, div, bpm parameters, the Main module's clock output; 7: the oscillator got the fb parameter; 6: the filter's outputs are lp24, lp12, bp, hp, mix; 5: the filter got the morph input (ports after cv moved), track and morph parameters; 4: the reverb module was added before the output
 /** bytes of a module record */
 export const recordSize = (type: string): number => 1 + 4 * DEFS[type].params.length + (DEFS[type].paramInputs ? 20 : 0);
 export const Q = 65536;
@@ -72,7 +72,8 @@ export function encodePatch(p: Patch): Uint8Array {
 }
 
 /** what the firmware engine (firmware/src/engine.c) can hold */
-export const DEVICE = { buffers: 160, instances: 128, voices: 8 } as const;
+/** the FM-1's pools, shared by its four voices (firmware/src/engine.c): what one patch may use at most, with the other voices empty */
+export const DEVICE = { buffers: 128, instances: 96, voices: 8 } as const;
 
 /**
  * What a patch costs on the FM-1, counted the way eng_load allocates: one instance per shared module, one per voice for

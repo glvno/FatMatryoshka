@@ -328,6 +328,9 @@ export class Editor {
   }
 
   /** one parameter slider (or check box); `label` overrides the name (a promoted parameter on an assembly card) */
+  /** redraws the value of a parameter row (the synced delay shows its time as a note length) */
+  private refreshers = new WeakMap<HTMLElement, () => void>();
+
   private paramRow(m: ModuleInst, def: ModuleDef, pd: ParamDef, o: { open?: AssemblyInst; label?: string; rename?: () => void } = {}): HTMLElement {
     const row = document.createElement('label');
     row.className = 'param';
@@ -352,8 +355,10 @@ export class Editor {
       };
     }
     const val = document.createElement('output');
-    const fmt = (v: number): string => (pd.choices ? pd.choices[Math.round(v)] : `${Number(v.toFixed(3))}${pd.unit ? ' ' + pd.unit : ''}`);
+    const fmt = (v: number): string =>
+      pd.altText && m.params[pd.altText.when] >= 0.5 ? pd.altText.text(v) : pd.choices ? pd.choices[Math.round(v)] : `${Number(v.toFixed(3))}${pd.unit ? ' ' + pd.unit : ''}`;
     val.textContent = fmt(m.params[pd.name]);
+    this.refreshers.set(row, () => (val.textContent = fmt(m.params[pd.name])));
     const input = document.createElement('input');
     input.type = 'range';
     if (pd.log) {
@@ -382,6 +387,7 @@ export class Editor {
         const v = input.checked ? 1 : 0;
         m.params[pd.name] = v;
         val.textContent = fmt(v);
+        for (const el of row.parentElement?.children ?? []) this.refreshers.get(el as HTMLElement)?.(); // a toggle can change how its siblings show (altText)
         this.ev.onParam(m.id, pd.name, v);
       };
     }

@@ -11,7 +11,10 @@
       "params": {
         "wave": 3,
         "rate": 6,
-        "depth": 1
+        "depth": 1,
+        "sync": 0,
+        "div": 6,
+        "bpm": 120
       },
       "att": [
         1,
@@ -174,7 +177,7 @@
   "inputs": [
     {
       "module": 1,
-      "port": "sync",
+      "port": "reset",
       "label": "reset"
     }
   ],

@@ -69,7 +69,10 @@
       "params": {
         "wave": 1,
         "rate": 0.3,
-        "depth": 1
+        "depth": 1,
+        "sync": 0,
+        "div": 6,
+        "bpm": 120
       },
       "att": [
         1,

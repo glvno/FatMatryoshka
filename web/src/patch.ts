@@ -7,6 +7,8 @@ export type SignalKind = 'audio' | 'control' | 'gate';
 export interface PortDef {
   name: string;
   kind: SignalKind;
+  /** shown in the editor instead of `name` */
+  label?: string;
   /** set on the two parameter inputs `p1` and `p2` (1 or 2) */
   pin?: 1 | 2;
 }
@@ -31,6 +33,8 @@ export interface ParamDef {
   bend?: boolean;
   /** an on/off switch (0 or 1): a check box in the editor, OFF / ON on the LCD */
   toggle?: boolean;
+  /** while the toggle parameter `when` is on, the value is shown as `text(value)` instead of the number (the synced delay time as a note length) */
+  altText?: { when: string; text: (v: number) => string };
 }
 
 /** position of a value in its range, 0..1 (logarithmic for log parameters) */
@@ -277,6 +281,7 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
     const mf = p.modules.find((m) => m.id === c.from?.module);
     if (mf?.type === 'filter' && c.from?.port === 'lp') c.from.port = 'lp12'; // the filter's 12 dB output used to be called lp
     const mt = p.modules.find((m) => m.id === c.to?.module);
+    if (mt?.type === 'lfo' && c.to?.port === 'sync') c.to.port = 'reset'; // the LFO's restart input used to be called sync (its tempo-sync toggle is `sync` now)
     if (!mf || !mt) throw new Error('cable to a missing module');
     if (!defs[mf.type].outputs.some((o) => o.name === c.from.port)) throw new Error(`no output "${c.from.port}" on ${mf.type}`);
     if (!defs[mt.type].inputs.some((i) => i.name === c.to.port)) throw new Error(`no input "${c.to.port}" on ${mt.type}`);

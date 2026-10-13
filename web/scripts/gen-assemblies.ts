@@ -272,7 +272,7 @@ asm('step sequencer', (b) => {
   const qn = b.add('quant', 2, 0, { scale: 1, root: 0 });
   b.wire(clk, 'out', sq, 'clock');
   b.wire(sq, 'out', qn, 'in');
-  b.input('reset', sq, 'reset', [clk, 'sync']);
+  b.input('reset', sq, 'reset', [clk, 'reset']);
   b.output('pitch', qn, 'out');
   b.output('gate', sq, 'gate');
   b.param('tempo', clk, 'rate');
@@ -294,7 +294,7 @@ asm('random melody', (b) => {
   b.wire(clk, 'out', sh, 'clock');
   b.wire(sh, 'out', qn, 'in');
   b.wire(clk, 'out', pl, 'trig');
-  b.input('reset', clk, 'sync');
+  b.input('reset', clk, 'reset');
   b.output('pitch', qn, 'out');
   b.output('gate', pl, 'out');
   b.param('tempo', clk, 'rate');
@@ -309,7 +309,7 @@ asm('clock', (b) => {
   const clk = b.add('lfo', 0, 0, { wave: 3, rate: 4, depth: 1 });
   const dv = b.add('clkdiv', 1, 0, { div: 3 });
   b.wire(clk, 'out', dv, 'clock');
-  b.input('reset', clk, 'sync', [dv, 'reset']);
+  b.input('reset', clk, 'reset', [dv, 'reset']);
   b.output('clock', clk, 'out');
   b.output('/2', dv, 'd2');
   b.output('/4', dv, 'd4');

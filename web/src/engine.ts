@@ -48,7 +48,7 @@ interface VoiceState extends Voice {
   retrig: boolean;
 }
 
-const newVoice = (): VoiceState => ({ pitch: 0, gate: 0, velocity: 0, spread: 0, note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false });
+const newVoice = (): VoiceState => ({ pitch: 0, gate: 0, velocity: 0, spread: 0, clock: false, note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false });
 /** the panel's spread output of voice i of n: -1 .. 1 in equal steps, 0 alone */
 export const spreadOf = (i: number, n: number): number => (n > 1 ? (2 * i - (n - 1)) / (n - 1) : 0);
 
@@ -59,6 +59,8 @@ export class Engine {
   private held: { note: number; vel: number }[] = [];
   private voices: VoiceState[] = [newVoice()];
   private stamp = 0;
+  private ticks = 0;
+  private clockOn = true;
 
   constructor(readonly sampleRate: number) {}
 
@@ -238,6 +240,15 @@ export class Engine {
       }
   }
 
+  /** MIDI clock (0xF8): one tick; Stop (0xFC) mutes the clock until Start/Continue */
+  clockTick(): void {
+    if (this.clockOn) this.ticks++;
+  }
+
+  clockRun(on: boolean): void {
+    this.clockOn = on;
+  }
+
   allNotesOff(): void {
     this.held = [];
     for (const x of this.voices) {
@@ -298,6 +309,9 @@ export class Engine {
     const vs = this.voices;
     for (let off = 0; off < total; off += BLOCK) {
       const n = Math.min(BLOCK, total - off);
+      const clock = this.ticks > 0; // the Main module's clock output: one pulse per block that saw a tick, the same for every voice
+      this.ticks = 0;
+      for (const x of vs) x.clock = clock;
       for (const node of this.order) {
         if (node.poly) {
           for (let v = 0; v < vs.length; v++) {

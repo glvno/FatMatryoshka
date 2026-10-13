@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 morgulbrut */
 /* Renders the device's LCD (firmware/src/ui.c) on the host into a PPM image, to look at the layout without a device.
- *   ui_preview OUT.ppm PRESET_INDEX [SELECTED_MODULE [OCTAVE [PAGE [STEP [VOICES]]]]]
+ *   ui_preview OUT.ppm PRESET_INDEX [SELECTED_MODULE [OCTAVE [PAGE [STEP [MENU_TAB [MANUAL_LINE [POLY]]]]]]]
  * tools/ui_preview.sh converts the image to PNG. */
 #include <stdint.h>
 #include <stdio.h>
@@ -48,7 +48,12 @@ static void lcd_sync(void) {}
 #include "../src/arp.c"
 #include "../src/ui.c"
 #include "../src/arp_ui.c"
-#include "../src/glo_ui.c"
+static void fm1_led_key(uint32_t id, int on) { (void)id; (void)on; }
+static void leds_avail(void) {}
+static void leds_octave(void) {}
+static void uboot_now(void) {}
+static void defaults_now(void) {}
+#include "../src/menu.c"
 
 int main(int argc, char **argv)
 {
@@ -61,11 +66,11 @@ int main(int argc, char **argv)
         fprintf(stderr, "no such preset\n");
         return 1;
     }
-    {   /* a copy of the preset, with the voice count of argv[7] if given (header byte 3) */
+    {   /* a copy of the preset, with the polyphony of argv[9] if given (header byte 3) */
         static uint8_t bin[4096];
         memcpy(bin, PRESET_LIST[p].data, PRESET_LIST[p].len);
-        if (argc > 7)
-            bin[3] = (uint8_t)atoi(argv[7]);
+        if (argc > 9)
+            bin[3] = (uint8_t)atoi(argv[9]);
         if (eng_load(bin, PRESET_LIST[p].len)) {
             fprintf(stderr, "eng_load failed\n");
             return 1;
@@ -77,10 +82,19 @@ int main(int argc, char **argv)
     }
     sel = argc > 3 ? (uint32_t)atoi(argv[3]) : 0u;
     octave = argc > 4 ? atoi(argv[4]) : 0;
-    page = argc > 5 ? (uint8_t)atoi(argv[5]) : 0u;          /* 1..3: the arpeggiator pages, 4: GLO */
+    page = argc > 5 ? (uint8_t)atoi(argv[5]) : 0u;          /* 1..3: the arpeggiator pages, 4: mixer, 5: menu */
     if (argc > 6) {                                         /* page 2: a playing step */
         arp_play = 1;
         arp_step_ui = (uint8_t)atoi(argv[6]);
+    }
+    booting = 0;
+    if (argc > 7) {                                         /* page 5: the menu's tab (4 = MANUAL) */
+        int t = atoi(argv[7]);
+        menu_tab = (uint8_t)(t < 0 ? 0 : t >= MT_COUNT ? MT_COUNT - 1 : t);
+    }
+    if (argc > 8) {                                         /* .. and the first line of the manual */
+        int t = atoi(argv[8]), max = (int)MAN_N - (int)MAN_VIS;
+        man_top = (uint32_t)(t < 0 ? 0 : t > max ? max : t);
     }
     patch_label = PRESET_LIST[p].name;
     screen_idle();
