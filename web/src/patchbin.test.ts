@@ -11,11 +11,11 @@ describe('binary patch format', () => {
       const b = encodePatch(p);
       const dv = new DataView(b.buffer);
       expect(b[0], name).toBe(0xa1);
-      expect(b[1], name).toBe(8);
+      expect(b[1], name).toBe(9);
       expect(b[2], name).toBe(p.modules.length);
       expect(b[3], name).toBe(1); // voices: the factory presets are mono
       expect(dv.getUint16(4, true), name).toBe(p.cables.length);
-      const size = 8 + p.modules.reduce((s, m) => s + 1 + 4 * DEFS[m.type].params.length + (DEFS[m.type].paramInputs ? 14 : 0), 0) + 4 * p.cables.length;
+      const size = 8 + p.modules.reduce((s, m) => s + 1 + 4 * DEFS[m.type].params.length + (DEFS[m.type].paramInputs ? 20 : 0), 0) + 4 * p.cables.length;
       expect(b.length, name).toBe(size);
       expect(p.cables.length).toBeLessThanOrEqual(MAX_CABLES);
     }
@@ -52,7 +52,7 @@ describe('binary patch format', () => {
     const att = osc + 1 + 4 * DEFS.osc.params.length; // osc: att1, att2, then the masks p1 p2 k1 k2 k3 k4
     expect(dv.getInt32(att, true)).toBe(65536);
     expect(dv.getInt32(att + 4, true)).toBe(65536);
-    expect(Array.from(b.slice(att + 8, att + 14))).toEqual([1, 2, 1, 2, 4, 8]); // the default matrix
+    expect(Array.from(b.slice(att + 8, att + 20))).toEqual([1, 0, 2, 0, 1, 0, 2, 0, 4, 0, 8, 0]); // the default matrix, u16 LE
     const cab = b.length - 4 * p.cables.length;
     expect([b[cab], b[cab + 1], b[cab + 2], b[cab + 3]]).toEqual([0, DEFS.fm1.outputs.findIndex((o) => o.name === 'pitch'), 1, DEFS.osc.inputs.findIndex((i) => i.name === 'pitch')]);
   });

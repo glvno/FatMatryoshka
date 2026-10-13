@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Compact binary patch format, read by firmware/src/engine.c (eng_load).
 //
-//   u8  magic 0xA1, u8 version 6, u8 module count, u8 voices (1..8; 0 = 1, what older files hold), u16 LE cable count, u16 reserved (0)
+//   u8  magic 0xA1, u8 version 9, u8 module count, u8 voices (1..8; 0 = 1, what older files hold), u16 LE cable count, u16 reserved (0)
 //   per module:  u8 type index, then one i32 LE per parameter (Q16.16), in the order of the definition;
 //                modules with parameter inputs (paramInputs) then add i32 att1, i32 att2 (Q16.16, -1..1) and
-//                six u8 matrix masks for the sources p1, p2, k1, k2, k3, k4 (bit n = the n-th parameter)
+//                six u16 LE matrix masks for the sources p1, p2, k1, k2, k3, k4 (bit n = the n-th parameter)
 //   per cable:   u8 from module index, u8 from output index, u8 to module index, u8 to input index
 //
 // Type indices are the position in TYPE_ORDER (append only: the firmware has the same list in defs.h).
@@ -15,9 +15,9 @@ import { MAX_MODULES, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Patch } f
 
 export const TYPE_ORDER: string[] = Object.keys(DEFS);
 export const MAX_CABLES = 192;
-export const VERSION = 8; // 8: osc and lfo got the sync input (p1 / p2 moved), glide and shape modules, the panel's spread output; 7: the oscillator got the fb parameter; 6: the filter's outputs are lp24, lp12, bp, hp, mix; 5: the filter got the morph input (ports after cv moved), track and morph parameters; 4: the reverb module was added before the output
+export const VERSION = 9; // 9: the matrix masks are u16 (modules with more than 8 parameters), the modules of the second module batch; 8: osc and lfo got the sync input (p1 / p2 moved), glide and shape modules, the panel's spread output; 7: the oscillator got the fb parameter; 6: the filter's outputs are lp24, lp12, bp, hp, mix; 5: the filter got the morph input (ports after cv moved), track and morph parameters; 4: the reverb module was added before the output
 /** bytes of a module record */
-export const recordSize = (type: string): number => 1 + 4 * DEFS[type].params.length + (DEFS[type].paramInputs ? 14 : 0);
+export const recordSize = (type: string): number => 1 + 4 * DEFS[type].params.length + (DEFS[type].paramInputs ? 20 : 0);
 export const Q = 65536;
 
 export const toQ16 = (v: number): number => Math.max(-0x80000000, Math.min(0x7fffffff, Math.round(v * Q)));
@@ -55,7 +55,8 @@ export function encodePatch(p: Patch): Uint8Array {
           const i = def.params.findIndex((q) => q.name === name);
           if (i >= 0) mask |= 1 << i;
         }
-        out[at++] = mask;
+        dv.setUint16(at, mask, true);
+        at += 2;
       }
     }
   }

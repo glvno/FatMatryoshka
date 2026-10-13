@@ -203,7 +203,7 @@ typedef struct {
     uint8_t type, conn;
     uint8_t inst0, ninst;            /* its instances in inst_pool[]: ninst > 1 = it runs once per voice (the panel too: its
                                         pitch / gate / vel are per voice, its knob outputs one buffer shared by its instances) */
-    uint8_t map[6];                  /* the matrix: bit j of map[s] = source s controls parameter j. s: p1 p2 k1 k2 k3 k4 */
+    uint16_t map[6];                 /* the matrix: bit j of map[s] = source s controls parameter j. s: p1 p2 k1 k2 k3 k4 */
     int32_t att[2];                  /* attenuverters of p1, p2: Q16, -1..1 */
     int32_t par[MAX_PAR];
 } node_t;
@@ -305,7 +305,7 @@ static inline int32_t rd32(const uint8_t *p)
 }
 
 /* bytes a module record has beyond its type byte and parameters: the attenuverters and the matrix */
-static inline uint32_t eng_record_extra(const def_t *d) { return d->cvbase >= 0 ? 14u : 0u; }
+static inline uint32_t eng_record_extra(const def_t *d) { return d->cvbase >= 0 ? 20u : 0u; }
 
 int eng_load(const uint8_t *p, uint32_t len)
 {
@@ -352,8 +352,8 @@ int eng_load(const uint8_t *p, uint32_t len)
             nd->att[0] = rd32(p + at);
             nd->att[1] = rd32(p + at + 4);
             at += 8;
-            for (j = 0; j < 6u; j++)
-                nd->map[j] = p[at++];
+            for (j = 0; j < 6u; j++, at += 2)
+                nd->map[j] = (uint16_t)((uint32_t)p[at] | (uint32_t)p[at + 1] << 8);
         }
         nd->ninst = 1;
     }

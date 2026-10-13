@@ -115,7 +115,7 @@ static uint32_t m1_record(uint32_t mod)
         if (at >= m1_cur_len || m1_cur[at] >= N_TYPES)
             return 0;
         d = &DEFS[m1_cur[at]];
-        at += 1u + 4u * d->npar + (d->cvbase >= 0 ? 14u : 0u);
+        at += 1u + 4u * d->npar + (d->cvbase >= 0 ? 20u : 0u);
     }
     return at < m1_cur_len && m1_cur[at] < N_TYPES ? at : 0;
 }
@@ -160,7 +160,7 @@ static int m1_valid(const uint8_t *p, uint32_t len)
         if (at >= len || p[at] >= N_TYPES)
             return 0;
         d = &DEFS[p[at]];
-        at += 1u + 4u * d->npar + (d->cvbase >= 0 ? 14u : 0u);
+        at += 1u + 4u * d->npar + (d->cvbase >= 0 ? 20u : 0u);
     }
     return at + 4u * ncab == len;
 }
