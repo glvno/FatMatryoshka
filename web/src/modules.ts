@@ -1144,30 +1144,65 @@ const glide: ModuleImpl<{ y: number }> = {
 };
 
 const SHAPES = ['soft', 'hard', 'fold'];
+const OS_CHOICES = ['off', 'on'];
 
-/** a waveshaper: drive into a cubic soft clip, a hard clip or a triangle fold; the peak stays at 1 */
-const shape: ModuleImpl<null> = {
+/**
+ * 2x oversampling around a nonlinearity (the `os` toggle of the shaper and the digitizer): the input is interpolated to two
+ * sub-samples by the FM oscillator's polyphase half-band used as an interpolator (even sub-sample = path 0, odd = path 1),
+ * f runs on each, and the same half-band decimates the pair back (path 1 takes the odd sub-sample of the previous frame,
+ * as in the oscillator). The harmonics the nonlinearity adds between 22 and 44 kHz are filtered out instead of folding
+ * back. s.ap: 8 allpass states of the interpolator then 8 of the decimator, s.xb: the odd sub-sample waiting.
+ */
+interface OsState {
+  xb: number;
+  ap: number[];
+}
+const osInit = (): OsState => ({ xb: 0, ap: new Array(16).fill(0) });
+function os2(s: OsState, x: number, f: (v: number) => number): number {
+  const u0 = allpass(s.ap, 4, HB[2], allpass(s.ap, 0, HB[0], x));
+  const u1 = allpass(s.ap, 6, HB[3], allpass(s.ap, 2, HB[1], x));
+  const y0 = f(u0);
+  const y1 = f(u1);
+  const p0 = allpass(s.ap, 12, HB[2], allpass(s.ap, 8, HB[0], y0));
+  const p1 = allpass(s.ap, 14, HB[3], allpass(s.ap, 10, HB[1], s.xb));
+  s.xb = y1;
+  return (p0 + p1) * 0.5;
+}
+
+/** the shaper's curve for the driven sample x: a cubic soft clip, a hard clip or a triangle fold, the peak at 1 */
+function shapeCurve(x: number, mode: number): number {
+  if (mode === 1) return Math.max(-1, Math.min(1, x));
+  if (mode === 2) {
+    const t = (((x + 1) % 4) + 4) % 4; // a triangle of period 4: back and forth between -1 and 1
+    return t < 2 ? t - 1 : 3 - t;
+  }
+  return Math.abs(x) >= 1 ? Math.sign(x) : 1.5 * x - 0.5 * x * x * x; // cubic: smooth up to the knee at 1
+}
+
+/** a waveshaper: drive into a cubic soft clip, a hard clip or a triangle fold; the peak stays at 1; `os` runs it 2x oversampled */
+const shape: ModuleImpl<OsState> = {
   def: {
     type: 'shape',
     label: 'Shaper',
     inputs: [audio('in')],
     outputs: [audio('out')],
-    params: [param('drive', 1, 32, 2, { step: 0.01, log: true }), param('mode', 0, 2, 0, { step: 1, choices: SHAPES }), param('level', 0, 1, 0.7, { step: 0.01 })],
+    params: [
+      param('drive', 1, 32, 2, { step: 0.01, log: true }),
+      param('mode', 0, 2, 0, { step: 1, choices: SHAPES }),
+      param('level', 0, 1, 0.7, { step: 0.01 }),
+      param('os', 0, 1, 0, { step: 1, choices: OS_CHOICES, toggle: true }),
+    ],
   },
-  init: () => null,
-  process(c) {
+  init: osInit,
+  process(c, s) {
     const drive = c.p.drive ?? 1;
     const mode = Math.round(c.p.mode ?? 0);
     const lvl = c.p.level ?? 1;
+    const os = (c.p.os ?? 0) >= 0.5;
+    const f = (v: number): number => shapeCurve(v, mode);
     for (let i = 0; i < c.n; i++) {
       const x = c.inp.in[i] * drive;
-      let y: number;
-      if (mode === 1) y = Math.max(-1, Math.min(1, x));
-      else if (mode === 2) {
-        const t = (((x + 1) % 4) + 4) % 4; // a triangle of period 4: back and forth between -1 and 1
-        y = t < 2 ? t - 1 : 3 - t;
-      } else y = Math.abs(x) >= 1 ? Math.sign(x) : 1.5 * x - 0.5 * x * x * x; // cubic: smooth up to the knee at 1
-      c.out.out[i] = y * lvl;
+      c.out.out[i] = (os ? os2(s, x, f) : shapeCurve(x, mode)) * lvl;
     }
   },
 };
@@ -1461,6 +1496,13 @@ interface SeqState {
   c1: number;
   r1: number;
   seed: number;
+  /** the glide one-pole on out */
+  y: number;
+  /** samples between the last two clock edges (0 until two were seen) and since the last one */
+  period: number;
+  since: number;
+  /** samples the gate stays up (gate length > 0) */
+  gleft: number;
 }
 
 const seq: ModuleImpl<SeqState> = {
@@ -1473,19 +1515,32 @@ const seq: ModuleImpl<SeqState> = {
       ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => param(`s${n}`, -1, 1, 0, { step: 0.01 })),
       param('len', 1, 8, 8, { step: 1 }),
       param('dir', 0, 3, 0, { step: 1, choices: SEQ_DIRS }),
+      param('glide', 0, 1, 0, { step: 0.01 }),
+      param('gate', 0, 1, 0, { step: 0.01 }),
     ],
   },
-  init: () => ({ pos: 0, down: 0, c1: 0, r1: 0, seed: 0x9e3779b9 }),
+  init: () => ({ pos: 0, down: 0, c1: 0, r1: 0, seed: 0x9e3779b9, y: 0, period: 0, since: -1, gleft: 0 }),
   process(c, s) {
     const steps = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => c.p[`s${n}`] ?? 0);
     const len = Math.min(8, Math.max(1, Math.round(c.p.len ?? 8)));
     const dir = Math.round(c.p.dir ?? 0);
+    // glide and gate length are fractions of the clock period, measured between the last two edges: nothing until two
+    // edges were seen. glide: a one-pole on out that reaches 99 % in glide x period (0 = out is the step itself).
+    // gate: the gate output stays up for gate x period after the edge (1 = legato, the steps tie); 0 = it follows the clock
+    const gl = c.p.glide ?? 0;
+    const glen = c.p.gate ?? 0;
+    const k = gl > 0 && s.period > 0 ? 1 - Math.exp(-4.6 / Math.max(gl * s.period, 1)) : 0;
     const { clock, reset } = c.inp;
     for (let i = 0; i < c.n; i++) {
       const rst = reset[i] >= 0.5 && s.r1 < 0.5;
       const clk = clock[i] >= 0.5 && s.c1 < 0.5;
       s.r1 = reset[i];
       s.c1 = clock[i];
+      if (s.since >= 0 && s.since < 8388608) s.since++; // -1 until the first edge
+      if (clk) {
+        if (s.since > 0) s.period = s.since;
+        s.since = 0;
+      }
       if (rst) {
         s.pos = 0;
         s.down = 0;
@@ -1510,8 +1565,15 @@ const seq: ModuleImpl<SeqState> = {
         } else s.pos = (s.pos + 1) % len;
       }
       const v = steps[Math.min(s.pos, len - 1)];
-      c.out.out[i] = v;
-      c.out.gate[i] = clock[i] >= 0.5 && v > -1 ? 1 : 0;
+      if (k > 0) {
+        s.y += k * (v - s.y);
+        c.out.out[i] = s.y;
+      } else c.out.out[i] = s.y = v;
+      if (glen > 0 && s.period > 0) {
+        if (clk) s.gleft = v > -1 ? Math.round(glen * s.period) : 0;
+        c.out.gate[i] = s.gleft > 0 ? 1 : 0;
+        if (s.gleft > 0) s.gleft--;
+      } else c.out.gate[i] = clock[i] >= 0.5 && v > -1 ? 1 : 0;
     }
   },
 };
@@ -1781,27 +1843,30 @@ const phaser: ModuleImpl<PhaserState> = {
 };
 
 /** bit depth and sample rate reduction: 2^bits levels over -1..1, every taken sample held for `rate` samples */
-const crush: ModuleImpl<{ held: number; cnt: number }> = {
+/** bit depth and sample rate reduction; `os` runs it 2x oversampled (the rate counts input samples either way) */
+const crush: ModuleImpl<{ held: number; cnt: number } & OsState> = {
   def: {
     type: 'crush',
     label: 'Digitizer',
     inputs: [audio('in')],
     outputs: [audio('out')],
-    params: [param('bits', 1, 16, 8, { step: 1 }), param('rate', 1, 64, 1, { step: 1 })],
+    params: [param('bits', 1, 16, 8, { step: 1 }), param('rate', 1, 64, 1, { step: 1 }), param('os', 0, 1, 0, { step: 1, choices: OS_CHOICES, toggle: true })],
   },
-  init: () => ({ held: 0, cnt: 0 }),
+  init: () => ({ held: 0, cnt: 0, ...osInit() }),
   process(c, s) {
     const bits = Math.round(c.p.bits ?? 8);
-    const rate = Math.round(c.p.rate ?? 1);
+    const os = (c.p.os ?? 0) >= 0.5;
+    const rate = Math.round(c.p.rate ?? 1) * (os ? 2 : 1);
     const q = Math.pow(2, bits - 1);
-    for (let i = 0; i < c.n; i++) {
+    const f = (v: number): number => {
       if (s.cnt <= 0) {
-        s.held = Math.floor(c.inp.in[i] * q + 0.5) / q;
+        s.held = Math.floor(v * q + 0.5) / q;
         s.cnt = rate;
       }
       s.cnt--;
-      c.out.out[i] = s.held;
-    }
+      return s.held;
+    };
+    for (let i = 0; i < c.n; i++) c.out.out[i] = os ? os2(s, c.inp.in[i], f) : f(c.inp.in[i]);
   },
 };
 

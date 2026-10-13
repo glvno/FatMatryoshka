@@ -1484,6 +1484,37 @@ describe('sequencer, clock divider, S&H, quantizer, pulse', () => {
     expect([0, 1, 2, 3, 4, 5, 6].map((k) => Number(r3.l[k * CLK + 10].toFixed(2)))).toEqual([0.1, 0.2, 0.3, 0.4, 0.3, 0.2, 0.1]);
   });
 
+  it('sequencer glide slews out over a fraction of the clock period, gate length holds the gate for a fraction of it', () => {
+    const { p, clock, out } = clocked();
+    const s = addModule(p, DEFS.seq, 0, 0);
+    Object.assign(s.params, { s1: 0, s2: 1, len: 2, glide: 0.5, gate: 0.75 });
+    wire(p, clock, 'out', s.id, 'clock');
+    wire(p, s.id, 'out', out, 'l');
+    wire(p, s.id, 'gate', out, 'r');
+    const e = new Engine(SR);
+    e.load(p);
+    const r = render(e, CLK * 4);
+    // edges at 0 (step 2), 480 (step 1), 960 (step 2): the period is known from the second edge on
+    expect(r.l[10]).toBe(1); // no period yet: the step itself
+    const t = 2 * CLK;
+    expect(r.l[t + 120]).toBeCloseTo(1 - Math.exp(-4.6 * 0.5), 1); // half of the 99 % time
+    expect(r.l[t + 239]).toBeCloseTo(0.99, 1);
+    expect(r.l[t + CLK - 1]).toBeGreaterThan(0.999);
+    expect(r.r[t + 300]).toBe(1); // the gate: 0.75 x 480 = 360 samples
+    expect(r.r[t + 400]).toBe(0);
+    s.params.gate = 1;
+    const e2 = new Engine(SR);
+    e2.load(p);
+    const r2 = render(e2, CLK * 4);
+    expect(r2.r[t + CLK - 1]).toBe(1); // legato: the gate ties into the next step
+    expect(r2.r[t + CLK + 1]).toBe(1);
+    s.params.s1 = -1; // a rest drops the gate at its edge
+    const e3 = new Engine(SR);
+    e3.load(p);
+    const r3 = render(e3, CLK * 4);
+    expect(r3.r[3 * CLK + 5]).toBe(0);
+  });
+
   it('clock divider passes every div-th pulse and the fixed divisions, reset makes the next pulse a downbeat', () => {
     const { p, clock, out } = clocked();
     const d = addModule(p, DEFS.clkdiv, 0, 0);
@@ -1671,6 +1702,66 @@ describe('pan, crossfade, vowel, phaser, digitizer, noise colour', () => {
     const swept = run(440, { mix: 0.5, depth: 1, rate: 3, fb: 0.9 });
     expect(swept.every(Number.isFinite)).toBe(true);
     expect(rms(swept)).toBeGreaterThan(0.05);
+  });
+
+  /** amplitude of a at frequency hz (Goertzel over a Hann window, so a strong neighbour does not leak into the bin) */
+  const power = (a: Float32Array, hz: number): number => {
+    const w = (2 * Math.PI * hz) / SR;
+    let s1 = 0, s2 = 0;
+    for (let i = 0; i < a.length; i++) {
+      const s0 = a[i] * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / a.length)) + 2 * Math.cos(w) * s1 - s2;
+      s2 = s1;
+      s1 = s0;
+    }
+    return Math.sqrt(s1 * s1 + s2 * s2 - 2 * Math.cos(w) * s1 * s2) / a.length;
+  };
+
+  it('oversampling: the shaper with os on keeps the harmonics in the band and loses the folded ones', () => {
+    const run = (os: number): Float32Array => {
+      const { p, out, add } = start();
+      const o = add('osc', { wave: 0, level: 1, coarse: 51, fine: 7 }); // 5 kHz: the clipped sine's harmonics at 15, 25, 35, 45 kHz
+      const s = add('shape', { mode: 1, drive: 4, level: 1, os });
+      wire(p, o, 'out', s, 'in');
+      wire(p, s, 'out', out, 'l');
+      const e = new Engine(SR);
+      e.load(p);
+      render(e, 2048);
+      return render(e, SR).l;
+    };
+    const plain = run(0), over = run(1);
+    expect(rms(over)).toBeGreaterThan(rms(plain) * 0.8); // a little less: the energy above 22 kHz is gone instead of folded
+    expect(rms(over)).toBeLessThan(rms(plain) * 1.05);
+    const f0 = 261.6255653 * Math.pow(2, 51.07 / 12); // 4998 Hz
+    const fold = (f: number): number => (f > SR / 2 ? SR - f : f); // where a harmonic lands without oversampling
+    expect(power(over, f0)).toBeCloseTo(power(plain, f0), 1); // the fundamental
+    expect(power(over, 3 * f0)).toBeGreaterThan(power(plain, 3 * f0) * 0.7); // the third harmonic (15 kHz) stays
+    // the fifth (25 kHz) and the seventh (35 kHz) fold to 23 and 13 kHz without oversampling; with it they are filtered
+    // out at the doubled rate (what remains at those bins is the folding of still higher harmonics, 10 dB down)
+    expect(power(over, fold(5 * f0))).toBeLessThan(power(plain, fold(5 * f0)) * 0.4);
+    expect(power(over, fold(7 * f0))).toBeLessThan(power(plain, fold(7 * f0)) * 0.4);
+  });
+
+  it('oversampling: the digitizer with os on holds each value for rate input samples and quantizes the same', () => {
+    const run = (os: number): Float32Array => {
+      const { p, out, add } = start();
+      const o = add('osc', { wave: 0, level: 1, coarse: -24 });
+      const cr = add('crush', { bits: 4, rate: 4, os });
+      wire(p, o, 'out', cr, 'in');
+      wire(p, cr, 'out', out, 'l');
+      const e = new Engine(SR);
+      e.load(p);
+      return render(e, 4096).l;
+    };
+    const plain = run(0), over = run(1);
+    expect(rms(over)).toBeCloseTo(rms(plain), 1);
+    const steps = (a: Float32Array): number => {
+      let n = 0;
+      for (let i = 1; i < a.length; i++) if (a[i] !== a[i - 1]) n++;
+      return n;
+    };
+    expect(steps(plain)).toBeLessThan(4096 / 4 + 1); // held 4 samples
+    expect(steps(over)).toBeGreaterThan(steps(plain)); // the decimator rounds the steps' corners
+    expect(power(over, 65.4)).toBeCloseTo(power(plain, 65.4), 1);
   });
 
   it('digitizer: one bit leaves -1, 0, 1; rate 8 holds every value for 8 samples', () => {

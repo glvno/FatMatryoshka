@@ -262,9 +262,10 @@ enum {
 #define SHAPE_P_DRIVE 0
 #define SHAPE_P_MODE 1
 #define SHAPE_P_LEVEL 2
+#define SHAPE_P_OS 3
 #define SHAPE_NIN 3
 #define SHAPE_NOUT 1
-#define SHAPE_NPAR 3
+#define SHAPE_NPAR 4
 #define SHAPE_CVBASE 1
 
 /* env: Env L/R */
@@ -351,9 +352,11 @@ enum {
 #define SEQ_P_S8 7
 #define SEQ_P_LEN 8
 #define SEQ_P_DIR 9
+#define SEQ_P_GLIDE 10
+#define SEQ_P_GATE 11
 #define SEQ_NIN 4
 #define SEQ_NOUT 2
-#define SEQ_NPAR 10
+#define SEQ_NPAR 12
 #define SEQ_CVBASE 2
 
 /* clkdiv: Clock div */
@@ -468,9 +471,10 @@ enum {
 #define CRUSH_O_OUT 0
 #define CRUSH_P_BITS 0
 #define CRUSH_P_RATE 1
+#define CRUSH_P_OS 2
 #define CRUSH_NIN 3
 #define CRUSH_NOUT 1
-#define CRUSH_NPAR 2
+#define CRUSH_NPAR 3
 #define CRUSH_CVBASE 1
 
 /* ladder: Ladder */
@@ -614,7 +618,7 @@ static const char *const DELAY_DIV_NAME[DELAY_NDIV] = {"1/16T", "1/16", "1/8T", 
 
 #define MAX_IN 6
 #define MAX_OUT 12
-#define MAX_PAR 10
+#define MAX_PAR 12
 
 typedef struct {
     uint8_t nin, nout, npar;
@@ -763,15 +767,16 @@ static const uint8_t GLIDE_LOG[] = {1};
 static const char *const GLIDE_UNIT[] = {"S"};
 static const char *const *const GLIDE_CH[] = {0};
 static const char *const SHAPE_INNAMES[] = {"IN", "P1", "P2"};
-static const int32_t SHAPE_MIN[] = {65536, 0, 0};
-static const int32_t SHAPE_MAX[] = {2097152, 131072, 65536};
-static const int32_t SHAPE_DEF[] = {131072, 0, 45875};
-static const int32_t SHAPE_INC[] = {20316, 65536, 655};
-static const char *const SHAPE_PN[] = {"DRIVE", "MODE", "LEVEL"};
-static const uint8_t SHAPE_LOG[] = {1, 0, 0};
-static const char *const SHAPE_UNIT[] = {"", "", ""};
+static const int32_t SHAPE_MIN[] = {65536, 0, 0, 0};
+static const int32_t SHAPE_MAX[] = {2097152, 131072, 65536, 65536};
+static const int32_t SHAPE_DEF[] = {131072, 0, 45875, 0};
+static const int32_t SHAPE_INC[] = {20316, 65536, 655, 65536};
+static const char *const SHAPE_PN[] = {"DRIVE", "MODE", "LEVEL", "OS"};
+static const uint8_t SHAPE_LOG[] = {1, 0, 0, 0};
+static const char *const SHAPE_UNIT[] = {"", "", "", ""};
 static const char *const SHAPE_CH1[] = {"SOFT", "HARD", "FOLD", 0};
-static const char *const *const SHAPE_CH[] = {0, SHAPE_CH1, 0};
+static const char *const SHAPE_CH3[] = {"OFF", "ON", 0};
+static const char *const *const SHAPE_CH[] = {0, SHAPE_CH1, 0, SHAPE_CH3};
 static const char *const ENV_INNAMES[] = {"GATE", "P1", "P2"};
 static const int32_t ENV_MIN[] = {0, 66, 0, 66, 0, 66, 0, 66};
 static const int32_t ENV_MAX[] = {65536, 655360, 65536, 655360, 65536, 655360, 65536, 655360};
@@ -811,15 +816,15 @@ static const uint8_t CHORUS_LOG[] = {1, 0, 0};
 static const char *const CHORUS_UNIT[] = {"HZ", "", ""};
 static const char *const *const CHORUS_CH[] = {0, 0, 0};
 static const char *const SEQ_INNAMES[] = {"CLOCK", "RESET", "P1", "P2"};
-static const int32_t SEQ_MIN[] = {-65536, -65536, -65536, -65536, -65536, -65536, -65536, -65536, 65536, 0};
-static const int32_t SEQ_MAX[] = {65536, 65536, 65536, 65536, 65536, 65536, 65536, 65536, 524288, 196608};
-static const int32_t SEQ_DEF[] = {0, 0, 0, 0, 0, 0, 0, 0, 524288, 0};
-static const int32_t SEQ_INC[] = {1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 65536, 65536};
-static const char *const SEQ_PN[] = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "LEN", "DIR"};
-static const uint8_t SEQ_LOG[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static const char *const SEQ_UNIT[] = {"", "", "", "", "", "", "", "", "", ""};
+static const int32_t SEQ_MIN[] = {-65536, -65536, -65536, -65536, -65536, -65536, -65536, -65536, 65536, 0, 0, 0};
+static const int32_t SEQ_MAX[] = {65536, 65536, 65536, 65536, 65536, 65536, 65536, 65536, 524288, 196608, 65536, 65536};
+static const int32_t SEQ_DEF[] = {0, 0, 0, 0, 0, 0, 0, 0, 524288, 0, 0, 0};
+static const int32_t SEQ_INC[] = {1311, 1311, 1311, 1311, 1311, 1311, 1311, 1311, 65536, 65536, 655, 655};
+static const char *const SEQ_PN[] = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "LEN", "DIR", "GLIDE", "GATE"};
+static const uint8_t SEQ_LOG[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const char *const SEQ_UNIT[] = {"", "", "", "", "", "", "", "", "", "", "", ""};
 static const char *const SEQ_CH9[] = {"FWD", "BACK", "PENDULUM", "RANDOM", 0};
-static const char *const *const SEQ_CH[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, SEQ_CH9};
+static const char *const *const SEQ_CH[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, SEQ_CH9, 0, 0};
 static const char *const CLKDIV_INNAMES[] = {"CLOCK", "RESET", "P1", "P2"};
 static const int32_t CLKDIV_MIN[] = {65536};
 static const int32_t CLKDIV_MAX[] = {1048576};
@@ -896,14 +901,15 @@ static const uint8_t PHASER_LOG[] = {1, 0, 1, 0, 0};
 static const char *const PHASER_UNIT[] = {"HZ", "", "HZ", "", ""};
 static const char *const *const PHASER_CH[] = {0, 0, 0, 0, 0};
 static const char *const CRUSH_INNAMES[] = {"IN", "P1", "P2"};
-static const int32_t CRUSH_MIN[] = {65536, 65536};
-static const int32_t CRUSH_MAX[] = {1048576, 4194304};
-static const int32_t CRUSH_DEF[] = {524288, 65536};
-static const int32_t CRUSH_INC[] = {65536, 65536};
-static const char *const CRUSH_PN[] = {"BITS", "RATE"};
-static const uint8_t CRUSH_LOG[] = {0, 0};
-static const char *const CRUSH_UNIT[] = {"", ""};
-static const char *const *const CRUSH_CH[] = {0, 0};
+static const int32_t CRUSH_MIN[] = {65536, 65536, 0};
+static const int32_t CRUSH_MAX[] = {1048576, 4194304, 65536};
+static const int32_t CRUSH_DEF[] = {524288, 65536, 0};
+static const int32_t CRUSH_INC[] = {65536, 65536, 65536};
+static const char *const CRUSH_PN[] = {"BITS", "RATE", "OS"};
+static const uint8_t CRUSH_LOG[] = {0, 0, 0};
+static const char *const CRUSH_UNIT[] = {"", "", ""};
+static const char *const CRUSH_CH2[] = {"OFF", "ON", 0};
+static const char *const *const CRUSH_CH[] = {0, 0, CRUSH_CH2};
 static const char *const LADDER_INNAMES[] = {"IN", "CV", "P1", "P2"};
 static const int32_t LADDER_MIN[] = {1310720, 0, 65536, 0, 0};
 static const int32_t LADDER_MAX[] = {1048576000, 65536, 524288, 262144, 65536};

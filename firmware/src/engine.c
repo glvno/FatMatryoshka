@@ -35,7 +35,7 @@
 #define ENG_NGRAIN 1                /* granular lines (a shared module): 1 s of int16 plus the grain records, 88 KB */
 #else
 #define ENG_MAX_INST 92             /* module instances, all voices: a shared module has one, a per-note module one per note */
-#define ENG_NBUF 126u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
+#define ENG_NBUF 124u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
 #define ENG_NDELAY 4                /* delay lines, all voices (one each when every voice has a delay) */
 #define ENG_NREV 2                  /* reverb memories, all voices */
 #define ENG_NSTRING 6               /* string lines, all voices (a per-note module: one per note) */
@@ -228,7 +228,8 @@ typedef struct {
         struct { uint32_t seed; int32_t y; } noise;   /* y: the colour one-pole, Q24 */
         struct { int32_t ic1[3], ic2[3]; } vow;       /* three band passes, Q20 */
         struct { uint32_t phase; int32_t ap[8], fbv; } phs;   /* the sweep LFO, x1 / y1 of the four allpasses, the feedback sample */
-        struct { int32_t held, cnt; } crush;
+        struct { int32_t held, cnt, xb, ap[16]; } crush;   /* xb, ap: the 2x oversampling (os_up / os_down) */
+        struct { int32_t xb, ap[16]; } shp;
         struct { int32_t v; uint8_t stage, prev; } adsr;
         struct { int32_t ic1, ic2, jc1, jc2; } flt;   /* stage 1 and stage 2 integrators */
         struct { int32_t s[4]; } lad;                 /* the four one-pole states, Q20 */
@@ -242,7 +243,7 @@ typedef struct {
         struct { int16_t *buf; uint32_t w, seed; int32_t lp, s1, err, burst, blen; } str;   /* Q13 line with error feedback */
         struct { uint32_t phase; int32_t s1; } wt;
         struct { int16_t *buf; uint32_t w, phase; } ch;
-        struct { uint32_t seed; int32_t c1, r1; int8_t pos, down; } seq;
+        struct { uint32_t seed; int32_t c1, r1, y, period, since, gleft; int8_t pos, down; } seq;   /* y: the glide one-pole, Q24; period / since: clock edge distance in samples (since -1 before the first edge) */
         struct { int32_t count, c1, r1; } cdv;
         struct { int32_t v, c1; } sh;
         struct { int32_t rem, t1; } pls;
@@ -394,6 +395,7 @@ static void init_state(const node_t *nd, inst_t *it)
         break;
     case T_SEQ:
         it->s.seq.seed = 0x9e3779b9u;
+        it->s.seq.since = -1;
         break;
     case T_GRAIN:
         it->s.gr.seed = 0x7f4a7c15u;
@@ -1154,27 +1156,51 @@ static void m_glide(const node_t *nd, inst_t *it, uint32_t n)
 }
 
 /* waveshaper: drive, then a cubic soft clip (1.5 x - x^3 / 2 up to the knee at 1), a hard clip or a triangle fold */
+/* 2x oversampling around a nonlinearity (modules.ts os2): the oscillator's half-band as an interpolator (os_up0 = the
+ * even sub-sample, os_up1 = the odd one; ap[0..7]) and as the decimator (os_down; ap[8..15], *xb = the odd sub-sample of
+ * the previous frame, as in m_osc) */
+static inline int32_t os_up0(int32_t *ap, int32_t x) { return allpass16(ap + 4, HB_A[2], allpass16(ap, HB_A[0], x)); }
+static inline int32_t os_up1(int32_t *ap, int32_t x) { return allpass16(ap + 6, HB_A[3], allpass16(ap + 2, HB_A[1], x)); }
+static inline int32_t os_down(int32_t *ap, int32_t *xb, int32_t y0, int32_t y1)
+{
+    int32_t p0 = os_up0(ap, y0), p1 = os_up1(ap, *xb);
+    *xb = y1;
+    return (p0 + p1) >> 1;
+}
+
+/* the shaper's curve of a driven sample x (up to +-32): a cubic soft clip, a hard clip or a triangle fold, the peak at 1 */
+static inline int32_t shape_curve(int32_t x, int32_t mode)
+{
+    int32_t y;
+    if (mode == 1)
+        y = clampi(x, -ENG_ONE, ENG_ONE);
+    else if (mode == 2) {
+        int32_t t = (x + ENG_ONE) & (4 * ENG_ONE - 1);                      /* 0 .. 4: a triangle of period 4 */
+        y = t < 2 * ENG_ONE ? t - ENG_ONE : 3 * ENG_ONE - t;
+    } else if (x >= ENG_ONE)
+        y = ENG_ONE;
+    else if (x <= -ENG_ONE)
+        y = -ENG_ONE;
+    else {
+        int32_t x3 = mul16(mul16(x, x), x);
+        y = x + (x >> 1) - (x3 >> 1);
+    }
+    return y;
+}
+
 static void m_shape(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *in = it->in[SHAPE_I_IN];
     esig_t *out = it->out[0];
     int32_t drive = EF(it, SHAPE_P_DRIVE), mode = round_q16(EF(it, SHAPE_P_MODE)), lvl = EF(it, SHAPE_P_LEVEL);
+    int os = EF(it, SHAPE_P_OS) >= 32768, *ap = it->s.shp.ap;
     uint32_t i;
     for (i = 0; i < n; i++) {
-        int32_t x = mul16(in[i], drive), y;                                /* up to +-32 */
-        if (mode == 1)
-            y = clampi(x, -ENG_ONE, ENG_ONE);
-        else if (mode == 2) {
-            int32_t t = (x + ENG_ONE) & (4 * ENG_ONE - 1);                  /* 0 .. 4: a triangle of period 4 */
-            y = t < 2 * ENG_ONE ? t - ENG_ONE : 3 * ENG_ONE - t;
-        } else if (x >= ENG_ONE)
-            y = ENG_ONE;
-        else if (x <= -ENG_ONE)
-            y = -ENG_ONE;
-        else {
-            int32_t x3 = mul16(mul16(x, x), x);
-            y = x + (x >> 1) - (x3 >> 1);
-        }
+        int32_t x = mul16(in[i], drive), y;
+        if (os)
+            y = os_down(ap + 8, &it->s.shp.xb, shape_curve(os_up0(ap, x), mode), shape_curve(os_up1(ap, x), mode));
+        else
+            y = shape_curve(x, mode);
         out[i] = mul16(y, lvl);
     }
 }
@@ -2060,12 +2086,25 @@ static void m_seq(const node_t *nd, inst_t *it, uint32_t n)
     esig_t *out = it->out[SEQ_O_OUT], *gate = it->out[SEQ_O_GATE];
     int32_t len = clampi(round_q16(EF(it, SEQ_P_LEN)), 1, 8), dir = round_q16(EF(it, SEQ_P_DIR));
     int32_t pos = it->s.seq.pos, down = it->s.seq.down, c1 = it->s.seq.c1, r1 = it->s.seq.r1;
+    int32_t y = it->s.seq.y, period = it->s.seq.period, since = it->s.seq.since, gleft = it->s.seq.gleft;
+    int32_t gl = EF(it, SEQ_P_GLIDE), glen = EF(it, SEQ_P_GATE), k = 0;
     uint32_t seed = it->s.seq.seed, i;
+    /* glide and gate length are fractions of the clock period (the last two edges): a one-pole on out reaching 99 % in
+     * glide x period; the gate stays up gate x period after the edge (1 = legato). 0: out is the step, the gate the clock */
+    if (gl > 0 && period > 0)
+        k = env_rate_q8((uint64_t)(uint32_t)mul16(gl, period << 8));
     for (i = 0; i < n; i++) {
         int rst = reset[i] >= 32768 && r1 < 32768, clk = clock[i] >= 32768 && c1 < 32768;
         int32_t v;
         r1 = reset[i];
         c1 = clock[i];
+        if (since >= 0 && since < (1 << 23))
+            since++;
+        if (clk) {
+            if (since > 0)
+                period = since;
+            since = 0;
+        }
         if (rst) {
             pos = 0;
             down = 0;
@@ -2095,14 +2134,29 @@ static void m_seq(const node_t *nd, inst_t *it, uint32_t n)
                 pos = (pos + 1) % len;
         }
         v = EF(it, SEQ_P_S1 + (pos < len ? pos : len - 1));
-        out[i] = v;
-        gate[i] = clock[i] >= 32768 && v > -ENG_ONE ? ENG_ONE : 0;
+        if (k > 0) {
+            y += mulq(k, (v << 8) - y, 30);
+            out[i] = (y + 128) >> 8;
+        } else
+            out[i] = v, y = v << 8;
+        if (glen > 0 && period > 0) {
+            if (clk)
+                gleft = v > -ENG_ONE ? (int32_t)(((int64_t)glen * period + 32768) >> 16) : 0;
+            gate[i] = gleft > 0 ? ENG_ONE : 0;
+            if (gleft > 0)
+                gleft--;
+        } else
+            gate[i] = clock[i] >= 32768 && v > -ENG_ONE ? ENG_ONE : 0;
     }
     it->s.seq.pos = (int8_t)pos;
     it->s.seq.down = (int8_t)down;
     it->s.seq.c1 = c1;
     it->s.seq.r1 = r1;
     it->s.seq.seed = seed;
+    it->s.seq.y = y;
+    it->s.seq.period = period;
+    it->s.seq.since = since;
+    it->s.seq.gleft = gleft;
 }
 
 static void m_clkdiv(const node_t *nd, inst_t *it, uint32_t n)
@@ -2294,15 +2348,36 @@ static void m_phaser(const node_t *nd, inst_t *it, uint32_t n)
 }
 
 /* 2^bits levels over -1..1 (a step of 2^(17 - bits) in Q16), every taken sample held for `rate` samples */
+/* bits / rate reduction; os: 2x oversampled (the rate counts input samples either way: the counter runs at 2 rate) */
 static void m_crush(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *in = it->in[CRUSH_I_IN];
     esig_t *out = it->out[0];
     int32_t bits = clampi(round_q16(EF(it, CRUSH_P_BITS)), 1, 16), rate = clampi(round_q16(EF(it, CRUSH_P_RATE)), 1, 64);
-    int32_t held = it->s.crush.held, cnt = it->s.crush.cnt;
+    int32_t held = it->s.crush.held, cnt = it->s.crush.cnt, *ap = it->s.crush.ap;
+    int os = EF(it, CRUSH_P_OS) >= 32768;
     unsigned sh = (unsigned)(17 - bits);
     uint32_t i;
+    if (os)
+        rate *= 2;
     for (i = 0; i < n; i++) {
+        if (os) {
+            int32_t u0 = os_up0(ap, in[i]), u1 = os_up1(ap, in[i]), y0, y1;
+            if (cnt <= 0) {
+                held = ((u0 + (1 << (sh - 1))) >> sh) << sh;
+                cnt = rate;
+            }
+            cnt--;
+            y0 = held;
+            if (cnt <= 0) {
+                held = ((u1 + (1 << (sh - 1))) >> sh) << sh;
+                cnt = rate;
+            }
+            cnt--;
+            y1 = held;
+            out[i] = os_down(ap + 8, &it->s.crush.xb, y0, y1);
+            continue;
+        }
         if (cnt <= 0) {
             held = ((in[i] + (1 << (sh - 1))) >> sh) << sh;
             cnt = rate;

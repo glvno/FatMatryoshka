@@ -11,7 +11,7 @@ describe('binary patch format', () => {
       const b = encodePatch(p);
       const dv = new DataView(b.buffer);
       expect(b[0], name).toBe(0xa1);
-      expect(b[1], name).toBe(12);
+      expect(b[1], name).toBe(13);
       expect(b[2], name).toBe(p.modules.length);
       expect(b[3], name).toBe(1); // voices: the factory presets are mono
       expect(dv.getUint16(4, true), name).toBe(p.cables.length);

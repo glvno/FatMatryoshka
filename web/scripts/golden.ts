@@ -750,6 +750,34 @@ kit('vowel-phaser', (add, wire) => {
   wire(ph, 'out', out, 'r');
 });
 // coloured noise through the digitizer
+kit('os-shape-crush', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.8, coarse: 12 });
+  const sh = add('shape', 0, 0, { mode: 1, drive: 6, level: 0.6, os: 1 });
+  const cr = add('crush', 0, 0, { bits: 5, rate: 3, os: 1 });
+  const out = add('output', 0, 0, { level: 0.8 });
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(osc, 'out', sh, 'in');
+  wire(sh, 'out', cr, 'in');
+  wire(cr, 'out', out, 'l');
+});
+kit('seq-glide', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const clk = add('lfo', 0, 0, { wave: 3, rate: 8, depth: 1 });
+  const sq = add('seq', 0, 0, { s1: 0, s2: 0.5, s3: -1, s4: 0.25, s5: 1, s6: 0.4, s7: -0.5, s8: 0, len: 8, glide: 0.35, gate: 0.6 });
+  const env = add('adsr', 0, 0, { a: 0.005, d: 0.1, s: 0.5, r: 0.08 });
+  const osc = add('osc', 0, 0, { wave: 3, level: 0.7 });
+  const vca = add('vca', 0, 0);
+  const out = add('output', 0, 0, { level: 0.8 });
+  wire(clk, 'out', sq, 'clock');
+  wire(kb, 'gate', sq, 'reset');
+  wire(sq, 'out', osc, 'pitch');
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(sq, 'gate', env, 'gate');
+  wire(osc, 'out', vca, 'in');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', out, 'l');
+});
 kit('crush-color', (add, wire) => {
   const nz = add('noise', 0, 0, { level: 0.6, color: 0.6 });
   const cr = add('crush', 0, 0, { bits: 6, rate: 5 });

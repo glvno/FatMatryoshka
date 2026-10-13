@@ -50,7 +50,7 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - The Oscillator and the LFO have a `sync` input: a rising edge (the Main gate, a square LFO, anything above 0.5) restarts the phase. Main `gate` into an oscillator's `sync` gives every note the same attack, the way FM synths do; one oscillator's output into another's `sync` is hard sync.
 - **Glide** is a one-pole slew for any control: Main `pitch` through a Glide into the oscillator is portamento; `time` is how long a step takes to get within 1 %.
-- **Shaper** drives a signal into a soft clip (smooth up to the knee), a hard clip or a triangle fold, with the peak kept at 1 and a `level` after it. It is the drive for a bass and the safety for a hot FM carrier.
+- **Shaper** drives a signal into a soft clip (smooth up to the knee), a hard clip or a triangle fold, with the peak kept at 1 and a `level` after it. It is the drive for a bass and the safety for a hot FM carrier. `os` runs it 2x oversampled: the harmonics above 22 kHz are filtered out instead of folding back as inharmonic grit (about 2.3x the CPU of the module; off by default).
 - The Main panel has a `spread` output: a constant per voice from -1 (first voice) to 1 (last), 0 in mono. Into an oscillator's `p1` with `fine` ticked it detunes the voices into a unison pad; into two VCAs with opposite attenuverters it pans them.
 
 
@@ -63,7 +63,7 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 ## Sequencer, clock divider, S&H, quantizer, pulse
 
-- **Sequencer**: eight steps (`s1`..`s8`, −1..1), `len` and `dir` (forward, backward, pendulum, random). A rising edge on `clock` moves on, `reset` goes back to step 1. `out` is the current step all the time, `gate` follows the clock while the step is not a rest; a step turned fully down is a rest. A square LFO is a clock; Main `gate` into `reset` restarts the pattern on every key.
+- **Sequencer**: eight steps (`s1`..`s8`, −1..1), `len` and `dir` (forward, backward, pendulum, random). A rising edge on `clock` moves on, `reset` goes back to step 1. `out` is the current step all the time, `gate` follows the clock while the step is not a rest; a step turned fully down is a rest. A square LFO is a clock; Main `gate` into `reset` restarts the pattern on every key. `glide` slews `out` from step to step (the time is that fraction of the clock period, so it follows the tempo; 0 = steps), `gate` sets the gate length as a fraction of the period (0 = the clock's own width, 1 = legato: the steps tie and an ADSR does not retrigger). Both measure the period from the last two clock edges.
 - **Clock div**: `out` passes every `div`-th clock pulse, `d2` `d4` `d8` every 2nd, 4th and 8th; `reset` makes the next pulse a downbeat.
 - **S&H**: `out` takes `in` on a clock edge (`hold`) or follows it while the clock is up (`track`). Noise into a clocked S&H into a Quantizer is a random melody.
 - **Quantizer**: snaps a pitch to the nearest note of a scale on a root (chromatic, major, minor, pentatonics, dorian, mixolydian, blues, whole tone, fifths, octaves). Put it after a Sequencer, an S&H, a Glide or an LFO into `pitch`.
@@ -74,7 +74,7 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 - **Crossfade** fades between `a` and `b` by `mix` + `pos` (an envelope or an LFO on `pos`).
 - **Vowel** is three band passes at the formants of A E I O U; `vowel` morphs between them (0..4), the input adds to it, `res` is the sharpness.
 - **Phaser** sweeps four allpass stages ±2 `depth` octaves around `center` at `rate`, with `fb` and `mix`.
-- **Digitizer** reduces the bit depth (`bits`) and the sample rate (`rate` = every sample held that many times).
+- **Digitizer** reduces the bit depth (`bits`) and the sample rate (`rate` = every sample held that many times). `os` as on the Shaper: the steps are rounded off at twice the rate before coming back down, so the images of the held samples alias less.
 - **Noise** has a `color` parameter: 0 is white, 1 rolls the top off from about 220 Hz.
 ## Unison
 
