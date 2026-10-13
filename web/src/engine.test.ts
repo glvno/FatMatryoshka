@@ -702,6 +702,35 @@ describe('bend, mod wheel, aftertouch, cc', () => {
   });
 });
 
+describe('frequency shifter', () => {
+  function rig(params: Record<string, number>, port: 'up' | 'down'): Float32Array {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    const sh = addModule(p, DEFS.shift, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    Object.assign(o.params, { wave: 0, level: 0.5, coarse: 9 }); // A4, 440 Hz
+    out.params.level = 1;
+    Object.assign(sh.params, params);
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: sh.id, port: 'in' });
+    connect(p, DEFS, { module: sh.id, port }, { module: out.id, port: 'l' });
+    e.load(p);
+    render(e, 4800);
+    return render(e, SR).l;
+  }
+
+  it('moves a 440 Hz sine up and down by the shift, with the level kept', () => {
+    const up = rig({ shift: 100, mix: 1 }, 'up');
+    const down = rig({ shift: 100, mix: 1 }, 'down');
+    expect(Math.abs(freq(up) - 540)).toBeLessThan(12);
+    expect(Math.abs(freq(down) - 340)).toBeLessThan(12);
+    expect(rms(up)).toBeCloseTo(0.5 / Math.SQRT2, 2);
+    expect(Math.abs(freq(rig({ shift: -100, mix: 1 }, 'up')) - 340)).toBeLessThan(12);
+    expect(Math.abs(freq(rig({ shift: 0, mix: 0 }, 'up')) - 440)).toBeLessThan(5);
+  });
+});
+
 describe('ladder filter', () => {
   /** noise -> ladder -> output left, taken from the given output */
   function rig(port: string, params: Record<string, number>, note?: number, level = 0.3): Float32Array {

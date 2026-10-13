@@ -218,6 +218,18 @@ kit('modal', (add, wire) => {
   wire(kb, 'pitch', md, 'pitch');
   wire(md, 'out', out, 'l');
 });
+kit('shift', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.6 });
+  const lfo = add('lfo', 0, 0, { wave: 1, rate: 0.5, depth: 1 });
+  const sh = add('shift', 0, 0, { shift: 80, cvamt: 200, mix: 0.9 });
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(osc, 'out', sh, 'in');
+  wire(lfo, 'out', sh, 'cv');
+  wire(sh, 'up', out, 'l');
+  wire(sh, 'down', out, 'r');
+});
 kit('ladder', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.8 });

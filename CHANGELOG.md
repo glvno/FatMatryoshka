@@ -8,6 +8,7 @@ The merge of the four-voice firmware (1.0.2) with the polyphony, assembly and mo
 - **Polyphony per voice:** each of the four voices' patches plays 1..8 notes (the editor's `voices` row; on the FM-1 the ALGORITHM encoder on the mixer page, shown as MONO / POLY n per voice and in the Main page title).
 - Modules from the development branch: glide, shaper, level/rate envelope, string, wavetable, chorus, sequencer, clock divider, S&H, quantizer, pulse, pan, crossfade, vowel, phaser, digitizer; noise colour; oscillator feedback and oversampled FM; sync inputs; the Main module's `spread` output; assemblies in the editor.
 - **Oscillator unison:** `unison` (1..5 detuned copies) and `detune` (cents) on the plain path; binary patch format 11 (older stored patches fall back to the factory patch).
+- Module **Freq shift** (`shift`): a single-sideband frequency shifter with `up` and `down` outputs, cv and mix.
 - **Pitch bend** (±2 semitones on the Main module's pitch, plus a `bend` output), **mod wheel** (`mod` output), **channel aftertouch** (`at` output) and **CC 16..19** to the Main module's knobs, in the browser and on the FM-1 (USB and TRS MIDI).
 - Modules **Comb** (tuned feedback comb with signed feedback and damping) and **Modal** (six-partial modal resonator, harmonic to bar-like, with decay, damp and brightness).
 - Module **Granular** (`grain`): a one second recording with up to eight pitch-shifted, windowed grains, density, position, spray, trig input and freeze. Shared like the delay; one line on the FM-1 (one-voice build only).

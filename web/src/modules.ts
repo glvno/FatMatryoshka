@@ -881,6 +881,67 @@ const modal: ModuleImpl<{ y1: Float64Array; y2: Float64Array }> = {
   },
 };
 
+/** the Hilbert pair: two chains of four second-order allpasses y = a^2 (x + y2) - x2 whose outputs are 90 degrees apart
+ *  (Olli Niemitalo's coefficients); chain A's output is delayed by one sample */
+const HILBERT_A = [0.6923878, 0.9360654322959, 0.988229522686, 0.9987488452737];
+const HILBERT_B = [0.4021921162426, 0.856171088242, 0.9722909545651, 0.9952884791278];
+
+/** one chain: s holds x1, x2, y1, y2 per section */
+function hilbert(s: Float64Array, a: number[], x: number): number {
+  for (let k = 0; k < 4; k++) {
+    const o = 4 * k;
+    const y = a[k] * a[k] * (x + s[o + 3]) - s[o + 1];
+    s[o + 1] = s[o];
+    s[o] = x;
+    s[o + 3] = s[o + 2];
+    s[o + 2] = y;
+    x = y;
+  }
+  return x;
+}
+
+/**
+ * Frequency shifter (single sideband): the Hilbert pair gives I (chain A, one sample late) and Q (chain B), a quadrature
+ * oscillator at `shift` + cv x cvamt Hz (per block, from the block mean of cv) moves the whole spectrum: up = I cos + Q sin,
+ * down = I cos - Q sin (with this Hilbert pair's sign convention); each output is in (1 - mix) + shifted mix. A negative
+ * shift swaps the two.
+ */
+const shift: ModuleImpl<{ a: Float64Array; b: Float64Array; ia: number; phase: number }> = {
+  def: {
+    type: 'shift',
+    label: 'Freq shift',
+    inputs: [audio('in'), control('cv')],
+    outputs: [audio('up'), audio('down')],
+    params: [
+      param('shift', -1000, 1000, 100, { unit: 'Hz', step: 0.5 }),
+      param('cvamt', 0, 1000, 100, { unit: 'Hz', step: 1 }),
+      param('mix', 0, 1, 1, { step: 0.01 }),
+    ],
+  },
+  init: () => ({ a: new Float64Array(16), b: new Float64Array(16), ia: 0, phase: 0 }),
+  process(c, s) {
+    let cvm = 0;
+    for (let i = 0; i < c.n; i++) cvm += c.inp.cv[i];
+    cvm /= c.n;
+    const hz = (c.p.shift ?? 0) + cvm * (c.p.cvamt ?? 0);
+    const inc = hz / c.sr;
+    const mix = c.p.mix ?? 1;
+    const dry = 1 - mix;
+    for (let i = 0; i < c.n; i++) {
+      const x = c.inp.in[i];
+      const ya = hilbert(s.a, HILBERT_A, x);
+      const I = s.ia;
+      s.ia = ya;
+      const Q = hilbert(s.b, HILBERT_B, x);
+      const co = Math.cos(2 * Math.PI * s.phase), si = Math.sin(2 * Math.PI * s.phase);
+      s.phase += inc;
+      s.phase -= Math.floor(s.phase);
+      c.out.up[i] = x * dry + (I * co + Q * si) * mix;
+      c.out.down[i] = x * dry + (I * co - Q * si) * mix;
+    }
+  },
+};
+
 const mixer: ModuleImpl<null> = {
   def: {
     type: 'mixer',
@@ -1736,7 +1797,7 @@ const crush: ModuleImpl<{ held: number; cnt: number }> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic, grain, comb, modal];
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic, grain, comb, modal, shift];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an

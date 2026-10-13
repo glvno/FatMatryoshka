@@ -234,6 +234,7 @@ typedef struct {
         struct { int32_t s[4]; } lad;                 /* the four one-pole states, Q20 */
         struct { int32_t env; } dyn;                  /* the peak follower, Q24 */
         struct { int32_t y1[6], y2[6]; } mod;         /* the modal resonators, Q20 */
+        struct { int32_t a[16], b[16], ia; uint32_t phase; } fs;   /* the Hilbert chains (x1 x2 y1 y2 per section), chain A's delayed sample, the quadrature oscillator */
         struct { struct grain_line *ln; uint32_t w, acc, seed; uint8_t prev; } gr;   /* acc: grains per sample, Q24 */
         struct { int16_t *buf; uint32_t w, t, seen, beat; uint32_t ring[DELAY_CLK_PPQN]; uint8_t prev; } dly;   /* t, ring, seen, beat: the clock tempo */
         struct { int16_t *buf; uint16_t ci[4], ai[2]; int32_t lp[4]; } rev;
@@ -1564,6 +1565,54 @@ static void m_grain(const node_t *nd, inst_t *it, uint32_t n)
     (void)nd;
 }
 
+/* the Hilbert pair's a^2 in Q30 (modules.ts HILBERT_A / HILBERT_B) */
+static const int32_t HILB_A2[4] = {514754545, 940817629, 1048585287, 1071056860};
+static const int32_t HILB_B2[4] = {173707895, 787158236, 1015003234, 1063657107};
+
+static inline int32_t hilbert16(int32_t *s, const int32_t *a2, int32_t x)      /* one chain: s = x1 x2 y1 y2 per section */
+{
+    uint32_t k;
+    for (k = 0; k < 4u; k++) {
+        int32_t *o = s + 4 * k;
+        int32_t y = mulr(a2[k], x + o[3], 30) - o[1];
+        o[1] = o[0];
+        o[0] = x;
+        o[3] = o[2];
+        o[2] = y;
+        x = y;
+    }
+    return x;
+}
+
+/* Frequency shifter (modules.ts shift): I = chain A one sample late, Q = chain B; up = I cos + Q sin, down = I cos - Q sin
+ * at shift + cv x cvamt Hz (per block). Signals Q16, allpass coefficients Q30, the oscillator sin_turn. */
+static void m_shift(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[SHIFT_I_IN], *cv = it->in[SHIFT_I_CV];
+    esig_t *up = it->out[SHIFT_O_UP], *down = it->out[SHIFT_O_DOWN];
+    int32_t hz = EF(it, SHIFT_P_SHIFT), mix = EF(it, SHIFT_P_MIX), dry = ENG_ONE - mix, ia = it->s.fs.ia;
+    uint32_t phase = it->s.fs.phase, inc, i;
+    if (nd->conn & (1u << SHIFT_I_CV)) {
+        int64_t sum = 0;
+        for (i = 0; i < n; i++)
+            sum += cv[i];
+        hz += mul16((int32_t)(sum / (int32_t)n), EF(it, SHIFT_P_CVAMT));
+    }
+    inc = (uint32_t)(((int64_t)hz << 16) / (int32_t)ENG_SR);                 /* Hz Q16 -> turns per sample in u32 (negative wraps) */
+    for (i = 0; i < n; i++) {
+        int32_t x = in[i], I = ia, Q, co, si;
+        ia = hilbert16(it->s.fs.a, HILB_A2, x);
+        Q = hilbert16(it->s.fs.b, HILB_B2, x);
+        co = sin_turn(phase + 0x40000000u);
+        si = sin_turn(phase);
+        phase += inc;
+        up[i] = mul16(x, dry) + mul16(mul16(I, co) + mul16(Q, si), mix);
+        down[i] = mul16(x, dry) + mul16(mul16(I, co) - mul16(Q, si), mix);
+    }
+    it->s.fs.ia = ia;
+    it->s.fs.phase = phase;
+}
+
 static void m_mixer(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *a = it->in[MIXER_I_IN1], *b = it->in[MIXER_I_IN2], *c = it->in[MIXER_I_IN3], *d = it->in[MIXER_I_IN4];
@@ -2323,6 +2372,7 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     case T_GRAIN: m_grain(nd, it, n); break;
     case T_COMB: m_comb(nd, it, n); break;
     case T_MODAL: m_modal(nd, it, n); break;
+    case T_SHIFT: m_shift(nd, it, n); break;
     case T_CRUSH: m_crush(nd, it, n); break;
     default: break;                      /* output: read by eng_render */
     }

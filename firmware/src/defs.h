@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 36
+#define N_TYPES 37
 enum {
     T_FM1,
     T_OSC,
@@ -41,6 +41,7 @@ enum {
     T_GRAIN,
     T_COMB,
     T_MODAL,
+    T_SHIFT,
 };
 
 /* fm1: Main */
@@ -587,6 +588,21 @@ enum {
 #define MODAL_NPAR 5
 #define MODAL_CVBASE 2
 
+/* shift: Freq shift */
+#define SHIFT_I_IN 0
+#define SHIFT_I_CV 1
+#define SHIFT_I_P1 2
+#define SHIFT_I_P2 3
+#define SHIFT_O_UP 0
+#define SHIFT_O_DOWN 1
+#define SHIFT_P_SHIFT 0
+#define SHIFT_P_CVAMT 1
+#define SHIFT_P_MIX 2
+#define SHIFT_NIN 4
+#define SHIFT_NOUT 2
+#define SHIFT_NPAR 3
+#define SHIFT_CVBASE 2
+
 #define DELAY_NDIV 11
 #define DELAY_CLK_PPQN 24
 static const uint8_t DELAY_DIV_NUM[DELAY_NDIV] = {1, 1, 1, 3, 1, 3, 1, 3, 2, 5, 4};
@@ -949,6 +965,15 @@ static const char *const MODAL_PN[] = {"COARSE", "DECAY", "STRUCT", "BRIGHT", "D
 static const uint8_t MODAL_LOG[] = {0, 1, 0, 0, 0};
 static const char *const MODAL_UNIT[] = {"ST", "S", "", "", ""};
 static const char *const *const MODAL_CH[] = {0, 0, 0, 0, 0};
+static const char *const SHIFT_INNAMES[] = {"IN", "CV", "P1", "P2"};
+static const int32_t SHIFT_MIN[] = {-65536000, 0, 0};
+static const int32_t SHIFT_MAX[] = {65536000, 65536000, 65536};
+static const int32_t SHIFT_DEF[] = {6553600, 6553600, 65536};
+static const int32_t SHIFT_INC[] = {1310720, 655360, 655};
+static const char *const SHIFT_PN[] = {"SHIFT", "CVAMT", "MIX"};
+static const uint8_t SHIFT_LOG[] = {0, 0, 0};
+static const char *const SHIFT_UNIT[] = {"HZ", "HZ", ""};
+static const char *const *const SHIFT_CH[] = {0, 0, 0};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, FM1_CVBASE, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -987,4 +1012,5 @@ static const def_t DEFS[N_TYPES] = {
     {GRAIN_NIN, GRAIN_NOUT, GRAIN_NPAR, GRAIN_CVBASE, GRAIN_MIN, GRAIN_MAX, GRAIN_DEF, GRAIN_INC, "GRANULAR", GRAIN_PN, GRAIN_INNAMES, GRAIN_LOG, GRAIN_UNIT, GRAIN_CH},   /* grain */
     {COMB_NIN, COMB_NOUT, COMB_NPAR, COMB_CVBASE, COMB_MIN, COMB_MAX, COMB_DEF, COMB_INC, "COMB", COMB_PN, COMB_INNAMES, COMB_LOG, COMB_UNIT, COMB_CH},   /* comb */
     {MODAL_NIN, MODAL_NOUT, MODAL_NPAR, MODAL_CVBASE, MODAL_MIN, MODAL_MAX, MODAL_DEF, MODAL_INC, "MODAL", MODAL_PN, MODAL_INNAMES, MODAL_LOG, MODAL_UNIT, MODAL_CH},   /* modal */
+    {SHIFT_NIN, SHIFT_NOUT, SHIFT_NPAR, SHIFT_CVBASE, SHIFT_MIN, SHIFT_MAX, SHIFT_DEF, SHIFT_INC, "FREQ SHIFT", SHIFT_PN, SHIFT_INNAMES, SHIFT_LOG, SHIFT_UNIT, SHIFT_CH},   /* shift */
 };

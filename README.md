@@ -80,6 +80,10 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - The **Oscillator** has `unison` (1..5 copies) and `detune` (cents, spread from −detune to +detune): a supersaw or a thick pulse from one module, summed so the peak stays at `level`. Sync restarts all copies. With `pm` connected or `fb` above 0 the oscillator runs its FM path, which plays one copy.
 
+## Frequency shifter
+
+- **Freq shift** moves every partial by the same number of Hz (not a pitch shift: harmonics become inharmonic): `up` and `down` outputs, `shift` ±1000 Hz with `cv` × `cvamt`, `mix`. A few Hz for a slow barber-pole phasing, hundreds for bells and clangs out of a saw.
+
 ## Performance controls
 
 - Pitch bend moves the Main module's `pitch` by ±2 semitones in every patch; the wheel is also a `bend` output (−1..1). The mod wheel (CC 1) is the `mod` output, channel aftertouch the `at` output: patch them into any `p1` / `p2`. CC 16..19 turn the Main module's K1..K4 from a controller. In the browser the editor's sliders do not follow CC.
