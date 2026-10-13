@@ -209,7 +209,7 @@ typedef struct {
     const esig_t *in[MAX_IN];
     esig_t *out[MAX_OUT];
     union {
-        struct { uint32_t phase; int32_t s1, y1, y2, pm1, xb, ap[8]; } osc;   /* s1: last sync sample; FM mode: feedback history, pm interpolation, decimator */
+        struct { uint32_t phase; int32_t s1, y1, y2, pm1, xb, ap[8]; uint32_t ph[4]; } osc;   /* s1: last sync sample; FM mode: feedback history, pm interpolation, decimator; ph: unison voices 2..5 (plain path) */
         struct { uint32_t phase, seed; int32_t held; uint32_t since; int32_t interval; uint16_t ticks; uint8_t clk_hi, rst_hi; } lfo;   /* interval: clock edge distance in samples, Q8 */
         struct { int32_t y; } gld;         /* Q24 */
         struct { uint32_t seed; int32_t y; } noise;   /* y: the colour one-pole, Q24 */
@@ -907,15 +907,36 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
     int32_t idx = nd->conn & (1u << OSC_I_PM) ? EF(it, OSC_P_PM) : 0;
     int32_t y1, y2, pm1, xb, *ap = it->s.osc.ap, s1 = it->s.osc.s1;
     if (idx <= 0 && fb <= 0) {                                             /* the plain oscillator: one wave per frame */
+        int32_t nu = clampi(round_q16(EF(it, OSC_P_UNISON)), 1, 5), det = EF(it, OSC_P_DETUNE), doct[5], j;
+        uint32_t *ph = it->s.osc.ph;
+        static const int32_t INV_N[6] = {0, 65536, 32768, 21845, 16384, 13107};
+        for (j = 0; j < nu; j++)                                           /* unison voice j: -detune .. +detune cents, in octaves */
+            doct[j] = nu > 1 ? (int32_t)(((int64_t)det * (2 * j - (nu - 1))) / ((int64_t)(nu - 1) * 1200)) : 0;
         for (i = 0; i < n; i++) {
-            uint32_t dt = exp2_scale(INC_C4, pitch[i] + base);
+            int rst = sync[i] >= 32768 && s1 < 32768;                      /* a rising edge on sync restarts the phases */
+            uint32_t dt = exp2_scale(INC_C4, pitch[i] + base + doct[0]);
+            int32_t y;
             if (dt > DT_MAX)
                 dt = DT_MAX;
-            if (sync[i] >= 32768 && s1 < 32768)                            /* a rising edge on sync restarts the phase */
-                phase = 0;
             s1 = sync[i];
+            if (rst)
+                phase = 0;
             phase += dt;
-            out[i] = mul16(wave(kind, phase, dt, pw), lvl);
+            y = wave(kind, phase, dt, pw);
+            if (nu == 1) {
+                out[i] = mul16(y, lvl);
+                continue;
+            }
+            for (j = 1; j < nu; j++) {
+                uint32_t dtj = exp2_scale(INC_C4, pitch[i] + base + doct[j]);
+                if (dtj > DT_MAX)
+                    dtj = DT_MAX;
+                if (rst)
+                    ph[j - 1] = 0;
+                ph[j - 1] += dtj;
+                y += wave(kind, ph[j - 1], dtj, pw);
+            }
+            out[i] = mul16(mul16(y, INV_N[nu]), lvl);
         }
         it->s.osc.phase = phase;
         it->s.osc.s1 = s1;

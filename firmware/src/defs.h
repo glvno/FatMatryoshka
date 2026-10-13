@@ -70,9 +70,11 @@ enum {
 #define OSC_P_PM 4
 #define OSC_P_LEVEL 5
 #define OSC_P_FB 6
+#define OSC_P_UNISON 7
+#define OSC_P_DETUNE 8
 #define OSC_NIN 5
 #define OSC_NOUT 1
-#define OSC_NPAR 7
+#define OSC_NPAR 9
 #define OSC_CVBASE 3
 
 /* lfo: LFO */
@@ -507,15 +509,15 @@ static const uint8_t FM1_LOG[] = {0, 0, 0, 0};
 static const char *const FM1_UNIT[] = {"", "", "", ""};
 static const char *const *const FM1_CH[] = {0, 0, 0, 0};
 static const char *const OSC_INNAMES[] = {"PITCH", "PM", "SYNC", "P1", "P2"};
-static const int32_t OSC_MIN[] = {0, 3277, -3145728, -6553600, 0, 0, 0};
-static const int32_t OSC_MAX[] = {196608, 62259, 3145728, 6553600, 524288, 65536, 65536};
-static const int32_t OSC_DEF[] = {0, 32768, 0, 0, 0, 52429, 0};
-static const int32_t OSC_INC[] = {65536, 655, 65536, 131072, 5243, 655, 655};
-static const char *const OSC_PN[] = {"WAVE", "PW", "COARSE", "FINE", "PM", "LEVEL", "FB"};
-static const uint8_t OSC_LOG[] = {0, 0, 0, 0, 0, 0, 0};
-static const char *const OSC_UNIT[] = {"", "", "ST", "CT", "", "", ""};
+static const int32_t OSC_MIN[] = {0, 3277, -3145728, -6553600, 0, 0, 0, 65536, 0};
+static const int32_t OSC_MAX[] = {196608, 62259, 3145728, 6553600, 524288, 65536, 65536, 327680, 6553600};
+static const int32_t OSC_DEF[] = {0, 32768, 0, 0, 0, 52429, 0, 65536, 655360};
+static const int32_t OSC_INC[] = {65536, 655, 65536, 131072, 5243, 655, 655, 65536, 65536};
+static const char *const OSC_PN[] = {"WAVE", "PW", "COARSE", "FINE", "PM", "LEVEL", "FB", "UNISON", "DETUNE"};
+static const uint8_t OSC_LOG[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const char *const OSC_UNIT[] = {"", "", "ST", "CT", "", "", "", "", "CT"};
 static const char *const OSC_CH0[] = {"SINE", "TRIANGLE", "SAW", "SQUARE", 0};
-static const char *const *const OSC_CH[] = {OSC_CH0, 0, 0, 0, 0, 0, 0};
+static const char *const *const OSC_CH[] = {OSC_CH0, 0, 0, 0, 0, 0, 0, 0, 0};
 static const char *const LFO_INNAMES[] = {"CLK", "RESET", "P1", "P2"};
 static const int32_t LFO_MIN[] = {0, 1311, 0, 0, 0, 2621440};
 static const int32_t LFO_MAX[] = {262144, 2621440, 65536, 65536, 655360, 19660800};

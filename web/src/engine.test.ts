@@ -394,6 +394,59 @@ describe('filter', () => {
   });
 });
 
+describe('unison', () => {
+  function rig(params: Record<string, number>, frames = SR): Float32Array {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    Object.assign(o.params, { wave: 2, level: 1, ...params });
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: out.id, port: 'l' });
+    e.load(p);
+    return render(e, frames).l;
+  }
+  const windows = (a: Float32Array, w: number): number[] => {
+    const r: number[] = [];
+    for (let i = 0; i + w <= a.length; i += w) r.push(rms(a.subarray(i, i + w)));
+    return r;
+  };
+
+  it('with no detune n copies sum to the single oscillator', () => {
+    const one = rig({ unison: 1 });
+    const three = rig({ unison: 3, detune: 0 });
+    for (let i = 0; i < one.length; i += 97) expect(three[i]).toBeCloseTo(one[i], 5);
+  });
+
+  it('detuned copies beat: the level rises and falls, the peak stays at the level', () => {
+    const two = rig({ unison: 2, detune: 30 }, SR * 2);
+    const w = windows(two, 1200);
+    expect(Math.max(...w) - Math.min(...w)).toBeGreaterThan(0.1);
+    expect(Math.max(...two.map(Math.abs))).toBeLessThanOrEqual(1.0001);
+    const one = windows(rig({ unison: 1 }, SR * 2), 1200);
+    expect(Math.max(...one) - Math.min(...one)).toBeLessThan(0.05); // (the windows are not whole periods)
+  });
+
+  it('a sync edge restarts every copy', () => {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    const l = addModule(p, DEFS.lfo, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    Object.assign(o.params, { wave: 2, level: 1, unison: 3, detune: 50 });
+    Object.assign(l.params, { wave: 3, rate: 20, depth: 1 });
+    connect(p, DEFS, { module: l.id, port: 'out' }, { module: o.id, port: 'sync' });
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: out.id, port: 'l' });
+    e.load(p);
+    const a = render(e, SR).l;
+    const period = SR / 20;
+    let same = 0;
+    for (let k = 2; k < 18; k++) same += Math.abs(a[k * period + 5] - a[(k + 1) * period + 5]) < 0.02 ? 1 : 0; // every sync cycle starts alike
+    expect(same).toBeGreaterThan(12);
+  });
+});
+
 describe('ladder filter', () => {
   /** noise -> ladder -> output left, taken from the given output */
   function rig(port: string, params: Record<string, number>, note?: number, level = 0.3): Float32Array {

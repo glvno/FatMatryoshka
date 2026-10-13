@@ -119,6 +119,18 @@ kit('filter-morph', (add, wire) => {
   wire(flt, 'lp24', mix, 'in2');
   wire(mix, 'out', out, 'l');
 });
+kit('unison', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.8, unison: 5, detune: 25 });
+  const osc2 = add('osc', 0, 0, { wave: 1, level: 0.5, unison: 2, detune: 60, coarse: -12 });
+  const mix = add('mixer', 0, 0, { l1: 0.6, l2: 0.4 });
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(kb, 'pitch', osc2, 'pitch');
+  wire(osc, 'out', mix, 'in1');
+  wire(osc2, 'out', mix, 'in2');
+  wire(mix, 'out', out, 'l');
+});
 kit('ladder', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.8 });

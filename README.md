@@ -76,6 +76,10 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 - **Phaser** sweeps four allpass stages ±2 `depth` octaves around `center` at `rate`, with `fb` and `mix`.
 - **Digitizer** reduces the bit depth (`bits`) and the sample rate (`rate` = every sample held that many times).
 - **Noise** has a `color` parameter: 0 is white, 1 rolls the top off from about 220 Hz.
+## Unison
+
+- The **Oscillator** has `unison` (1..5 copies) and `detune` (cents, spread from −detune to +detune): a supersaw or a thick pulse from one module, summed so the peak stays at `level`. Sync restarts all copies. With `pm` connected or `fb` above 0 the oscillator runs its FM path, which plays one copy.
+
 ## Ladder filter
 
 - **Ladder** is a four-pole low pass of the Moog kind with `drive`: four one-pole stages in a feedback loop with a soft saturator inside it, so `res` goes up to self-oscillation (at 1) and `drive` (1..8) pushes the signal into the saturator for grit. Outputs `lp24` and `lp12`; `cv` with `cvamt` and `track` as on the Filter. Its cutoff modulation is updated once per block (fine for envelopes and LFOs; the Filter is the one for audio-rate cutoff).

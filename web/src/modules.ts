@@ -121,7 +121,12 @@ interface OscState {
   /** the decimator: the odd sub-sample waiting for the next frame and x1 / y1 of the four allpass sections */
   xb: number;
   ap: number[];
+  /** the phases of unison voices 2..5 (voice 1 is `phase`), plain path only */
+  ph: number[];
 }
+
+/** unison voice j of n: its detune in octaves, spread symmetrically from -detune to +detune cents */
+const unisonOct = (j: number, n: number, detune: number): number => (n > 1 ? (detune * ((2 * j) / (n - 1) - 1)) / 1200 : 0);
 
 /** one first-order allpass section of the decimator: y = a (x - y1) + x1 */
 function allpass(s: number[], k: number, a: number, x: number): number {
@@ -145,9 +150,11 @@ const osc: ModuleImpl<OscState> = {
       param('pm', 0, 8, 0, { step: 0.01 }),
       param('level', 0, 1, 0.8, { step: 0.01 }),
       param('fb', 0, 1, 0, { step: 0.01 }),
+      param('unison', 1, 5, 1, { step: 1 }),
+      param('detune', 0, 100, 10, { step: 1, unit: 'ct' }),
     ],
   },
-  init: () => ({ phase: 0, s1: 0, y1: 0, y2: 0, pm1: 0, xb: 0, ap: [0, 0, 0, 0, 0, 0, 0, 0] }),
+  init: () => ({ phase: 0, s1: 0, y1: 0, y2: 0, pm1: 0, xb: 0, ap: [0, 0, 0, 0, 0, 0, 0, 0], ph: [0, 0, 0, 0] }),
   process(c, s) {
     const { pitch, pm, sync } = c.inp;
     const pw = Math.min(0.95, Math.max(0.05, c.p.pw ?? 0.5));
@@ -158,15 +165,35 @@ const osc: ModuleImpl<OscState> = {
     const lvl = c.p.level ?? 1;
     const out = c.out.out;
     if (idx <= 0 && fb <= 0) {
-      // the plain oscillator: one wave per frame
+      // the plain oscillator: one wave per frame; unison: n detuned copies (phases s.phase, s.ph[0..n-2]) summed / n
+      const nu = Math.max(1, Math.min(5, Math.round(c.p.unison ?? 1)));
+      const det = c.p.detune ?? 0;
+      const inv = 1 / nu;
       for (let i = 0; i < c.n; i++) {
         const f = C4 * Math.pow(2, pitch[i] + base);
-        const dt = Math.min(f / c.sr, 0.45);
-        if (sync[i] >= 0.5 && s.s1 < 0.5) s.phase = 0;
+        const rst = sync[i] >= 0.5 && s.s1 < 0.5;
         s.s1 = sync[i];
-        s.phase += dt;
+        if (nu === 1) {
+          const dt = Math.min(f / c.sr, 0.45);
+          if (rst) s.phase = 0;
+          s.phase += dt;
+          if (s.phase >= 1) s.phase -= 1;
+          out[i] = wave(kind, s.phase, dt, pw) * lvl;
+          continue;
+        }
+        const dt0 = Math.min(f * Math.pow(2, unisonOct(0, nu, det)) / c.sr, 0.45);
+        if (rst) s.phase = 0;
+        s.phase += dt0;
         if (s.phase >= 1) s.phase -= 1;
-        out[i] = wave(kind, s.phase, dt, pw) * lvl;
+        let y = wave(kind, s.phase, dt0, pw);
+        for (let j = 1; j < nu; j++) {
+          const dtj = Math.min(f * Math.pow(2, unisonOct(j, nu, det)) / c.sr, 0.45);
+          if (rst) s.ph[j - 1] = 0;
+          s.ph[j - 1] += dtj;
+          if (s.ph[j - 1] >= 1) s.ph[j - 1] -= 1;
+          y += wave(kind, s.ph[j - 1], dtj, pw);
+        }
+        out[i] = y * inv * lvl;
       }
       s.y1 = s.y2 = s.pm1 = s.xb = 0;
       s.ap.fill(0);
