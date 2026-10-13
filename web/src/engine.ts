@@ -166,6 +166,14 @@ export class Engine {
     return this.morphT;
   }
 
+  /** the buffer an output wrote in the last block (voice 0 of a per-voice module; the Main's per-voice ports too), for a scope probe */
+  probe(id: number, port: string): Float32Array | null {
+    const n = this.nodes.get(id);
+    if (!n) return null;
+    if (n.vout && VOICE_PORTS.has(port)) return n.vout[port][0];
+    return n.inst[0]?.out[port] ?? null;
+  }
+
   /** the morph position for the next block: the Main module's `morph` parameter plus the block mean of its morph input (what the input summed in the previous block) */
   private morphPosition(n: number): number {
     const m = this.main;

@@ -60,6 +60,19 @@ select.over { border-color: #c0392b; color: #c0392b; }
 .matrix td { text-align: center; padding: 0; height: 18px; }
 .matrix td:first-child { text-align: left; color: var(--muted); padding-right: 4px; }
 .matrix input { margin: 0; accent-color: var(--accent); }
+.scope { position: sticky; left: 8px; bottom: 8px; z-index: 5; width: 496px; max-width: calc(100% - 16px); margin: 8px; background: var(--panel); border: 1px solid var(--muted); border-radius: 8px; box-shadow: 0 2px 8px #0003; padding: 6px 8px; font-size: 12px; }
+.scope-head { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+.scope-head span { font-weight: 600; margin-right: auto; }
+.scope-head button { padding: 1px 6px; font-size: 11px; }
+.scope-head button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.scope canvas { display: block; width: 100%; height: 160px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+.scope-list { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; }
+.scope-probe { display: inline-flex; gap: 6px; align-items: center; }
+.scope-probe output { color: var(--muted); font-variant-numeric: tabular-nums; }
+.scope-probe button { padding: 0 4px; font-size: 11px; }
+button.prb { padding: 0 2px; line-height: 1; border: none; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
+button.prb.on { color: var(--accent); }
+.dot.probed { box-shadow: 0 0 0 2px var(--accent); }
 details.arp { margin: 4px 8px 6px; border-top: 1px solid var(--line); padding-top: 4px; }
 details.arp summary { cursor: pointer; color: var(--muted); font-size: 11px; padding: 2px 0; }
 details.arp .param select { grid-column: 1 / -1; width: 100%; }

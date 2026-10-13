@@ -10,6 +10,7 @@ import { attachKeyboard, attachMidi } from './input';
 import { DEFS } from './modules';
 import { emptyPatch, validatePatch, voicesOf, type Patch } from './patch';
 import { ARP_DEFAULT } from './arp';
+import { Scope } from './scope';
 import { PRESETS } from './presets';
 import { deviceBudget, DEVICE } from './patchbin';
 
@@ -86,6 +87,13 @@ const sink = {
 };
 
 let refreshAssemblies: () => void = () => {};
+const scope = new Scope($('scope'));
+scope.onRemove = (key) => {
+  scope.remove(key);
+  host.send({ t: 'unprobe', key });
+  editor.dropProbe(key);
+};
+host.onProbe = (key, data, sr) => scope.feed(key, data, sr);
 const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw'](), {
   onStructure(p) {
     host.setPatch(p);
@@ -126,6 +134,15 @@ const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw']
   onArpPlay(on) {
     host.send({ t: 'arpplay', on });
     if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, on);
+  },
+  onProbe(key, id, port, kind, label, on) {
+    if (on) {
+      scope.add(key, label, kind);
+      host.send({ t: 'probe', key, id, port });
+    } else {
+      scope.remove(key);
+      host.send({ t: 'unprobe', key });
+    }
   },
   onLayout(p) {
     queueSave(p);

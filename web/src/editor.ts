@@ -99,6 +99,8 @@ export interface EditorEvents {
   onArp(cfg: ArpCfg): void;
   /** the arpeggiator's transport (editor state, not saved) */
   onArpPlay(on: boolean): void;
+  /** a scope probe on an output was set or removed (key = probeKey) */
+  onProbe(key: string, id: number, port: string, kind: PortDef['kind'], label: string, on: boolean): void;
   /** cards were moved: positions changed, nothing the engine needs */
   onLayout(p: Patch): void;
   /** a message for the status line */
@@ -109,6 +111,8 @@ export interface EditorEvents {
   morphCandidates?(): { name: string; patch: Patch }[];
 }
 
+/** the key of a scope probe on an output */
+export const probeKey = (id: number, port: string): string => `${id}:${port}`;
 type Pt = { x: number; y: number };
 /** a parameter value as the cards print it: the choice's name, or the number with its unit */
 const fmtValue = (pd: ParamDef, v: number): string => (pd.choices ? pd.choices[Math.round(v)] : `${Number(v.toFixed(3))}${pd.unit ? ' ' + pd.unit : ''}`);
@@ -507,6 +511,15 @@ export class Editor {
 
   /** the arpeggiator's transport (editor state) */
   arpPlay = false;
+  /** the outputs with a scope probe (probeKey) */
+  readonly probes = new Set<string>();
+
+  /** the scope dropped a probe: forget it (the cards redraw their buttons) */
+  dropProbe(key: string): void {
+    this.probes.delete(key);
+    for (const dot of this.ports.values()) if (dot.dataset.dir === 'out' && probeKey(Number(dot.dataset.mod), dot.dataset.port!) === key) dot.classList.remove('probed');
+    this.modulesEl.querySelectorAll<HTMLButtonElement>(`button.prb[data-key="${CSS.escape(key)}"]`).forEach((b) => b.classList.remove('on'));
+  }
 
   /** the arpeggiator on the Main card: the rows of the FM-1's MELODY / RHYTHM / CHAOS pages, saved with the patch (Patch.arp) */
   private arpPanel(): HTMLElement {
@@ -747,6 +760,24 @@ export class Editor {
       'tog');
       if (dir === 'in') parts.push(t, ...this.mergeTools(a, m, p, ref));
       else parts.unshift(t);
+    }
+    if (dir === 'out') {
+      // a scope probe on this output
+      const key = probeKey(m.id, p.name);
+      const on = this.probes.has(key);
+      const b = this.button('◎', on ? `remove the scope probe on ${p.name}` : `watch ${p.name} on the scope`, () => {
+        const now = !this.probes.has(key);
+        if (now) this.probes.add(key);
+        else this.probes.delete(key);
+        b.classList.toggle('on', now);
+        b.title = now ? `remove the scope probe on ${p.name}` : `watch ${p.name} on the scope`;
+        dot.classList.toggle('probed', now);
+        this.ev.onProbe(key, m.id, p.name, p.kind, `${o.label ?? DEFS[m.type].label} ${p.name}`, now);
+      }, 'prb');
+      b.dataset.key = key;
+      b.classList.toggle('on', on);
+      dot.classList.toggle('probed', on);
+      parts.unshift(b);
     }
     if (o.also?.length) dot.dataset.also = JSON.stringify(o.also);
     if (o.also?.length && !o.open) {

@@ -106,6 +106,10 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - **Compressor** is an envelope follower and compressor in one: `env` outputs the follower (a control: an oscillator's loudness as a CV, a sidechain pump from a kick into a VCA), `out` the signal compressed above `thresh` by `ratio` with `attack`, `release` and makeup `gain`. The `side` input is the sidechain; without it the detector listens to `in`.
 
+## Scope
+
+- Every output jack has a small **◎**: click it and the signal appears in the scope panel at the bottom of the canvas, several at once in their own colours (the jack gets a ring). The **time** view auto-scales; audio signals are triggered on a rising zero crossing so the wave stands still, control and gate signals show the whole last 85 ms with a min / max / mean readout. The **spectrum** view is a 2048-point FFT (log frequency, 0 dB = a full-scale sine) with the peak's frequency in the readout, so an oscillator can be tuned by eye. Probes cost nothing on the FM-1: they live in the browser's engine.
+
 ## Arpeggiator in the editor
 
 - The FM-1's arpeggiator (MELODY / RHYTHM / CHAOS pages) is on the Main card too, under **Arpeggiator**: mode, scale (the device's 67 scales and chords), root, bpm, rate, Euclidean steps / pulses / rotation, octaves and the three chaos amounts, plus a **play** switch. The browser runs the same arpeggiator (the same clock, modes, random generator and 65 % gate), so a patch grooves the same way on both. The settings are saved with the patch (`arp` in the JSON; the binary patch does not carry them) and reach the FM-1 with every upload and with every change (the ARP command); play starts and stops the device's arpeggiator as the PLAY button does. A patch without the section leaves the FM-1's settings alone.

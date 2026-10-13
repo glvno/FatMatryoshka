@@ -18,6 +18,8 @@ export type HostMsg =
   | { t: 'range'; id: number; index: number; name: string; range: [number, number] | null }
   | { t: 'arp'; cfg: ArpCfg }
   | { t: 'arpplay'; on: boolean }
+  | { t: 'probe'; key: string; id: number; port: string }
+  | { t: 'unprobe'; key: string }
   | { t: 'on'; note: number; vel: number }
   | { t: 'off'; note: number }
   | { t: 'clock' }
@@ -27,11 +29,19 @@ export type HostMsg =
   | { t: 'at'; v: number }
   | { t: 'panic' };
 
+/** samples a probe keeps (about 85 ms at 48 kHz: a few cycles of a bass note, a whole envelope attack) */
+const PROBE_LEN = 4096;
+/** blocks between two probe messages: 12 x 128 = 1536 samples, about 32 ms */
+const PROBE_EVERY = 12;
+
 class ModularProcessor extends AudioWorkletProcessor {
   private engine = new Engine(sampleRate);
   /** the arpeggiator: runs before every block, plays the engine, drives its clock while it plays (then MIDI clock is ignored, as on the device) */
   private arp = new Arp(sampleRate, (Math.random() * 0xffffffff) >>> 0);
   private failed = false;
+  /** scope probes: the last PROBE_LEN samples of an output, sent to the host about 30 times a second */
+  private probes = new Map<string, { id: number; port: string; ring: Float32Array; w: number }>();
+  private probeBlocks = 0;
   constructor() {
     super();
     this.port.onmessage = (ev: MessageEvent<HostMsg>) => {
@@ -45,6 +55,8 @@ class ModularProcessor extends AudioWorkletProcessor {
         else if (m.t === 'att') this.engine.setAtt(m.id, m.index, m.value);
         else if (m.t === 'bypass') this.engine.setBypass(m.id, m.on);
         else if (m.t === 'range') this.engine.setRange(m.id, m.index, m.name, m.range);
+        else if (m.t === 'probe') this.probes.set(m.key, { id: m.id, port: m.port, ring: new Float32Array(PROBE_LEN), w: 0 });
+        else if (m.t === 'unprobe') this.probes.delete(m.key);
         else if (m.t === 'arp') this.arp.set(m.cfg);
         else if (m.t === 'arpplay') {
           this.arp.play = m.on;
@@ -67,11 +79,31 @@ class ModularProcessor extends AudioWorkletProcessor {
       }
     };
   }
+  private feedProbes(n: number): void {
+    for (const p of this.probes.values()) {
+      const src = this.engine.probe(p.id, p.port);
+      if (!src) continue;
+      for (let i = 0; i < n; i++) {
+        p.ring[p.w] = src[i];
+        if (++p.w === PROBE_LEN) p.w = 0;
+      }
+    }
+    if (++this.probeBlocks < PROBE_EVERY) return;
+    this.probeBlocks = 0;
+    for (const [key, p] of this.probes) {
+      const data = new Float32Array(PROBE_LEN); // oldest first
+      data.set(p.ring.subarray(p.w));
+      data.set(p.ring.subarray(0, p.w), PROBE_LEN - p.w);
+      this.port.postMessage({ probe: key, data, sr: sampleRate }, [data.buffer]);
+    }
+  }
+
   process(_in: Float32Array[][], outputs: Float32Array[][]): boolean {
     const out = outputs[0];
     try {
       this.arp.run(out[0].length, this.engine);
       this.engine.render(out[0], out[1] ?? out[0]);
+      if (this.probes.size) this.feedProbes(out[0].length);
     } catch (e) {
       if (!this.failed) this.port.postMessage({ error: `engine: ${e}` });
       this.failed = true; // stay silent instead of throwing in the audio thread on every block

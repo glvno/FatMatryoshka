@@ -9,6 +9,8 @@ export class AudioHost {
   private node: AudioWorkletNode | null = null;
   private pending: Patch | null = null;
   onError: (msg: string) => void = () => {};
+  /** a scope probe's latest samples (oldest first) */
+  onProbe: (key: string, data: Float32Array, sr: number) => void = () => {};
 
   get running(): boolean {
     return this.ctx?.state === 'running';
@@ -21,6 +23,7 @@ export class AudioHost {
       const node = new AudioWorkletNode(ctx, 'modular-1', { numberOfInputs: 0, outputChannelCount: [2] });
       node.port.onmessage = (ev) => {
         if (ev.data?.error) this.onError(ev.data.error);
+        else if (ev.data?.probe) this.onProbe(ev.data.probe, ev.data.data, ev.data.sr);
       };
       node.connect(ctx.destination);
       this.ctx = ctx;
