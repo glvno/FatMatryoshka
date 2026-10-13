@@ -377,7 +377,7 @@ describe('assemblies', () => {
     expect(freeSpot([{ x: 100, y: 100, w: 250, h: 300 }], 250, 540)).toEqual({ x: 560, y: 20 });
   });
 
-  it('nests: a selection inside an open assembly becomes a child, with members, boundary and hiding through the levels', () => {
+  it('nests: a selection inside an expanded assembly becomes a child, with members, boundary and hiding through the levels', () => {
     const { p, kb, e1, e2, vca, osc } = twoEnv();
     const outer = makeAssembly(p, [osc, e1, e2, vca], 'voice');
     outer.open = true;
@@ -404,7 +404,7 @@ describe('assemblies', () => {
     reconcileAll(p, DEFS);
     expect(outer.inputs.map((r) => `${r.module}.${r.port}`)).toContain(`${e2}.gate`);
     expect(inner.inputs.map((r) => `${r.module}.${r.port}`)).toContain(`${e2}.gate`);
-    // hiding: a collapsed parent hides everything, an open parent with a collapsed child hides the child's modules
+    // hiding: a collapsed parent hides everything, an expanded parent with a collapsed child hides the child's modules
     outer.open = false;
     expect(hiddenModules(p)).toEqual(new Set([osc, e1, e2, vca]));
     expect(hiddenAssemblies(p)).toEqual(new Set([inner.id]));

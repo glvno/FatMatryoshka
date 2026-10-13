@@ -80,7 +80,7 @@ function snapTo(pd: ParamDef, v: number): number {
   return Math.min(pd.max, Math.max(pd.min, Number(x.toFixed(6))));
 }
 
-/** the frame around an open assembly: padding around its cards and the height of its header */
+/** the frame around an expanded assembly: padding around its cards and the height of its header */
 const FRAME_PAD = 12;
 const FRAME_HEAD = 30;
 
@@ -316,7 +316,7 @@ export class Editor {
     return b;
   }
 
-  /** a module card; inside an open assembly its ports and parameters get the expose / pin toggles */
+  /** a module card; inside an expanded assembly its ports and parameters get the expose / pin toggles */
   private card(m: ModuleInst, def: ModuleDef, perVoice: boolean, open?: AssemblyInst): HTMLElement {
     const el = document.createElement('div');
     el.className = 'module' + (this.selected.has(m.id) ? ' selected' : '') + (open ? ' member' : '');
@@ -965,7 +965,7 @@ export class Editor {
   }
 
   /**
-   * A port row. On a member card of an open assembly it gets the expose toggle; on an assembly card (`label`) the dot
+   * A port row. On a member card of an expanded assembly it gets the expose toggle; on an assembly card (`label`) the dot
    * still belongs to the inner module, so cables and drags work the same, and the label renames on click.
    */
   private port(m: ModuleInst, p: PortDef, dir: 'out' | 'in', o: { open?: AssemblyInst; label?: string; rename?: () => void; also?: Target[] } = {}): HTMLElement {
@@ -1028,7 +1028,7 @@ export class Editor {
   }
 
   /**
-   * On an exposed input inside an open assembly: a "merge into…" list of the other exposed inputs of the same kind, a
+   * On an exposed input inside an expanded assembly: a "merge into…" list of the other exposed inputs of the same kind, a
    * badge with the count on a merged jack and a button to split it again.
    */
   private mergeTools(a: AssemblyInst, m: ModuleInst, p: PortDef, ref: PortRef | undefined): HTMLElement[] {
@@ -1091,7 +1091,7 @@ export class Editor {
     pw.setAttribute('aria-pressed', String(!a.bypass));
     return [
       pw,
-      this.button(a.open ? 'close' : 'open', a.open ? 'Collapse to one card' : 'Open: show and edit the modules inside', () =>
+      this.button(a.open ? 'collapse' : 'expand', a.open ? 'Collapse to one card' : 'Expand: show and edit the modules inside', () =>
         this.change(() => {
           a.open = !a.open;
           if (a.open && overlapping(this.patch, a)) tileMembers(this.patch, a); // stacked cards (an old file, members added at one spot) spread out
@@ -1114,7 +1114,7 @@ export class Editor {
   }
 
   /**
-   * The collapsed assembly: one card with the exposed ports and the promoted parameters. Inside an open parent (`open`)
+   * The collapsed assembly: one card with the exposed ports and the promoted parameters. Inside an expanded parent (`open`)
    * its rows get the parent's expose / pin toggles, like a member card's.
    */
   private container(a: AssemblyInst, perVoice: boolean, open?: AssemblyInst): HTMLElement {
@@ -1178,7 +1178,7 @@ export class Editor {
     if (v && v !== r.label) this.change(() => (r.label = v));
   }
 
-  /** the frame around an open assembly's cards, with its header; placed by layoutFrames() once the cards have a size */
+  /** the frame around an expanded assembly's cards, with its header; placed by layoutFrames() once the cards have a size */
   private frame(a: AssemblyInst, perVoice: boolean): HTMLElement {
     const el = document.createElement('div');
     el.className = 'frame' + (a.bypass ? ' off' : '');
@@ -1196,7 +1196,7 @@ export class Editor {
   }
 
   /**
-   * The box around what an open assembly shows: its member cards, its children's cards (collapsed) or frames (open), in
+   * The box around what an expanded assembly shows: its member cards, its children's cards (collapsed) or frames (expanded), in
    * canvas coordinates; `exclude` leaves cards out and `excludeAsm` children (while they are dragged)
    */
   private frameRect(a: AssemblyInst, exclude?: Set<number>, excludeAsm?: number): Rect | null {
@@ -1323,7 +1323,7 @@ export class Editor {
     );
   }
 
-  /** after a drag: cards dropped into an open assembly's frame join it, members dragged out of theirs leave it */
+  /** after a drag: cards dropped into an expanded assembly's frame join it, members dragged out of theirs leave it */
   private membership(moved: ModuleInst[]): void {
     const movedIds = new Set(moved.map((m) => m.id));
     const inside = (c: HTMLElement, r: Rect): boolean => {
@@ -1391,14 +1391,14 @@ export class Editor {
     );
   }
 
-  /** after a container drag: dropped into an open frame it becomes a child of that assembly; dragged out of its parent's frame it leaves */
+  /** after a container drag: dropped into an expanded frame it becomes a child of that assembly; dragged out of its parent's frame it leaves */
   private nesting(a: AssemblyInst, el: HTMLElement): void {
     const cx = el.offsetLeft + el.offsetWidth / 2;
     const cy = el.offsetTop + HEAD_Y; // where the hand is: the card's header, not its middle (cards are tall)
     const inside = (r: Rect): boolean => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
     const parent = parentOf(this.patch, a.id);
     const below = new Set(descendants(this.patch, a).map((d) => d.id));
-    // the innermost open frame under the card that is not the assembly itself or one of its own
+    // the innermost expanded frame under the card that is not the assembly itself or one of its own
     let target: AssemblyInst | undefined;
     for (const b of assembliesOf(this.patch)) {
       if (!b.open || b.id === a.id || below.has(b.id) || !this.frames.has(b.id)) continue;

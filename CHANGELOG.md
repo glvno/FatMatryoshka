@@ -5,6 +5,7 @@
 The merge of the four-voice firmware (1.0.2) with the polyphony, assembly and module work. Host-tested (vitest, golden vectors, arpeggiator and protocol tests, LCD preview), **not built with the JieLi toolchain and not flashed**.
 
 ### Added
+- Assembly cards: the toggle button reads expand / collapse (was open / close); hints and docs follow (#21).
 - **Polyphony per voice:** each of the four voices' patches plays 1..8 notes (the editor's `voices` row; on the FM-1 the ALGORITHM encoder on the mixer page, shown as MONO / POLY n per voice and in the Main page title).
 - Modules from the development branch: glide, shaper, level/rate envelope, string, wavetable, chorus, sequencer, clock divider, S&H, quantizer, pulse, pan, crossfade, vowel, phaser, digitizer; noise colour; oscillator feedback and oversampled FM; sync inputs; the Main module's `spread` output; assemblies in the editor.
 - **Oscillator unison:** `unison` (1..5 detuned copies) and `detune` (cents) on the plain path; binary patch format 11 (older stored patches fall back to the factory patch).
