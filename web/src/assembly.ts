@@ -84,6 +84,8 @@ export interface AssemblyDef {
   format: 'modular-1-assembly';
   version: 1;
   name: string;
+  /** a factory assembly's shelf in the browser (CATEGORIES in assemblies.ts); the user's own have none */
+  category?: string;
   /** every module inside, the nested ones included */
   modules: ModuleInst[];
   cables: Cable[];
@@ -718,15 +720,33 @@ export function insertAssembly(p: Patch, defs: Record<string, ModuleDef>, def: A
 const isRec = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object';
 
 /** structural check of a saved assembly (a file, a library entry, a factory file). Throws with a readable message. */
+/**
+ * Drop the Main panel and the Output from a definition (a file or library entry made by hand, or by an older editor):
+ * their cables, exposed ports and promoted parameters go with them. Returns how many modules went.
+ */
+export function stripPatchIO(d: AssemblyDef): number {
+  const gone = new Set(d.modules.filter((m) => isRec(m) && EXCLUDED_TYPES.has(String(m.type))).map((m) => m.id));
+  if (!gone.size) return 0;
+  d.modules = d.modules.filter((m) => !gone.has(m.id));
+  d.cables = d.cables.filter((c) => isRec(c) && isRec(c.from) && isRec(c.to) && !gone.has(c.from.module) && !gone.has(c.to.module));
+  const keep = (r: unknown): boolean => isRec(r) && !gone.has(r.module as number) && !(Array.isArray(r.also) && r.also.some((a) => isRec(a) && gone.has(a.module as number)));
+  if (Array.isArray(d.inputs)) d.inputs = d.inputs.filter(keep);
+  if (Array.isArray(d.outputs)) d.outputs = d.outputs.filter(keep);
+  if (Array.isArray(d.params)) d.params = d.params.filter(keep);
+  if (Array.isArray(d.assemblies)) for (const n of d.assemblies) if (isRec(n) && Array.isArray(n.modules)) n.modules = n.modules.filter((id) => !gone.has(id as number));
+  return gone.size;
+}
+
 export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef>): AssemblyDef {
   if (!isRec(raw) || raw.format !== ASSEMBLY_FORMAT || !Array.isArray(raw.modules) || !Array.isArray(raw.cables)) throw new Error('not a Modular-1 assembly');
   const d = raw as unknown as AssemblyDef;
+  stripPatchIO(d); // a patch's own modules never belong to a building block
   if (d.modules.length > MAX_MODULES || !d.modules.length) throw new Error('an assembly holds 1 to 32 modules');
+  if (d.category !== undefined && typeof d.category !== 'string') delete d.category;
   const seen = new Set<number>();
   for (const m of d.modules) {
     const def = defs[m.type];
     if (!def) throw new Error(`unknown module type "${m.type}"`);
-    if (EXCLUDED_TYPES.has(m.type)) throw new Error('the Main panel and the Output cannot be part of an assembly');
     if (!Number.isInteger(m.id) || seen.has(m.id)) throw new Error(`bad or duplicate module id ${m.id}`);
     seen.add(m.id);
     m.params = { ...defaultParams(def), ...(m.params ?? {}) };

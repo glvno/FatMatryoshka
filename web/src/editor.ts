@@ -30,7 +30,7 @@ import {
   paramValue,
 } from './patch';
 import { ARP_DEFAULT, ARP_MODES, ARP_RATES, ARP_SCALES, ARP_MAX_STEPS, fixArp, noteName, type ArpCfg } from './arp';
-import {
+import { EXCLUDED_TYPES,
   addChild,
   addMember,
   allModules,
@@ -201,10 +201,15 @@ export class Editor {
   /** group the selected modules into a new assembly */
   makeAssembly(): void {
     if (!this.selected.size) return this.ev.onError('select the modules first: shift-click them, or drag a box on the canvas');
+    // a patch's own modules never go into a building block: they stay outside, the rest is grouped
+    const ids = [...this.selected].filter((id) => !EXCLUDED_TYPES.has(this.patch.modules.find((m) => m.id === id)?.type ?? ''));
+    if (!ids.length) return this.ev.onError('the Main panel and the Output stay outside an assembly: select other modules');
     const name = window.prompt('Name of the assembly', 'assembly')?.trim();
     if (!name) return;
-    const ids = [...this.selected];
-    if (this.change(() => makeAssembly(this.patch, ids, name))) this.selected.clear();
+    if (this.change(() => makeAssembly(this.patch, ids, name))) {
+      this.selected.clear();
+      if (ids.length < this.selected.size + ids.length) this.ev.onError('Main and Output stay outside');
+    }
   }
 
   // ---- undo

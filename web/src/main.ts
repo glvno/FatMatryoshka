@@ -5,10 +5,12 @@ import { DeviceLink } from './device';
 import { Editor } from './editor';
 import { bankPatches, buildBankTab } from './bank';
 import { buildAssembliesTab, storeAssembly } from './assemblies';
+import { AssemblyBrowser } from './browser';
+import { score } from './fuzzy';
 import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi } from './input';
 import { DEFS } from './modules';
-import { emptyPatch, validatePatch, voicesOf, type Patch } from './patch';
+import { newPatch, validatePatch, voicesOf, type Patch } from './patch';
 import { ARP_DEFAULT } from './arp';
 import { Scope } from './scope';
 import { diffCount, diffLines, diffPatches } from './diff';
@@ -180,10 +182,10 @@ host.setPatch(editor.patch);
 
 // toolbar
 const presetSel = $<HTMLSelectElement>('preset');
-presetSel.append(new Option('Load patch…', ''), ...Object.keys(PRESETS).map((n) => new Option(n, n)), new Option('Empty patch', '__empty'));
+presetSel.append(new Option('Load patch…', ''), new Option('New patch', '__new'), ...Object.keys(PRESETS).map((n) => new Option(n, n)));
 presetSel.onchange = () => {
   const v = presetSel.value;
-  if (v) editor.setPatch(v === '__empty' ? emptyPatch() : PRESETS[v]());
+  if (v) editor.setPatch(v === '__new' ? newPatch(DEFS) : PRESETS[v]());
   setBaseline();
   presetSel.value = '';
   $<HTMLInputElement>('patch-name').value = editor.patch.name;
@@ -199,9 +201,34 @@ const showVoices = (): void => {
   const b = deviceBudget(editor.patch);
   if (!b.fits) status.textContent = `too big for the FM-1: ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} instances (fewer voices or modules)`;
 };
+/** the module select, by kind; picking one inserts it (the building blocks; assemblies have their own browser) */
+const MODULE_GROUPS: [string, string[]][] = [
+  ['Sources', ['osc', 'wavetable', 'noise', 'string', 'modal', 'comb', 'grain']],
+  ['Filters', ['filter', 'ladder', 'vowel']],
+  ['Modulators', ['lfo', 'adsr', 'env', 'seq', 'sh', 'clkdiv', 'pulse', 'glide', 'quant']],
+  ['Effects', ['delay', 'reverb', 'chorus', 'phaser', 'shape', 'crush', 'shift', 'dyn']],
+  ['Utilities', ['vca', 'mixer', 'scale', 'const', 'math', 'logic', 'pan', 'xfade']],
+  ['I/O', ['fm1', 'output']],
+];
 const typeSel = $<HTMLSelectElement>('add-type');
-typeSel.append(...Object.values(DEFS).map((d) => new Option(d.label, d.type)));
-$('add-btn').onclick = () => editor.add(typeSel.value);
+{
+  const placed = new Set<string>();
+  typeSel.append(new Option('Add module…', ''));
+  for (const [g, types] of MODULE_GROUPS) {
+    const og = document.createElement('optgroup');
+    og.label = g;
+    for (const t of types) if (DEFS[t]) (og.append(new Option(DEFS[t].label, t)), placed.add(t));
+    typeSel.append(og);
+  }
+  const rest = Object.values(DEFS).filter((d) => !placed.has(d.type)); // a module nobody filed yet lands at the end
+  if (rest.length) typeSel.append(...rest.map((d) => new Option(d.label, d.type)));
+}
+typeSel.onchange = () => {
+  if (typeSel.value) editor.add(typeSel.value);
+  typeSel.value = '';
+};
+const browser = new AssemblyBrowser((d) => editor.insert(d));
+$('asm-insert').onclick = () => browser.open();
 $('asm-btn').onclick = () => editor.makeAssembly();
 $('undo-btn').onclick = () => editor.undo();
 $('redo-btn').onclick = () => editor.redo();
@@ -276,7 +303,8 @@ const commands = (): Cmd[] => {
     ...Object.values(DEFS).map((d) => ({ kind: 'add module', label: d.label, run: () => editor.add(d.type) })),
     ...asms.map((d) => ({ kind: 'insert', label: d.name, run: () => editor.insert(d) })),
     ...patchCandidates().map((c) => ({ kind: 'load patch', label: c.name, run: () => loadNamed(c.patch) })),
-    { kind: 'command', label: 'Empty patch', run: () => loadNamed(emptyPatch()) },
+    { kind: 'command', label: 'New patch', run: () => loadNamed(newPatch(DEFS)) },
+    { kind: 'command', label: 'Insert assembly… (browser)', run: () => browser.open() },
     { kind: 'command', label: 'Diff since the last load / upload', run: showDiff },
     { kind: 'command', label: 'Make assembly from the selection', run: () => editor.makeAssembly() },
   ];
@@ -285,19 +313,6 @@ const loadNamed = (p: Patch): void => {
   editor.setPatch(p);
   setBaseline();
   nameInput.value = editor.patch.name;
-};
-/** fuzzy: every character of the query in order; a run of adjacent matches and a match at a word start score higher */
-const score = (q: string, s: string): number => {
-  s = s.toLowerCase();
-  let i = 0, sc = 0, last = -2;
-  for (const ch of q) {
-    const j = s.indexOf(ch, i);
-    if (j < 0) return -1;
-    sc += j === last + 1 ? 3 : j === 0 || s[j - 1] === ' ' ? 2 : 1;
-    last = j;
-    i = j + 1;
-  }
-  return sc;
 };
 let palSel = 0;
 let palItems: Cmd[] = [];
@@ -497,11 +512,11 @@ $('dev-release').onclick = () => {
 };
 
 // tabs
-buildBankTab($('tab-presets'), device, () => editor.patch, (msg) => {
+buildBankTab($('tab-library'), device, () => editor.patch, (msg) => {
   devStatus(msg);
   for (const id of ['dev-live', 'dev-send', 'dev-store']) $<HTMLInputElement>(id).disabled = false;
 });
-refreshAssemblies = buildAssembliesTab($('tab-assemblies'), {
+refreshAssemblies = buildAssembliesTab($('tab-library'), {
   insert(def) {
     document.querySelector<HTMLButtonElement>('#tabs button[data-tab="patch"]')?.click();
     editor.insert(def);
@@ -524,5 +539,8 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) {
   };
 }
 
-// open the tab named in the address (#presets, #flash, #about)
-document.querySelector<HTMLButtonElement>(`#tabs button[data-tab="${location.hash.slice(1)}"]`)?.click();
+// open the tab named in the address (#library, #flash, #about; the old #presets and #assemblies open the Library)
+{
+  const h = location.hash.slice(1);
+  document.querySelector<HTMLButtonElement>(`#tabs button[data-tab="${h === 'presets' || h === 'assemblies' ? 'library' : h}"]`)?.click();
+}

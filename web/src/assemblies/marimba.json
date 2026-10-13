@@ -2,6 +2,7 @@
   "format": "modular-1-assembly",
   "version": 1,
   "name": "marimba",
+  "category": "Voices",
   "modules": [
     {
       "id": 1,

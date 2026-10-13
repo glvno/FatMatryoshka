@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
+  stripPatchIO,
   bypassAssembly,
   addChild,
   addMember,
@@ -32,7 +33,8 @@ import {
   tileMembers,
   validateAssemblyDef,
 } from './assembly';
-import { FACTORY } from './assemblies';
+import { CATEGORIES, categoryOf, FACTORY } from './assemblies';
+import { newPatch } from './patch';
 import { Engine } from './engine';
 import { DEFS } from './modules';
 import { addModule, connect, emptyPatch, removeModule, validatePatch, type Patch } from './patch';
@@ -231,6 +233,43 @@ describe('assemblies', () => {
     expect(p.modules).toHaveLength(30);
   });
 
+  it('a new patch is Main and Output, unwired, on the grid; the model still allows a bare patch', () => {
+    const p = newPatch(DEFS);
+    expect(p.modules.map((m) => m.type)).toEqual(['fm1', 'output']);
+    expect(p.cables).toEqual([]);
+    expect(p.modules[1].x).toBeGreaterThan(p.modules[0].x + 500);
+    expect(emptyPatch().modules).toEqual([]);
+  });
+
+  it('a definition with the Main panel or the Output loses them on load (their cables, ports and parameters too)', () => {
+    const { p, kb, osc, env, vca, out } = voice();
+    const raw = {
+      format: 'modular-1-assembly',
+      version: 1,
+      name: 'with io',
+      modules: p.modules.map((m) => ({ ...m })),
+      cables: p.cables.map((c) => ({ ...c })),
+      inputs: [{ label: 'gate', module: env, port: 'gate' }, { label: 'pitch', module: kb, port: 'pitch' }],
+      outputs: [{ label: 'out', module: vca, port: 'out' }, { label: 'l', module: out, port: 'l' }],
+      params: [{ label: 'cut', module: osc, param: 'level' }, { label: 'vol', module: out, param: 'level' }],
+    };
+    expect(stripPatchIO(JSON.parse(JSON.stringify(raw))) as number).toBe(2);
+    const d = validateAssemblyDef(JSON.parse(JSON.stringify(raw)), DEFS);
+    expect(d.modules.map((m) => m.type)).not.toContain('fm1');
+    expect(d.modules.map((m) => m.type)).not.toContain('output');
+    expect(d.cables.every((c) => c.from.module !== kb && c.to.module !== out)).toBe(true);
+    expect(d.inputs.map((r) => r.label)).toEqual(['gate']);
+    expect(d.outputs.map((r) => r.label)).toEqual(['out']);
+    expect(d.params.map((r) => r.label)).toEqual(['cut']);
+    expect(() => validateAssemblyDef({ format: 'modular-1-assembly', version: 1, name: 'io only', modules: [{ id: 1, type: 'fm1', x: 0, y: 0, params: {} }], cables: [], inputs: [], outputs: [], params: [] }, DEFS)).toThrow(/1 to 32/);
+  });
+
+  it('every factory assembly sits on one of the browser shelves', () => {
+    for (const d of FACTORY) expect((CATEGORIES as readonly string[]).includes(d.category ?? ''), d.name).toBe(true);
+    expect(categoryOf({ ...FACTORY[0], category: undefined })).toBe(CATEGORIES[CATEGORIES.length - 1]);
+    expect(FACTORY.filter((d) => categoryOf(d) === 'Drums').map((d) => d.name)).toContain('kick');
+  });
+
   it('ships factory assemblies that load, insert and play', () => {
     expect(FACTORY.map((d) => d.name)).toEqual([
       'adsr operator', 'auto pan', 'barber pole', 'bowed glass', 'bowed string', 'clap', 'clock', 'cloud', 'cowbell', 'echo', 'filter voice', 'fm pair', 'gamelan', 'glass bell', 'hats', 'hihat', 'kalimba', 'kick', 'marimba', 'noise voice', 'operator', 'pluck', 'rain', 'random melody', 'resonator bank', 'reverse pad', 'rim', 'shimmer', 'sidechain pump', 'slicer', 'snare', 'stack voice', 'step sequencer', 'stutter', 'sub bass', 'tabla', 'talking filter', 'time smear', 'tom', 'vibrato', 'voice', 'vowel voice', 'wavetable pad',
@@ -275,7 +314,7 @@ describe('assemblies', () => {
   it('rejects bad definitions', () => {
     expect(() => validateAssemblyDef({ format: 'x' }, DEFS)).toThrow(/not a Modular-1 assembly/);
     const base = FACTORY[0];
-    expect(() => validateAssemblyDef({ ...base, modules: [{ id: 1, type: 'fm1', x: 0, y: 0, params: {} }], cables: [] }, DEFS)).toThrow(/Main panel/);
+    expect(() => validateAssemblyDef({ ...base, modules: [{ id: 1, type: 'fm1', x: 0, y: 0, params: {} }], cables: [] }, DEFS)).toThrow(/1 to 32/) /* the Main panel is stripped, nothing is left */;
     expect(() => validateAssemblyDef({ ...base, inputs: [{ module: 1, port: 'nope' }] }, DEFS)).toThrow(/does not exist/);
     expect(() => validateAssemblyDef({ ...base, params: [{ module: 1, param: 'nope' }] }, DEFS)).toThrow(/does not exist/);
   });

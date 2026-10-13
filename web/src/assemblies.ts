@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The assembly library: the factory set shipped with the editor (src/assemblies/*.json) and the user's own, kept in
-// localStorage, each one in the file format of assembly.ts. The Assemblies page lists them: insert, export, import, delete.
+// localStorage, each one in the file format of assembly.ts. The Library page lists them: insert, export, import, delete.
 import { validateAssemblyDef, type AssemblyDef } from './assembly';
 import { DEFS } from './modules';
 
 const STORE = 'modular-1.assemblies';
+
+/** the shelves of the assembly browser and the Library page, in display order; the user's own come first under their own shelf */
+export const CATEGORIES = ['Drums', 'Voices', 'Effects', 'Textures', 'Utilities'] as const;
+export const USER_SHELF = 'Your library';
+/** a factory definition's shelf (an unknown or missing one lands on the last shelf) */
+export const categoryOf = (d: AssemblyDef): string => (CATEGORIES as readonly string[]).includes(d.category ?? '') ? d.category! : CATEGORIES[CATEGORIES.length - 1];
 
 /** the assemblies shipped with the editor, in file order */
 export const FACTORY: AssemblyDef[] = Object.entries(import.meta.glob('./assemblies/*.json', { eager: true, import: 'default' }) as Record<string, unknown>)
@@ -59,7 +65,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLEl
   return e;
 }
 
-const summary = (d: AssemblyDef): string => {
+/** the module names and the exposed ports in one line */
+export const summary = (d: AssemblyDef): string => {
   const io = [d.inputs.map((r) => r.label).join(', '), d.outputs.map((r) => r.label).join(', ')].filter(Boolean).join(' → ');
   return `${d.modules.map((m) => DEFS[m.type].label).join(' + ')}${io ? ` · ${io}` : ''}`;
 };
@@ -78,10 +85,10 @@ export interface LibraryEvents {
   status(msg: string): void;
 }
 
-/** the Assemblies page. Returns a refresh function for when the library changed elsewhere (a save from the editor). */
+/** the assemblies section of the Library page. Returns a refresh function for when the library changed elsewhere (a save from the editor). */
 export function buildAssembliesTab(root: HTMLElement, ev: LibraryEvents): () => void {
   const userEl = el('div', { class: 'bank-list' });
-  const factoryEl = el('div', { class: 'bank-list' });
+  const factoryEl = el('div');
   const note = el('p', { class: 'muted' });
   const row = (d: AssemblyDef, user: boolean): HTMLElement =>
     el(
@@ -108,7 +115,12 @@ export function buildAssembliesTab(root: HTMLElement, ev: LibraryEvents): () => 
     const list = loadLibrary();
     userEl.replaceChildren(...list.map((d) => row(d, true)));
     note.textContent = list.length ? '' : 'None yet. Select modules in the patch, click "Make assembly", then "save" on its card.';
-    factoryEl.replaceChildren(...FACTORY.map((d) => row(d, false)));
+    factoryEl.replaceChildren(
+      ...CATEGORIES.flatMap((c) => {
+        const ds = FACTORY.filter((d) => categoryOf(d) === c);
+        return ds.length ? [el('h4', { textContent: c }), el('div', { class: 'bank-list' }, ...ds.map((d) => row(d, false)))] : [];
+      }),
+    );
   };
   const file = el('input', { type: 'file', accept: 'application/json,.json', hidden: true });
   file.onchange = async () => {
@@ -129,8 +141,8 @@ export function buildAssembliesTab(root: HTMLElement, ev: LibraryEvents): () => 
       'div',
       { class: 'card' },
       el('h2', { textContent: 'Assemblies' }),
-      el('p', { class: 'muted', textContent: 'An assembly is a group of prewired modules that appears as one card with the ports and parameters it exposes. Make one from a selection in the patch; save it here to use it again.' }),
-      el('h3', { textContent: 'Your library' }),
+      el('p', { class: 'muted', textContent: 'An assembly is a building block: prewired modules that appear as one card with the ports and parameters it exposes, never the Main panel or the Output. Make one from a selection in the patch and "save" it on its card; "Insert assembly" in the toolbar puts any of these into the patch.' }),
+      el('h3', { textContent: USER_SHELF }),
       userEl,
       note,
       el('div', { class: 'row' }, el('label', { class: 'btn', textContent: 'Import .json' }, file)),

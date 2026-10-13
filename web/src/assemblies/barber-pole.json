@@ -2,6 +2,7 @@
   "format": "modular-1-assembly",
   "version": 1,
   "name": "barber pole",
+  "category": "Effects",
   "modules": [
     {
       "id": 1,

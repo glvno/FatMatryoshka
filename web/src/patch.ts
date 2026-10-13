@@ -182,6 +182,14 @@ export function emptyPatch(name = 'init'): Patch {
   return { version: 2, name, modules: [], cables: [] };
 }
 
+/** what the editor's "New patch" opens: the Main panel at the top left and the Output at the right, nothing wired (grid of assembly.ts) */
+export function newPatch(defs: Record<string, ModuleDef>, name = 'init'): Patch {
+  const p = emptyPatch(name);
+  addModule(p, defs.fm1, 20, 20);
+  addModule(p, defs.output, 20 + 3 * 270, 20);
+  return p;
+}
+
 /** the voice count of a patch: a whole number 1..MAX_VOICES, 1 when missing */
 export function voicesOf(p: Pick<Patch, 'voices'>): number {
   const v = Math.round(Number(p.voices));

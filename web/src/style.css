@@ -76,6 +76,23 @@ dialog.palette ul { list-style: none; margin: 0; padding: 0; max-height: 40vh; o
 dialog.palette li { padding: 4px 8px; border-radius: 4px; cursor: pointer; display: flex; gap: 8px; font-size: 13px; }
 dialog.palette li span.k { color: var(--muted); font-size: 11px; min-width: 64px; }
 dialog.palette li.sel, dialog.palette li:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+dialog.browser { width: 720px; max-width: calc(100% - 32px); height: 70vh; max-height: calc(100% - 32px); padding: 0; border: 1px solid var(--muted); border-radius: 8px; background: var(--panel); color: var(--ink); box-shadow: 0 4px 16px #0004; display: flex; flex-direction: column; overflow: hidden; }
+dialog.browser:not([open]) { display: none; }
+dialog.browser::backdrop { background: #0004; }
+dialog.browser .head { display: flex; gap: 8px; padding: 8px; border-bottom: 1px solid var(--line); }
+dialog.browser .head input { flex: 1; font-size: 14px; padding: 6px 8px; }
+dialog.browser .panes { display: flex; flex: 1; min-height: 0; }
+dialog.browser .shelves { display: flex; flex-direction: column; gap: 2px; padding: 8px; border-right: 1px solid var(--line); min-width: 150px; overflow: auto; }
+dialog.browser .shelves button { text-align: left; display: flex; justify-content: space-between; gap: 8px; }
+dialog.browser .shelves button.on { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+dialog.browser .shelves .n { color: var(--muted); font-size: 11px; }
+dialog.browser .entries { list-style: none; margin: 0; padding: 8px; overflow: auto; flex: 1; }
+dialog.browser .entries li { padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+dialog.browser .entries li.sel, dialog.browser .entries li:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+dialog.browser .entries li.none { cursor: default; background: none; }
+dialog.browser .entries .name { display: flex; gap: 8px; align-items: baseline; }
+dialog.browser .entries .shelf { color: var(--muted); font-size: 11px; }
+dialog.browser .entries .ports { color: var(--accent); font-family: ui-monospace, monospace; font-size: 11px; }
 dialog.help { max-width: 560px; border: 1px solid var(--muted); border-radius: 8px; background: var(--panel); color: var(--ink); font-size: 13px; }
 dialog.help::backdrop { background: #0004; }
 dialog.help h2 { margin-top: 0; font-size: 15px; }
@@ -141,10 +158,14 @@ progress { width: 100%; }
   .hint { display: none; }
   .scope { width: calc(100% - 24px); left: 12px; bottom: 80px; }
   .panel { width: calc(100% - 24px); right: 12px; bottom: 80px; }
+  dialog.browser { width: 100%; max-width: 100%; height: 100%; max-height: 100%; border-radius: 0; margin: 0; }
+  dialog.browser .panes { flex-direction: column; }
+  dialog.browser .shelves { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); min-width: 0; }
 }
 
 .bank-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
 .bank-cols .card { margin-bottom: 0; }
+.card h4 { margin: 12px 0 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .bank-list { display: grid; gap: 2px; max-height: 520px; overflow: auto; }
 .bank-row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; }
 .bank-row:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }

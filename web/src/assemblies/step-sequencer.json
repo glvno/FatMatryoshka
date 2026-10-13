@@ -2,6 +2,7 @@
   "format": "modular-1-assembly",
   "version": 1,
   "name": "step sequencer",
+  "category": "Utilities",
   "modules": [
     {
       "id": 1,

@@ -44,7 +44,7 @@ GPL-3.0-only. The flasher, loader, hardware layer and tools are copied from [Fel
 
 ## Assemblies
 
-An assembly is a group of prewired modules that appears as one card with the ports and parameters it exposes: an "operator" of oscillator, envelope and VCA, a whole subtractive voice, an echo. Select modules in the editor (shift-click, or drag a box on the canvas) and click **Make assembly**: the ports that had cables to the outside become the card's ports. **open** shows the modules inside a frame, where ○ / ● next to a port or a parameter puts it on the card; drag cards into or out of the frame to change what belongs to it. **save** puts the assembly into the library (the Assemblies page), from where it can be inserted into any patch, exported as a `.json` file and imported again. Three come with the editor: operator, voice and echo.
+A **patch** is a complete sound: it starts from Main and Output ("New patch" in the toolbar's patch select) and is what the bank and the FM-1 hold. An **assembly** is a building block: a group of prewired modules that appears as one card with the ports and parameters it exposes: an "operator" of oscillator, envelope and VCA, a whole subtractive voice, an echo. Select modules in the editor (shift-click, or drag a box on the canvas) and click **Make assembly**: the ports that had cables to the outside become the card's ports (Main and Output never join: they stay outside, and a `.json` with them in loses them). **open** shows the modules inside a frame, where ○ / ● next to a port or a parameter puts it on the card; drag cards into or out of the frame to change what belongs to it. **save** puts the assembly into the library (your shelf of the **Insert assembly** browser and of the Library page), from where it can be inserted into any patch, exported as a `.json` file and imported again. Forty-three come with the editor, on the shelves Drums, Voices, Effects, Textures and Utilities.
 
 Assemblies are an editor-only overlay: the patch stays a flat list of modules and cables, the FM-1 receives it unchanged, and an older editor loads such a patch and only loses the grouping. Knob assignments (K1..K4) are not part of a saved assembly, since the knobs belong to the patch. Ctrl/Cmd+Z undoes structural changes, Shift redoes.
 
@@ -123,7 +123,7 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 ## Keyboard
 
-- `/` or Ctrl/Cmd+K opens a **command palette**: type part of a name to add a module, insert an assembly (library or factory) or load a patch; Enter runs the first match, arrows choose. `?` lists every shortcut.
+- `/` or Ctrl/Cmd+K opens a **command palette**: type part of a name to add a module, insert an assembly (library or factory), load a patch or start a new one; Enter runs the first match, arrows choose. `?` lists every shortcut.
 - Click a jack, then a jack of the other kind, to connect them (Esc cancels; dragging works as before). With cards selected (shift-click or a box): Delete removes them, B bypasses them, G groups them into an assembly, Ctrl/Cmd+D duplicates them with their settings and the cables among them, the arrows nudge them (Shift: ×10). Space starts and stops the arpeggiator, Tab flips A/B, Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z undo and redo. The shortcuts are off while a text field has focus; the note keys (A W S E D F T G Y H U J K) still play when they are not taken.
 
 ## Scope
@@ -140,7 +140,7 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 ## Patch morphing
 
-- A patch can carry a **B side**: the parameters of another stored patch with the same modules and cables. Pick it on the Main card ("B side": the Patches page and the factory list are offered, only those of the same structure), then the Main module's `morph` slider fades every parameter from this patch (A, at 0) to the other (B, at 1): linearly, in octaves for a logarithmic one (a cutoff morphs musically), a choice or a switch flips at the midpoint. Notes keep sounding while you morph: only the parameters move. The Main module has a `morph` input as well; it adds to the slider, so an LFO, an envelope or a sequencer can morph the patch (block rate, one block late). On the FM-1 the mixer page's K2 is the morph (one-voice build) and CC 20 sets it; the B side travels with the patch (binary format 14) and is saved with it. To get a B side: save the patch under a second name, change its sounds, come back to the first and pick the copy.
+- A patch can carry a **B side**: the parameters of another stored patch with the same modules and cables. Pick it on the Main card ("B side": the Library page and the factory list are offered, only those of the same structure), then the Main module's `morph` slider fades every parameter from this patch (A, at 0) to the other (B, at 1): linearly, in octaves for a logarithmic one (a cutoff morphs musically), a choice or a switch flips at the midpoint. Notes keep sounding while you morph: only the parameters move. The Main module has a `morph` input as well; it adds to the slider, so an LFO, an envelope or a sequencer can morph the patch (block rate, one block late). On the FM-1 the mixer page's K2 is the morph (one-voice build) and CC 20 sets it; the B side travels with the patch (binary format 14) and is saved with it. To get a B side: save the patch under a second name, change its sounds, come back to the first and pick the copy.
 
 ## Reverb
 
@@ -159,12 +159,12 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 ## Assemblies: merged ports, placement, nesting
 
 - **Merged ports.** On an expanded assembly, every exposed input has a `merge…` list of the card's other inputs of the same kind. Merging turns two jacks into one that feeds both (the factory `voice` has one `gate` for its two envelopes); the card shows `×2` and a `split` button. A cable into a merged jack goes to every input behind it, and removing it takes them all.
-- **Placement.** "Add module" and "Insert" put the new card on the first free grid cell instead of on top of what is there.
+- **Placement.** "Add module" (a select by kind; picking inserts) and "Insert assembly" (a browser: shelves on the left, entries with their ports on the right, a search across all) put the new card on the first free grid cell instead of on top of what is there.
 - **Nesting.** An assembly can hold assemblies, three levels deep: select modules inside an expanded assembly and "Make assembly", or drop a collapsed card into an expanded frame. The parent's card may show whatever its children expose; collapsing the parent hides everything inside. Ungroup dissolves one level, delete keeps the nested ones. Saved assemblies carry their nested ones.
 
 ## Factory assemblies
 
-The Assemblies page ships forty-three, made by `web/scripts/gen-assemblies.ts` (edit the script, rerun it, commit the files; `voice` and `echo` are kept by hand):
+The browser's factory shelves hold forty-three, made by `web/scripts/gen-assemblies.ts` (edit the script, rerun it, commit the files; `voice` and `echo` are kept by hand):
 
 - The recipes of the factory patches: **filter voice** (oscillator, filter, one ADSR on the VCA, the filter's cv exposed), **adsr operator** (oscillator into a VCA with an ADSR: the operator of the FM patches), **noise voice**, **stack voice** (two oscillators, mixer, filter, ADSR, VCA, with `in3` for a third oscillator), **vibrato** (LFO through a Scale). 29 of the 33 factory patches open as a few of these cards plus an **echo** (the four that do not share a recipe stay flat); the overlay is editor-only, so the sound and the binary patch are unchanged, and a patch saved from the editor keeps its grouping in the JSON and the bank while the FM-1 and the binary form drop it.
 

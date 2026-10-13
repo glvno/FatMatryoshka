@@ -2,6 +2,7 @@
   "format": "modular-1-assembly",
   "version": 1,
   "name": "hats",
+  "category": "Drums",
   "modules": [
     {
       "id": 1,

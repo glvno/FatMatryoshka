@@ -5,6 +5,7 @@
 The merge of the four-voice firmware (1.0.2) with the polyphony, assembly and module work. Host-tested (vitest, golden vectors, arpeggiator and protocol tests, LCD preview), **not built with the JieLi toolchain and not flashed**.
 
 ### Added
+- Editor: "New patch" starts with Main and Output (the module-free "Empty patch" is gone); the module select is grouped by kind and inserts on pick (no "Add module" button); "Insert assembly" opens a browser with shelves (your library, Drums, Voices, Effects, Textures, Utilities), descriptions, ports and a search; Main and Output never enter an assembly (left out of a selection, stripped from imports); the Patches and Assemblies tabs are one Library tab.
 - Shaper: `sym` (asymmetry: an offset before the curve) and `stages` (the curve cascaded 1..4 times, a denser wavefolder); binary patch format 16.
 - Assembly cards: the toggle button reads expand / collapse (was open / close); hints and docs follow (#21).
 - **Polyphony per voice:** each of the four voices' patches plays 1..8 notes (the editor's `voices` row; on the FM-1 the ALGORITHM encoder on the mixer page, shown as MONO / POLY n per voice and in the Main page title).

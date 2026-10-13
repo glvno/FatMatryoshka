@@ -20,7 +20,7 @@ interface B {
   param(label: string, module: number, param: string): void;
 }
 
-function build(name: string, f: (b: B) => void): AssemblyDef {
+function build(name: string, category: string, f: (b: B) => void): AssemblyDef {
   const modules: ModuleInst[] = [];
   const cables: AssemblyDef['cables'] = [];
   const inputs: (PortRef & { also?: { module: number; port: string }[] })[] = [];
@@ -68,16 +68,17 @@ function build(name: string, f: (b: B) => void): AssemblyDef {
     },
   };
   f(b);
-  return { format: 'modular-1-assembly', version: 1, name, modules, cables, inputs, outputs, params };
+  return { format: 'modular-1-assembly', version: 1, name, category, modules, cables, inputs, outputs, params };
 }
 
 const defs: AssemblyDef[] = [];
-const asm = (name: string, f: (b: B) => void): void => {
-  defs.push(build(name, f));
+/** category: the shelf of the editor's assembly browser (CATEGORIES in src/assemblies.ts) */
+const asm = (name: string, category: string, f: (b: B) => void): void => {
+  defs.push(build(name, category, f));
 };
 
 // an FM operator: oscillator, DX-style level / rate envelope, VCA
-asm('operator', (b) => {
+asm('operator', 'Voices', (b) => {
   const osc = b.add('osc', 0, 0, { wave: 0, level: 1 });
   const env = b.add('env', 1, 0, { l1: 1, r1: 0.002, l2: 0.6, r2: 0.3, l3: 0.4, r3: 1, l4: 0, r4: 0.3 });
   const vca = b.add('vca', 2, 0);
@@ -97,7 +98,7 @@ asm('operator', (b) => {
 });
 
 // two operators: a modulator with its own envelope into the carrier's phase, the carrier with its envelope
-asm('fm pair', (b) => {
+asm('fm pair', 'Voices', (b) => {
   const mod = b.add('osc', 0, 0, { wave: 0, coarse: 12, level: 1 });
   const menv = b.add('env', 1, 0, { l1: 1, r1: 0.002, l2: 0.3, r2: 0.4, l3: 0.2, r3: 1, l4: 0, r4: 0.3 });
   const mvca = b.add('vca', 2, 0);
@@ -122,7 +123,7 @@ asm('fm pair', (b) => {
 });
 
 // a kick (909 style): a sine with a fast pitch drop, a decaying amplitude envelope, a 1 ms noise click and a little drive
-asm('kick', (b) => {
+asm('kick', 'Drums', (b) => {
   const osc = b.add('osc', 0, 0, { wave: 0, coarse: -26, level: 1 });
   const penv = b.add('env', 1, 0, { l1: 1, r1: 0.001, l2: 0, r2: 0.07, l3: 0, r3: 0.1, l4: 0, r4: 0.05 });
   const sc = b.add('scale', 2, 0, { gain: 2.5, offset: 0 });
@@ -154,7 +155,7 @@ asm('kick', (b) => {
 });
 
 // a clap: a noise band with a flam (a two-bump envelope on a 20 ms trigger) and a longer tail
-asm('clap', (b) => {
+asm('clap', 'Drums', (b) => {
   const nz = b.add('noise', 0, 0, { level: 1 });
   const flt = b.add('filter', 1, 0, { cutoff: 1200, res: 0.55 });
   const pl = b.add('pulse', 0, 1, { time: 0.02 });
@@ -180,7 +181,7 @@ asm('clap', (b) => {
 });
 
 // a rim shot / cross-stick: a 2 ms strike into a short inharmonic modal body and a tuned comb for the stick
-asm('rim', (b) => {
+asm('rim', 'Drums', (b) => {
   const pl = b.add('pulse', 0, 0, { time: 0.002 });
   const hit = b.add('scale', 0, 1, { gain: 0.06, offset: 0 });
   const md = b.add('modal', 1, 0, { coarse: 12, decay: 0.06, struct: 0.6, bright: 0.8, damp: 0.2 });
@@ -199,7 +200,7 @@ asm('rim', (b) => {
 
 // hi-hats: a detuned square cluster plus noise through a 7 kHz high pass; `gate` is the closed hat (short), `open` the open
 // one (long), and the closed hat chokes the open one (a 250 ms pulse on the closed trigger shuts the open hat's VCA)
-asm('hats', (b) => {
+asm('hats', 'Drums', (b) => {
   const osc = b.add('osc', 0, 0, { wave: 3, coarse: 38, level: 0.6, unison: 5, detune: 90, pw: 0.3 });
   const nz = b.add('noise', 1, 0, { level: 0.5 });
   const src = b.add('mixer', 2, 0, { l1: 0.7, l2: 0.7, l3: 0, l4: 0 });
@@ -235,7 +236,7 @@ asm('hats', (b) => {
 });
 
 // a cowbell: two squares a sixth apart through a band pass and a short envelope
-asm('cowbell', (b) => {
+asm('cowbell', 'Drums', (b) => {
   const o1 = b.add('osc', 0, 0, { wave: 3, coarse: 14, fine: -5, level: 0.7 });
   const o2 = b.add('osc', 0, 1, { wave: 3, coarse: 20, fine: 30, level: 0.7 });
   const mix = b.add('mixer', 1, 0, { l1: 0.7, l2: 0.7, l3: 0, l4: 0 });
@@ -256,7 +257,7 @@ asm('cowbell', (b) => {
 });
 
 // a tom: a harmonic modal body struck by a 2 ms pulse, with a pitch drop; `tune` picks the size
-asm('tom', (b) => {
+asm('tom', 'Drums', (b) => {
   const pl = b.add('pulse', 0, 0, { time: 0.002 });
   const hit = b.add('scale', 2, 0, { gain: 0.015, offset: 0 });
   const md = b.add('modal', 1, 0, { coarse: -12, decay: 0.5, struct: 0, bright: 0.4, damp: 0.5 });
@@ -277,7 +278,7 @@ asm('tom', (b) => {
 
 // a tabla / membrane: a slightly inharmonic modal head hit by a pulse and a noise slap; velocity opens `bright`, a slow
 // envelope bends the pitch down (the bass drum's "ghe")
-asm('tabla', (b) => {
+asm('tabla', 'Drums', (b) => {
   const pl = b.add('pulse', 0, 0, { time: 0.0015 });
   const nz = b.add('noise', 1, 0, { level: 1 });
   const nenv = b.add('env', 2, 0, { l1: 1, r1: 0.001, l2: 0, r2: 0.008, l3: 0, r3: 0.01, l4: 0, r4: 0.01 });
@@ -305,7 +306,7 @@ asm('tabla', (b) => {
 });
 
 // a snare: a noise burst through a high pass and a short sine body, mixed
-asm('snare', (b) => {
+asm('snare', 'Drums', (b) => {
   const nz = b.add('noise', 0, 0, { level: 1 });
   const flt = b.add('filter', 1, 0, { cutoff: 1500, res: 0.3 });
   const nvca = b.add('vca', 2, 0);
@@ -331,7 +332,7 @@ asm('snare', (b) => {
 });
 
 // a hi-hat: noise through a high pass with a very short envelope
-asm('hihat', (b) => {
+asm('hihat', 'Drums', (b) => {
   const nz = b.add('noise', 0, 0, { level: 1 });
   const flt = b.add('filter', 1, 0, { cutoff: 4000, res: 0.2 });
   const vca = b.add('vca', 2, 0, { gain: 0.8 });
@@ -347,7 +348,7 @@ asm('hihat', (b) => {
 });
 
 // a plucked string with a tracking low pass for the body
-asm('pluck', (b) => {
+asm('pluck', 'Voices', (b) => {
   const str = b.add('string', 0, 0, { decay: 2, damp: 0.3, burst: 0, level: 0.8 });
   const flt = b.add('filter', 1, 0, { cutoff: 3000, res: 0.1, track: 1 });
   b.wire(str, 'out', flt, 'in');
@@ -362,7 +363,7 @@ asm('pluck', (b) => {
 });
 
 // a wavetable pad: slow sweep of the frame position, low pass, slow envelope
-asm('wavetable pad', (b) => {
+asm('wavetable pad', 'Voices', (b) => {
   const wt = b.add('wavetable', 0, 0, { bank: 2, pos: 0.3, level: 0.7 }, { p1: 'pos', att: [0.5, 1] });
   const lfo = b.add('lfo', 1, 0, { wave: 1, rate: 0.15, depth: 1 });
   const flt = b.add('filter', 2, 0, { cutoff: 2500, res: 0.2 });
@@ -384,7 +385,7 @@ asm('wavetable pad', (b) => {
 });
 
 // a sub bass: glide, a square an octave down, a dark tracking low pass
-asm('sub bass', (b) => {
+asm('sub bass', 'Voices', (b) => {
   const gl = b.add('glide', 0, 0, { time: 0.08 });
   const osc = b.add('osc', 1, 0, { wave: 3, coarse: -12, level: 0.8 });
   const flt = b.add('filter', 2, 0, { cutoff: 300, res: 0.3, track: 1 });
@@ -404,7 +405,7 @@ asm('sub bass', (b) => {
 });
 
 // a vowel voice: a saw through the vowel filter swept by an LFO
-asm('vowel voice', (b) => {
+asm('vowel voice', 'Voices', (b) => {
   const osc = b.add('osc', 0, 0, { wave: 2, level: 0.8 });
   const vow = b.add('vowel', 1, 0, { vowel: 0, res: 0.6, level: 0.8 });
   const lfo = b.add('lfo', 2, 0, { wave: 1, rate: 0.3, depth: 1 });
@@ -428,7 +429,7 @@ asm('vowel voice', (b) => {
 // ---- the recipes of the factory patches (presets.ts voice() / toOut()), so a patch opens as a few cards
 
 // one oscillator through a filter into a VCA with one ADSR (the filter's cv is exposed for an envelope or LFO)
-asm('filter voice', (b) => {
+asm('filter voice', 'Voices', (b) => {
   const osc = b.add('osc', 0, 0, { wave: 2, level: 0.8 });
   const flt = b.add('filter', 1, 0, { cutoff: 1200, res: 0.3 });
   const env = b.add('adsr', 0, 1, { a: 0.01, d: 0.2, s: 0.6, r: 0.3 });
@@ -447,7 +448,7 @@ asm('filter voice', (b) => {
 });
 
 // an oscillator into a VCA with an ADSR: the operator of the FM patches, a plain voice without a filter
-asm('adsr operator', (b) => {
+asm('adsr operator', 'Voices', (b) => {
   const osc = b.add('osc', 0, 0, { wave: 0, level: 0.8 });
   const env = b.add('adsr', 1, 0, { a: 0.01, d: 0.2, s: 0.6, r: 0.3 });
   const vca = b.add('vca', 2, 0);
@@ -465,7 +466,7 @@ asm('adsr operator', (b) => {
 });
 
 // noise through a filter into a VCA with an ADSR: wind, hats, sweeps
-asm('noise voice', (b) => {
+asm('noise voice', 'Voices', (b) => {
   const nz = b.add('noise', 0, 0, { level: 0.6 });
   const flt = b.add('filter', 1, 0, { cutoff: 2000, res: 0.4 });
   const env = b.add('adsr', 0, 1, { a: 0.01, d: 0.2, s: 0.5, r: 0.3 });
@@ -483,7 +484,7 @@ asm('noise voice', (b) => {
 });
 
 // two oscillators into a mixer, a filter and a VCA with an ADSR (a third oscillator can go into the mixer's in3)
-asm('stack voice', (b) => {
+asm('stack voice', 'Voices', (b) => {
   const o1 = b.add('osc', 0, 0, { wave: 2, level: 0.7 });
   const o2 = b.add('osc', 0, 1, { wave: 2, fine: 8, level: 0.7 });
   const mix = b.add('mixer', 1, 0, { l1: 0.7, l2: 0.7, l3: 0.7, l4: 0 });
@@ -507,7 +508,7 @@ asm('stack voice', (b) => {
 });
 
 // an LFO through a Scale: vibrato (into a pitch input), tremolo (into a VCA's cv with an offset), a filter sweep
-asm('vibrato', (b) => {
+asm('vibrato', 'Utilities', (b) => {
   const lfo = b.add('lfo', 0, 0, { wave: 0, rate: 5, depth: 1 });
   const sc = b.add('scale', 1, 0, { gain: 0.03, offset: 0 });
   b.wire(lfo, 'out', sc, 'in');
@@ -520,7 +521,7 @@ asm('vibrato', (b) => {
 });
 
 // a step sequencer with its own clock: pitch (quantized) and gate out; add its pitch to Main's into an oscillator
-asm('step sequencer', (b) => {
+asm('step sequencer', 'Utilities', (b) => {
   const clk = b.add('lfo', 0, 0, { wave: 3, rate: 8, depth: 1 });
   const sq = b.add('seq', 1, 0, { s1: 0, s2: 0.25, s3: 0.58, s4: 0.33, s5: 0, s6: 0.75, s7: 0.58, s8: 1, len: 8, dir: 0 });
   const qn = b.add('quant', 2, 0, { scale: 1, root: 0 });
@@ -538,7 +539,7 @@ asm('step sequencer', (b) => {
 });
 
 // a random melody: clocked sample & hold on noise, quantized; a pulse makes the gate
-asm('random melody', (b) => {
+asm('random melody', 'Utilities', (b) => {
   const clk = b.add('lfo', 0, 0, { wave: 3, rate: 6, depth: 1 });
   const nz = b.add('noise', 1, 0, { level: 0.6 });
   const sh = b.add('sh', 2, 0, { mode: 0 });
@@ -559,7 +560,7 @@ asm('random melody', (b) => {
 });
 
 // a clock with divisions
-asm('clock', (b) => {
+asm('clock', 'Utilities', (b) => {
   const clk = b.add('lfo', 0, 0, { wave: 3, rate: 4, depth: 1 });
   const dv = b.add('clkdiv', 1, 0, { div: 3 });
   b.wire(clk, 'out', dv, 'clock');
@@ -577,7 +578,7 @@ asm('clock', (b) => {
 
 // a cloud: whatever comes in, scattered into a dense pitch-true cloud; `freeze` is the instrument: play a chord, freeze it,
 // play over the cloud (put a Reverb after it)
-asm('cloud', (b) => {
+asm('cloud', 'Textures', (b) => {
   const gr = b.add('grain', 0, 0, { position: 0.3, size: 0.15, density: 25, pitch: 0, spray: 0.6, freeze: 0, mix: 1 });
   b.input('in', gr, 'in');
   b.input('trig', gr, 'trig');
@@ -593,7 +594,7 @@ asm('cloud', (b) => {
 
 // shimmer: the reverb's tail is fed back through a granular pitch shift an octave up (one Reverb and one Granular: the
 // patch cannot hold another of either)
-asm('shimmer', (b) => {
+asm('shimmer', 'Textures', (b) => {
   const mix = b.add('mixer', 0, 0, { l1: 1, l2: 0.4, l3: 0, l4: 0 });
   const rv = b.add('reverb', 1, 0, { size: 0.8, damp: 0.3, mix: 0.5, pre: 10, mod: 0.4 });
   const gr = b.add('grain', 2, 0, { position: 0.05, size: 0.25, density: 12, pitch: 12, spray: 0, freeze: 0, mix: 1 });
@@ -611,7 +612,7 @@ asm('shimmer', (b) => {
 
 // stutter: grains fired by an internal clock (divided), the read position jumping with a slow square; density 0 = only the
 // clock fires grains
-asm('stutter', (b) => {
+asm('stutter', 'Effects', (b) => {
   const clk = b.add('lfo', 0, 0, { wave: 3, rate: 8, depth: 1 });
   const dv = b.add('clkdiv', 1, 0, { div: 2 });
   const pos = b.add('lfo', 0, 1, { wave: 3, rate: 0.7, depth: 1 });
@@ -634,7 +635,7 @@ asm('stutter', (b) => {
 
 // time smear: a feedback delay into grains an octave down whose read position drifts with a slow triangle, crossfaded with
 // the dry signal (holds the patch's Delay and Granular)
-asm('time smear', (b) => {
+asm('time smear', 'Textures', (b) => {
   const dly = b.add('delay', 0, 0, { time: 400, fb: 0.5, mix: 1 });
   const lfo = b.add('lfo', 0, 1, { wave: 1, rate: 0.1, depth: 1 });
   const sc = b.add('scale', 1, 1, { gain: 0.3, offset: 0 });
@@ -655,7 +656,7 @@ asm('time smear', (b) => {
 
 // a slicer: a step sequencer picks the read position of the last second of audio, its gate fires the grain: a sample
 // slicer on whatever was played into it
-asm('slicer', (b) => {
+asm('slicer', 'Effects', (b) => {
   const clk = b.add('lfo', 0, 0, { wave: 3, rate: 8, depth: 1 });
   const sq = b.add('seq', 1, 0, { s1: -0.8, s2: 0.2, s3: -0.4, s4: 0.8, s5: 0, s6: -0.6, s7: 0.5, s8: -0.2, len: 8, dir: 0 });
   const gr = b.add('grain', 2, 0, { position: 0.5, size: 0.2, density: 0, pitch: 0, spray: 0, freeze: 0, mix: 1 }, { p1: 'position', att: [0.5, 1] });
@@ -675,7 +676,7 @@ asm('slicer', (b) => {
 });
 
 // a reverse pad: long grains read from `age` seconds back, under a slow attack: a "played from the past" smear (turn age up for the oldest audio)
-asm('reverse pad', (b) => {
+asm('reverse pad', 'Textures', (b) => {
   const gr = b.add('grain', 0, 0, { position: 0.2, size: 0.15, density: 12, pitch: 0, spray: 0, freeze: 0, mix: 1 });
   const env = b.add('adsr', 0, 1, { a: 0.5, d: 0.5, s: 1, r: 1.5 });
   const vca = b.add('vca', 1, 0);
@@ -694,7 +695,7 @@ asm('reverse pad', (b) => {
 // ---- modal
 
 // a glass bell: a 3 ms strike into a bar-like modal body, a little frequency shift for the shimmer; velocity opens `bright`
-asm('glass bell', (b) => {
+asm('glass bell', 'Voices', (b) => {
   const pl = b.add('pulse', 0, 0, { time: 0.003 });
   const hit = b.add('scale', 0, 1, { gain: 0.04, offset: 0 });
   const md = b.add('modal', 1, 0, { coarse: 0, decay: 4, struct: 1, bright: 0.7, damp: 0.2 }, { p1: 'bright', att: [0.4, 1] });
@@ -714,7 +715,7 @@ asm('glass bell', (b) => {
 });
 
 // gamelan: two bar-like modal bodies a fifth apart, the second a little sharp (beating), both hit by one noise burst
-asm('gamelan', (b) => {
+asm('gamelan', 'Voices', (b) => {
   const nz = b.add('noise', 0, 0, { level: 1 });
   const env = b.add('env', 1, 0, { l1: 1, r1: 0.001, l2: 0, r2: 0.015, l3: 0, r3: 0.01, l4: 0, r4: 0.01 });
   const vca = b.add('vca', 2, 0, { gain: 0.05 });
@@ -740,7 +741,7 @@ asm('gamelan', (b) => {
 });
 
 // a kalimba: a plucked modal tine with a tuned comb for the body
-asm('kalimba', (b) => {
+asm('kalimba', 'Voices', (b) => {
   const pl = b.add('pulse', 0, 0, { time: 0.002 });
   const hit = b.add('scale', 0, 1, { gain: 0.015, offset: 0 });
   const md = b.add('modal', 1, 0, { coarse: 0, decay: 0.8, struct: 0.3, bright: 0.5, damp: 0.7 });
@@ -759,7 +760,7 @@ asm('kalimba', (b) => {
 
 // marimba / vibes: a harmonic modal bar with a resonator tube (a darker modal an octave below) by `tube`, and a tremolo
 // `motor` for the vibes
-asm('marimba', (b) => {
+asm('marimba', 'Voices', (b) => {
   const pl = b.add('pulse', 0, 0, { time: 0.002 });
   const hit = b.add('scale', 0, 1, { gain: 0.02, offset: 0 });
   const bar = b.add('modal', 1, 0, { coarse: 0, decay: 0.4, struct: 0, bright: 0.6, damp: 0.4 });
@@ -789,7 +790,7 @@ asm('marimba', (b) => {
 
 // bowed glass: noise through a tracking ladder into a modal body, the noise under a slow envelope (the bow pressure), a
 // compressor keeps the sustain even
-asm('bowed glass', (b) => {
+asm('bowed glass', 'Voices', (b) => {
   const nz = b.add('noise', 0, 0, { level: 1 });
   const env = b.add('adsr', 0, 1, { a: 0.4, d: 0.3, s: 0.8, r: 0.6 });
   const vca = b.add('vca', 1, 0, { gain: 0.5 });
@@ -812,7 +813,7 @@ asm('bowed glass', (b) => {
 });
 
 // rain: a fast random clock samples noise into a pentatonic pitch and strikes a modal body with a 2 ms burst
-asm('rain', (b) => {
+asm('rain', 'Textures', (b) => {
   const clk = b.add('lfo', 0, 0, { wave: 3, rate: 9, depth: 1 });
   const nz = b.add('noise', 1, 0, { level: 0.8 });
   const sh = b.add('sh', 2, 0, { mode: 0 });
@@ -838,7 +839,7 @@ asm('rain', (b) => {
 });
 
 // a resonator bank (effect): three modal bodies on the root, the fifth and the octave in parallel
-asm('resonator bank', (b) => {
+asm('resonator bank', 'Textures', (b) => {
   const m1 = b.add('modal', 0, 0, { coarse: 0, decay: 1.5, struct: 0, bright: 0.5, damp: 0.4 });
   const m2 = b.add('modal', 0, 1, { coarse: 7, decay: 1.5, struct: 0, bright: 0.5, damp: 0.4 });
   const m3 = b.add('modal', 0, 2, { coarse: 12, decay: 1.5, struct: 0, bright: 0.5, damp: 0.4 });
@@ -860,7 +861,7 @@ asm('resonator bank', (b) => {
 // ---- comb, shifter, compressor
 
 // a bowed string: noise through a ladder into a high-feedback comb at the pitch; an ADSR on the noise, a glide on the pitch
-asm('bowed string', (b) => {
+asm('bowed string', 'Voices', (b) => {
   const gl = b.add('glide', 0, 0, { time: 0.08 });
   const nz = b.add('noise', 1, 0, { level: 1 });
   const env = b.add('adsr', 2, 0, { a: 0.15, d: 0.3, s: 0.8, r: 0.3 });
@@ -883,7 +884,7 @@ asm('bowed string', (b) => {
 });
 
 // barber pole: a slow frequency shift up and down, crossfaded by a slow LFO: an endless rise (or fall)
-asm('barber pole', (b) => {
+asm('barber pole', 'Effects', (b) => {
   const fs = b.add('shift', 0, 0, { shift: 0.3, cvamt: 100, mix: 1 });
   const lfo = b.add('lfo', 0, 1, { wave: 1, rate: 0.08, depth: 1 });
   const sc = b.add('scale', 1, 1, { gain: 0.5, offset: 0.5 });
@@ -900,7 +901,7 @@ asm('barber pole', (b) => {
 });
 
 // sidechain pump: a compressor ducked by an internal clock's pulse
-asm('sidechain pump', (b) => {
+asm('sidechain pump', 'Effects', (b) => {
   const clk = b.add('lfo', 0, 0, { wave: 3, rate: 2, depth: 1 });
   const pl = b.add('pulse', 1, 0, { time: 0.03 });
   const dyn = b.add('dyn', 2, 0, { thresh: -30, ratio: 12, attack: 0.002, release: 0.18, gain: 0 });
@@ -916,7 +917,7 @@ asm('sidechain pump', (b) => {
 });
 
 // a talking filter: the input's envelope opens the vowel (the louder, the more open)
-asm('talking filter', (b) => {
+asm('talking filter', 'Effects', (b) => {
   const dyn = b.add('dyn', 0, 0, { thresh: 0, ratio: 1, attack: 0.005, release: 0.08, gain: 0 });
   const sc = b.add('scale', 1, 0, { gain: 4, offset: 0 });
   const vow = b.add('vowel', 2, 0, { vowel: 0, res: 0.6, level: 0.8 });
@@ -931,7 +932,7 @@ asm('talking filter', (b) => {
 });
 
 // an auto pan
-asm('auto pan', (b) => {
+asm('auto pan', 'Effects', (b) => {
   const lfo = b.add('lfo', 0, 0, { wave: 1, rate: 0.5, depth: 1 });
   const pan = b.add('pan', 1, 0, { pan: 0 });
   b.wire(lfo, 'out', pan, 'pos');
