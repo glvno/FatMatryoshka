@@ -1380,6 +1380,41 @@ static void m_dyn(const node_t *nd, inst_t *it, uint32_t n)
     it->s.dyn.env = env;
 }
 
+static void m_math(const node_t *nd, inst_t *it, uint32_t n)      /* modules.ts `math`: a' = a ka + off, b' = b kb */
+{
+    const esig_t *ia = it->in[MATH_I_A], *ib = it->in[MATH_I_B];
+    esig_t **o = it->out;
+    int32_t ka = EF(it, MATH_P_KA), kb = EF(it, MATH_P_KB), off = EF(it, MATH_P_OFF);
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        int32_t a = mul16(ia[i], ka) + off, b = mul16(ib[i], kb);
+        o[MATH_O_ADD][i] = a + b;
+        o[MATH_O_SUB][i] = a - b;
+        o[MATH_O_MUL][i] = mul16(a, b);
+        o[MATH_O_MIN][i] = a < b ? a : b;
+        o[MATH_O_MAX][i] = a > b ? a : b;
+        o[MATH_O_ABS][i] = a < 0 ? -a : a;
+        o[MATH_O_CMP][i] = a > b ? ENG_ONE : 0;
+    }
+    (void)nd;
+}
+
+static void m_logic(const node_t *nd, inst_t *it, uint32_t n)     /* modules.ts `logic`: gates high at or above thresh */
+{
+    const esig_t *ia = it->in[LOGIC_I_A], *ib = it->in[LOGIC_I_B];
+    esig_t **o = it->out;
+    int32_t t = EF(it, LOGIC_P_THRESH);
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        int a = ia[i] >= t, b = ib[i] >= t;
+        o[LOGIC_O_AND][i] = a && b ? ENG_ONE : 0;
+        o[LOGIC_O_OR][i] = a || b ? ENG_ONE : 0;
+        o[LOGIC_O_XOR][i] = a != b ? ENG_ONE : 0;
+        o[LOGIC_O_NOT][i] = a ? 0 : ENG_ONE;
+    }
+    (void)nd;
+}
+
 static void m_mixer(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *a = it->in[MIXER_I_IN1], *b = it->in[MIXER_I_IN2], *c = it->in[MIXER_I_IN3], *d = it->in[MIXER_I_IN4];
@@ -2049,6 +2084,8 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     case T_PHASER: m_phaser(nd, it, n); break;
     case T_LADDER: m_ladder(nd, it, n); break;
     case T_DYN: m_dyn(nd, it, n); break;
+    case T_MATH: m_math(nd, it, n); break;
+    case T_LOGIC: m_logic(nd, it, n); break;
     case T_CRUSH: m_crush(nd, it, n); break;
     default: break;                      /* output: read by eng_render */
     }

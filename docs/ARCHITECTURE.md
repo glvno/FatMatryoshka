@@ -145,6 +145,10 @@ Rules: `reconcile` keeps an assembly consistent after every structural change (d
 
 - `osc` parameters `unison` (1..5) and `detune` (0..100 cents, default 10): in the plain path (no pm, no feedback) the oscillator runs n phases, voice j detuned by detune·(2j/(n−1) − 1) cents (−detune .. +detune, symmetric), and outputs their sum / n (the peak stays at `level`; detuned copies beat). A sync edge restarts every phase. The FM path ignores unison (one voice). C: the extra phases are `inst_t.s.osc.ph[4]` (the union is sized by the delay's record, so nothing grew), one `exp2_scale` per voice per sample, sum × 1/n from a table. Binary patch format 11 (the oscillator record has 9 parameters). Golden kit `unison` (5 + 2 voices): 1.3 % rel rms (the detuned saw edges fall on different samples in float and Q16, as in the other saw kits).
 
+## Math and logic
+
+- `math`: a' = a·ka + off, b' = b·kb; outputs add, sub, mul, min, max, abs (of a'), cmp (1 while a' > b'). `logic`: inputs high at or above `thresh`; outputs and, or, xor, not (of a). Both stateless, per sample, Q16 in C. Golden kit `math-logic` (xor of two square LFOs gates an ADSR; max / abs of the math module on a VCA and a pitch).
+
 ## Envelope follower and compressor
 
 - `dyn`: inputs `in`, `side`; outputs `out`, `env`. The detector is a one-pole peak follower of |side| (|in| when side is not connected) with the ADSR's rate formula (99 % in `attack` up, `release` down); it rides a little under the peak of a steady tone and ripples at the signal's frequency. Gain above `thresh` (dB): 2^(makeup − slope·(log2 env − log2 thresh)), slope = 1 − 1/ratio; below it only the makeup `gain` (dB). C: env Q24, rates Q30 (`env_rate`), dB → octaves by 1/6.0206 in Q16, one `log2_q16` + `exp2_q16` per sample while above the threshold (`exp2_q16` gives a plain integer: the Q16 / Q24 offsets are added to its argument). Golden kit `dyn` (gated saw into the compressor, its env output on a second VCA): 0.3 % rel rms.

@@ -491,6 +491,52 @@ describe('compressor', () => {
   });
 });
 
+describe('math and logic', () => {
+  /** two constants into the module, one output to the left channel */
+  function rig(type: 'math' | 'logic', a: number, b: number, port: string, params: Record<string, number> = {}): number {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const ca = addModule(p, DEFS.const, 0, 0);
+    const cb = addModule(p, DEFS.const, 0, 0);
+    const m = addModule(p, DEFS[type], 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    ca.params.value = a;
+    cb.params.value = b;
+    out.params.level = 1;
+    Object.assign(m.params, params);
+    connect(p, DEFS, { module: ca.id, port: 'out' }, { module: m.id, port: 'a' });
+    connect(p, DEFS, { module: cb.id, port: 'out' }, { module: m.id, port: 'b' });
+    connect(p, DEFS, { module: m.id, port }, { module: out.id, port: 'l' });
+    e.load(p);
+    const l = render(e, 256).l;
+    return l[200];
+  }
+
+  it('math: add, sub, mul, min, max, abs, cmp with the scales and the offset', () => {
+    expect(rig('math', 0.3, 0.2, 'add')).toBeCloseTo(0.5, 5);
+    expect(rig('math', 0.3, 0.2, 'sub')).toBeCloseTo(0.1, 5);
+    expect(rig('math', 0.5, 0.5, 'mul')).toBeCloseTo(0.25, 5);
+    expect(rig('math', -0.4, 0.2, 'min')).toBeCloseTo(-0.4, 5);
+    expect(rig('math', -0.4, 0.2, 'max')).toBeCloseTo(0.2, 5);
+    expect(rig('math', -0.4, 0.2, 'abs')).toBeCloseTo(0.4, 5);
+    expect(rig('math', 0.3, 0.2, 'cmp')).toBe(1);
+    expect(rig('math', 0.1, 0.2, 'cmp')).toBe(0);
+    expect(rig('math', 0.1, 0.2, 'add', { ka: 2, kb: -1, off: 0.5 })).toBeCloseTo(0.5, 5); // 0.2 + 0.5 - 0.2
+  });
+
+  it('logic: and, or, xor, not at the threshold', () => {
+    expect(rig('logic', 1, 1, 'and')).toBe(1);
+    expect(rig('logic', 1, 0, 'and')).toBe(0);
+    expect(rig('logic', 1, 0, 'or')).toBe(1);
+    expect(rig('logic', 0, 0, 'or')).toBe(0);
+    expect(rig('logic', 1, 1, 'xor')).toBe(0);
+    expect(rig('logic', 0, 1, 'xor')).toBe(1);
+    expect(rig('logic', 0, 0, 'not')).toBe(1);
+    expect(rig('logic', 0.3, 0, 'not', { thresh: 0.2 })).toBe(0);
+  });
+});
+
 describe('ladder filter', () => {
   /** noise -> ladder -> output left, taken from the given output */
   function rig(port: string, params: Record<string, number>, note?: number, level = 0.3): Float32Array {

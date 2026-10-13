@@ -599,6 +599,55 @@ const dyn: ModuleImpl<{ env: number }> = {
   },
 };
 
+/** arithmetic on two signals: a' = a·ka + off, b' = b·kb; add, sub, mul, min, max, abs (of a'), cmp (1 while a' > b') */
+const math: ModuleImpl<null> = {
+  def: {
+    type: 'math',
+    label: 'Math',
+    inputs: [control('a'), control('b')],
+    outputs: [control('add'), control('sub'), control('mul'), control('min'), control('max'), control('abs'), gate('cmp')],
+    params: [param('ka', -4, 4, 1, { step: 0.01 }), param('kb', -4, 4, 1, { step: 0.01 }), param('off', -4, 4, 0, { step: 0.01 })],
+  },
+  init: () => null,
+  process(c) {
+    const ka = c.p.ka ?? 1, kb = c.p.kb ?? 1, off = c.p.off ?? 0;
+    const o = c.out;
+    for (let i = 0; i < c.n; i++) {
+      const a = c.inp.a[i] * ka + off, b = c.inp.b[i] * kb;
+      o.add[i] = a + b;
+      o.sub[i] = a - b;
+      o.mul[i] = a * b;
+      o.min[i] = Math.min(a, b);
+      o.max[i] = Math.max(a, b);
+      o.abs[i] = Math.abs(a);
+      o.cmp[i] = a > b ? 1 : 0;
+    }
+  },
+};
+
+/** gates from two inputs (high at or above `thresh`): and, or, xor, not (of a) */
+const logic: ModuleImpl<null> = {
+  def: {
+    type: 'logic',
+    label: 'Logic',
+    inputs: [gate('a'), gate('b')],
+    outputs: [gate('and'), gate('or'), gate('xor'), gate('not')],
+    params: [param('thresh', 0.05, 0.95, 0.5, { step: 0.01 })],
+  },
+  init: () => null,
+  process(c) {
+    const t = c.p.thresh ?? 0.5;
+    const o = c.out;
+    for (let i = 0; i < c.n; i++) {
+      const a = c.inp.a[i] >= t, b = c.inp.b[i] >= t;
+      o.and[i] = a && b ? 1 : 0;
+      o.or[i] = a || b ? 1 : 0;
+      o.xor[i] = a !== b ? 1 : 0;
+      o.not[i] = a ? 0 : 1;
+    }
+  },
+};
+
 const mixer: ModuleImpl<null> = {
   def: {
     type: 'mixer',
@@ -1454,7 +1503,7 @@ const crush: ModuleImpl<{ held: number; cnt: number }> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn];
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an

@@ -80,6 +80,11 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - The **Oscillator** has `unison` (1..5 copies) and `detune` (cents, spread from −detune to +detune): a supersaw or a thick pulse from one module, summed so the peak stays at `level`. Sync restarts all copies. With `pm` connected or `fb` above 0 the oscillator runs its FM path, which plays one copy.
 
+## Math and logic
+
+- **Math** takes two signals (`a` scaled by `ka` plus `off`, `b` scaled by `kb`) and outputs their sum, difference, product, min, max, |a| and a gate that is high while a > b: ring modulation, a CV mixer, a comparator, a rectifier.
+- **Logic** combines two gates: `and`, `or`, `xor`, `not` (of `a`), high from `thresh` on. Two clocks into `xor` make a rhythm.
+
 ## Compressor
 
 - **Compressor** is an envelope follower and compressor in one: `env` outputs the follower (a control: an oscillator's loudness as a CV, a sidechain pump from a kick into a VCA), `out` the signal compressed above `thresh` by `ratio` with `attack`, `release` and makeup `gain`. The `side` input is the sidechain; without it the detector listens to `in`.

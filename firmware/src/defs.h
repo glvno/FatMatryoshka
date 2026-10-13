@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 31
+#define N_TYPES 33
 enum {
     T_FM1,
     T_OSC,
@@ -36,6 +36,8 @@ enum {
     T_CRUSH,
     T_LADDER,
     T_DYN,
+    T_MATH,
+    T_LOGIC,
 };
 
 /* fm1: Main */
@@ -495,6 +497,41 @@ enum {
 #define DYN_NPAR 5
 #define DYN_CVBASE 2
 
+/* math: Math */
+#define MATH_I_A 0
+#define MATH_I_B 1
+#define MATH_I_P1 2
+#define MATH_I_P2 3
+#define MATH_O_ADD 0
+#define MATH_O_SUB 1
+#define MATH_O_MUL 2
+#define MATH_O_MIN 3
+#define MATH_O_MAX 4
+#define MATH_O_ABS 5
+#define MATH_O_CMP 6
+#define MATH_P_KA 0
+#define MATH_P_KB 1
+#define MATH_P_OFF 2
+#define MATH_NIN 4
+#define MATH_NOUT 7
+#define MATH_NPAR 3
+#define MATH_CVBASE 2
+
+/* logic: Logic */
+#define LOGIC_I_A 0
+#define LOGIC_I_B 1
+#define LOGIC_I_P1 2
+#define LOGIC_I_P2 3
+#define LOGIC_O_AND 0
+#define LOGIC_O_OR 1
+#define LOGIC_O_XOR 2
+#define LOGIC_O_NOT 3
+#define LOGIC_P_THRESH 0
+#define LOGIC_NIN 4
+#define LOGIC_NOUT 4
+#define LOGIC_NPAR 1
+#define LOGIC_CVBASE 2
+
 #define DELAY_NDIV 11
 #define DELAY_CLK_PPQN 24
 static const uint8_t DELAY_DIV_NUM[DELAY_NDIV] = {1, 1, 1, 3, 1, 3, 1, 3, 2, 5, 4};
@@ -811,6 +848,24 @@ static const char *const DYN_PN[] = {"THRESH", "RATIO", "ATTACK", "RELEASE", "GA
 static const uint8_t DYN_LOG[] = {0, 0, 1, 1, 0};
 static const char *const DYN_UNIT[] = {"DB", "", "S", "S", "DB"};
 static const char *const *const DYN_CH[] = {0, 0, 0, 0, 0};
+static const char *const MATH_INNAMES[] = {"A", "B", "P1", "P2"};
+static const int32_t MATH_MIN[] = {-262144, -262144, -262144};
+static const int32_t MATH_MAX[] = {262144, 262144, 262144};
+static const int32_t MATH_DEF[] = {65536, 65536, 0};
+static const int32_t MATH_INC[] = {5243, 5243, 5243};
+static const char *const MATH_PN[] = {"KA", "KB", "OFF"};
+static const uint8_t MATH_LOG[] = {0, 0, 0};
+static const char *const MATH_UNIT[] = {"", "", ""};
+static const char *const *const MATH_CH[] = {0, 0, 0};
+static const char *const LOGIC_INNAMES[] = {"A", "B", "P1", "P2"};
+static const int32_t LOGIC_MIN[] = {3277};
+static const int32_t LOGIC_MAX[] = {62259};
+static const int32_t LOGIC_DEF[] = {32768};
+static const int32_t LOGIC_INC[] = {655};
+static const char *const LOGIC_PN[] = {"THRESH"};
+static const uint8_t LOGIC_LOG[] = {0};
+static const char *const LOGIC_UNIT[] = {""};
+static const char *const *const LOGIC_CH[] = {0};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, FM1_CVBASE, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -844,4 +899,6 @@ static const def_t DEFS[N_TYPES] = {
     {CRUSH_NIN, CRUSH_NOUT, CRUSH_NPAR, CRUSH_CVBASE, CRUSH_MIN, CRUSH_MAX, CRUSH_DEF, CRUSH_INC, "DIGITIZER", CRUSH_PN, CRUSH_INNAMES, CRUSH_LOG, CRUSH_UNIT, CRUSH_CH},   /* crush */
     {LADDER_NIN, LADDER_NOUT, LADDER_NPAR, LADDER_CVBASE, LADDER_MIN, LADDER_MAX, LADDER_DEF, LADDER_INC, "LADDER", LADDER_PN, LADDER_INNAMES, LADDER_LOG, LADDER_UNIT, LADDER_CH},   /* ladder */
     {DYN_NIN, DYN_NOUT, DYN_NPAR, DYN_CVBASE, DYN_MIN, DYN_MAX, DYN_DEF, DYN_INC, "COMPRESSOR", DYN_PN, DYN_INNAMES, DYN_LOG, DYN_UNIT, DYN_CH},   /* dyn */
+    {MATH_NIN, MATH_NOUT, MATH_NPAR, MATH_CVBASE, MATH_MIN, MATH_MAX, MATH_DEF, MATH_INC, "MATH", MATH_PN, MATH_INNAMES, MATH_LOG, MATH_UNIT, MATH_CH},   /* math */
+    {LOGIC_NIN, LOGIC_NOUT, LOGIC_NPAR, LOGIC_CVBASE, LOGIC_MIN, LOGIC_MAX, LOGIC_DEF, LOGIC_INC, "LOGIC", LOGIC_PN, LOGIC_INNAMES, LOGIC_LOG, LOGIC_UNIT, LOGIC_CH},   /* logic */
 };

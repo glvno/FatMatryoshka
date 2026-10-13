@@ -153,6 +153,31 @@ kit('dyn', (add, wire) => {
   wire(vca2, 'out', mix, 'in2');
   wire(mix, 'out', out, 'l');
 });
+kit('math-logic', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const lfo1 = add('lfo', 0, 0, { wave: 3, rate: 3, depth: 1 });
+  const lfo2 = add('lfo', 0, 0, { wave: 3, rate: 5, depth: 1 });
+  const lfo3 = add('lfo', 0, 0, { wave: 1, rate: 0.7, depth: 1 });
+  const lg = add('logic', 0, 0);
+  const mt = add('math', 0, 0, { ka: 0.5, kb: 0.3, off: 0.1 });
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.7 });
+  const adsr = add('adsr', 0, 0, { a: 0.002, d: 0.08, s: 0.2, r: 0.05 });
+  const vca = add('vca', 0, 0);
+  const vca2 = add('vca', 0, 0);
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(lfo1, 'out', lg, 'a');
+  wire(lfo2, 'out', lg, 'b');
+  wire(lg, 'xor', adsr, 'gate');
+  wire(osc, 'out', vca, 'in');
+  wire(adsr, 'env', vca, 'cv');
+  wire(lfo3, 'out', mt, 'a');
+  wire(lfo1, 'out', mt, 'b');
+  wire(mt, 'max', vca2, 'cv');
+  wire(vca, 'out', vca2, 'in');
+  wire(vca2, 'out', out, 'l');
+  wire(mt, 'abs', osc, 'pitch');
+});
 kit('ladder', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.8 });
