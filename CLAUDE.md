@@ -218,3 +218,7 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 - Fixed on the way: dev's main.c used `voices_set` before its definition (the JieLi toolchain never saw it); upstream's `vgain[]` initialised only two of four voices (harmless, `mix_apply_all` runs at boot).
 - Hazard: `git merge` auto-merged several upstream fragments into engine.c (`buf_pool[VOICE_NO]`, `eng_clock_tick`, the voice API at the end, the delay's state struct) without conflict markers; check the whole file, not only the hunks, after a merge there.
 - `web/public/firmware/modular-1.fwsc` / `.json` are upstream's 1.0.2 package (CI rebuilds it for Pages); not rebuilt here.
+
+## Handoff
+
+- `docs/HANDOFF.md` (2026-10-13): the decisions after the upstream merge (one-voice build via `ENG_VOICES`, one delay + one reverb, granular budget, feature order) and the plan for the first new modules. Read it before continuing that work.
