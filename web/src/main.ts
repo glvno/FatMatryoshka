@@ -9,6 +9,7 @@ import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi } from './input';
 import { DEFS } from './modules';
 import { emptyPatch, validatePatch, voicesOf, type Patch } from './patch';
+import { ARP_DEFAULT } from './arp';
 import { PRESETS } from './presets';
 import { deviceBudget, DEVICE } from './patchbin';
 
@@ -115,6 +116,16 @@ const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw']
     queueSave(editor.patch);
     if (live() && !uploading) device.range(editor.patch, id, index, name, range);
     else if (live()) dirty = true;
+  },
+  onArp(cfg) {
+    host.send({ t: 'arp', cfg });
+    queueSave(editor.patch);
+    if (live() && !uploading) device.arp(cfg, null);
+    else if (live()) dirty = true;
+  },
+  onArpPlay(on) {
+    host.send({ t: 'arpplay', on });
+    if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, on);
   },
   onLayout(p) {
     queueSave(p);

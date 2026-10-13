@@ -16,7 +16,8 @@
 #define M1_PATCH_MAX 3072u
 #define M1_VERSION 1
 
-enum { C_HELLO = 0x01, C_CHUNK = 0x10, C_COMMIT = 0x11, C_STORE = 0x12, C_PARAM = 0x20, C_ATT = 0x21, C_BYPASS = 0x22, C_RANGE = 0x23, C_SLOT = 0x13, C_SLOT_ERASE = 0x14, C_SLOT_INFO = 0x15, R_ACK = 0x40, R_INFO = 0x41, R_SLOT = 0x42 };
+enum { C_HELLO = 0x01, C_CHUNK = 0x10, C_COMMIT = 0x11, C_STORE = 0x12, C_PARAM = 0x20, C_ATT = 0x21, C_BYPASS = 0x22, C_RANGE = 0x23, C_ARP = 0x24, C_SLOT = 0x13, C_SLOT_ERASE = 0x14, C_SLOT_INFO = 0x15, R_ACK = 0x40, R_INFO = 0x41, R_SLOT = 0x42 };
+#define M1_FEATURES 1u                                       /* INFO byte 5: bit 0 = the ARP command */
 #define M1_SLOTS 32u
 #define M1_NAME 20u
 enum { S_OK, S_RANGE, S_CRC, S_LOAD, S_FLASH, S_CMD, S_NONE };
@@ -260,13 +261,14 @@ static int m1_handle(const uint8_t *f, uint32_t n)
         return 1;                                            /* more than any of our frames carries */
     switch (f[3]) {
     case C_HELLO: {
-        uint8_t p[5];
+        uint8_t p[6];
         p[0] = M1_VERSION;
         p[1] = ENG_MAX_MODULES;
         p[2] = ENG_MAX_CABLES;
         p[3] = (uint8_t)((m1_flash_ok() ? 1u : 0u) | (m1_cur_len ? 2u : 0u));
         p[4] = ENG_NDELAY;                                   /* delay lines (shared by the voices) */
-        m1_reply(R_INFO, p, 5);
+        p[5] = M1_FEATURES;
+        m1_reply(R_INFO, p, 6);
         break;
     }
     case C_CHUNK: {
@@ -401,6 +403,10 @@ static int m1_handle(const uint8_t *f, uint32_t n)
             eng_set_att(d[0], d[1], v);
             m1_patch_att(d[0], d[1], v);
         }
+        break;
+    case C_ARP:                                              /* the arpeggiator's settings (13 bytes, arp_pack) and transport */
+        if (len >= 13u)
+            m1_arp_set(d, len);
         break;
     case C_RANGE:
         if (len >= 6u) {

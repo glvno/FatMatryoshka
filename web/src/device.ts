@@ -2,8 +2,9 @@
 // The FM-1 as a Web MIDI SysEx peer: patch upload, store, live parameters (wire format: protocol.ts).
 import { DEFS } from './modules';
 import type { Patch } from './patch';
+import type { ArpCfg } from './arp';
 import { encodePatch, toQ16 } from './patchbin';
-import { attFrame, bypassFrame, chunkFrames, CMD, parseSlot, rangeFrame, slotEraseFrame, slotFrame, slotInfoFrame, SLOTS, type SlotInfo, commitFrame, helloFrame, paramFrame, parse, parseAck, parseInfo, STATUS_TEXT, storeFrame, type Ack, type Info } from './protocol';
+import { arpFrame, attFrame, bypassFrame, chunkFrames, CMD, parseSlot, rangeFrame, slotEraseFrame, slotFrame, slotInfoFrame, SLOTS, type SlotInfo, commitFrame, helloFrame, paramFrame, parse, parseAck, parseInfo, STATUS_TEXT, storeFrame, type Ack, type Info } from './protocol';
 
 const NAME = /felucca|fm-?1|modular/i;
 const ACK_TIMEOUT = 700;
@@ -89,8 +90,20 @@ export class DeviceLink {
       const bin = encodePatch(patch);
       await this.sendChunks(bin);
       await this.ackFor(commitFrame(bin), CMD.commit);
+      if (patch.arp && this.hasArp) this.out!.send(arpFrame(patch.arp, null)); // the groove travels with the patch
     };
     return this.serial(run);
+  }
+
+  /** the firmware takes the ARP command (INFO feature bit 0) */
+  get hasArp(): boolean {
+    return !!(this.info && this.info.features & 1);
+  }
+
+  /** the arpeggiator's settings and transport (null = leave the transport) */
+  arp(cfg: ArpCfg, play: boolean | null): void {
+    if (!this.connected || !this.hasArp) return;
+    this.out!.send(arpFrame(cfg, play));
   }
 
   private async sendChunks(bin: Uint8Array): Promise<void> {

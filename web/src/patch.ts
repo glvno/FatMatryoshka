@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import type { AssemblyInst } from './assembly';
+import { fixArp, type ArpCfg } from './arp';
 // Patch data model, shared by the editor, the WebAudio engine and (later) the firmware encoder.
 
 export type SignalKind = 'audio' | 'control' | 'gate';
@@ -129,6 +130,9 @@ export interface Patch {
   assemblies?: AssemblyInst[];
   /** the name of the patch the B side (paramsB) was taken from, for display */
   morphName?: string;
+  /** the arpeggiator's settings (arp.ts), an optional overlay: the browser's arpeggiator and the FM-1's (ARP command) take
+   * them with the patch; the binary patch does not carry them */
+  arp?: ArpCfg;
 }
 
 /** do two patches have the same structure (modules of the same types in the same order, the same cables), so that one can be the B side of the other? */
@@ -380,6 +384,8 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
   }
   p.name = String(p.name ?? 'patch');
   if (!hasMorph(p as Patch) || typeof p.morphName !== 'string') delete p.morphName;
+  if (p.arp && typeof p.arp === 'object') p.arp = fixArp(p.arp);
+  else delete p.arp;
   if (p.voices === undefined || p.voices === null) delete p.voices;
   else p.voices = voicesOf(p);
   return p as Patch;

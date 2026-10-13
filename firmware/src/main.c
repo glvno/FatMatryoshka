@@ -130,6 +130,23 @@ static void arp_pack(uint8_t *d, const arp_cfg_t *c)
     d[7] = c->steps; d[8] = c->pulses; d[9] = c->rot; d[10] = c->rate; d[11] = (uint8_t)c->bpm; d[12] = (uint8_t)(c->bpm >> 8);
 }
 
+static void arp_unpack(uint32_t v, const uint8_t *d);
+
+/* the editor's ARP command: the 13 byte record into the selected voice's arpeggiator, byte 13 the transport (0 stop,
+ * 1 start, else leave) */
+static void m1_arp_set(const uint8_t *d, uint32_t n)
+{
+    uint32_t v = eng_voice();
+    arp_unpack(v, d);
+    if (!v)
+        arp_sync_scale();
+    if (n >= 14u && d[13] < 2u) {
+        AV[v].play = d[13];
+        leds_arp();
+    }
+    ui_dirty = 2;
+}
+
 static void arp_unpack(uint32_t v, const uint8_t *d)
 {
     arp_t *keep = arp_p;

@@ -29,6 +29,7 @@ import {
   rangeOf,
   paramValue,
 } from './patch';
+import { ARP_DEFAULT, ARP_MODES, ARP_RATES, ARP_SCALES, ARP_MAX_STEPS, fixArp, noteName, type ArpCfg } from './arp';
 import {
   addChild,
   addMember,
@@ -94,6 +95,10 @@ export interface EditorEvents {
   onBypass(id: number, on: boolean): void;
   /** a macro range of p1 / p2 (index 0 / 1) on a parameter changed or was removed (null) */
   onRange(id: number, index: number, name: string, range: [number, number] | null): void;
+  /** the arpeggiator's settings changed (they are part of the patch: Patch.arp) */
+  onArp(cfg: ArpCfg): void;
+  /** the arpeggiator's transport (editor state, not saved) */
+  onArpPlay(on: boolean): void;
   /** cards were moved: positions changed, nothing the engine needs */
   onLayout(p: Patch): void;
   /** a message for the status line */
@@ -346,7 +351,7 @@ export class Editor {
     for (const pd of def.params) params.append(this.paramRow(m, def, pd, { open }));
     body.append(io);
     if (def.paramInputs) body.append(this.pins(m, def, open), this.matrix(m, def));
-    if (def.type === 'fm1') params.append(this.voicesRow(), this.morphRow());
+    if (def.type === 'fm1') params.append(this.voicesRow(), this.morphRow(), this.arpPanel());
     body.append(params);
     el.append(head, body);
     return el;
@@ -498,6 +503,97 @@ export class Editor {
     };
     row.append(name, val, sel);
     return row;
+  }
+
+  /** the arpeggiator's transport (editor state) */
+  arpPlay = false;
+
+  /** the arpeggiator on the Main card: the rows of the FM-1's MELODY / RHYTHM / CHAOS pages, saved with the patch (Patch.arp) */
+  private arpPanel(): HTMLElement {
+    const box = document.createElement('details');
+    box.className = 'arp';
+    box.open = !!this.patch.arp || this.arpPlay;
+    const sum = document.createElement('summary');
+    sum.textContent = 'Arpeggiator';
+    box.append(sum);
+    const cfg = (): ArpCfg => this.patch.arp ?? { ...ARP_DEFAULT };
+    const set = (f: keyof ArpCfg, v: number): void => {
+      const c = fixArp({ ...cfg(), [f]: v });
+      this.patch.arp = c;
+      this.ev.onArp(c);
+      refresh();
+    };
+    const rows: (() => void)[] = [];
+    const row = (label: string, el: HTMLElement, show: () => string): void => {
+      const r = document.createElement('label');
+      r.className = 'param';
+      const name = document.createElement('span');
+      name.textContent = label;
+      const val = document.createElement('output');
+      r.append(name, val, el);
+      rows.push(() => (val.textContent = show()));
+      box.append(r);
+    };
+    const refresh = (): void => rows.forEach((f) => f());
+    const choice = (label: string, f: keyof ArpCfg, names: string[]): void => {
+      const sel = document.createElement('select');
+      sel.setAttribute('aria-label', `arpeggiator ${label}`);
+      sel.append(...names.map((n, i) => new Option(n, String(i))));
+      sel.onchange = () => set(f, Number(sel.value));
+      row(label, sel, () => ((sel.value = String(cfg()[f])), ''));
+    };
+    const num = (label: string, f: keyof ArpCfg, lo: number, hi: () => number, show: (v: number) => string = String): void => {
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = String(lo);
+      input.step = '1';
+      input.setAttribute('aria-label', `arpeggiator ${label}`);
+      input.oninput = () => set(f, Number(input.value));
+      row(label, input, () => {
+        input.max = String(hi());
+        input.value = String(cfg()[f]);
+        return show(cfg()[f]);
+      });
+    };
+    // transport
+    const play = document.createElement('label');
+    play.className = 'param';
+    const pname = document.createElement('span');
+    pname.textContent = 'play';
+    const pbox = document.createElement('input');
+    pbox.type = 'checkbox';
+    pbox.checked = this.arpPlay;
+    pbox.setAttribute('aria-label', 'arpeggiator play');
+    pbox.oninput = () => {
+      this.arpPlay = pbox.checked;
+      if (this.arpPlay && !this.patch.arp) {
+        this.patch.arp = { ...ARP_DEFAULT };
+        this.ev.onArp(this.patch.arp);
+      }
+      this.ev.onArpPlay(this.arpPlay);
+    };
+    const pval = document.createElement('output');
+    pval.textContent = 'PLAY on the FM-1';
+    play.append(pname, pval, pbox);
+    box.append(play);
+    choice('mode', 'mode', ARP_MODES);
+    choice('scale', 'scale', ARP_SCALES.map((s) => s.name));
+    num('root', 'root', 0, () => 100, noteName);
+    num('bpm', 'bpm', 40, () => 300);
+    choice('rate', 'rate', ARP_RATES);
+    num('steps', 'steps', 1, () => ARP_MAX_STEPS);
+    num('pulses', 'pulses', 0, () => cfg().steps);
+    num('rotation', 'rot', 0, () => Math.max(0, cfg().steps - 1));
+    num('octaves', 'octaves', 1, () => 3);
+    num('melody chaos', 'chaos', 0, () => 100, (v) => `${v} %`);
+    num('velocity chaos', 'vchaos', 0, () => 100, (v) => `${v} %`);
+    num('rhythm chaos', 'rchaos', 0, () => 100, (v) => `${v} %`);
+    const foot = document.createElement('div');
+    foot.className = 'hint';
+    foot.textContent = this.patch.arp ? 'saved with the patch; sent to the FM-1 with it' : 'the FM-1 defaults: change a row to save the groove with the patch';
+    box.append(foot);
+    refresh();
+    return box;
   }
 
   /** the two parameter inputs, each with an attenuverter (-1..1: scale and invert) */

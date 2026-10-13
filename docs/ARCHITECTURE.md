@@ -170,6 +170,13 @@ Rules: `reconcile` keeps an assembly consistent after every structural change (d
 
 - `dyn`: inputs `in`, `side`; outputs `out`, `env`. The detector is a one-pole peak follower of |side| (|in| when side is not connected) with the ADSR's rate formula (99 % in `attack` up, `release` down); it rides a little under the peak of a steady tone and ripples at the signal's frequency. Gain above `thresh` (dB): 2^(makeup − slope·(log2 env − log2 thresh)), slope = 1 − 1/ratio; below it only the makeup `gain` (dB). C: env Q24, rates Q30 (`env_rate`), dB → octaves by 1/6.0206 in Q16, one `log2_q16` + `exp2_q16` per sample while above the threshold (`exp2_q16` gives a plain integer: the Q16 / Q24 offsets are added to its argument). Golden kit `dyn` (gated saw into the compressor, its env output on a second VCA): 0.3 % rel rms.
 
+## Arpeggiator in the editor
+
+- `web/src/arp.ts` is a line-by-line port of `firmware/src/arp.c` (penta-midi's arpeggiator): `ArpCfg` (the 12 settings), `fixArp` (arp_fix), `packArp` / `unpackArp` (the 13 byte record of `arp_pack`), the scale table (67 entries, generated from arp.c), and class `Arp` with the same xorshift32, modes (up, down, include, exclude, turing, walk, random), Euclid gate, sample-accumulator clock (acc += frames × bpm, a tick every sr × 2.5) and the 65 % gate. `arp.test.ts` repeats the checks of `firmware/test/arp_test.c`.
+- Worklet: one `Arp` runs before every block and plays the engine; while it plays, MIDI clock messages are ignored and its own ticks drive the Main module's clock output, as on the device. Messages `arp` (settings) and `arpplay`; `AudioHost.setPatch` sends the patch's settings (or the defaults) with every patch.
+- Model: `Patch.arp?: ArpCfg` (validated by `fixArp`, dropped when absent). The editor's transport (`Editor.arpPlay`) is not saved.
+- Protocol: ARP 0x24 = the 13 byte record + a transport byte (0 stop, 1 start, 255 leave); INFO gained byte 5, feature bits (bit 0 = ARP), `Info.features`, `DeviceLink.hasArp`. `upload()` sends the patch's settings after COMMIT. Firmware: proto.c → hook `m1_arp_set` (main.c): `arp_unpack` into the selected voice, voice 1's scale synced to the others, the transport into `AV[v].play`, LEDs and LCD refreshed.
+
 ## Macro ranges
 
 - Model: `ModuleInst.range` = `{ p1?: { [param]: [lo, hi] }, p2?: ... }`, ends 0..1 in `paramUnit` space (octaves for a log parameter, no slider bend; `paramValue` is the inverse: the same pair the morph uses). `fixMatrix` keeps a range only on parameters the pin controls (`map`) and clamps the ends; `rangeOf(m, pin, name)`.

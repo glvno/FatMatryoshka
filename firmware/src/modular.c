@@ -56,6 +56,7 @@ static int m1_slot_write(uint32_t slot, const char *name, const uint8_t *p, uint
 static int m1_slot_erase(uint32_t slot);
 static int m1_slot_info(uint32_t slot, char *name, uint32_t *len);
 static void m1_ui_changed(void);                               /* main.c: a live edit changed what the LCD shows */
+static void m1_arp_set(const uint8_t *d, uint32_t n);          /* main.c: the editor's ARP command (settings + transport) */
 #include "proto.c"
 #include "patchstore.c"
 #include "slotstore.c"

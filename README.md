@@ -106,6 +106,10 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - **Compressor** is an envelope follower and compressor in one: `env` outputs the follower (a control: an oscillator's loudness as a CV, a sidechain pump from a kick into a VCA), `out` the signal compressed above `thresh` by `ratio` with `attack`, `release` and makeup `gain`. The `side` input is the sidechain; without it the detector listens to `in`.
 
+## Arpeggiator in the editor
+
+- The FM-1's arpeggiator (MELODY / RHYTHM / CHAOS pages) is on the Main card too, under **Arpeggiator**: mode, scale (the device's 67 scales and chords), root, bpm, rate, Euclidean steps / pulses / rotation, octaves and the three chaos amounts, plus a **play** switch. The browser runs the same arpeggiator (the same clock, modes, random generator and 65 % gate), so a patch grooves the same way on both. The settings are saved with the patch (`arp` in the JSON; the binary patch does not carry them) and reach the FM-1 with every upload and with every change (the ARP command); play starts and stops the device's arpeggiator as the PLAY button does. A patch without the section leaves the FM-1's settings alone.
+
 ## Macro ranges
 
 - A parameter input normally *adds* to a parameter: p1 at 1 moves it up by the attenuverter's share of its range. A **macro range** makes the input *set* it between two ends instead: in the matrix, a `↔` next to a checked p1 / p2 box opens a row with the two ends (as values; for a logarithmic parameter the travel is in octaves). One Main knob into p1 of the filter and of the envelope then opens the cutoff from 200 Hz to 8 kHz while it shortens the decay from 0.5 s to 50 ms, each over its own travel; swapped ends make a knob go down. The slider's own value is ignored while a range is set; the attenuverter scales the travel, the input is clamped to 0..1 (for a bipolar LFO put a Scale with offset 0.5 in front). The ranges travel with the patch (binary format 15) and live edits reach the FM-1 (RANGE command); the LCD draws the travel as a bracket over the knob row's bar.

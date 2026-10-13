@@ -30,6 +30,8 @@ static int m1_store(const uint8_t *p, uint32_t n)
 }
 static int m1_flash_ok(void) { return 1; }
 static void m1_ui_changed(void) {}
+static int arp_set_calls;
+static void m1_arp_set(const uint8_t *d, uint32_t n) { (void)d; (void)n; arp_set_calls++; }
 static int m1_slot_write(uint32_t slot, const char *name, const uint8_t *p, uint32_t len)
 {
     slot_writes++;

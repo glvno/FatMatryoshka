@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import workletUrl from './worklet.ts?worker&url';
 import type { Patch } from './patch';
+import { ARP_DEFAULT } from './arp';
 import type { HostMsg } from './worklet';
 
 export class AudioHost {
@@ -24,7 +25,10 @@ export class AudioHost {
       node.connect(ctx.destination);
       this.ctx = ctx;
       this.node = node;
-      if (this.pending) this.send({ t: 'patch', patch: this.pending });
+      if (this.pending) {
+        this.send({ t: 'patch', patch: this.pending });
+        this.send({ t: 'arp', cfg: this.pending.arp ?? ARP_DEFAULT }); // the groove rides with the patch
+      }
     }
     await this.ctx.resume();
   }
@@ -33,6 +37,7 @@ export class AudioHost {
   setPatch(patch: Patch): void {
     this.pending = patch;
     this.send({ t: 'patch', patch });
+    this.send({ t: 'arp', cfg: patch.arp ?? ARP_DEFAULT });
   }
 
   send(msg: HostMsg): void {
