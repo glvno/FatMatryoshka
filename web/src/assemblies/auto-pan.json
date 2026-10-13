@@ -1,0 +1,105 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "auto pan",
+  "modules": [
+    {
+      "id": 1,
+      "type": "lfo",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 1,
+        "rate": 0.5,
+        "depth": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "pan",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "pan": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "pan"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "pos"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 2,
+      "port": "in",
+      "label": "in"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 2,
+      "port": "l",
+      "label": "l"
+    },
+    {
+      "module": 2,
+      "port": "r",
+      "label": "r"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "rate",
+      "label": "rate"
+    },
+    {
+      "module": 1,
+      "param": "depth",
+      "label": "width"
+    },
+    {
+      "module": 2,
+      "param": "pan",
+      "label": "centre"
+    }
+  ]
+}

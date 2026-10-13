@@ -1,0 +1,220 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "random melody",
+  "modules": [
+    {
+      "id": 1,
+      "type": "lfo",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 3,
+        "rate": 6,
+        "depth": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "noise",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "level": 0.6,
+        "color": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "level"
+        ],
+        "p2": [
+          "color"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "sh",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "mode": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "mode"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "quant",
+      "x": 810,
+      "y": 0,
+      "params": {
+        "scale": 4,
+        "root": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "scale"
+        ],
+        "p2": [
+          "root"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "pulse",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "time": 0.08
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "time"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "clock"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 5,
+        "port": "trig"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "sync",
+      "label": "reset"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 4,
+      "port": "out",
+      "label": "pitch"
+    },
+    {
+      "module": 5,
+      "port": "out",
+      "label": "gate"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "rate",
+      "label": "tempo"
+    },
+    {
+      "module": 2,
+      "param": "level",
+      "label": "range"
+    },
+    {
+      "module": 4,
+      "param": "scale",
+      "label": "scale"
+    },
+    {
+      "module": 4,
+      "param": "root",
+      "label": "root"
+    },
+    {
+      "module": 5,
+      "param": "time",
+      "label": "gate length"
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "step sequencer",
+  "modules": [
+    {
+      "id": 1,
+      "type": "lfo",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 3,
+        "rate": 8,
+        "depth": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "seq",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "s1": 0,
+        "s2": 0.25,
+        "s3": 0.58,
+        "s4": 0.33,
+        "s5": 0,
+        "s6": 0.75,
+        "s7": 0.58,
+        "s8": 1,
+        "len": 8,
+        "dir": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "s1"
+        ],
+        "p2": [
+          "s2"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "quant",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "scale": 1,
+        "root": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "scale"
+        ],
+        "p2": [
+          "root"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "clock"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 2,
+      "port": "reset",
+      "label": "reset",
+      "also": [
+        {
+          "module": 1,
+          "port": "sync"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "module": 3,
+      "port": "out",
+      "label": "pitch"
+    },
+    {
+      "module": 2,
+      "port": "gate",
+      "label": "gate"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "rate",
+      "label": "tempo"
+    },
+    {
+      "module": 2,
+      "param": "len",
+      "label": "length"
+    },
+    {
+      "module": 2,
+      "param": "dir",
+      "label": "direction"
+    },
+    {
+      "module": 3,
+      "param": "scale",
+      "label": "scale"
+    },
+    {
+      "module": 3,
+      "param": "root",
+      "label": "root"
+    },
+    {
+      "module": 2,
+      "param": "s1",
+      "label": "s1"
+    },
+    {
+      "module": 2,
+      "param": "s2",
+      "label": "s2"
+    },
+    {
+      "module": 2,
+      "param": "s3",
+      "label": "s3"
+    },
+    {
+      "module": 2,
+      "param": "s4",
+      "label": "s4"
+    },
+    {
+      "module": 2,
+      "param": "s5",
+      "label": "s5"
+    },
+    {
+      "module": 2,
+      "param": "s6",
+      "label": "s6"
+    },
+    {
+      "module": 2,
+      "param": "s7",
+      "label": "s7"
+    },
+    {
+      "module": 2,
+      "param": "s8",
+      "label": "s8"
+    }
+  ]
+}

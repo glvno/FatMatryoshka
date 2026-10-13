@@ -1,0 +1,262 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "vowel voice",
+  "modules": [
+    {
+      "id": 1,
+      "type": "osc",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 2,
+        "pw": 0.5,
+        "coarse": 0,
+        "fine": 0,
+        "pm": 0,
+        "level": 0.8,
+        "fb": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "pw"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "vowel",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "vowel": 0,
+        "res": 0.6,
+        "level": 0.8
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "vowel"
+        ],
+        "p2": [
+          "res"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "lfo",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "wave": 1,
+        "rate": 0.3,
+        "depth": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "scale",
+      "x": 810,
+      "y": 0,
+      "params": {
+        "gain": 2,
+        "offset": 2
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [
+          "offset"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "adsr",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "a": 0.05,
+        "d": 0.3,
+        "s": 0.7,
+        "r": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "a"
+        ],
+        "p2": [
+          "d"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "vca",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "gain": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "vowel"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 6,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 5,
+        "port": "env"
+      },
+      "to": {
+        "module": 6,
+        "port": "cv"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "pitch",
+      "label": "pitch"
+    },
+    {
+      "module": 5,
+      "port": "gate",
+      "label": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 6,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 3,
+      "param": "rate",
+      "label": "rate"
+    },
+    {
+      "module": 2,
+      "param": "res",
+      "label": "res"
+    },
+    {
+      "module": 4,
+      "param": "gain",
+      "label": "depth"
+    },
+    {
+      "module": 5,
+      "param": "r",
+      "label": "release"
+    }
+  ]
+}

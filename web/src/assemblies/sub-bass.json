@@ -1,0 +1,224 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "sub bass",
+  "modules": [
+    {
+      "id": 1,
+      "type": "glide",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "time": 0.08
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "time"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "osc",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "wave": 3,
+        "pw": 0.5,
+        "coarse": -12,
+        "fine": 0,
+        "pm": 0,
+        "level": 0.8,
+        "fb": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "pw"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "filter",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "cutoff": 300,
+        "res": 0.3,
+        "cvamt": 1,
+        "track": 1,
+        "morph": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "cutoff"
+        ],
+        "p2": [
+          "res"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "adsr",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "a": 0.005,
+        "d": 0.2,
+        "s": 0.8,
+        "r": 0.1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "a"
+        ],
+        "p2": [
+          "d"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "vca",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "gain": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "pitch"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "lp24"
+      },
+      "to": {
+        "module": 5,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "env"
+      },
+      "to": {
+        "module": 5,
+        "port": "cv"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "in",
+      "label": "pitch"
+    },
+    {
+      "module": 4,
+      "port": "gate",
+      "label": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 5,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "time",
+      "label": "glide"
+    },
+    {
+      "module": 3,
+      "param": "cutoff",
+      "label": "cutoff"
+    },
+    {
+      "module": 3,
+      "param": "res",
+      "label": "res"
+    },
+    {
+      "module": 4,
+      "param": "r",
+      "label": "release"
+    }
+  ]
+}

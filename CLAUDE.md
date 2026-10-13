@@ -132,7 +132,7 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 ## Assemblies (editor only, browser-tested)
 
 - `web/src/assembly.ts` (model, no DOM), `web/src/assemblies.ts` (library page, localStorage `modular-1.assemblies`, factory set from `web/src/assemblies/*.json` via `import.meta.glob`), `editor.ts` (selection: shift-click / rubber band; container cards; open frames; membership by drag; snapshot undo). `Patch.assemblies` is an optional overlay; the engine, encoder, protocol and firmware ignore it, old editors keep it as an unknown field. Tests: `assembly.test.ts` (12).
-- Factory assemblies are exported files: to add one, build it in the editor, "save", export, commit the file; a test checks every factory file loads, inserts and plays. The three shipped were generated with a throwaway script (see git history of this section if needed).
+- Factory assemblies: `web/scripts/gen-assemblies.ts` defines thirteen of them as small patches (grid positions, cables, exposed ports with `also` for merged gates, promoted parameters) and writes `web/src/assemblies/*.json`; `voice.json` and `echo.json` are kept as files. `assembly.test.ts` lists the names, inserts every one and plays it. The operator and the drums use the level/rate envelope, the subtractive voices keep the ADSR.
 - Class names: `.pin` is the parameter-input row (pins), the expose / promote toggle button is `.tog`.
 
 ## Sync, glide, shaper, spread (host-tested, golden 49 patches pass; not flashed)

@@ -78,3 +78,13 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 - **Merged ports.** On an open assembly, every exposed input has a `merge…` list of the card's other inputs of the same kind. Merging turns two jacks into one that feeds both (the factory `voice` has one `gate` for its two envelopes); the card shows `×2` and a `split` button. A cable into a merged jack goes to every input behind it, and removing it takes them all.
 - **Placement.** "Add module" and "Insert" put the new card on the first free grid cell instead of on top of what is there.
 - **Nesting.** An assembly can hold assemblies, three levels deep: select modules inside an open assembly and "Make assembly", or drop a collapsed card into an open frame. The parent's card may show whatever its children expose; closing the parent hides everything inside. Ungroup dissolves one level, delete keeps the nested ones. Saved assemblies carry their nested ones.
+
+## Factory assemblies
+
+The Assemblies page ships fifteen, made by `web/scripts/gen-assemblies.ts` (edit the script, rerun it, commit the files; `voice` and `echo` are kept by hand):
+
+- Voices: **operator** (oscillator, level/rate envelope, VCA: an FM operator, with `pm` in and `level cv`), **fm pair** (a modulator with its own envelope into a carrier: one `pitch`, one `gate`), **voice** (subtractive: oscillator, filter, two ADSRs), **sub bass** (glide, square an octave down, dark tracking filter), **wavetable pad** (slow frame sweep, filter, slow ADSR), **vowel voice** (saw through the vowel filter swept by an LFO), **pluck** (string into a tracking low pass).
+- Drums: **kick** (sine with a pitch drop, decay envelope, drive), **snare** (noise through a high pass plus a sine body), **hihat** (noise through a high pass, very short). All take one `gate`; the drums ignore pitch, so one key per drum through a Sequencer's gate or the Main gate.
+- Sequencing: **clock** (square LFO with /2 /4 /8 /div), **step sequencer** (clock, eight steps, quantizer: `pitch` and `gate` out, add its `pitch` to Main's into an oscillator), **random melody** (clocked S&H on noise, quantizer, pulse gate).
+- Utilities: **auto pan** (LFO on a Pan: `in` to `l` `r`), **echo** (delay into reverb).
+

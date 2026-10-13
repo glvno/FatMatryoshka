@@ -206,22 +206,37 @@ describe('assemblies', () => {
   });
 
   it('ships factory assemblies that load, insert and play', () => {
-    expect(FACTORY.map((d) => d.name)).toEqual(['echo', 'operator', 'voice']);
-    const p = emptyPatch('f');
-    const kb = addModule(p, DEFS.fm1, 0, 0).id;
-    const out = addModule(p, DEFS.output, 0, 0).id;
-    const op = insertAssembly(p, DEFS, FACTORY.find((d) => d.name === 'operator')!, 0, 0);
-    const port = (a: typeof op, label: string, dir: 'inputs' | 'outputs') => a[dir].find((r) => r.label === label)!;
-    connect(p, DEFS, { module: kb, port: 'pitch' }, port(op, 'pitch', 'inputs'));
-    connect(p, DEFS, { module: kb, port: 'gate' }, port(op, 'gate', 'inputs'));
-    const o = port(op, 'out', 'outputs');
-    expect(connect(p, DEFS, o, { module: out, port: 'l' })).toBe(true);
-    const l = render(p, 48000);
-    expect(Math.max(...l)).toBeGreaterThan(0.1);
+    expect(FACTORY.map((d) => d.name)).toEqual([
+      'auto pan', 'clock', 'echo', 'fm pair', 'hihat', 'kick', 'operator', 'pluck', 'random melody', 'snare', 'step sequencer', 'sub bass', 'voice', 'vowel voice', 'wavetable pad',
+    ]);
     for (const d of FACTORY) {
-      expect(d.modules.every((m) => m.map === undefined || ['k1', 'k2', 'k3', 'k4'].every((k) => m.map![k as 'k1'].length === 0))).toBe(true);
-      expect(d.inputs.length + d.outputs.length).toBeGreaterThan(0);
-      expect(d.params.length).toBeGreaterThan(0);
+      expect(d.modules.every((m) => m.map === undefined || ['k1', 'k2', 'k3', 'k4'].every((k) => m.map![k as 'k1'].length === 0)), d.name).toBe(true);
+      expect(d.inputs.length + d.outputs.length, d.name).toBeGreaterThan(0);
+      expect(d.params.length, d.name).toBeGreaterThan(0);
+      expect(new Set(d.inputs.map((r) => r.label)).size, d.name).toBe(d.inputs.length); // no duplicate jack labels: the gates are merged
+    }
+    // every assembly with a pitch or gate input and an audio output plays from the panel; the others put out a moving signal
+    for (const d of FACTORY) {
+      const p = emptyPatch('f');
+      const kb = addModule(p, DEFS.fm1, 0, 0).id;
+      const out = addModule(p, DEFS.output, 0, 0).id;
+      p.modules[1].params.level = 1;
+      const a = insertAssembly(p, DEFS, d, 0, 0);
+      const inp = (label: string) => a.inputs.find((r) => r.label === label);
+      const feed = (from: string, label: string): void => {
+        const r = inp(label);
+        if (r) for (const t of targetsOf(r)) expect(connect(p, DEFS, { module: kb, port: from }, t), `${d.name} ${label}`).toBe(true);
+      };
+      feed('pitch', 'pitch');
+      feed('gate', 'gate');
+      if (inp('in')) connect(p, DEFS, { module: kb, port: 'gate' }, inp('in')!); // a held key is a steady signal to pan
+      const o = a.outputs.find((r) => ['out', 'l', 'pitch', 'clock'].includes(r.label))!;
+      expect(connect(p, DEFS, o, { module: out, port: 'l' }), d.name).toBe(true);
+      const l = render(p, 24000);
+      if (inp('gate') || o.label !== 'out') expect(Math.max(...Array.from(l).map(Math.abs)), d.name).toBeGreaterThan(0.05);
+      // all of them: a finite output, nothing stuck at the clamp
+      expect(l.every((v) => Number.isFinite(v)), d.name).toBe(true);
+      if (o.label === 'out' || o.label === 'l') expect(l.filter((v) => Math.abs(v) >= 1).length, d.name).toBeLessThan(l.length / 20); // a clock is a square at +-1 by design
     }
   });
 

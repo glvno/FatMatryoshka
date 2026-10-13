@@ -36,14 +36,18 @@
     },
     {
       "id": 2,
-      "type": "adsr",
+      "type": "env",
       "x": 270,
       "y": 0,
       "params": {
-        "a": 0.002,
-        "d": 0.6,
-        "s": 0.4,
-        "r": 0.3
+        "l1": 1,
+        "r1": 0.002,
+        "l2": 0.6,
+        "r2": 0.3,
+        "l3": 0.4,
+        "r3": 1,
+        "l4": 0,
+        "r4": 0.3
       },
       "att": [
         1,
@@ -51,10 +55,10 @@
       ],
       "map": {
         "p1": [
-          "a"
+          "l1"
         ],
         "p2": [
-          "d"
+          "r1"
         ],
         "k1": [],
         "k2": [],
@@ -165,23 +169,43 @@
     },
     {
       "module": 2,
-      "param": "a",
-      "label": "a"
+      "param": "l1",
+      "label": "l1"
     },
     {
       "module": 2,
-      "param": "d",
-      "label": "d"
+      "param": "r1",
+      "label": "r1"
     },
     {
       "module": 2,
-      "param": "s",
-      "label": "s"
+      "param": "l2",
+      "label": "l2"
     },
     {
       "module": 2,
-      "param": "r",
-      "label": "r"
+      "param": "r2",
+      "label": "r2"
+    },
+    {
+      "module": 2,
+      "param": "l3",
+      "label": "l3"
+    },
+    {
+      "module": 2,
+      "param": "r3",
+      "label": "r3"
+    },
+    {
+      "module": 2,
+      "param": "l4",
+      "label": "l4"
+    },
+    {
+      "module": 2,
+      "param": "r4",
+      "label": "r4"
     }
   ]
 }

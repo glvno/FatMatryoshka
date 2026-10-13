@@ -1,0 +1,299 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "fm pair",
+  "modules": [
+    {
+      "id": 1,
+      "type": "osc",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 0,
+        "pw": 0.5,
+        "coarse": 12,
+        "fine": 0,
+        "pm": 0,
+        "level": 1,
+        "fb": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "pw"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "env",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "l1": 1,
+        "r1": 0.002,
+        "l2": 0.3,
+        "r2": 0.4,
+        "l3": 0.2,
+        "r3": 1,
+        "l4": 0,
+        "r4": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "l1"
+        ],
+        "p2": [
+          "r1"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "vca",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "gain": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "osc",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "wave": 0,
+        "pw": 0.5,
+        "coarse": 0,
+        "fine": 0,
+        "pm": 3,
+        "level": 0.8,
+        "fb": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "pw"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "env",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "l1": 1,
+        "r1": 0.003,
+        "l2": 0.7,
+        "r2": 0.3,
+        "l3": 0.6,
+        "r3": 1,
+        "l4": 0,
+        "r4": 0.4
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "l1"
+        ],
+        "p2": [
+          "r1"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "vca",
+      "x": 540,
+      "y": 560,
+      "params": {
+        "gain": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "env"
+      },
+      "to": {
+        "module": 3,
+        "port": "cv"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "pm"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "out"
+      },
+      "to": {
+        "module": 6,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 5,
+        "port": "env"
+      },
+      "to": {
+        "module": 6,
+        "port": "cv"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 4,
+      "port": "pitch",
+      "label": "pitch",
+      "also": [
+        {
+          "module": 1,
+          "port": "pitch"
+        }
+      ]
+    },
+    {
+      "module": 5,
+      "port": "gate",
+      "label": "gate",
+      "also": [
+        {
+          "module": 2,
+          "port": "gate"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "module": 6,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 4,
+      "param": "pm",
+      "label": "index"
+    },
+    {
+      "module": 1,
+      "param": "coarse",
+      "label": "ratio"
+    },
+    {
+      "module": 1,
+      "param": "fb",
+      "label": "feedback"
+    },
+    {
+      "module": 2,
+      "param": "r2",
+      "label": "mod decay"
+    },
+    {
+      "module": 2,
+      "param": "l3",
+      "label": "mod sustain"
+    },
+    {
+      "module": 5,
+      "param": "r1",
+      "label": "attack"
+    },
+    {
+      "module": 5,
+      "param": "r4",
+      "label": "release"
+    }
+  ]
+}

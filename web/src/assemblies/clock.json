@@ -1,0 +1,121 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "clock",
+  "modules": [
+    {
+      "id": 1,
+      "type": "lfo",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 3,
+        "rate": 4,
+        "depth": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "clkdiv",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "div": 3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "div"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "clock"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "sync",
+      "label": "reset",
+      "also": [
+        {
+          "module": 2,
+          "port": "reset"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "module": 1,
+      "port": "out",
+      "label": "clock"
+    },
+    {
+      "module": 2,
+      "port": "d2",
+      "label": "/2"
+    },
+    {
+      "module": 2,
+      "port": "d4",
+      "label": "/4"
+    },
+    {
+      "module": 2,
+      "port": "d8",
+      "label": "/8"
+    },
+    {
+      "module": 2,
+      "port": "out",
+      "label": "/div"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "rate",
+      "label": "rate"
+    },
+    {
+      "module": 2,
+      "param": "div",
+      "label": "div"
+    }
+  ]
+}
