@@ -1,13 +1,13 @@
 # Licensing
 
-Modular-1 is GPL-3.0-only (`LICENSE`).
+FatMatryoshka-1 is GPL-3.0-only (`LICENSE`). It is derived from [Modular-1](https://github.com/WiggisModular/Modular-1) by [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), also GPL-3.0-only. Original copyright and licence notices are retained.
 
 ## Copied from Felucca
 
 Source: <https://github.com/hugelton/Felucca> at commit `a4d7ca2e5d52a4c35e2468401f00d883cadbda03`.
 Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments. GPL-3.0-only.
 
-Copied files, to be changed only as part of Modular-1's own work:
+Copied files, to be changed only as part of FatMatryoshka-1's own work:
 
 - `firmware/hal/`, `firmware/loader/`, `firmware/crt0.S`, `firmware/app.ld`
 - `tools/build.py`, `tools/fm1_install.py`, `tools/fm1pkg_make.py`, `tools/lz4blk.py`, `tools/get_toolchain.sh`

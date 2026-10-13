@@ -13,7 +13,8 @@ export interface Probe {
   sr: number;
 }
 
-const COLORS = ['#c2410c', '#2563eb', '#059669', '#9333ea', '#b45309', '#0891b2'];
+// Keep CSS token references on labels; resolve them for the canvas on each frame.
+const COLORS = ['var(--scope-1)', 'var(--scope-2)', 'var(--scope-3)', 'var(--scope-4)', 'var(--scope-5)', 'var(--scope-6)'];
 const FFT_N = 2048;
 
 /** in-place radix-2 FFT of re / im (length a power of two) */
@@ -163,9 +164,10 @@ export class Scope {
     const g = this.cv.getContext('2d');
     if (!g) return;
     const W = this.cv.width, H = this.cv.height;
-    g.fillStyle = getComputedStyle(this.cv).getPropertyValue('--panel') || '#fff';
+    const style = getComputedStyle(this.cv);
+    g.fillStyle = style.getPropertyValue('--panel').trim();
     g.fillRect(0, 0, W, H);
-    g.strokeStyle = '#8884';
+    g.strokeStyle = style.getPropertyValue('--line').trim();
     g.lineWidth = 1;
     g.beginPath();
     g.moveTo(0, H / 2);
@@ -179,7 +181,7 @@ export class Scope {
         const s = spectrum(d);
         const n = s.length;
         const fmin = 20, fmax = p.sr / 2;
-        g.strokeStyle = p.color;
+        g.strokeStyle = style.getPropertyValue(p.color.slice(4, -1)).trim();
         g.beginPath();
         for (let x = 0; x < W; x++) {
           const f = fmin * Math.pow(fmax / fmin, x / W);
@@ -214,7 +216,7 @@ export class Scope {
       }
       const amp = Math.max(1e-3, Math.abs(lo), Math.abs(hi));
       const scale = p.kind === 'audio' ? amp : Math.max(1, amp);
-      g.strokeStyle = p.color;
+      g.strokeStyle = style.getPropertyValue(p.color.slice(4, -1)).trim();
       g.lineWidth = 1.5;
       g.beginPath();
       for (let x = 0; x < W; x++) {

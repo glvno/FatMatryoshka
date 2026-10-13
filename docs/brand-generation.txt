@@ -1,0 +1,10 @@
+FatMatryoshka-1 logo
+Generated with the built-in image generation tool, 2026-10-13.
+Final asset: web/public/brand/fatmatryoshka-1.png (transparent PNG).
+
+Final edit prompt:
+Use case: precise-object-edit / logo-brand. Revise this FatMatryoshka-1 logo according to this crucial physical construction: the TWO OUTERMOST nesting dolls must be visibly SPLIT OPEN horizontally into separate top and bottom shell halves, with their upper halves LIFTED OFF AND HOVERING. The smallest golden doll stays complete and intact, standing inside the open bottom half of the teal doll, which itself sits inside the open bottom half of the coral doll. Show the cut rims and empty space between detached tops and bottoms so these are clearly real open hollow nesting dolls revealing smaller dolls, NOT smaller dolls painted on a larger doll's belly. The large coral head/top shell hovers above and slightly to the left of its coral lower shell; the medium teal head/top shell hovers above and slightly to the right of its teal lower shell. Use a clean compact exploded-view composition with very slight three-quarter view to reveal the hollow rims. Keep the friendly faces, synth patch-jack details, small waveform on the intact gold doll, thick crisp shapes, dark ink outlines/details and warm ivory separators. Preserve the coral #E7775D, teal #287D80, gold #E8B65A, ivory #FFF7E8, ink #202A2C palette and the friendly sophisticated logo identity. Minimal flat vector-like emblem, no shading, no gradients, no texture, no drop shadows, no text, no extra decorations or motion lines. Make the open shells and levitating lids unmistakable. One centered emblem on a genuinely transparent background, generous margins, square composition suitable for README and app header.
+
+Reference palette: coral #E7775D, teal #287D80, gold #E8B65A,
+ivory #FFF7E8, ink #202A2C. UI semantic tokens and contrast-adjusted
+light/dark variants live in web/src/style.css.

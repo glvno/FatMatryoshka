@@ -1,6 +1,6 @@
 name: pages
 # Builds the firmware (JieLi toolchain + AC79 SDK files), then publishes the web app (editor, presets, flasher and the freshly built firmware package) to GitHub Pages:
-#   https://<owner>.github.io/<repo>/
+#   https://glvno.github.io/FatMatryoshka-1/ (repository: glvno/FatMatryoshka-1)
 # One-time setup: repository Settings > Pages > Source: GitHub Actions. The github-pages environment
 # only lets main deploy by default; every branch listed below needs a deployment branch policy there
 # (Settings > Environments > github-pages, or POST .../environments/github-pages/deployment-branch-policies).

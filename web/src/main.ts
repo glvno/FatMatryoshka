@@ -527,9 +527,14 @@ refreshAssemblies = buildAssembliesTab($('tab-library'), {
 });
 buildFlashTab($('tab-flash'));
 $('tab-about').innerHTML = `
-  <div class="card"><h2>Modular-1</h2>
-  <p>A patchable modular synth for the M-VAVE FM-1, with a browser editor. The module engine runs in your browser here and on the FM-1 itself.</p>
-  <p class="muted">GPL-3.0-only. The flasher, loader and hardware layer are derived from <a href="https://github.com/hugelton/Felucca">Felucca</a> by Leo Kuroshita / Hügelton Instruments. Not affiliated with M-VAVE or Clavia.</p></div>`;
+  <div class="card about-brand">
+  <img src="./brand/fatmatryoshka-1.png" width="160" height="160" alt="Open coral and teal synth dolls with hovering tops reveal a gold doll" />
+  <h2>FatMatryoshka-1</h2>
+  <p>A patchable modular synth for the M-VAVE FM-1, with a browser editor. Build sounds from modules, wrap them into assemblies, and nest those assemblies inside bigger instruments. The module engine runs in your browser here and on the FM-1 itself.</p></div>
+  <div class="card credits"><h2>We stand on the shoulders of giants.</h2>
+  <p><a href="https://github.com/hugelton/Felucca">Felucca</a>, by <a href="https://github.com/kurogedelic">Leo Kuroshita (@kurogedelic)</a> / <a href="https://github.com/hugelton">Hügelton Instruments</a>, provides the foundation for the flasher, loader and hardware support.</p>
+  <p><a href="https://github.com/WiggisModular/Modular-1">Modular-1</a>, by <a href="https://github.com/morgulbrut">@morgulbrut</a> / <a href="https://github.com/WiggisModular">WiggisModular</a>, is the modular synthesizer this project grew from.</p>
+  <p class="muted">GPL-3.0-only. Not affiliated with M-VAVE or Clavia.</p></div>`;
 for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) {
   b.onclick = () => {
     currentTab = b.dataset.tab!;

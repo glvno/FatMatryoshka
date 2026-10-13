@@ -1,9 +1,20 @@
-# Modular-1
-I always liked the concept of the Nord Modular (never used one though) so i decided to give it a try. Here we are
+# **WE STAND ON THE SHOULDERS OF GIANTS.**
+
+**FatMatryoshka-1 exists thanks to [Leo Kuroshita (@kurogedelic)](https://github.com/kurogedelic) / [Hügelton Instruments](https://github.com/hugelton), creators of [Felucca](https://github.com/hugelton/Felucca), and [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), creators of [Modular-1](https://github.com/WiggisModular/Modular-1). Thank you for making this possible.**
+
+<p align="center">
+  <img src="web/public/brand/fatmatryoshka-1.png" width="240" height="240" alt="FatMatryoshka-1: coral and teal synth dolls split open with hovering tops, revealing an intact gold doll" />
+</p>
+
+# FatMatryoshka-1
+
+A modular synthesizer for the **M-VAVE FM-1**, with a browser patch editor and reusable, nested assemblies. Build a sound, wrap it into an instrument, then nest it inside something bigger. The name celebrates that matryoshka structure.
+
+FatMatryoshka-1 is an independent project grown from Modular-1, which builds on Felucca's flashing tools and hardware support.
 
 ## Webapp
 
-There's a Webappp here: https://wiggismodular.github.io/Modular-1/ that allows you to make patches, like you would do on a modular system and upload it to the FM-1. The development fork (branch `dev`: the modules, assemblies, morphing, scope and editor work of the changelog) deploys to https://glvno.github.io/Modular-1/ from the same workflow; its firmware package has not been installed on a device.
+[Open the FatMatryoshka-1 editor](https://glvno.github.io/FatMatryoshka-1/) to make patches and upload them to the FM-1. The editor currently deploys from branch `dev`; its firmware package has not been installed on a device. The [original Modular-1 editor](https://wiggismodular.github.io/Modular-1/) is also available.
 
 Modules have two parameter inputs: p1 and p2 with an attenuverter
 
