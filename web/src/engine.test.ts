@@ -2171,3 +2171,54 @@ describe('live parameter displays', () => {
     expect(e.parameterValues().find((m) => m.id === amp.id)!.params.gain).toBeCloseTo(0.4);
   });
 });
+
+describe('dedicated CV parameter displays', () => {
+  it.each([
+    ['filter', 'cv', 'cutoff', 1000, 2000],
+    ['ladder', 'cv', 'cutoff', 1000, 2000],
+    ['vca', 'cv', 'gain', 1.5, 0.75],
+    ['pan', 'pos', 'pan', 0, 0.5],
+    ['xfade', 'pos', 'mix', 0.2, 0.7],
+    ['vowel', 'vowel', 'vowel', 1, 1.5],
+    ['shift', 'cv', 'shift', 100, 150],
+    ['filter', 'morph', 'morph', 0.2, 0.7],
+  ] as const)('%s %s moves the %s display after DSP modulation', (type, port, param, base, expected) => {
+    const p = emptyPatch();
+    const source = addModule(p, DEFS.const, 0, 0);
+    source.params.value = 0.5;
+    const target = addModule(p, DEFS[type], 0, 0);
+    target.params[param] = base;
+    if (type === 'filter' || type === 'ladder') target.params.cvamt = 2;
+    if (type === 'shift') target.params.cvamt = 100;
+    connect(p, DEFS, { module: source.id, port: 'out' }, { module: target.id, port });
+    const e = new Engine(SR);
+    e.load(p);
+    render(e, 128);
+    expect(e.parameterValues().find((m) => m.id === target.id)!.params[param]).toBeCloseTo(expected);
+    expect(target.params[param]).toBe(base);
+    e.setParam(source.id, 'value', 0);
+    render(e, 128);
+    expect(e.parameterValues().find((m) => m.id === target.id)!.params[param]).toBeCloseTo(type === 'vca' ? 0 : base);
+  });
+});
+
+it('animates the Wobble 2 factory filter and VCA displays through their dedicated CV jacks', () => {
+  const p = PRESETS['Wobble 2']();
+  const original = JSON.stringify(p);
+  const filter = p.modules.find((m) => m.type === 'filter')!;
+  const amp = p.modules.find((m) => m.type === 'vca')!;
+  const e = new Engine(SR);
+  e.load(p);
+  e.noteOn(48);
+  const cutoff: number[] = [];
+  for (let i = 0; i < 60; i++) {
+    render(e, 800);
+    cutoff.push(e.parameterValues().find((m) => m.id === filter.id)!.params.cutoff);
+  }
+  expect(Math.max(...cutoff) - Math.min(...cutoff)).toBeGreaterThan(10);
+  expect(e.parameterValues().find((m) => m.id === amp.id)!.params.gain).toBeGreaterThan(0.5);
+  e.noteOff(48);
+  render(e, SR);
+  expect(e.parameterValues().find((m) => m.id === amp.id)!.params.gain).toBeLessThan(0.001);
+  expect(JSON.stringify(p)).toBe(original);
+});

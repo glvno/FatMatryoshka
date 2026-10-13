@@ -30,6 +30,8 @@ export interface Ctx {
   connected: Record<string, boolean>;
   p: Record<string, number>;
   voice: Voice;
+  /** Display-only values after dedicated CV processing; never fed back into DSP parameters. */
+  display?: Record<string, number>;
 }
 
 export interface ModuleImpl<S = any> {
@@ -461,7 +463,12 @@ const vca: ModuleImpl<null> = {
   init: () => null,
   process(c) {
     const open = !c.connected.cv;
-    for (let i = 0; i < c.n; i++) c.out.out[i] = c.inp.in[i] * (open ? 1 : c.inp.cv[i]) * (c.p.gain ?? 1);
+    let cv = 1;
+    for (let i = 0; i < c.n; i++) {
+      cv = open ? 1 : c.inp.cv[i];
+      c.out.out[i] = c.inp.in[i] * cv * (c.p.gain ?? 1);
+    }
+    if (c.display) c.display.gain = cv * (c.p.gain ?? 1);
   },
 };
 
@@ -485,8 +492,9 @@ const filter: ModuleImpl<{ ic1: number; ic2: number; jc1: number; jc2: number }>
     const k = 2 - 1.98 * (c.p.res ?? 0);
     const k2 = Math.SQRT2; // stage 2 is damped (Q 0.7): the resonance peak comes from stage 1 alone
     const tr = (c.p.track ?? 0) >= 0.5 ? c.voice.pitch : 0; // keyboard tracking: the cutoff follows the played pitch 1 octave per octave (C4 = the cutoff as set)
+    let fc = c.p.cutoff ?? 1000, m = c.p.morph ?? 0;
     for (let i = 0; i < c.n; i++) {
-      const fc = Math.min((c.p.cutoff ?? 1000) * Math.pow(2, c.inp.cv[i] * (c.p.cvamt ?? 1) + tr), c.sr * 0.45);
+      fc = Math.min((c.p.cutoff ?? 1000) * Math.pow(2, c.inp.cv[i] * (c.p.cvamt ?? 1) + tr), c.sr * 0.45);
       const g = Math.tan((Math.PI * fc) / c.sr);
       const a1 = 1 / (1 + g * (g + k));
       const a2 = g * a1;
@@ -507,7 +515,7 @@ const filter: ModuleImpl<{ ic1: number; ic2: number; jc1: number; jc2: number }>
       const w2 = s.jc2 + b2 * s.jc1 + b3 * w3;
       s.jc1 = 2 * w1 - s.jc1;
       s.jc2 = 2 * w2 - s.jc2;
-      const m = Math.min(1, Math.max(0, (c.p.morph ?? 0) + c.inp.morph[i]));
+      m = Math.min(1, Math.max(0, (c.p.morph ?? 0) + c.inp.morph[i]));
       c.out.lp12[i] = v2;
       c.out.bp[i] = v1;
       c.out.hp[i] = hp;
@@ -516,6 +524,10 @@ const filter: ModuleImpl<{ ic1: number; ic2: number; jc1: number; jc2: number }>
       c.out.notch[i] = v0 - kv1; // = lp12 + hp: a null at the cutoff
       c.out.peak[i] = v2 - hp; // = lp12 - hp: a resonant bump at the cutoff over a flat response
       c.out.ap[i] = v0 - 2 * kv1; // = notch - k bp: flat magnitude, the phase turns through 360 degrees around the cutoff
+    }
+    if (c.display) {
+      c.display.cutoff = fc;
+      c.display.morph = m;
     }
   },
 };
@@ -551,6 +563,7 @@ const ladder: ModuleImpl<{ s: Float64Array }> = {
     cvm /= c.n;
     const tr = (c.p.track ?? 0) >= 0.5 ? c.voice.pitch : 0;
     const fc = Math.min((c.p.cutoff ?? 1000) * Math.pow(2, cvm * (c.p.cvamt ?? 1) + tr), c.sr * 0.45);
+    if (c.display) c.display.cutoff = fc;
     const g = Math.tan((Math.PI * fc) / c.sr);
     const G = g / (1 + g);
     const G2 = G * G, G3 = G2 * G, G4 = G3 * G, hG = 1 - G;
@@ -932,6 +945,7 @@ const shift: ModuleImpl<{ a: Float64Array; b: Float64Array; ia: number; phase: n
     for (let i = 0; i < c.n; i++) cvm += c.inp.cv[i];
     cvm /= c.n;
     const hz = (c.p.shift ?? 0) + cvm * (c.p.cvamt ?? 0);
+    if (c.display) c.display.shift = hz;
     const inc = hz / c.sr;
     const mix = c.p.mix ?? 1;
     const dry = 1 - mix;
@@ -1796,12 +1810,14 @@ const pan: ModuleImpl<null> = {
   init: () => null,
   process(c) {
     const base = c.p.pan ?? 0;
+    let p = base;
     for (let i = 0; i < c.n; i++) {
-      const p = Math.min(1, Math.max(-1, base + c.inp.pos[i]));
+      p = Math.min(1, Math.max(-1, base + c.inp.pos[i]));
       const a = ((p + 1) * Math.PI) / 4;
       c.out.l[i] = c.inp.in[i] * Math.cos(a);
       c.out.r[i] = c.inp.in[i] * Math.sin(a);
     }
+    if (c.display) c.display.pan = p;
   },
 };
 
@@ -1818,10 +1834,12 @@ const xfade: ModuleImpl<null> = {
   init: () => null,
   process(c) {
     const base = c.p.mix ?? 0.5;
+    let m = base;
     for (let i = 0; i < c.n; i++) {
-      const m = Math.min(1, Math.max(0, base + c.inp.pos[i]));
+      m = Math.min(1, Math.max(0, base + c.inp.pos[i]));
       c.out.out[i] = c.inp.a[i] * (1 - m) + c.inp.b[i] * m;
     }
+    if (c.display) c.display.mix = m;
   },
 };
 
@@ -1852,6 +1870,7 @@ const vowel: ModuleImpl<VowelState> = {
   init: () => ({ ic1: [0, 0, 0], ic2: [0, 0, 0] }),
   process(c, s) {
     const v = Math.min(4, Math.max(0, (c.p.vowel ?? 0) + c.inp.vowel[0]));
+    if (c.display) c.display.vowel = v;
     const vi = Math.min(3, Math.floor(v));
     const t = v - vi;
     const k = 1 / (2 + 18 * (c.p.res ?? 0.5));

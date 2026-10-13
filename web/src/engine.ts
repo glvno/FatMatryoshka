@@ -20,6 +20,8 @@ interface Inst {
   state: unknown;
   /** params after modulation, what the module reads */
   eff: Record<string, number>;
+  /** Overrides captured by DSP for dedicated CV inputs, after the parameter matrix. */
+  display: Record<string, number>;
   inp: Record<string, Float32Array>;
   out: Record<string, Float32Array>;
 }
@@ -99,6 +101,7 @@ export class Engine {
     return {
       state: impl.init(this.sampleRate),
       eff: {},
+      display: {},
       inp: Object.fromEntries(impl.def.inputs.map((p) => [p.name, new Float32Array(BLOCK)])),
       out: Object.fromEntries(impl.def.outputs.map((p) => [p.name, new Float32Array(BLOCK)])),
     };
@@ -185,9 +188,9 @@ export class Engine {
       if ((a.on && !b.on) || (a.on === b.on && a.onStamp > b.onStamp)) voice = i;
     }
     return this.order.map((node) => {
-      const eff = node.inst[node.poly ? voice : 0].eff;
+      const { eff, display } = node.inst[node.poly ? voice : 0];
       const params = Object.fromEntries(node.impl.def.params.map((pd) => [
-        pd.name, node.bypass ? node.params[pd.name] ?? pd.default : eff[pd.name] ?? node.params[pd.name] ?? pd.default,
+        pd.name, node.bypass ? node.params[pd.name] ?? pd.default : display[pd.name] ?? eff[pd.name] ?? node.params[pd.name] ?? pd.default,
       ]));
       if (node === this.main && this.hasB) params.morph = this.morphT;
       return { id: node.id, params };
@@ -413,7 +416,7 @@ export class Engine {
       else out[name].fill(0, 0, n);
       return;
     }
-    const ctx: Ctx = { sr: this.sampleRate, n, inp: inst.inp, out, connected: node.connected, p: inst.eff, voice };
+    const ctx: Ctx = { sr: this.sampleRate, n, inp: inst.inp, out, connected: node.connected, p: inst.eff, voice, display: inst.display };
     node.impl.process(ctx, inst.state);
     if (node.type === 'fm1' && voice.retrig) {
       out.gate[0] = 0; // one low sample: the envelopes of a stolen voice see a new gate

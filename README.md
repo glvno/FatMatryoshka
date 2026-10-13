@@ -101,7 +101,7 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 ## Performance controls
 
-During browser playback, sliders and their readouts follow parameter-input modulation, macro ranges and patch morphing, including parameters exposed on assembly cards. A moving value uses the teal accent; hover it to see its saved base value. Dragging or using the keyboard edits that base value, and animation resumes when you release the control. Fast modulation is sampled as often as the display can update. Polyphonic parameters show the newest held note (or its release when no notes are held). These displays follow the browser engine; the FM-1 does not send live parameter telemetry back.
+During browser playback, sliders and their readouts follow dedicated CV inputs (including filter cutoff and VCA envelopes), parameter-input modulation, macro ranges and patch morphing, including parameters exposed on assembly cards. A moving value uses the teal accent; hover it to see its saved base value. Dragging or using the keyboard edits that base value, and animation resumes when you release the control. Fast modulation is sampled as often as the display can update. Polyphonic parameters show the newest held note (or its release when no notes are held). These displays follow the browser engine; the FM-1 does not send live parameter telemetry back.
 
 - Pitch bend moves the Main module's `pitch` by ±2 semitones in every patch; the wheel is also a `bend` output (−1..1). The mod wheel (CC 1) is the `mod` output, channel aftertouch the `at` output: patch them into any `p1` / `p2`. CC 16..19 turn the Main module's K1..K4 from a controller. During browser playback, the Main sliders follow incoming CC values.
 
