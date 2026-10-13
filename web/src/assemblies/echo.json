@@ -33,7 +33,7 @@
     {
       "id": 2,
       "type": "reverb",
-      "x": 2,
+      "x": 270,
       "y": 0,
       "params": {
         "size": 0.5,

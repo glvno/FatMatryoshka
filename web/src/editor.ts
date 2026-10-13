@@ -38,9 +38,11 @@ import {
   isPromoted,
   makeAssembly,
   moveAssembly,
+  overlapping,
   promote,
   reconcileAll,
   removeMember,
+  tileMembers,
   toDef,
   ungroup,
   type AssemblyDef,
@@ -501,7 +503,12 @@ export class Editor {
 
   private assemblyButtons(a: AssemblyInst): HTMLElement[] {
     return [
-      this.button(a.open ? 'close' : 'open', a.open ? 'Collapse to one card' : 'Open: show and edit the modules inside', () => this.change(() => (a.open = !a.open))),
+      this.button(a.open ? 'close' : 'open', a.open ? 'Collapse to one card' : 'Open: show and edit the modules inside', () =>
+        this.change(() => {
+          a.open = !a.open;
+          if (a.open && overlapping(this.patch, a)) tileMembers(this.patch, a); // stacked cards (an old file, members added at one spot) spread out
+        }),
+      ),
       this.button('save', 'Save to the assembly library', () => this.saveAssembly(a)),
       this.button('ungroup', 'Dissolve: the modules stay as plain modules', () => this.change(() => ungroup(this.patch, a.id))),
       this.button('×', `Remove "${a.label}" with its modules`, () => this.change(() => deleteAssembly(this.patch, a.id)), 'x'),

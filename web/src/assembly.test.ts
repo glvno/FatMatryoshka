@@ -15,6 +15,8 @@ import {
   removeMember,
   toDef,
   ungroup,
+  overlapping,
+  tileMembers,
   validateAssemblyDef,
 } from './assembly';
 import { FACTORY } from './assemblies';
@@ -233,4 +235,20 @@ describe('assemblies', () => {
     // no overlay at all is fine, and so is every factory preset
     for (const make of Object.values(PRESETS)) expect(fixAssemblies(make(), DEFS)).toEqual([]);
   });
+
+  it('tiles stacked members when they would open on top of each other; factory assemblies are laid out', () => {
+    const { p, osc, env, vca } = voice();
+    const a = makeAssembly(p, [osc, env, vca], 'operator');
+    expect(overlapping(p, a)).toBe(false);
+    for (const m of p.modules) if (a.modules.includes(m.id)) m.x = m.y = 50;
+    expect(overlapping(p, a)).toBe(true);
+    tileMembers(p, a);
+    expect(overlapping(p, a)).toBe(false);
+    expect(p.modules.filter((m) => a.modules.includes(m.id)).map((m) => [m.x, m.y])).toEqual([[50, 50], [320, 50], [590, 50]]);
+    for (const d of FACTORY) {
+      const q = emptyPatch();
+      expect(overlapping(q, insertAssembly(q, DEFS, d, 0, 0))).toBe(false);
+    }
+  });
 });
+

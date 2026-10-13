@@ -260,6 +260,30 @@ export function moveAssembly(p: Patch, a: AssemblyInst, dx: number, dy: number):
   }
 }
 
+/** the editor's card grid: columns 270 px apart, rows 560 px (what "Add module" uses) */
+export const GRID = { x: 270, y: 560, cols: 4 };
+
+const memberModules = (p: Patch, a: AssemblyInst): ModuleInst[] => a.modules.map((id) => p.modules.find((m) => m.id === id)!).filter(Boolean);
+
+/** whether two member cards sit on top of each other (closer than most of a card in both directions) */
+export function overlapping(p: Patch, a: AssemblyInst): boolean {
+  const ms = memberModules(p, a);
+  for (let i = 0; i < ms.length; i++)
+    for (let j = i + 1; j < ms.length; j++) if (Math.abs(ms[i].x - ms[j].x) < 200 && Math.abs(ms[i].y - ms[j].y) < 120) return true;
+  return false;
+}
+
+/** lay the members out on the grid from their top left corner, in their current reading order */
+export function tileMembers(p: Patch, a: AssemblyInst): void {
+  const ms = memberModules(p, a).sort((u, v) => u.y - v.y || u.x - v.x);
+  const x0 = Math.min(...ms.map((m) => m.x));
+  const y0 = Math.min(...ms.map((m) => m.y));
+  ms.forEach((m, i) => {
+    m.x = x0 + (i % GRID.cols) * GRID.x;
+    m.y = y0 + Math.floor(i / GRID.cols) * GRID.y;
+  });
+}
+
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 
 function stripKnobs(m: ModuleInst): void {
