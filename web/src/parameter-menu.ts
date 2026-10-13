@@ -12,6 +12,7 @@ export function parameterMenu(m: ModuleInst, def: ModuleDef, pd: ParamDef, ev: E
   const menu = document.createElement('details');
   menu.className = 'parameter-routing';
   menu.addEventListener('keydown', (e) => {
+    if (!menu.open && ![' ', 'Enter', 'Tab'].includes(e.key)) return;
     if (e.key === 'Escape') { menu.open = false; summary.focus(); }
     if (!e.ctrlKey && !e.metaKey) e.stopPropagation();
   });
