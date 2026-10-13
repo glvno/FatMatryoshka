@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 15
+#define N_TYPES 19
 enum {
     T_FM1,
     T_OSC,
@@ -20,6 +20,10 @@ enum {
     T_OUTPUT,
     T_GLIDE,
     T_SHAPE,
+    T_ENV,
+    T_STRING,
+    T_WAVETABLE,
+    T_CHORUS,
 };
 
 /* fm1: Main */
@@ -227,9 +231,76 @@ enum {
 #define SHAPE_NPAR 3
 #define SHAPE_CVBASE 1
 
+/* env: Env L/R */
+#define ENV_I_GATE 0
+#define ENV_I_P1 1
+#define ENV_I_P2 2
+#define ENV_O_ENV 0
+#define ENV_P_L1 0
+#define ENV_P_R1 1
+#define ENV_P_L2 2
+#define ENV_P_R2 3
+#define ENV_P_L3 4
+#define ENV_P_R3 5
+#define ENV_P_L4 6
+#define ENV_P_R4 7
+#define ENV_NIN 3
+#define ENV_NOUT 1
+#define ENV_NPAR 8
+#define ENV_CVBASE 1
+
+/* string: String */
+#define STRING_I_PITCH 0
+#define STRING_I_GATE 1
+#define STRING_I_EXC 2
+#define STRING_I_P1 3
+#define STRING_I_P2 4
+#define STRING_O_OUT 0
+#define STRING_P_DECAY 0
+#define STRING_P_DAMP 1
+#define STRING_P_BURST 2
+#define STRING_P_COARSE 3
+#define STRING_P_LEVEL 4
+#define STRING_NIN 5
+#define STRING_NOUT 1
+#define STRING_NPAR 5
+#define STRING_CVBASE 3
+
+/* wavetable: Wavetable */
+#define WAVETABLE_I_PITCH 0
+#define WAVETABLE_I_PM 1
+#define WAVETABLE_I_SYNC 2
+#define WAVETABLE_I_P1 3
+#define WAVETABLE_I_P2 4
+#define WAVETABLE_O_OUT 0
+#define WAVETABLE_P_BANK 0
+#define WAVETABLE_P_POS 1
+#define WAVETABLE_P_COARSE 2
+#define WAVETABLE_P_FINE 3
+#define WAVETABLE_P_PM 4
+#define WAVETABLE_P_LEVEL 5
+#define WAVETABLE_NIN 5
+#define WAVETABLE_NOUT 1
+#define WAVETABLE_NPAR 6
+#define WAVETABLE_CVBASE 3
+
+/* chorus: Chorus */
+#define CHORUS_I_IN 0
+#define CHORUS_I_P1 1
+#define CHORUS_I_P2 2
+#define CHORUS_O_L 0
+#define CHORUS_O_R 1
+#define CHORUS_P_RATE 0
+#define CHORUS_P_DEPTH 1
+#define CHORUS_P_MIX 2
+#define CHORUS_NIN 3
+#define CHORUS_NOUT 2
+#define CHORUS_NPAR 3
+#define CHORUS_CVBASE 1
+
 #define MAX_IN 6
 #define MAX_OUT 8
-#define MAX_PAR 7
+#define MAX_PAR 8
 
 typedef struct {
     uint8_t nin, nout, npar;
@@ -382,6 +453,44 @@ static const uint8_t SHAPE_LOG[] = {1, 0, 0};
 static const char *const SHAPE_UNIT[] = {"", "", ""};
 static const char *const SHAPE_CH1[] = {"SOFT", "HARD", "FOLD", 0};
 static const char *const *const SHAPE_CH[] = {0, SHAPE_CH1, 0};
+static const char *const ENV_INNAMES[] = {"GATE", "P1", "P2"};
+static const int32_t ENV_MIN[] = {0, 66, 0, 66, 0, 66, 0, 66};
+static const int32_t ENV_MAX[] = {65536, 655360, 65536, 655360, 65536, 655360, 65536, 655360};
+static const int32_t ENV_DEF[] = {65536, 655, 39322, 19661, 39322, 65536, 0, 32768};
+static const int32_t ENV_INC[] = {655, 6553, 655, 6553, 655, 6553, 655, 6553};
+static const char *const ENV_PN[] = {"L1", "R1", "L2", "R2", "L3", "R3", "L4", "R4"};
+static const uint8_t ENV_LOG[] = {0, 1, 0, 1, 0, 1, 0, 1};
+static const char *const ENV_UNIT[] = {"", "S", "", "S", "", "S", "", "S"};
+static const char *const *const ENV_CH[] = {0, 0, 0, 0, 0, 0, 0, 0};
+static const char *const STRING_INNAMES[] = {"PITCH", "GATE", "EXC", "P1", "P2"};
+static const int32_t STRING_MIN[] = {3277, 0, 0, -1572864, 0};
+static const int32_t STRING_MAX[] = {655360, 65536, 65536, 1572864, 65536};
+static const int32_t STRING_DEF[] = {131072, 19661, 0, 0, 52429};
+static const int32_t STRING_INC[] = {6521, 655, 65536, 65536, 655};
+static const char *const STRING_PN[] = {"DECAY", "DAMP", "BURST", "COARSE", "LEVEL"};
+static const uint8_t STRING_LOG[] = {1, 0, 0, 0, 0};
+static const char *const STRING_UNIT[] = {"S", "", "", "ST", ""};
+static const char *const STRING_CH2[] = {"NOISE", "PULSE", 0};
+static const char *const *const STRING_CH[] = {0, 0, STRING_CH2, 0, 0};
+static const char *const WAVETABLE_INNAMES[] = {"PITCH", "PM", "SYNC", "P1", "P2"};
+static const int32_t WAVETABLE_MIN[] = {0, 0, -3145728, -6553600, 0, 0};
+static const int32_t WAVETABLE_MAX[] = {196608, 65536, 3145728, 6553600, 524288, 65536};
+static const int32_t WAVETABLE_DEF[] = {0, 0, 0, 0, 0, 52429};
+static const int32_t WAVETABLE_INC[] = {65536, 655, 65536, 131072, 5243, 655};
+static const char *const WAVETABLE_PN[] = {"BANK", "POS", "COARSE", "FINE", "PM", "LEVEL"};
+static const uint8_t WAVETABLE_LOG[] = {0, 0, 0, 0, 0, 0};
+static const char *const WAVETABLE_UNIT[] = {"", "", "ST", "CT", "", ""};
+static const char *const WAVETABLE_CH0[] = {"ANALOG", "ORGAN", "FORMANT", "DIGITAL", 0};
+static const char *const *const WAVETABLE_CH[] = {WAVETABLE_CH0, 0, 0, 0, 0, 0};
+static const char *const CHORUS_INNAMES[] = {"IN", "P1", "P2"};
+static const int32_t CHORUS_MIN[] = {3277, 0, 0};
+static const int32_t CHORUS_MAX[] = {327680, 65536, 65536};
+static const int32_t CHORUS_DEF[] = {39322, 32768, 32768};
+static const int32_t CHORUS_INC[] = {3244, 655, 655};
+static const char *const CHORUS_PN[] = {"RATE", "DEPTH", "MIX"};
+static const uint8_t CHORUS_LOG[] = {1, 0, 0};
+static const char *const CHORUS_UNIT[] = {"HZ", "", ""};
+static const char *const *const CHORUS_CH[] = {0, 0, 0};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, FM1_CVBASE, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -399,4 +508,8 @@ static const def_t DEFS[N_TYPES] = {
     {OUTPUT_NIN, OUTPUT_NOUT, OUTPUT_NPAR, OUTPUT_CVBASE, OUTPUT_MIN, OUTPUT_MAX, OUTPUT_DEF, OUTPUT_INC, "OUTPUT", OUTPUT_PN, OUTPUT_INNAMES, OUTPUT_LOG, OUTPUT_UNIT, OUTPUT_CH},   /* output */
     {GLIDE_NIN, GLIDE_NOUT, GLIDE_NPAR, GLIDE_CVBASE, GLIDE_MIN, GLIDE_MAX, GLIDE_DEF, GLIDE_INC, "GLIDE", GLIDE_PN, GLIDE_INNAMES, GLIDE_LOG, GLIDE_UNIT, GLIDE_CH},   /* glide */
     {SHAPE_NIN, SHAPE_NOUT, SHAPE_NPAR, SHAPE_CVBASE, SHAPE_MIN, SHAPE_MAX, SHAPE_DEF, SHAPE_INC, "SHAPER", SHAPE_PN, SHAPE_INNAMES, SHAPE_LOG, SHAPE_UNIT, SHAPE_CH},   /* shape */
+    {ENV_NIN, ENV_NOUT, ENV_NPAR, ENV_CVBASE, ENV_MIN, ENV_MAX, ENV_DEF, ENV_INC, "ENV L/R", ENV_PN, ENV_INNAMES, ENV_LOG, ENV_UNIT, ENV_CH},   /* env */
+    {STRING_NIN, STRING_NOUT, STRING_NPAR, STRING_CVBASE, STRING_MIN, STRING_MAX, STRING_DEF, STRING_INC, "STRING", STRING_PN, STRING_INNAMES, STRING_LOG, STRING_UNIT, STRING_CH},   /* string */
+    {WAVETABLE_NIN, WAVETABLE_NOUT, WAVETABLE_NPAR, WAVETABLE_CVBASE, WAVETABLE_MIN, WAVETABLE_MAX, WAVETABLE_DEF, WAVETABLE_INC, "WAVETABLE", WAVETABLE_PN, WAVETABLE_INNAMES, WAVETABLE_LOG, WAVETABLE_UNIT, WAVETABLE_CH},   /* wavetable */
+    {CHORUS_NIN, CHORUS_NOUT, CHORUS_NPAR, CHORUS_CVBASE, CHORUS_MIN, CHORUS_MAX, CHORUS_DEF, CHORUS_INC, "CHORUS", CHORUS_PN, CHORUS_INNAMES, CHORUS_LOG, CHORUS_UNIT, CHORUS_CH},   /* chorus */
 };

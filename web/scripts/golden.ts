@@ -361,6 +361,91 @@ kit(
   2,
 );
 
+// the level / rate envelope on the amplitude and (through a Scale) on the pitch of an FM pair
+kit('env-lr', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const mod = add('osc', 0, 0, { wave: 0, coarse: 12, level: 0.8 });
+  const car = add('osc', 0, 0, { wave: 0, pm: 2.5 });
+  const ea = add('env', 0, 0, { l1: 1, r1: 0.005, l2: 0.3, r2: 0.15, l3: 0.5, r3: 0.4, l4: 0, r4: 0.3 });
+  const ep = add('env', 0, 0, { l1: 1, r1: 0.002, l2: 0, r2: 0.08, l3: 0.2, r3: 0.5, l4: 0.6, r4: 0.2 });
+  const sc = add('scale', 0, 0, { gain: 0.5, offset: -0.25 });
+  const va = add('vca', 0, 0);
+  const out = add('output', 0, 0, { level: 0.8 });
+  wire(kb, 'pitch', mod, 'pitch');
+  wire(kb, 'pitch', car, 'pitch');
+  wire(ep, 'env', sc, 'in');
+  wire(sc, 'out', car, 'pitch');
+  wire(kb, 'gate', ea, 'gate');
+  wire(kb, 'gate', ep, 'gate');
+  wire(mod, 'out', car, 'pm');
+  wire(car, 'out', va, 'in');
+  wire(ea, 'env', va, 'cv');
+  wire(va, 'out', out, 'l');
+});
+// two plucked strings per voice (noise and pulse bursts, damp and decay apart), plus one rung by an oscillator
+kit(
+  'string',
+  (add, wire) => {
+    const kb = add('fm1', 0, 0);
+    const s1 = add('string', 0, 0, { decay: 1.5, damp: 0.3, burst: 0, level: 0.6 });
+    const s2 = add('string', 0, 0, { decay: 0.4, damp: 0.7, burst: 1, coarse: 12, level: 0.5 });
+    const o = add('osc', 0, 0, { wave: 3, pw: 0.1, coarse: -24, level: 0.03 });
+    const s3 = add('string', 0, 0, { decay: 2, damp: 0.1, coarse: 7, level: 0.3 });
+    const mix = add('mixer', 0, 0, { l1: 0.6, l2: 0.6, l3: 0.4 });
+    const out = add('output', 0, 0, { level: 0.6 });
+    wire(kb, 'pitch', s1, 'pitch');
+    wire(kb, 'pitch', s2, 'pitch');
+    wire(kb, 'pitch', s3, 'pitch');
+    wire(kb, 'pitch', o, 'pitch');
+    wire(kb, 'gate', s1, 'gate');
+    wire(kb, 'gate', s2, 'gate');
+    wire(o, 'out', s3, 'exc');
+    wire(s1, 'out', mix, 'in1');
+    wire(s2, 'out', mix, 'in2');
+    wire(s3, 'out', mix, 'in3');
+    wire(mix, 'out', out, 'l');
+  },
+  2,
+);
+// every bank of the wavetable, the position swept by an LFO through p1, one of them phase modulated and synced
+kit('wavetable', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const lfo = add('lfo', 0, 0, { wave: 1, rate: 0.7, depth: 1 });
+  const mix = add('mixer', 0, 0, { l1: 0.3, l2: 0.3, l3: 0.3, l4: 0.3 });
+  const out = add('output', 0, 0);
+  const mod = add('osc', 0, 0, { wave: 0, coarse: 7, level: 0.5 });
+  wire(kb, 'pitch', mod, 'pitch');
+  [0, 1, 2, 3].forEach((b, i) => {
+    const w = add('wavetable', 0, 0, { bank: b, pos: 0.5, coarse: i === 3 ? 12 : i * -12, fine: i * 5, pm: i === 1 ? 1.5 : 0, level: 0.7 }, { map: { p1: ['pos'] }, att: [0.5, 1] });
+    wire(kb, 'pitch', w, 'pitch');
+    wire(lfo, 'out', w, 'p1');
+    if (i === 1) wire(mod, 'out', w, 'pm');
+    if (i === 2) wire(kb, 'gate', w, 'sync');
+    wire(w, 'out', mix, `in${i + 1}`);
+  });
+  wire(mix, 'out', out, 'l');
+});
+// a shared chorus on a two-voice saw pad, l and r to the output
+kit(
+  'chorus',
+  (add, wire) => {
+    const kb = add('fm1', 0, 0);
+    const o = add('osc', 0, 0, { wave: 2, level: 0.5 });
+    const env = add('adsr', 0, 0, { a: 0.02, d: 0.3, s: 0.7, r: 0.3 });
+    const vca = add('vca', 0, 0);
+    const ch = add('chorus', 0, 0, { rate: 0.8, depth: 0.7, mix: 0.6 });
+    const out = add('output', 0, 0, { level: 0.7 });
+    wire(kb, 'pitch', o, 'pitch');
+    wire(kb, 'gate', env, 'gate');
+    wire(o, 'out', vca, 'in');
+    wire(env, 'env', vca, 'cv');
+    wire(vca, 'out', ch, 'in');
+    wire(ch, 'l', out, 'l');
+    wire(ch, 'r', out, 'r');
+  },
+  2,
+);
+
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 for (const [name, patch] of Object.entries(tests)) {
   const e = new Engine(SR);

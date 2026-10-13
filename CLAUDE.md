@@ -140,3 +140,9 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 - `osc` / `lfo` input `sync` (rising edge restarts the phase), modules `glide` (one-pole slew, Q24 state in C) and `shape` (soft / hard / fold), panel output `spread` (-1..1 per voice, in `VOICE_PORTS` and `port_poly`). Appended to `ALL` in `modules.ts` so type indices stay; binary format 8. Golden adds `sync-glide-shape` and `spread` (3 voices).
 - Lesson: a Q16 one-pole with a small coefficient stalls about 1 % short of its target (the step rounds to 0); keep such states in Q24 / Q30 as the ADSR does.
 
+
+## Level/rate envelope, string, wavetable, chorus (host-tested, golden 53 patches pass; not flashed)
+
+- Modules `env` (DX7 level / rate envelope), `string` (Karplus-Strong, `exc` input, 8 per patch, `str_pool`), `wavetable` (banks from `tools/gen_wavetables.py` -> `web/src/wavetables.json` + `firmware/src/wt_tables.h`; rerun the script after changing the recipes), `chorus` (shared, stereo, one per patch). Appended to `ALL`; binary format 9 (also: u16 matrix masks).
+- The string loop is clamped to ±2 in both engines (a steady `exc` would grow by 1 / (1 − g)); its int16 line uses error feedback. Falling `env` segments end after `r` (not when within 1e-4 like the ADSR decay), else the next segment starts about 2 r late.
+- Pool: about 10 KB free after this batch (numbers in docs/ARCHITECTURE.md). The LCD colours of new types go in `TYPE_COLOR` (ui.c), or the module page draws them black.

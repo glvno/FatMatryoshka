@@ -8,6 +8,7 @@
 #include "engine.h"
 #include "defs.h"
 #include "dsp_tables.h"
+#include "wt_tables.h"
 
 #ifndef ENG_POOL
 #define ENG_POOL
@@ -21,6 +22,10 @@
 #define ENG_NREV 2                  /* reverb modules per patch */
 #define RV_LEN 5934u                /* the four combs (1116 1188 1277 1356) and two allpasses (556 441), int16 Q13 */
 #define DELAY_LEN 46305u            /* ceil(ENG_SR * 1.05) samples, as the reference */
+#define ENG_NSTRING 8               /* string instances per patch (a per-voice module: one per voice) */
+#define STR_LEN 1104u               /* ceil(ENG_SR / 40) + 1: the lowest string is 40 Hz, as the reference */
+#define ENG_NCHORUS 1               /* chorus modules per patch (shared, like the delay) */
+#define CH_LEN 927u                 /* ceil(ENG_SR * 0.021): 12 ms +- 8 ms of sweep */
 #define MAX_SUM 192                 /* summed inputs (an input of an instance with two or more sources) */
 #define MAX_SRC 512                 /* their sources: a shared input reading a per-voice output has one per voice */
 #define MAX_HELD 16
@@ -196,6 +201,10 @@ typedef struct {
         struct { int32_t ic1, ic2, jc1, jc2; } flt;   /* stage 1 and stage 2 integrators */
         struct { int16_t *buf; uint32_t w; } dly;
         struct { int16_t *buf; uint16_t ci[4], ai[2]; int32_t lp[4]; } rev;
+        struct { int32_t v; uint32_t t; uint8_t stage, prev; } env;  /* Q30, like the ADSR; t: samples in the segment */
+        struct { int16_t *buf; uint32_t w, seed; int32_t lp, s1, err, burst, blen; } str;   /* Q13 line with error feedback */
+        struct { uint32_t phase; int32_t s1; } wt;
+        struct { int16_t *buf; uint32_t w, phase; } ch;
     } s;
 } inst_t;
 
@@ -225,7 +234,7 @@ static struct {
     uint16_t nsrc;
     uint8_t order[ENG_MAX_MODULES], outputs[ENG_MAX_MODULES];
     uint8_t from_m[ENG_MAX_CABLES], from_p[ENG_MAX_CABLES], to_m[ENG_MAX_CABLES], to_p[ENG_MAX_CABLES];
-    uint16_t ncab, nbuf, ndly, nrev;
+    uint16_t ncab, nbuf, ndly, nrev, nstr, nch;
     node_t node[ENG_MAX_MODULES];
     sum_t sum[MAX_SUM];
     const esig_t *sum_src[MAX_SRC];
@@ -240,6 +249,8 @@ static uint32_t cur_v;               /* the voice whose instance is being render
 static esig_t buf_pool[ENG_NBUF][ENG_BLOCK] ENG_POOL;
 static int16_t dly_pool[ENG_NDELAY][DELAY_LEN] ENG_POOL;
 static int16_t rev_pool[ENG_NREV][RV_LEN] ENG_POOL;
+static int16_t str_pool[ENG_NSTRING][STR_LEN] ENG_POOL;
+static int16_t ch_pool[ENG_NCHORUS][CH_LEN] ENG_POOL;
 static const esig_t zero_buf[ENG_BLOCK];
 static esig_t dummy_out[ENG_BLOCK];
 
@@ -279,6 +290,10 @@ static void init_state(const node_t *nd, inst_t *it)
         break;
     case T_NOISE:
         it->s.noise.seed = 0x1234567u;
+        break;
+    case T_STRING:
+        it->s.str.seed = 0x3779b97fu;
+        it->s.str.blen = 1;
         break;
     default:
         break;
@@ -333,6 +348,8 @@ int eng_load(const uint8_t *p, uint32_t len)
     E.nbuf = 0;
     E.ndly = 0;
     E.nrev = 0;
+    E.nstr = 0;
+    E.nch = 0;
     E.ninst = 0;
     for (i = 0; i < E.nmod; i++) {
         node_t *nd = &E.node[i];
@@ -382,7 +399,7 @@ int eng_load(const uint8_t *p, uint32_t len)
             grew = 0;
             for (c = 0; c < ncab; c++) {
                 node_t *t = &E.node[E.to_m[c]];
-                if (t->ninst > 1 || t->type == T_DELAY || t->type == T_REVERB || t->type == T_OUTPUT)
+                if (t->ninst > 1 || t->type == T_DELAY || t->type == T_REVERB || t->type == T_CHORUS || t->type == T_OUTPUT)
                     continue;
                 if (port_poly(E.from_m[c], E.from_p[c])) {
                     t->ninst = (uint8_t)nv;
@@ -417,6 +434,20 @@ int eng_load(const uint8_t *p, uint32_t len)
                 it->s.dly.buf = dly_pool[E.ndly++];
                 for (j = 0; j < DELAY_LEN; j++)
                     it->s.dly.buf[j] = 0;
+            }
+            if (nd->type == T_STRING) {
+                if (E.nstr >= ENG_NSTRING)
+                    return -4;
+                it->s.str.buf = str_pool[E.nstr++];
+                for (j = 0; j < STR_LEN; j++)
+                    it->s.str.buf[j] = 0;
+            }
+            if (nd->type == T_CHORUS) {
+                if (E.nch >= ENG_NCHORUS)
+                    return -4;
+                it->s.ch.buf = ch_pool[E.nch++];
+                for (j = 0; j < CH_LEN; j++)
+                    it->s.ch.buf[j] = 0;
             }
         }
     }
@@ -874,6 +905,7 @@ static void m_scale(const node_t *nd, inst_t *it, uint32_t n)
 }
 
 static int32_t env_rate(int32_t t_q16);
+static int32_t env_rate_n(uint32_t n);
 
 /* a one-pole glide: 99 % of a step in `time` (the envelope's rate curve, Q30 per sample). The state is Q24 (+-128):
  * in Q16 the step k * (in - y) would round to nothing while still 1 % short of the target, which a pitch can hear. */
@@ -916,10 +948,9 @@ static void m_shape(const node_t *nd, inst_t *it, uint32_t n)
     }
 }
 
-/* 1 - exp(-4.6 / max(t * sr, 1)) in Q30, t in seconds Q16 */
-static int32_t env_rate(int32_t t_q16)
+/* 1 - exp(-4.6 / samples) in Q30, samples in Q8 (at least 1) */
+static int32_t env_rate_q8(uint64_t tsr)
 {
-    uint64_t tsr = ((uint64_t)(uint32_t)t_q16 * ENG_SR) >> 8;        /* samples, Q8 */
     uint64_t y;
     if (tsr < 256u)
         tsr = 256u;
@@ -935,6 +966,11 @@ static int32_t env_rate(int32_t t_q16)
         return (int32_t)(1u << 30) - (int32_t)e30;
     }
 }
+
+/* 1 - exp(-4.6 / max(t * sr, 1)) in Q30, t in seconds Q16 */
+static int32_t env_rate(int32_t t_q16) { return env_rate_q8(((uint64_t)(uint32_t)t_q16 * ENG_SR) >> 8); }
+/* the same for a segment of n whole samples */
+static int32_t env_rate_n(uint32_t n) { return env_rate_q8((uint64_t)n << 8); }
 
 static void m_adsr(const node_t *nd, inst_t *it, uint32_t n)
 {
@@ -1169,6 +1205,207 @@ static void m_reverb(const node_t *nd, inst_t *it, uint32_t n)
     }
 }
 
+/* The level / rate envelope (modules.ts env): three segments to l1 l2 l3 in r1 r2 r3 on the gate, hold l3, release to l4
+ * in r4. Rising: linear at the rate that covers 0..1 in r (the ADSR attack); falling: 99 % in r (the ADSR decay), then the
+ * segment ends (the last 1 % is stepped). Q30. */
+static void m_env(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *gate = it->in[ENV_I_GATE];
+    esig_t *out = it->out[0];
+    int32_t lv[6], inc[6], k[6], v = it->s.env.v;
+    uint32_t len[6], tt = it->s.env.t;
+    uint8_t stage = it->s.env.stage, prev = it->s.env.prev;
+    uint32_t i, st;
+    static const uint8_t LP[6] = {ENV_P_L4, ENV_P_L1, ENV_P_L2, ENV_P_L3, ENV_P_L3, ENV_P_L4};
+    static const uint8_t RP[6] = {0, ENV_P_R1, ENV_P_R2, ENV_P_R3, 0, ENV_P_R4};
+    for (st = 0; st < 6u; st++) {
+        uint64_t tsr;
+        lv[st] = EF(it, LP[st]) << 14;
+        if (st == 0 || st == 4) {
+            inc[st] = k[st] = 0;
+            len[st] = 1;
+            continue;
+        }
+        tsr = ((uint64_t)(uint32_t)EF(it, RP[st]) * ENG_SR + 32768u) >> 16;   /* round(r * sr) samples */
+        if (tsr < 1u)
+            tsr = 1u;
+        len[st] = (uint32_t)tsr;
+        inc[st] = (int32_t)((1ull << 30) / tsr);
+        k[st] = env_rate_n((uint32_t)tsr);
+    }
+    for (i = 0; i < n; i++) {
+        uint8_t g = gate[i] > 32768 ? 1 : 0;
+        uint32_t guard;
+        if (g && !prev) {
+            stage = 1;
+            tt = 0;
+        } else if (!g && prev) {
+            stage = 5;
+            tt = 0;
+        }
+        prev = g;
+        for (guard = 0; guard < 4u; guard++) {
+            int32_t t;
+            if (stage == 0 || stage == 4) {
+                v = lv[stage];
+                break;
+            }
+            t = lv[stage];
+            tt++;
+            if (v < t) {
+                v += inc[stage];
+                if (v < t)
+                    break;
+            } else if (tt < len[stage]) {
+                v += mulq(t - v, k[stage], 30);
+                break;
+            }
+            v = t;
+            stage = stage == 5 ? 0 : (uint8_t)(stage + 1);
+            tt = 0;
+        }
+        out[i] = v >> 14;
+    }
+    it->s.env.t = tt;
+    it->s.env.v = v;
+    it->s.env.stage = stage;
+    it->s.env.prev = prev;
+}
+
+#define LOG2_1000_Q16 653124        /* log2(1000): decay is the time to -60 dB */
+
+/* The plucked string (modules.ts string): a Q13 delay line of one period with a one-pole in the loop, written with
+ * first-order error feedback so the int16 rounding does not pile up in the loop. Period, loop gain and the damping's
+ * delay compensation are set once per block from the block's first pitch. */
+static void m_string(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *pitch = it->in[STRING_I_PITCH], *gate = it->in[STRING_I_GATE], *exc = it->in[STRING_I_EXC];
+    esig_t *out = it->out[0];
+    int16_t *buf = it->s.str.buf;
+    uint32_t dt = exp2_scale(INC_C4, pitch[0] + EF(it, STRING_P_COARSE) / 12), w = it->s.str.w, seed = it->s.str.seed, i, di;
+    int32_t per, cl, dl, d, fr, g, bl, lvl = EF(it, STRING_P_LEVEL), kind = round_q16(EF(it, STRING_P_BURST));
+    int32_t lp = it->s.str.lp, s1 = it->s.str.s1, err = it->s.str.err, burst = it->s.str.burst, blen = it->s.str.blen;
+    int64_t e;
+    if (dt == 0u)
+        dt = 1u;
+    per = (int32_t)clampi((int64_t)((1ull << 48) / dt) > 0x7FFFFFFF ? 0x7FFFFFFF : (int32_t)((1ull << 48) / dt), 2 << 16, (int32_t)(STR_LEN - 2u) << 16);   /* period, Q16 samples */
+    cl = ENG_ONE - mul16(EF(it, STRING_P_DAMP), 58982);                    /* 1 - 0.9 damp */
+    dl = (int32_t)(((int64_t)(ENG_ONE - cl) << 16) / cl);                 /* the one-pole's low-frequency delay */
+    d = per - dl;
+    if (d < ENG_ONE)
+        d = ENG_ONE;
+    di = (uint32_t)d >> 16;
+    fr = d & 0xFFFF;
+    e = -(((int64_t)LOG2_1000_Q16 * per) >> 16);                           /* -log2(1000) * period, Q16 */
+    e = (e << 16) / ((int64_t)EF(it, STRING_P_DECAY) * ENG_SR);           /* / (decay * sr): octaves, Q16 */
+    g = (int32_t)exp2_scale(ENG_ONE, (int32_t)(e < -(60 << 16) ? -(60 << 16) : e));
+    bl = (per + 32768) >> 16;
+    for (i = 0; i < n; i++) {
+        int32_t x = exc[i], r0, r1, r, y, wq;
+        int16_t q;
+        uint32_t p0 = w >= di ? w - di : w + STR_LEN - di, p1 = p0 ? p0 - 1u : STR_LEN - 1u;
+        if (gate[i] >= 32768 && s1 < 32768) {
+            burst = bl;
+            blen = bl;
+        }
+        s1 = gate[i];
+        if (burst > 0) {
+            if (kind == 0) {
+                seed = seed * 1664525u + 1013904223u;
+                x += (int32_t)(seed >> 15) - ENG_ONE;
+            } else
+                x += blen - burst < (blen >> 1) ? ENG_ONE : -ENG_ONE;
+            burst--;
+        }
+        r0 = (int32_t)buf[p0] * 8;
+        r1 = (int32_t)buf[p1] * 8;
+        r = r0 + mulr(r1 - r0, fr, 16);
+        lp += mulr(r - lp, cl, 16);
+        y = clampi(x + mulr(lp, g, 16), -2 * ENG_ONE, 2 * ENG_ONE);
+        wq = y + err;
+        q = dly_pack(wq);
+        err = wq - (int32_t)q * 8;
+        buf[w] = q;
+        if (++w == STR_LEN)
+            w = 0;
+        out[i] = mul16(y, lvl);
+    }
+    it->s.str.w = w;
+    it->s.str.seed = seed;
+    it->s.str.lp = lp;
+    it->s.str.s1 = s1;
+    it->s.str.err = err;
+    it->s.str.burst = burst;
+    it->s.str.blen = blen;
+}
+
+/* The wavetable oscillator (modules.ts wavetable): two neighbouring frames of a bank read with linear interpolation and
+ * crossfaded by pos; the mip level (32 / 16 / 8 harmonics) from the block's first pitch. Phase modulation as the plain
+ * oscillator's (no oversampling). */
+static void m_wavetable(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *pitch = it->in[WAVETABLE_I_PITCH], *pm = it->in[WAVETABLE_I_PM], *sync = it->in[WAVETABLE_I_SYNC];
+    esig_t *out = it->out[0];
+    int32_t base = EF(it, WAVETABLE_P_COARSE) / 12 + EF(it, WAVETABLE_P_FINE) / 1200;
+    int32_t bank = clampi(round_q16(EF(it, WAVETABLE_P_BANK)), 0, WT_FRAMES / 8 - 1), lvl = EF(it, WAVETABLE_P_LEVEL);
+    int32_t pos7 = clampi(EF(it, WAVETABLE_P_POS), 0, ENG_ONE) * 7, f0 = pos7 >> 16, f1 = f0 < 7 ? f0 + 1 : 7, fm = pos7 & 0xFFFF;
+    int32_t idx = nd->conn & (1u << WAVETABLE_I_PM) ? EF(it, WAVETABLE_P_PM) : 0, s1 = it->s.wt.s1;
+    uint32_t dt0 = exp2_scale(INC_C4, pitch[0] + base), phase = it->s.wt.phase, i;
+    uint32_t mip = dt0 < 67108864u ? 0u : dt0 < 134217728u ? 1u : 2u;
+    const int16_t *ta = WT_T[mip][bank * 8 + f0], *tb = WT_T[mip][bank * 8 + f1];
+    for (i = 0; i < n; i++) {
+        uint32_t dt = exp2_scale(INC_C4, pitch[i] + base), ph, xi, xf;
+        int32_t ya, yb;
+        if (dt > DT_MAX)
+            dt = DT_MAX;
+        if (sync[i] >= 32768 && s1 < 32768)
+            phase = 0;
+        s1 = sync[i];
+        phase += dt;
+        ph = phase + (uint32_t)(((int64_t)mul16(idx, pm[i]) * TURN_PER_RAD) >> 16);
+        xi = ph >> 24;
+        xf = (ph >> 8) & 0xFFFFu;
+        ya = ta[xi] * 2 + (int32_t)(((int64_t)(ta[xi + 1] - ta[xi]) * 2 * (int32_t)xf) >> 16);
+        yb = tb[xi] * 2 + (int32_t)(((int64_t)(tb[xi + 1] - tb[xi]) * 2 * (int32_t)xf) >> 16);
+        out[i] = mul16(ya + mul16(yb - ya, fm), lvl);
+    }
+    it->s.wt.phase = phase;
+    it->s.wt.s1 = s1;
+}
+
+#define CH_BASE_Q16 34681651u       /* 0.012 * ENG_SR samples, Q16 */
+#define CH_SWING_Q16 23121101u      /* 0.008 * ENG_SR samples, Q16 */
+
+/* The stereo chorus (modules.ts chorus): a Q13 line, two taps swept in quadrature by a sine around 12 ms by up to 8 ms. */
+static void m_chorus(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[CHORUS_I_IN];
+    esig_t *l = it->out[CHORUS_O_L], *r = it->out[CHORUS_O_R];
+    int16_t *buf = it->s.ch.buf;
+    uint32_t w = it->s.ch.w, phase = it->s.ch.phase, i;
+    uint32_t dphi = (uint32_t)(((uint64_t)(uint32_t)EF(it, CHORUS_P_RATE) << 16) / ENG_SR);
+    int32_t swing = mul16((int32_t)CH_SWING_Q16, EF(it, CHORUS_P_DEPTH)), mix = EF(it, CHORUS_P_MIX), dry = ENG_ONE - mix;
+    for (i = 0; i < n; i++) {
+        int32_t x = in[i], tap[2], k;
+        uint32_t dd[2];
+        buf[w] = dly_pack(x);
+        dd[0] = CH_BASE_Q16 + (uint32_t)mul16(swing, sin_turn(phase));
+        dd[1] = CH_BASE_Q16 + (uint32_t)mul16(swing, sin_turn(phase + 0x40000000u));
+        for (k = 0; k < 2; k++) {
+            uint32_t di = dd[k] >> 16, p0 = w >= di ? w - di : w + CH_LEN - di, p1 = p0 ? p0 - 1u : CH_LEN - 1u;
+            int32_t a = (int32_t)buf[p0] * 8, b = (int32_t)buf[p1] * 8;
+            tap[k] = a + mulr(b - a, (int32_t)(dd[k] & 0xFFFFu), 16);
+        }
+        l[i] = mul16(x, dry) + mul16(tap[0], mix);
+        r[i] = mul16(x, dry) + mul16(tap[1], mix);
+        if (++w == CH_LEN)
+            w = 0;
+        phase += dphi;
+    }
+    it->s.ch.w = w;
+    it->s.ch.phase = phase;
+}
+
 /* ------------------------------------------------------------------ rendering */
 
 /* Block-rate parameter modulation (engine.ts applyCv): the mean of p1 / p2 over the block, times the attenuverter, is
@@ -1225,6 +1462,10 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     case T_REVERB: m_reverb(nd, it, n); break;
     case T_GLIDE: m_glide(nd, it, n); break;
     case T_SHAPE: m_shape(nd, it, n); break;
+    case T_ENV: m_env(nd, it, n); break;
+    case T_STRING: m_string(nd, it, n); break;
+    case T_WAVETABLE: m_wavetable(nd, it, n); break;
+    case T_CHORUS: m_chorus(nd, it, n); break;
     default: break;                      /* output: read by eng_render */
     }
 }

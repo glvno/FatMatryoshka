@@ -2,6 +2,7 @@
 // The module library: definitions (shared with the editor) and DSP implementations.
 
 import type { ModuleDef, ParamDef, PortDef } from './patch';
+import WT from './wavetables.json';
 
 export interface Voice {
   /** octaves relative to middle C (MIDI 60) */
@@ -541,7 +542,283 @@ const shape: ModuleImpl<null> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape];
+/**
+ * A level / rate envelope (the DX7 shape): on a gate it runs through three segments to l1, l2, l3 (each in its time r),
+ * holds l3 while the gate stays up, and on release goes to l4 in r4 and stays there. A rising segment is linear at the
+ * rate that would cover 0..1 in r (the ADSR's attack); a falling one approaches its level exponentially, 99 % in r (the
+ * ADSR's decay) and ends after r (the last 1 % is stepped). A segment that starts at its level is skipped. Stage: 0 idle at
+ * l4, 1..3 the segments, 4 holding l3, 5 the release.
+ */
+interface EnvState {
+  stage: 0 | 1 | 2 | 3 | 4 | 5;
+  v: number;
+  prev: number;
+  /** samples spent in the current segment */
+  t: number;
+}
+
+const env: ModuleImpl<EnvState> = {
+  def: {
+    type: 'env',
+    label: 'Env L/R',
+    inputs: [gate('gate')],
+    outputs: [control('env')],
+    params: [
+      param('l1', 0, 1, 1, { step: 0.01 }),
+      param('r1', 0.001, 10, 0.01, { unit: 's', step: 0.001, log: true }),
+      param('l2', 0, 1, 0.6, { step: 0.01 }),
+      param('r2', 0.001, 10, 0.3, { unit: 's', step: 0.001, log: true }),
+      param('l3', 0, 1, 0.6, { step: 0.01 }),
+      param('r3', 0.001, 10, 1, { unit: 's', step: 0.001, log: true }),
+      param('l4', 0, 1, 0, { step: 0.01 }),
+      param('r4', 0.001, 10, 0.5, { unit: 's', step: 0.001, log: true }),
+    ],
+  },
+  init: () => ({ stage: 0, v: 0, prev: 0, t: 0 }),
+  process(c, s) {
+    const lv = [0, c.p.l1 ?? 1, c.p.l2 ?? 0.6, c.p.l3 ?? 0.6, c.p.l3 ?? 0.6, c.p.l4 ?? 0];
+    const tm = [0, c.p.r1 ?? 0.01, c.p.r2 ?? 0.3, c.p.r3 ?? 1, 0, c.p.r4 ?? 0.5];
+    const len = tm.map((t) => Math.max(Math.round(t * c.sr), 1));
+    const inc = len.map((l) => 1 / l);
+    const k = len.map((l) => 1 - Math.exp(-4.6 / l));
+    for (let i = 0; i < c.n; i++) {
+      const g = c.inp.gate[i] > 0.5 ? 1 : 0;
+      if (g && !s.prev) {
+        s.stage = 1;
+        s.t = 0;
+      } else if (!g && s.prev) {
+        s.stage = 5;
+        s.t = 0;
+      }
+      s.prev = g;
+      // a segment: linear up, exponential down; done -> the next stage (the hold stages track their level)
+      for (let guard = 0; guard < 4; guard++) {
+        const st = s.stage;
+        if (st === 0 || st === 4) {
+          s.v = lv[st === 0 ? 5 : 3];
+          break;
+        }
+        const t = lv[st];
+        s.t++;
+        if (s.v < t) {
+          s.v += inc[st];
+          if (s.v < t) break;
+        } else if (s.t < len[st]) {
+          s.v += (t - s.v) * k[st];
+          break;
+        }
+        s.v = t;
+        s.stage = st === 5 ? 0 : ((st + 1) as EnvState['stage']);
+        s.t = 0;
+      }
+      c.out.env[i] = s.v;
+    }
+  },
+};
+
+/**
+ * A plucked string (Karplus-Strong): a delay line of one period with a one-pole damping filter in its loop. A rising gate
+ * fires a burst of one period (noise, or a square cycle) into the loop; whatever comes in at `exc` is added too, so an
+ * oscillator click or a noise hit plucks it, and a steady signal makes it a tuned resonator. `decay` is the time to -60 dB
+ * (per block, from the block's first pitch), `damp` the loop lowpass (0 = bright), whose delay the tuning compensates.
+ * The period is set once per block: lowest note 40 Hz (period 1/40 s). The loop is held to +-2 (a steady exciter is
+ * amplified by 1 / (1 - g)).
+ */
+const STR_LOW = 40;
+const LOG2_1000 = Math.log2(1000);
+interface StringState {
+  buf: Float32Array;
+  w: number;
+  lp: number;
+  s1: number;
+  seed: number;
+  /** burst samples left and the burst's length */
+  burst: number;
+  blen: number;
+}
+
+const string: ModuleImpl<StringState> = {
+  def: {
+    type: 'string',
+    label: 'String',
+    inputs: [control('pitch'), gate('gate'), audio('exc')],
+    outputs: [audio('out')],
+    params: [
+      param('decay', 0.05, 10, 2, { unit: 's', step: 0.01, log: true }),
+      param('damp', 0, 1, 0.3, { step: 0.01 }),
+      param('burst', 0, 1, 0, { step: 1, choices: ['noise', 'pulse'] }),
+      param('coarse', -24, 24, 0, { step: 1, unit: 'st' }),
+      param('level', 0, 1, 0.8, { step: 0.01 }),
+    ],
+  },
+  init: (sr) => ({ buf: new Float32Array(Math.ceil(sr / STR_LOW) + 1), w: 0, lp: 0, s1: 0, seed: 0x3779b97f, burst: 0, blen: 1 }),
+  process(c, s) {
+    const len = s.buf.length;
+    const f = C4 * Math.pow(2, c.inp.pitch[0] + (c.p.coarse ?? 0) / 12);
+    const period = Math.min(len - 2, Math.max(2, c.sr / f));
+    const cl = 1 - 0.9 * (c.p.damp ?? 0.3);
+    const dl = (1 - cl) / cl; // the one-pole's delay at low frequencies, taken off the line
+    const d = Math.max(1, period - dl);
+    const di = Math.floor(d);
+    const fr = d - di;
+    const g = Math.pow(2, (-LOG2_1000 * period) / ((c.p.decay ?? 2) * c.sr));
+    const kind = Math.round(c.p.burst ?? 0);
+    const lvl = c.p.level ?? 1;
+    const bl = Math.round(period);
+    for (let i = 0; i < c.n; i++) {
+      const gate = c.inp.gate[i];
+      if (gate >= 0.5 && s.s1 < 0.5) {
+        s.burst = bl;
+        s.blen = bl;
+      }
+      s.s1 = gate;
+      let x = c.inp.exc[i];
+      if (s.burst > 0) {
+        if (kind === 0) {
+          s.seed = (Math.imul(s.seed, 1664525) + 1013904223) >>> 0;
+          x += s.seed / 0x80000000 - 1;
+        } else x += s.blen - s.burst < s.blen >> 1 ? 1 : -1;
+        s.burst--;
+      }
+      const r0 = s.buf[(s.w - di + len) % len];
+      const r1 = s.buf[(s.w - di - 1 + len) % len];
+      const r = r0 + (r1 - r0) * fr;
+      s.lp += (r - s.lp) * cl;
+      const y = Math.max(-2, Math.min(2, x + s.lp * g)); // a steady exciter would otherwise grow by 1 / (1 - g)
+      s.buf[s.w] = y;
+      s.w = (s.w + 1) % len;
+      c.out.out[i] = y * lvl;
+    }
+  },
+};
+
+/**
+ * The wavetables (tools/gen_wavetables.py): four banks of eight frames, each frame its first 32 harmonics, at three mip
+ * levels (32, 16, 8 harmonics) so the high notes do not alias. Built once from the coefficients in wavetables.json; the
+ * firmware has the same tables as int16 in wt_tables.h.
+ */
+const WT_N = 256;
+const WT_MIPS = [32, 16, 8];
+const WT_BANKS: string[] = WT.banks;
+const WT_T: Float32Array[][] = WT_MIPS.map((nh) =>
+  (WT.frames as number[][][]).map((f) => {
+    const t = new Float32Array(WT_N + 1);
+    for (let i = 0; i < WT_N; i++) {
+      let y = 0;
+      for (let k = 1; k <= nh; k++) y += f[k - 1][0] * Math.cos((2 * Math.PI * k * i) / WT_N) + f[k - 1][1] * Math.sin((2 * Math.PI * k * i) / WT_N);
+      t[i] = y;
+    }
+    t[WT_N] = t[0];
+    return t;
+  }),
+);
+
+interface WtState {
+  phase: number;
+  s1: number;
+}
+
+const wavetable: ModuleImpl<WtState> = {
+  def: {
+    type: 'wavetable',
+    label: 'Wavetable',
+    inputs: [control('pitch'), audio('pm'), gate('sync')],
+    outputs: [audio('out')],
+    params: [
+      param('bank', 0, WT_BANKS.length - 1, 0, { step: 1, choices: WT_BANKS }),
+      param('pos', 0, 1, 0, { step: 0.01 }),
+      param('coarse', -48, 48, 0, { step: 1, unit: 'st' }),
+      param('fine', -100, 100, 0, { step: 1, unit: 'ct' }),
+      param('pm', 0, 8, 0, { step: 0.01 }),
+      param('level', 0, 1, 0.8, { step: 0.01 }),
+    ],
+  },
+  init: () => ({ phase: 0, s1: 0 }),
+  process(c, s) {
+    const { pitch, pm, sync } = c.inp;
+    const base = (c.p.coarse ?? 0) / 12 + (c.p.fine ?? 0) / 1200;
+    const bank = Math.round(c.p.bank ?? 0);
+    const posf = Math.min(7, Math.max(0, (c.p.pos ?? 0) * 7));
+    const f0 = Math.floor(posf);
+    const f1 = Math.min(7, f0 + 1);
+    const fm = posf - f0;
+    const idx = c.connected.pm ? (c.p.pm ?? 0) : 0;
+    const lvl = c.p.level ?? 1;
+    const K = 1 / (2 * Math.PI);
+    // the mip level from the block's first pitch: 32 harmonics below sr / 64, 16 below sr / 32, else 8
+    const dt0 = (C4 * Math.pow(2, pitch[0] + base)) / c.sr;
+    const mip = dt0 < 1 / 64 ? 0 : dt0 < 1 / 32 ? 1 : 2;
+    const ta = WT_T[mip][bank * 8 + f0];
+    const tb = WT_T[mip][bank * 8 + f1];
+    for (let i = 0; i < c.n; i++) {
+      const f = C4 * Math.pow(2, pitch[i] + base);
+      const dt = Math.min(f / c.sr, 0.45);
+      if (sync[i] >= 0.5 && s.s1 < 0.5) s.phase = 0;
+      s.s1 = sync[i];
+      s.phase += dt;
+      if (s.phase >= 1) s.phase -= 1;
+      let ph = s.phase + idx * pm[i] * K;
+      ph -= Math.floor(ph);
+      const x = ph * WT_N;
+      const xi = Math.floor(x);
+      const xf = x - xi;
+      const ya = ta[xi] + (ta[xi + 1] - ta[xi]) * xf;
+      const yb = tb[xi] + (tb[xi + 1] - tb[xi]) * xf;
+      c.out.out[i] = (ya + (yb - ya) * fm) * lvl;
+    }
+  },
+};
+
+/**
+ * A stereo chorus: one delay line, two taps swept in quadrature by a sine at `rate` around 12 ms by up to 8 ms (`depth`),
+ * read with linear interpolation. Shared like the delay (one per patch on the FM-1); its l / r go to the output.
+ */
+const CH_BASE = 0.012;
+const CH_SWING = 0.008;
+interface ChorusState {
+  buf: Float32Array;
+  w: number;
+  phase: number;
+}
+
+const chorus: ModuleImpl<ChorusState> = {
+  def: {
+    type: 'chorus',
+    label: 'Chorus',
+    inputs: [audio('in')],
+    outputs: [audio('l'), audio('r')],
+    params: [param('rate', 0.05, 5, 0.6, { unit: 'Hz', step: 0.01, log: true }), param('depth', 0, 1, 0.5, { step: 0.01 }), param('mix', 0, 1, 0.5, { step: 0.01 })],
+  },
+  init: (sr) => ({ buf: new Float32Array(Math.ceil(sr * 0.021)), w: 0, phase: 0 }),
+  process(c, s) {
+    const len = s.buf.length;
+    const dphi = (c.p.rate ?? 0.6) / c.sr;
+    const base = CH_BASE * c.sr;
+    const swing = CH_SWING * c.sr * (c.p.depth ?? 0.5);
+    const mix = c.p.mix ?? 0.5;
+    const dry = 1 - mix;
+    const tap = (d: number): number => {
+      const di = Math.floor(d);
+      const fr = d - di;
+      const a = s.buf[(s.w - di + len) % len];
+      const b = s.buf[(s.w - di - 1 + len) % len];
+      return a + (b - a) * fr;
+    };
+    for (let i = 0; i < c.n; i++) {
+      const x = c.inp.in[i];
+      s.buf[s.w] = x;
+      const dl = base + swing * Math.sin(2 * Math.PI * s.phase);
+      const dr = base + swing * Math.sin(2 * Math.PI * (s.phase + 0.25));
+      c.out.l[i] = x * dry + tap(dl) * mix;
+      c.out.r[i] = x * dry + tap(dr) * mix;
+      s.w = (s.w + 1) % len;
+      s.phase += dphi;
+      if (s.phase >= 1) s.phase -= 1;
+    }
+  },
+};
+
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an

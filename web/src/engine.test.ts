@@ -739,3 +739,188 @@ describe('sync, glide, shaper, spread', () => {
     expect(render(build(2), 256).l[100]).toBeCloseTo(0.4, 4);
   });
 });
+
+describe('level/rate envelope, string, wavetable, chorus', () => {
+  const wire = (p: Patch, a: number, ap: string, b: number, bp: string): void => {
+    expect(connect(p, DEFS, { module: a, port: ap }, { module: b, port: bp })).toBe(true);
+  };
+  const peak = (a: Float32Array): number => Math.max(...Array.from(a).map(Math.abs));
+  const bright = (a: Float32Array): number => {
+    let s = 0;
+    for (let i = 1; i < a.length; i++) s += (a[i] - a[i - 1]) ** 2;
+    return Math.sqrt(s / a.length) / Math.max(rms(a), 1e-9);
+  };
+  /** pitch by autocorrelation with a parabolic peak (zero crossings miscount a bright pluck) */
+  const pitchAC = (a: Float32Array): number => {
+    const ac: number[] = [];
+    for (let lag = 20; lag <= 600; lag++) {
+      let s = 0;
+      for (let i = lag; i < a.length; i++) s += a[i] * a[i - lag];
+      ac.push(s);
+    }
+    let b = 1;
+    for (let i = 2; i < ac.length - 1; i++) if (ac[i] > ac[b]) b = i;
+    const d = (ac[b - 1] - ac[b + 1]) / (2 * (ac[b - 1] - 2 * ac[b] + ac[b + 1]));
+    return SR / (20 + b + d);
+  };
+  /** magnitude of a frequency in a signal (Goertzel) */
+  const mag = (a: Float32Array, f: number): number => {
+    const w = (2 * Math.PI * f) / SR;
+    let s0 = 0;
+    let s1 = 0;
+    let s2 = 0;
+    for (let i = 0; i < a.length; i++) {
+      s0 = a[i] + 2 * Math.cos(w) * s1 - s2;
+      s2 = s1;
+      s1 = s0;
+    }
+    return Math.sqrt(s1 * s1 + s2 * s2 - 2 * Math.cos(w) * s1 * s2) / a.length;
+  };
+
+  it('env runs l1 l2 l3 in r1 r2 r3, holds l3, releases to l4 in r4', () => {
+    const p = emptyPatch();
+    const kb = addModule(p, DEFS.fm1, 0, 0).id;
+    const e = addModule(p, DEFS.env, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    out.params.level = 1;
+    Object.assign(e.params, { l1: 1, r1: 0.01, l2: 0.25, r2: 0.1, l3: 0.75, r3: 0.1, l4: 0.1, r4: 0.1 });
+    wire(p, kb, 'gate', e.id, 'gate');
+    wire(p, e.id, 'env', out.id, 'l');
+    const en = new Engine(SR);
+    en.load(p);
+    expect(render(en, 100).l[50]).toBeCloseTo(0.1, 5); // idle at l4
+    en.noteOn(60);
+    const a = render(en, Math.round(SR * 0.01)).l; // the attack: linear 0.1 -> 1 at the 0..1 rate, so it arrives at 90 % of r1
+    expect(a[Math.round(SR * 0.005)]).toBeCloseTo(0.6, 1);
+    expect(a[Math.round(SR * 0.0089)]).toBeCloseTo(0.99, 1);
+    expect(Math.max(...Array.from(a))).toBeCloseTo(1, 4);
+    const d = render(en, Math.round(SR * 0.1)).l; // down to l2 (exponential, 99 % in r2)
+    expect(d[d.length - 1]).toBeCloseTo(0.25, 1);
+    const u = render(en, Math.round(SR * 0.1)).l; // up to l3, linear: 0.5 of travel in 0.05 s
+    expect(u[u.length - 1]).toBeCloseTo(0.75, 5);
+    expect(render(en, Math.round(SR * 0.2)).l[1000]).toBeCloseTo(0.75, 5); // held
+    en.noteOff(60);
+    const r = render(en, Math.round(SR * 0.1)).l;
+    expect(r[0]).toBeLessThan(0.75);
+    expect(r[r.length - 1]).toBeCloseTo(0.1, 1);
+    expect(render(en, 1000).l[999]).toBeCloseTo(0.1, 2);
+  });
+
+  const stringPatch = (params: Record<string, number>, exc = false) => {
+    const p = emptyPatch();
+    const kb = addModule(p, DEFS.fm1, 0, 0).id;
+    const s = addModule(p, DEFS.string, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    out.params.level = 1;
+    Object.assign(s.params, { level: 1 }, params);
+    wire(p, kb, 'pitch', s.id, 'pitch');
+    if (exc) {
+      const o = addModule(p, DEFS.osc, 0, 0);
+      o.params.wave = 3;
+      o.params.coarse = -36;
+      wire(p, kb, 'pitch', o.id, 'pitch');
+      wire(p, o.id, 'out', s.id, 'exc');
+    } else wire(p, kb, 'gate', s.id, 'gate');
+    wire(p, s.id, 'out', out.id, 'l');
+    return p;
+  };
+
+  it('string: a gate plucks a tone at the played pitch that decays to -60 dB in about `decay`', () => {
+    const e = new Engine(SR);
+    e.load(stringPatch({ decay: 0.5, damp: 0.2 }));
+    e.noteOn(69);
+    const a = render(e, SR).l;
+    const seg = (t0: number, t1: number): Float32Array => a.subarray(Math.round(t0 * SR), Math.round(t1 * SR));
+    expect(Math.abs(pitchAC(seg(0.1, 0.4)) - 440)).toBeLessThan(6);
+    const early = rms(seg(0.05, 0.1));
+    const late = rms(seg(0.5, 0.55));
+    expect(20 * Math.log10(late / early)).toBeLessThan(-45); // 0.45 s later: most of the 60 dB gone
+    expect(20 * Math.log10(late / early)).toBeGreaterThan(-75);
+    expect(late).toBeGreaterThan(1e-5); // not dead yet
+  });
+
+  it('string: damp darkens the pluck; the exc input rings the string without a gate', () => {
+    const run = (params: Record<string, number>): Float32Array => {
+      const e = new Engine(SR);
+      e.load(stringPatch(params));
+      e.noteOn(57);
+      return render(e, SR / 2).l.subarray(2000);
+    };
+    expect(bright(run({ damp: 0.8 }))).toBeLessThan(bright(run({ damp: 0 })) * 0.5);
+    const ring = (decay: number): Float32Array => {
+      const e = new Engine(SR);
+      e.load(stringPatch({ decay, damp: 0.2 }, true));
+      e.noteOn(69);
+      return render(e, SR / 2).l.subarray(SR / 4);
+    };
+    const long = ring(3);
+    const short = ring(0.05);
+    expect(rms(long)).toBeGreaterThan(0.01);
+    // the 55 Hz pulse train has every harmonic; the resonator at 440 Hz (its 8th) lifts that one far above its 7th
+    expect(mag(long, 440) / mag(long, 385)).toBeGreaterThan(5 * (mag(short, 440) / mag(short, 385)));
+  });
+
+  it('wavetable: frame 0 of analog is a sine, pos sweeps to brighter frames, high notes take the smaller mip', () => {
+    const run = (params: Record<string, number>, note = 60): Float32Array => {
+      const p = emptyPatch();
+      const kb = addModule(p, DEFS.fm1, 0, 0).id;
+      const w = addModule(p, DEFS.wavetable, 0, 0);
+      const out = addModule(p, DEFS.output, 0, 0);
+      out.params.level = 1;
+      Object.assign(w.params, { level: 1 }, params);
+      wire(p, kb, 'pitch', w.id, 'pitch');
+      wire(p, w.id, 'out', out.id, 'l');
+      const e = new Engine(SR);
+      e.load(p);
+      e.noteOn(note);
+      return render(e, SR / 4).l;
+    };
+    const sine = run({ bank: 0, pos: 0 });
+    expect(Math.abs(freq(sine) - 261.63)).toBeLessThan(3);
+    expect(rms(sine)).toBeCloseTo(Math.SQRT1_2, 2);
+    expect(peak(sine)).toBeCloseTo(1, 2);
+    const saw = run({ bank: 0, pos: 3 / 7 });
+    const sq = run({ bank: 0, pos: 5 / 7 });
+    expect(bright(saw)).toBeGreaterThan(bright(sine) * 2);
+    expect(rms(sq)).toBeGreaterThan(rms(saw));
+    const mid = run({ bank: 0, pos: 0.5 / 7 }); // half way between sine and triangle
+    expect(bright(mid)).toBeGreaterThan(bright(sine));
+    expect(bright(mid)).toBeLessThan(bright(run({ bank: 0, pos: 1 / 7 })));
+    for (let b = 0; b < 4; b++) for (const pos of [0, 0.5, 1]) expect(peak(run({ bank: b, pos }))).toBeLessThanOrEqual(1.02);
+    const hi = run({ bank: 0, pos: 3 / 7 }, 100); // 2.6 kHz: 8 harmonics only, the top one at 21 kHz
+    expect(bright(hi)).toBeLessThan(bright(saw) * 20);
+    expect(Math.abs(freq(hi) - 2637)).toBeLessThan(30);
+  });
+
+  it('chorus: mix 0 passes the input, mix 1 is a swept delay of equal loudness, l and r differ; it is shared across voices', () => {
+    const build = (mix: number, voices = 1): Engine => {
+      const p = emptyPatch();
+      const kb = addModule(p, DEFS.fm1, 0, 0).id;
+      const o = addModule(p, DEFS.osc, 0, 0);
+      const ch = addModule(p, DEFS.chorus, 0, 0);
+      const out = addModule(p, DEFS.output, 0, 0);
+      out.params.level = 1;
+      o.params.level = 0.5;
+      Object.assign(ch.params, { mix, rate: 1, depth: 1 });
+      wire(p, kb, 'pitch', o.id, 'pitch');
+      wire(p, o.id, 'out', ch.id, 'in');
+      wire(p, ch.id, 'l', out.id, 'l');
+      wire(p, ch.id, 'r', out.id, 'r');
+      p.voices = voices;
+      expect(voiceSplit(p).has(ch.id)).toBe(false);
+      const e = new Engine(SR);
+      e.load(p);
+      e.noteOn(60);
+      return e;
+    };
+    const dry = render(build(0), SR / 2);
+    expect(rms(dry.l)).toBeCloseTo(0.5 * Math.SQRT1_2, 2);
+    expect(dry.l[1000]).toBeCloseTo(dry.r[1000], 6);
+    const wet = render(build(1), SR / 2);
+    expect(rms(wet.l.subarray(2000))).toBeCloseTo(rms(dry.l), 1);
+    let diff = 0;
+    for (let i = 2000; i < wet.l.length; i++) diff += (wet.l[i] - wet.r[i]) ** 2;
+    expect(Math.sqrt(diff / (wet.l.length - 2000))).toBeGreaterThan(0.05);
+    expect(peak(render(build(0.5, 4), SR / 4).l)).toBeGreaterThan(0.1);
+  });
+});
