@@ -96,3 +96,6 @@ button.tog { padding: 0 2px; line-height: 1; border: none; background: transpare
 .fhead { position: absolute; left: 0; right: 0; top: 0; height: 30px; display: flex; justify-content: space-between; align-items: center; padding: 0 10px; font-weight: 600; color: var(--accent); cursor: grab; touch-action: none; pointer-events: auto; user-select: none; }
 .rubber { position: absolute; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); pointer-events: none; }
 #tab-assemblies h3 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); }
+.merged { font-size: 10px; color: var(--accent); white-space: nowrap; }
+select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
+.module.assembly.member { border-style: dashed; }

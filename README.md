@@ -73,3 +73,8 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 - **Phaser** sweeps four allpass stages ±2 `depth` octaves around `center` at `rate`, with `fb` and `mix`.
 - **Digitizer** reduces the bit depth (`bits`) and the sample rate (`rate` = every sample held that many times).
 - **Noise** has a `color` parameter: 0 is white, 1 rolls the top off from about 220 Hz.
+## Assemblies: merged ports, placement, nesting
+
+- **Merged ports.** On an open assembly, every exposed input has a `merge…` list of the card's other inputs of the same kind. Merging turns two jacks into one that feeds both (the factory `voice` has one `gate` for its two envelopes); the card shows `×2` and a `split` button. A cable into a merged jack goes to every input behind it, and removing it takes them all.
+- **Placement.** "Add module" and "Insert" put the new card on the first free grid cell instead of on top of what is there.
+- **Nesting.** An assembly can hold assemblies, three levels deep: select modules inside an open assembly and "Make assembly", or drop a collapsed card into an open frame. The parent's card may show whatever its children expose; closing the parent hides everything inside. Ungroup dissolves one level, delete keeps the nested ones. Saved assemblies carry their nested ones.

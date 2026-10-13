@@ -194,12 +194,13 @@
     {
       "module": 3,
       "port": "gate",
-      "label": "gate (filter)"
-    },
-    {
-      "module": 4,
-      "port": "gate",
-      "label": "gate (amp)"
+      "label": "gate",
+      "also": [
+        {
+          "module": 4,
+          "port": "gate"
+        }
+      ]
     },
     {
       "module": 2,
