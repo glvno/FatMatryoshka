@@ -25,6 +25,7 @@ static struct {
 #define patch_label (vs[eng_voice()].label)
 #define PAGE_MIXER 4u                           /* GLO: the mixer (menu.c) */
 #define PAGE_MENU 5u                            /* HOME held: the settings menu (menu.c) */
+#define PAGE_PERF 6u                            /* ENV: the performance page (big values, no names: perf_draw) */
 static uint8_t page;                            /* 0: the selected module, 1..3: the arpeggiator pages MELODY, RHYTHM, CHAOS (arp_ui.c), 4 mixer, 5 menu */
 
 /* the settings of the menu (menu.c); saved with the state (SAVE) */
@@ -585,12 +586,88 @@ static void arp_view_draw(uint32_t page, int full);
 static void mixer_draw(int full);
 static void menu_draw(int full);
 
+/* The performance page (ENV): what matters while playing, readable from arm's length. The four knob rows show the
+ * destination of the Main module's K1..K4 with the value they put out (big), the strip shows the patch with bypassed
+ * modules dim, and one line below the rows says the arpeggiator's state, the polyphony, the octave and how many modules
+ * are off. K1..K4 keep turning the Main module's knobs here (main.c knobs_poll). */
+static void perf_draw(int full)
+{
+    char line[40], tgt[40], num[12], *p;
+    int panel = eng_find(T_FM1);
+    uint32_t k, n = (uint32_t)eng_nmodules(), off = 0, i;
+    if (full) {
+        p = put(line, patch_label ? patch_label : "");
+        pad(p, line, 15);
+        text_mid(12, 30, line, C_ACC, C_BG);
+        thumb_show();
+    }
+    for (k = 0; k < 4u; k++) {
+        int32_t v = panel >= 0 ? eng_get_param((uint32_t)panel, FM1_P_K1 + k) : 0;
+        int has = panel >= 0 && knob_target((uint32_t)panel, k, tgt);
+        uint32_t y = 56u + 36u * k, w;
+        v = v < 0 ? 0 : v > 65536 ? 65536 : v;
+        w = (uint32_t)(((int64_t)v * LEFT_W) >> 16);
+        if (!has)
+            put(tgt, "-");
+        tgt[11] = 0;
+        p = put(line, tgt);                             /* the destination, big (11 characters: 99 px of the 136) */
+        pad(p, line, 12);
+        text_mid(12, y + 2u, line, has ? C_FG : C_DIM, C_BG);
+        fmt_int(num, (int32_t)(((int64_t)v * 100) >> 16));   /* the knob's position in percent, small, at the right edge */
+        p = put(line, num);
+        *p++ = '%';
+        pad(p, line, 4);
+        text5x7(12 + LEFT_W - 24u, y + 4u, line, 1, C_DIM, C_BG);
+        lcd_fill(12, y + 24u, w, 3, has ? C_ACC : C_DIM);
+        lcd_fill(12 + w, y + 24u, LEFT_W - w, 3, 0x2104u);
+    }
+    for (i = 0; i < n; i++)
+        off += eng_bypass(i) ? 1u : 0u;
+    p = line;                                           /* ARP 120 1/16  POLY 4  OCT +1  2 OFF */
+    if (arp_play) {
+        fmt_int(num, arp_c.bpm);
+        p = put(p, "ARP ");
+        p = put(p, num);
+        *p++ = ' ';
+        p = put(p, ARP_RATE_NAME[arp_c.rate]);
+    } else
+        p = put(p, "ARP OFF");
+    *p++ = ' ';
+    *p++ = ' ';
+    if (eng_poly() > 1) {
+        fmt_int(num, eng_poly());
+        p = put(p, "POLY ");
+        p = put(p, num);
+    } else
+        p = put(p, "MONO");
+    *p++ = ' ';
+    *p++ = ' ';
+    p = put(p, "OCT ");
+    if (octave >= 0)
+        *p++ = '+';
+    fmt_int(num, octave);
+    p = put(p, num);
+    if (off) {
+        *p++ = ' ';
+        *p++ = ' ';
+        fmt_int(num, (int32_t)off);
+        p = put(p, num);
+        p = put(p, " OFF");
+    }
+    pad(p, line, 26);
+    text5x7(12, 204, line, 1, arp_play ? C_FG : C_DIM, C_BG);
+    if (full)
+        text5x7(12, 230, "K1-K4: MAIN KNOBS  ENV: BACK", 1, 0x4208u, C_BG);
+}
+
 static void view_draw(int full)                 /* whichever page is showing */
 {
     if (page == PAGE_MIXER)
         mixer_draw(full);
     else if (page == PAGE_MENU)
         menu_draw(full);
+    else if (page == PAGE_PERF)
+        perf_draw(full);
     else if (page)
         arp_view_draw(page, full);
     else

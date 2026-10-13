@@ -705,6 +705,25 @@ static void knobs_poll(void)
     }
     if (page && st[0])                              /* SELECT: back to the module page */
         page_set(page);
+    if (page == PAGE_PERF) {                        /* the performance page: K1..K4 are the Main module's knobs */
+        int panel = eng_find(T_FM1);
+        for (k = 0; k < 4u && panel >= 0; k++) {
+            const def_t *fd = &DEFS[T_FM1];
+            int32_t inc = fd->pinc[k], v;
+            if (!st[2u + k])
+                continue;
+            if (cfg.accel && fm1_ms - last_ms[k] < 80u)
+                inc *= 5;
+            last_ms[k] = fm1_ms;
+            v = eng_get_param((uint32_t)panel, k) + st[2u + k] * inc;
+            v = v < fd->pmin[k] ? fd->pmin[k] : v > fd->pmax[k] ? fd->pmax[k] : v;
+            eng_set_param((uint32_t)panel, k, v);
+            m1_patch_param((uint32_t)panel, k, v);
+            if (!ui_dirty)
+                ui_dirty = 1;
+        }
+        return;
+    }
     if (page) {                                     /* K1..K4 of an arpeggiator page */
         for (k = 0; k < 4u; k++) {
             uint32_t fast = cfg.accel && fm1_ms - last_ms[k] < 80u;
@@ -1026,6 +1045,8 @@ static void buttons_poll(void)
     }
     if (p & (1u << BTN_GLO))
         page_set(PAGE_MIXER);
+    if (p & (1u << BTN_ENV))
+        page_set(PAGE_PERF);                        /* the performance page (again: back to the module page) */
     if (p & (1u << BTN_ARP))
         page_set(1);
     if (p & (1u << BTN_SEQ))
