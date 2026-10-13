@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 13
+#define N_TYPES 15
 enum {
     T_FM1,
     T_OSC,
@@ -18,6 +18,8 @@ enum {
     T_DELAY,
     T_REVERB,
     T_OUTPUT,
+    T_GLIDE,
+    T_SHAPE,
 };
 
 /* fm1: Main */
@@ -28,20 +30,22 @@ enum {
 #define FM1_O_K2 4
 #define FM1_O_K3 5
 #define FM1_O_K4 6
+#define FM1_O_SPREAD 7
 #define FM1_P_K1 0
 #define FM1_P_K2 1
 #define FM1_P_K3 2
 #define FM1_P_K4 3
 #define FM1_NIN 0
-#define FM1_NOUT 7
+#define FM1_NOUT 8
 #define FM1_NPAR 4
 #define FM1_CVBASE -1
 
 /* osc: Oscillator */
 #define OSC_I_PITCH 0
 #define OSC_I_PM 1
-#define OSC_I_P1 2
-#define OSC_I_P2 3
+#define OSC_I_SYNC 2
+#define OSC_I_P1 3
+#define OSC_I_P2 4
 #define OSC_O_OUT 0
 #define OSC_P_WAVE 0
 #define OSC_P_PW 1
@@ -50,22 +54,23 @@ enum {
 #define OSC_P_PM 4
 #define OSC_P_LEVEL 5
 #define OSC_P_FB 6
-#define OSC_NIN 4
+#define OSC_NIN 5
 #define OSC_NOUT 1
 #define OSC_NPAR 7
-#define OSC_CVBASE 2
+#define OSC_CVBASE 3
 
 /* lfo: LFO */
-#define LFO_I_P1 0
-#define LFO_I_P2 1
+#define LFO_I_SYNC 0
+#define LFO_I_P1 1
+#define LFO_I_P2 2
 #define LFO_O_OUT 0
 #define LFO_P_WAVE 0
 #define LFO_P_RATE 1
 #define LFO_P_DEPTH 2
-#define LFO_NIN 2
+#define LFO_NIN 3
 #define LFO_NOUT 1
 #define LFO_NPAR 3
-#define LFO_CVBASE 0
+#define LFO_CVBASE 1
 
 /* noise: Noise */
 #define NOISE_I_P1 0
@@ -198,8 +203,32 @@ enum {
 #define OUTPUT_NPAR 1
 #define OUTPUT_CVBASE -1
 
+/* glide: Glide */
+#define GLIDE_I_IN 0
+#define GLIDE_I_P1 1
+#define GLIDE_I_P2 2
+#define GLIDE_O_OUT 0
+#define GLIDE_P_TIME 0
+#define GLIDE_NIN 3
+#define GLIDE_NOUT 1
+#define GLIDE_NPAR 1
+#define GLIDE_CVBASE 1
+
+/* shape: Shaper */
+#define SHAPE_I_IN 0
+#define SHAPE_I_P1 1
+#define SHAPE_I_P2 2
+#define SHAPE_O_OUT 0
+#define SHAPE_P_DRIVE 0
+#define SHAPE_P_MODE 1
+#define SHAPE_P_LEVEL 2
+#define SHAPE_NIN 3
+#define SHAPE_NOUT 1
+#define SHAPE_NPAR 3
+#define SHAPE_CVBASE 1
+
 #define MAX_IN 6
-#define MAX_OUT 7
+#define MAX_OUT 8
 #define MAX_PAR 7
 
 typedef struct {
@@ -223,7 +252,7 @@ static const char *const FM1_PN[] = {"K1", "K2", "K3", "K4"};
 static const uint8_t FM1_LOG[] = {0, 0, 0, 0};
 static const char *const FM1_UNIT[] = {"", "", "", ""};
 static const char *const *const FM1_CH[] = {0, 0, 0, 0};
-static const char *const OSC_INNAMES[] = {"PITCH", "PM", "P1", "P2"};
+static const char *const OSC_INNAMES[] = {"PITCH", "PM", "SYNC", "P1", "P2"};
 static const int32_t OSC_MIN[] = {0, 3277, -3145728, -6553600, 0, 0, 0};
 static const int32_t OSC_MAX[] = {196608, 62259, 3145728, 6553600, 524288, 65536, 65536};
 static const int32_t OSC_DEF[] = {0, 32768, 0, 0, 0, 52429, 0};
@@ -233,7 +262,7 @@ static const uint8_t OSC_LOG[] = {0, 0, 0, 0, 0, 0, 0};
 static const char *const OSC_UNIT[] = {"", "", "ST", "CT", "", "", ""};
 static const char *const OSC_CH0[] = {"SINE", "TRIANGLE", "SAW", "SQUARE", 0};
 static const char *const *const OSC_CH[] = {OSC_CH0, 0, 0, 0, 0, 0, 0};
-static const char *const LFO_INNAMES[] = {"P1", "P2"};
+static const char *const LFO_INNAMES[] = {"SYNC", "P1", "P2"};
 static const int32_t LFO_MIN[] = {0, 1311, 0};
 static const int32_t LFO_MAX[] = {262144, 2621440, 65536};
 static const int32_t LFO_DEF[] = {0, 262144, 65536};
@@ -334,6 +363,25 @@ static const char *const OUTPUT_PN[] = {"LEVEL"};
 static const uint8_t OUTPUT_LOG[] = {0};
 static const char *const OUTPUT_UNIT[] = {""};
 static const char *const *const OUTPUT_CH[] = {0};
+static const char *const GLIDE_INNAMES[] = {"IN", "P1", "P2"};
+static const int32_t GLIDE_MIN[] = {66};
+static const int32_t GLIDE_MAX[] = {327680};
+static const int32_t GLIDE_DEF[] = {6554};
+static const int32_t GLIDE_INC[] = {3276};
+static const char *const GLIDE_PN[] = {"TIME"};
+static const uint8_t GLIDE_LOG[] = {1};
+static const char *const GLIDE_UNIT[] = {"S"};
+static const char *const *const GLIDE_CH[] = {0};
+static const char *const SHAPE_INNAMES[] = {"IN", "P1", "P2"};
+static const int32_t SHAPE_MIN[] = {65536, 0, 0};
+static const int32_t SHAPE_MAX[] = {2097152, 131072, 65536};
+static const int32_t SHAPE_DEF[] = {131072, 0, 45875};
+static const int32_t SHAPE_INC[] = {20316, 65536, 655};
+static const char *const SHAPE_PN[] = {"DRIVE", "MODE", "LEVEL"};
+static const uint8_t SHAPE_LOG[] = {1, 0, 0};
+static const char *const SHAPE_UNIT[] = {"", "", ""};
+static const char *const SHAPE_CH1[] = {"SOFT", "HARD", "FOLD", 0};
+static const char *const *const SHAPE_CH[] = {0, SHAPE_CH1, 0};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, FM1_CVBASE, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -349,4 +397,6 @@ static const def_t DEFS[N_TYPES] = {
     {DELAY_NIN, DELAY_NOUT, DELAY_NPAR, DELAY_CVBASE, DELAY_MIN, DELAY_MAX, DELAY_DEF, DELAY_INC, "DELAY", DELAY_PN, DELAY_INNAMES, DELAY_LOG, DELAY_UNIT, DELAY_CH},   /* delay */
     {REVERB_NIN, REVERB_NOUT, REVERB_NPAR, REVERB_CVBASE, REVERB_MIN, REVERB_MAX, REVERB_DEF, REVERB_INC, "REVERB", REVERB_PN, REVERB_INNAMES, REVERB_LOG, REVERB_UNIT, REVERB_CH},   /* reverb */
     {OUTPUT_NIN, OUTPUT_NOUT, OUTPUT_NPAR, OUTPUT_CVBASE, OUTPUT_MIN, OUTPUT_MAX, OUTPUT_DEF, OUTPUT_INC, "OUTPUT", OUTPUT_PN, OUTPUT_INNAMES, OUTPUT_LOG, OUTPUT_UNIT, OUTPUT_CH},   /* output */
+    {GLIDE_NIN, GLIDE_NOUT, GLIDE_NPAR, GLIDE_CVBASE, GLIDE_MIN, GLIDE_MAX, GLIDE_DEF, GLIDE_INC, "GLIDE", GLIDE_PN, GLIDE_INNAMES, GLIDE_LOG, GLIDE_UNIT, GLIDE_CH},   /* glide */
+    {SHAPE_NIN, SHAPE_NOUT, SHAPE_NPAR, SHAPE_CVBASE, SHAPE_MIN, SHAPE_MAX, SHAPE_DEF, SHAPE_INC, "SHAPER", SHAPE_PN, SHAPE_INNAMES, SHAPE_LOG, SHAPE_UNIT, SHAPE_CH},   /* shape */
 };

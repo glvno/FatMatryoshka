@@ -622,3 +622,120 @@ describe('FM oscillator', () => {
     expect(new DataView(b.buffer).getInt32(at, true)).toBe(Math.round(0.25 * 65536));
   });
 });
+
+describe('sync, glide, shaper, spread', () => {
+  const wire = (p: Patch, a: number, ap: string, b: number, bp: string): void => {
+    expect(connect(p, DEFS, { module: a, port: ap }, { module: b, port: bp })).toBe(true);
+  };
+
+  it('sync restarts the oscillator phase on a rising edge: two oscillators started apart line up after a gate', () => {
+    const p = emptyPatch();
+    const kb = addModule(p, DEFS.fm1, 0, 0).id;
+    const a = addModule(p, DEFS.osc, 0, 0);
+    const b = addModule(p, DEFS.osc, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0).id;
+    a.params.wave = b.params.wave = 0;
+    wire(p, kb, 'pitch', a.id, 'pitch');
+    wire(p, kb, 'pitch', b.id, 'pitch');
+    wire(p, kb, 'gate', a.id, 'sync');
+    wire(p, kb, 'gate', b.id, 'sync');
+    wire(p, a.id, 'out', out, 'l');
+    wire(p, b.id, 'out', out, 'r');
+    const e = new Engine(SR);
+    e.load(p);
+    // put b out of phase: run a few blocks with a connected to pitch only, then detune b for a while
+    b.params.fine = 50;
+    e.setParam(b.id, 'fine', 50);
+    render(e, 2000);
+    e.setParam(b.id, 'fine', 0);
+    let r = render(e, 1000);
+    expect(Math.abs(r.l[999] - r.r[999])).toBeGreaterThan(0.05); // apart
+    e.noteOn(69);
+    r = render(e, 1000);
+    for (let i = 10; i < 1000; i++) expect(r.l[i]).toBeCloseTo(r.r[i], 5); // together after the sync edge
+  });
+
+  it('glide reaches a step smoothly: 99 % after `time`, in both directions', () => {
+    const p = emptyPatch();
+    const kb = addModule(p, DEFS.fm1, 0, 0).id;
+    const g = addModule(p, DEFS.glide, 0, 0);
+    const outM = addModule(p, DEFS.output, 0, 0);
+    const out = outM.id;
+    outM.params.level = 1;
+    g.params.time = 0.1;
+    wire(p, kb, 'pitch', g.id, 'in');
+    wire(p, g.id, 'out', out, 'l');
+    const e = new Engine(SR);
+    e.load(p);
+    e.noteOn(72); // pitch 1 octave
+    const r = render(e, Math.round(SR * 0.1));
+    expect(r.l[0]).toBeLessThan(0.01);
+    expect(r.l[Math.round(SR * 0.05)]).toBeGreaterThan(0.85);
+    expect(r.l[r.l.length - 1]).toBeGreaterThan(0.985);
+    expect(r.l[r.l.length - 1]).toBeLessThan(1);
+    e.noteOn(60);
+    const d = render(e, Math.round(SR * 0.1));
+    expect(d.l[d.l.length - 1]).toBeLessThan(0.015);
+  });
+
+  it('shaper: hard clip bounds, soft clip brightens, fold stays within the level', () => {
+    const run = (mode: number, drive: number): Float32Array => {
+      const p = emptyPatch();
+      const kb = addModule(p, DEFS.fm1, 0, 0).id;
+      const o = addModule(p, DEFS.osc, 0, 0);
+      const s = addModule(p, DEFS.shape, 0, 0);
+      const outM = addModule(p, DEFS.output, 0, 0);
+      const out = outM.id;
+      outM.params.level = 1;
+      o.params.wave = 0;
+      o.params.level = 1;
+      s.params.mode = mode;
+      s.params.drive = drive;
+      s.params.level = 1;
+      wire(p, kb, 'pitch', o.id, 'pitch');
+      wire(p, o.id, 'out', s.id, 'in');
+      wire(p, s.id, 'out', out, 'l');
+      const e = new Engine(SR);
+      e.load(p);
+      e.noteOn(57);
+      return render(e, SR / 4).l;
+    };
+    const bright = (a: Float32Array): number => {
+      let s = 0;
+      for (let i = 1; i < a.length; i++) s += (a[i] - a[i - 1]) ** 2;
+      return Math.sqrt(s / a.length) / rms(a);
+    };
+    const peak = (a: Float32Array): number => Math.max(...Array.from(a).map(Math.abs));
+    const clean = run(0, 1);
+    const soft = run(0, 6);
+    const hard = run(1, 6);
+    const fold = run(2, 6);
+    expect(peak(clean)).toBeCloseTo(1, 1); // drive 1 through the cubic: the sine's peak maps to 1
+    expect(bright(soft)).toBeGreaterThan(bright(clean) * 1.3);
+    expect(peak(hard)).toBeLessThanOrEqual(1.0001);
+    expect(rms(hard)).toBeGreaterThan(0.9); // nearly a square
+    expect(peak(fold)).toBeLessThanOrEqual(1.0001);
+    expect(bright(fold)).toBeGreaterThan(bright(hard)); // the fold's extra zero crossings
+  });
+
+  it('spread is -1..1 across the voices and 0 in mono: through 0.2 s + 0.2 the voices sum to 0.2 per voice', () => {
+    const build = (voices?: number): Engine => {
+      const p = emptyPatch();
+      const kb = addModule(p, DEFS.fm1, 0, 0).id;
+      const sc = addModule(p, DEFS.scale, 0, 0);
+      const out = addModule(p, DEFS.output, 0, 0);
+      sc.params.gain = 0.2;
+      sc.params.offset = 0.2;
+      out.params.level = 1;
+      wire(p, kb, 'spread', sc.id, 'in');
+      wire(p, sc.id, 'out', out.id, 'l');
+      if (voices) p.voices = voices;
+      const e = new Engine(SR);
+      e.load(p);
+      return e;
+    };
+    expect(render(build(), 256).l[100]).toBeCloseTo(0.2, 5);
+    expect(render(build(4), 256).l[100]).toBeCloseTo(0.8, 4); // spreads -1, -1/3, 1/3, 1 -> 0, 2/15, 4/15, 2/5
+    expect(render(build(2), 256).l[100]).toBeCloseTo(0.4, 4);
+  });
+});

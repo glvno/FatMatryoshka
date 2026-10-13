@@ -15,7 +15,7 @@ import { MAX_MODULES, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Patch } f
 
 export const TYPE_ORDER: string[] = Object.keys(DEFS);
 export const MAX_CABLES = 192;
-export const VERSION = 7; // 7: the oscillator got the fb parameter; 6: the filter's outputs are lp24, lp12, bp, hp, mix; 5: the filter got the morph input (ports after cv moved), track and morph parameters; 4: the reverb module was added before the output
+export const VERSION = 8; // 8: osc and lfo got the sync input (p1 / p2 moved), glide and shape modules, the panel's spread output; 7: the oscillator got the fb parameter; 6: the filter's outputs are lp24, lp12, bp, hp, mix; 5: the filter got the morph input (ports after cv moved), track and morph parameters; 4: the reverb module was added before the output
 /** bytes of a module record */
 export const recordSize = (type: string): number => 1 + 4 * DEFS[type].params.length + (DEFS[type].paramInputs ? 14 : 0);
 export const Q = 65536;

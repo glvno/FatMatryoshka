@@ -8,6 +8,8 @@ export interface Voice {
   pitch: number;
   gate: number;
   velocity: number;
+  /** where this voice sits among the voices, -1 (first) .. 1 (last); 0 with one voice */
+  spread: number;
 }
 
 export interface Ctx {
@@ -82,7 +84,7 @@ const fm1: ModuleImpl<null> = {
     type: 'fm1',
     label: 'Main',
     inputs: [],
-    outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control)],
+    outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), control('spread')],
     params: [...knobNames.map((n) => param(n, 0, 1, 0.5, { step: 0.01 }))],
   },
   init: () => null,
@@ -90,6 +92,7 @@ const fm1: ModuleImpl<null> = {
     c.out.pitch.fill(c.voice.pitch, 0, c.n);
     c.out.gate.fill(c.voice.gate, 0, c.n);
     c.out.vel.fill(c.voice.velocity, 0, c.n);
+    c.out.spread.fill(c.voice.spread, 0, c.n); // -1..1 across the voices: detune or pan them with one cable
     for (const n of knobNames) c.out[n].fill(c.p[n] ?? 0, 0, c.n);
   },
 };
@@ -102,6 +105,8 @@ const HB = [5376, 17567, 35764, 55599].map((q) => q / 65536);
 
 interface OscState {
   phase: number;
+  /** the previous sync sample: a rising edge (through 0.5) restarts the phase */
+  s1: number;
   /** the last two raw wave values (feedback) and the previous pm sample (interpolation), only in FM mode */
   y1: number;
   y2: number;
@@ -123,7 +128,7 @@ const osc: ModuleImpl<OscState> = {
   def: {
     type: 'osc',
     label: 'Oscillator',
-    inputs: [control('pitch'), audio('pm')],
+    inputs: [control('pitch'), audio('pm'), gate('sync')],
     outputs: [audio('out')],
     params: [
       param('wave', 0, 3, 0, { step: 1, choices: WAVES }),
@@ -135,9 +140,9 @@ const osc: ModuleImpl<OscState> = {
       param('fb', 0, 1, 0, { step: 0.01 }),
     ],
   },
-  init: () => ({ phase: 0, y1: 0, y2: 0, pm1: 0, xb: 0, ap: [0, 0, 0, 0, 0, 0, 0, 0] }),
+  init: () => ({ phase: 0, s1: 0, y1: 0, y2: 0, pm1: 0, xb: 0, ap: [0, 0, 0, 0, 0, 0, 0, 0] }),
   process(c, s) {
-    const { pitch, pm } = c.inp;
+    const { pitch, pm, sync } = c.inp;
     const pw = Math.min(0.95, Math.max(0.05, c.p.pw ?? 0.5));
     const base = (c.p.coarse ?? 0) / 12 + (c.p.fine ?? 0) / 1200;
     const kind = Math.round(c.p.wave ?? 0);
@@ -150,6 +155,8 @@ const osc: ModuleImpl<OscState> = {
       for (let i = 0; i < c.n; i++) {
         const f = C4 * Math.pow(2, pitch[i] + base);
         const dt = Math.min(f / c.sr, 0.45);
+        if (sync[i] >= 0.5 && s.s1 < 0.5) s.phase = 0;
+        s.s1 = sync[i];
         s.phase += dt;
         if (s.phase >= 1) s.phase -= 1;
         out[i] = wave(kind, s.phase, dt, pw) * lvl;
@@ -164,6 +171,8 @@ const osc: ModuleImpl<OscState> = {
     for (let i = 0; i < c.n; i++) {
       const f = C4 * Math.pow(2, pitch[i] + base);
       const dt = Math.min(f / c.sr, 0.45) / 2;
+      if (sync[i] >= 0.5 && s.s1 < 0.5) s.phase = 0;
+      s.s1 = sync[i];
       const pmNow = idx > 0 ? pm[i] : 0;
       const pmMid = (s.pm1 + pmNow) / 2;
       s.pm1 = pmNow;
@@ -190,20 +199,23 @@ const osc: ModuleImpl<OscState> = {
 
 const LFO_WAVES = [...WAVES, 'S&H'];
 
-const lfo: ModuleImpl<{ phase: number; seed: number; held: number }> = {
+const lfo: ModuleImpl<{ phase: number; seed: number; held: number; s1: number }> = {
   def: {
     type: 'lfo',
     label: 'LFO',
-    inputs: [],
+    inputs: [gate('sync')],
     outputs: [control('out')],
     params: [param('wave', 0, 4, 0, { step: 1, choices: LFO_WAVES }), param('rate', 0.02, 40, 4, { unit: 'Hz', step: 0.01 }), param('depth', 0, 1, 1, { step: 0.01 })],
   },
-  init: () => ({ phase: 0, seed: 0x2545f491, held: 0 }),
+  init: () => ({ phase: 0, seed: 0x2545f491, held: 0, s1: 0 }),
   process(c, s) {
     const dt = (c.p.rate ?? 1) / c.sr;
     const kind = Math.round(c.p.wave ?? 0);
     const depth = c.p.depth ?? 1;
+    const sync = c.inp.sync;
     for (let i = 0; i < c.n; i++) {
+      if (sync[i] >= 0.5 && s.s1 < 0.5) s.phase = 0; // a rising edge restarts the cycle (key sync, or a sequencer step)
+      s.s1 = sync[i];
       s.phase += dt;
       if (s.phase >= 1) {
         s.phase -= 1;
@@ -481,7 +493,55 @@ const output: ModuleImpl<null> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output];
+/** portamento, or a slew on any control: a one-pole glide that reaches 99 % of a step in `time` */
+const glide: ModuleImpl<{ y: number }> = {
+  def: {
+    type: 'glide',
+    label: 'Glide',
+    inputs: [control('in')],
+    outputs: [control('out')],
+    params: [param('time', 0.001, 5, 0.1, { unit: 's', step: 0.001, log: true })],
+  },
+  init: () => ({ y: 0 }),
+  process(c, s) {
+    const k = 1 - Math.exp(-4.6 / Math.max((c.p.time ?? 0.1) * c.sr, 1));
+    for (let i = 0; i < c.n; i++) {
+      s.y += k * (c.inp.in[i] - s.y);
+      c.out.out[i] = s.y;
+    }
+  },
+};
+
+const SHAPES = ['soft', 'hard', 'fold'];
+
+/** a waveshaper: drive into a cubic soft clip, a hard clip or a triangle fold; the peak stays at 1 */
+const shape: ModuleImpl<null> = {
+  def: {
+    type: 'shape',
+    label: 'Shaper',
+    inputs: [audio('in')],
+    outputs: [audio('out')],
+    params: [param('drive', 1, 32, 2, { step: 0.01, log: true }), param('mode', 0, 2, 0, { step: 1, choices: SHAPES }), param('level', 0, 1, 0.7, { step: 0.01 })],
+  },
+  init: () => null,
+  process(c) {
+    const drive = c.p.drive ?? 1;
+    const mode = Math.round(c.p.mode ?? 0);
+    const lvl = c.p.level ?? 1;
+    for (let i = 0; i < c.n; i++) {
+      const x = c.inp.in[i] * drive;
+      let y: number;
+      if (mode === 1) y = Math.max(-1, Math.min(1, x));
+      else if (mode === 2) {
+        const t = (((x + 1) % 4) + 4) % 4; // a triangle of period 4: back and forth between -1 and 1
+        y = t < 2 ? t - 1 : 3 - t;
+      } else y = Math.abs(x) >= 1 ? Math.sign(x) : 1.5 * x - 0.5 * x * x * x; // cubic: smooth up to the knee at 1
+      c.out.out[i] = y * lvl;
+    }
+  },
+};
+
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an

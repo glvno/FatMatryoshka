@@ -48,7 +48,9 @@ interface VoiceState extends Voice {
   retrig: boolean;
 }
 
-const newVoice = (): VoiceState => ({ pitch: 0, gate: 0, velocity: 0, note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false });
+const newVoice = (): VoiceState => ({ pitch: 0, gate: 0, velocity: 0, spread: 0, note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false });
+/** the panel's spread output of voice i of n: -1 .. 1 in equal steps, 0 alone */
+export const spreadOf = (i: number, n: number): number => (n > 1 ? (2 * i - (n - 1)) / (n - 1) : 0);
 
 export class Engine {
   private nodes = new Map<number, Node>();
@@ -89,7 +91,7 @@ export class Engine {
     const nv = voicesOf(patch);
     const poly = voiceSplit(patch);
     if (nv !== this.voices.length) {
-      this.voices = Array.from({ length: nv }, newVoice);
+      this.voices = Array.from({ length: nv }, (_, i) => ({ ...newVoice(), spread: spreadOf(i, nv) }));
       this.held = [];
     }
     const next = new Map<number, Node>();

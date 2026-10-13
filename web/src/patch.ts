@@ -111,7 +111,7 @@ export function voicesOf(p: Pick<Patch, 'voices'>): number {
 }
 
 /** the panel outputs that differ per voice; its knobs are the same for every voice */
-export const VOICE_PORTS = new Set(['pitch', 'gate', 'vel']);
+export const VOICE_PORTS = new Set(['pitch', 'gate', 'vel', 'spread']);
 /** modules that always run once, however many voices: their inputs sum the voices (big state, or the end of the chain) */
 export const SHARED_TYPES = new Set(['delay', 'reverb', 'output']);
 

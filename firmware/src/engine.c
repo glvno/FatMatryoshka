@@ -188,8 +188,9 @@ typedef struct {
     const esig_t *in[MAX_IN];
     esig_t *out[MAX_OUT];
     union {
-        struct { uint32_t phase; int32_t y1, y2, pm1, xb, ap[8]; } osc;   /* FM mode: feedback history, pm interpolation, decimator */
-        struct { uint32_t phase, seed; int32_t held; } lfo;
+        struct { uint32_t phase; int32_t s1, y1, y2, pm1, xb, ap[8]; } osc;   /* s1: last sync sample; FM mode: feedback history, pm interpolation, decimator */
+        struct { uint32_t phase, seed; int32_t held, s1; } lfo;
+        struct { int32_t y; } gld;         /* Q24 */
         struct { uint32_t seed; } noise;
         struct { int32_t v; uint8_t stage, prev; } adsr;
         struct { int32_t ic1, ic2, jc1, jc2; } flt;   /* stage 1 and stage 2 integrators */
@@ -288,7 +289,7 @@ static void init_state(const node_t *nd, inst_t *it)
 static int port_poly(uint32_t m, uint32_t p)
 {
     const node_t *nd = &E.node[m];
-    return nd->ninst > 1 && !(nd->type == T_FM1 && p >= FM1_O_K1);
+    return nd->ninst > 1 && !(nd->type == T_FM1 && p >= FM1_O_K1 && p <= FM1_O_K4);
 }
 
 /* the buffer of output p of module m as voice v sees it */
@@ -738,6 +739,7 @@ static void m_fm1(const node_t *nd, inst_t *it, uint32_t n)
     fill(it->out[FM1_O_K2], EF(it, FM1_P_K2), n);
     fill(it->out[FM1_O_K3], EF(it, FM1_P_K3), n);
     fill(it->out[FM1_O_K4], EF(it, FM1_P_K4), n);
+    fill(it->out[FM1_O_SPREAD], E.nv > 1 ? (int32_t)((((int64_t)2 * (int32_t)cur_v - ((int32_t)E.nv - 1)) << 16) / ((int32_t)E.nv - 1)) : 0, n);
 }
 
 /* The FM oscillator (pm connected with pm > 0, or feedback) runs at twice the rate: two waves per frame, the pm input
@@ -756,23 +758,27 @@ static inline int32_t allpass16(int32_t *s, int32_t a, int32_t x)      /* y = a 
 
 static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
 {
-    const esig_t *pitch = it->in[OSC_I_PITCH], *pm = it->in[OSC_I_PM];
+    const esig_t *pitch = it->in[OSC_I_PITCH], *pm = it->in[OSC_I_PM], *sync = it->in[OSC_I_SYNC];
     esig_t *out = it->out[OSC_O_OUT];
     int32_t pw_q = clampi(EF(it, OSC_P_PW), 3277, 62259);                  /* 0.05 .. 0.95 */
     uint32_t pw = (uint32_t)pw_q << 16, phase = it->s.osc.phase, i;
     int32_t base = EF(it, OSC_P_COARSE) / 12 + EF(it, OSC_P_FINE) / 1200;
     int32_t kind = round_q16(EF(it, OSC_P_WAVE)), lvl = EF(it, OSC_P_LEVEL), fb = EF(it, OSC_P_FB);
     int32_t idx = nd->conn & (1u << OSC_I_PM) ? EF(it, OSC_P_PM) : 0;
-    int32_t y1, y2, pm1, xb, *ap = it->s.osc.ap;
+    int32_t y1, y2, pm1, xb, *ap = it->s.osc.ap, s1 = it->s.osc.s1;
     if (idx <= 0 && fb <= 0) {                                             /* the plain oscillator: one wave per frame */
         for (i = 0; i < n; i++) {
             uint32_t dt = exp2_scale(INC_C4, pitch[i] + base);
             if (dt > DT_MAX)
                 dt = DT_MAX;
+            if (sync[i] >= 32768 && s1 < 32768)                            /* a rising edge on sync restarts the phase */
+                phase = 0;
+            s1 = sync[i];
             phase += dt;
             out[i] = mul16(wave(kind, phase, dt, pw), lvl);
         }
         it->s.osc.phase = phase;
+        it->s.osc.s1 = s1;
         it->s.osc.y1 = it->s.osc.y2 = it->s.osc.pm1 = it->s.osc.xb = 0;
         for (i = 0; i < 8; i++)
             ap[i] = 0;
@@ -788,6 +794,9 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
         if (dt > DT_MAX)
             dt = DT_MAX;
         dt >>= 1;
+        if (sync[i] >= 32768 && s1 < 32768)
+            phase = 0;
+        s1 = sync[i];
         pm1 = pm_now;
         for (sub = 0; sub < 2; sub++) {
             uint32_t ph;
@@ -808,6 +817,7 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
         }
     }
     it->s.osc.phase = phase;
+    it->s.osc.s1 = s1;
     it->s.osc.y1 = y1;
     it->s.osc.y2 = y2;
     it->s.osc.pm1 = pm1;
@@ -817,11 +827,16 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
 static void m_lfo(const node_t *nd, inst_t *it, uint32_t n)
 {
     esig_t *out = it->out[0];
+    const esig_t *sync = it->in[LFO_I_SYNC];
     uint32_t dt = (uint32_t)(((uint64_t)(uint32_t)EF(it, LFO_P_RATE) << 16) / ENG_SR), phase = it->s.lfo.phase, i;
-    int32_t kind = round_q16(EF(it, LFO_P_WAVE)), depth = EF(it, LFO_P_DEPTH);
+    int32_t kind = round_q16(EF(it, LFO_P_WAVE)), depth = EF(it, LFO_P_DEPTH), s1 = it->s.lfo.s1;
     for (i = 0; i < n; i++) {
-        uint32_t prev = phase;
+        uint32_t prev;
         int32_t w;
+        if (sync[i] >= 32768 && s1 < 32768)                                /* a rising edge on sync restarts the cycle */
+            phase = 0;
+        s1 = sync[i];
+        prev = phase;
         phase += dt;
         if (phase < prev) {                 /* a new cycle: sample & hold takes a new random value */
             it->s.lfo.seed = it->s.lfo.seed * 1664525u + 1013904223u;
@@ -831,6 +846,7 @@ static void m_lfo(const node_t *nd, inst_t *it, uint32_t n)
         out[i] = mul16(w, depth);
     }
     it->s.lfo.phase = phase;
+    it->s.lfo.s1 = s1;
 }
 
 static void m_noise(const node_t *nd, inst_t *it, uint32_t n)
@@ -855,6 +871,49 @@ static void m_scale(const node_t *nd, inst_t *it, uint32_t n)
     uint32_t i;
     for (i = 0; i < n; i++)
         out[i] = mul16(in[i], g) + o;
+}
+
+static int32_t env_rate(int32_t t_q16);
+
+/* a one-pole glide: 99 % of a step in `time` (the envelope's rate curve, Q30 per sample). The state is Q24 (+-128):
+ * in Q16 the step k * (in - y) would round to nothing while still 1 % short of the target, which a pitch can hear. */
+static void m_glide(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[GLIDE_I_IN];
+    esig_t *out = it->out[0];
+    int32_t k = env_rate(EF(it, GLIDE_P_TIME)), y = it->s.gld.y;
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        y += mulq(k, (clampi(in[i], -(1 << 23), (1 << 23) - 1) << 8) - y, 30);
+        out[i] = (y + 128) >> 8;
+    }
+    it->s.gld.y = y;
+}
+
+/* waveshaper: drive, then a cubic soft clip (1.5 x - x^3 / 2 up to the knee at 1), a hard clip or a triangle fold */
+static void m_shape(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const esig_t *in = it->in[SHAPE_I_IN];
+    esig_t *out = it->out[0];
+    int32_t drive = EF(it, SHAPE_P_DRIVE), mode = round_q16(EF(it, SHAPE_P_MODE)), lvl = EF(it, SHAPE_P_LEVEL);
+    uint32_t i;
+    for (i = 0; i < n; i++) {
+        int32_t x = mul16(in[i], drive), y;                                /* up to +-32 */
+        if (mode == 1)
+            y = clampi(x, -ENG_ONE, ENG_ONE);
+        else if (mode == 2) {
+            int32_t t = (x + ENG_ONE) & (4 * ENG_ONE - 1);                  /* 0 .. 4: a triangle of period 4 */
+            y = t < 2 * ENG_ONE ? t - ENG_ONE : 3 * ENG_ONE - t;
+        } else if (x >= ENG_ONE)
+            y = ENG_ONE;
+        else if (x <= -ENG_ONE)
+            y = -ENG_ONE;
+        else {
+            int32_t x3 = mul16(mul16(x, x), x);
+            y = x + (x >> 1) - (x3 >> 1);
+        }
+        out[i] = mul16(y, lvl);
+    }
 }
 
 /* 1 - exp(-4.6 / max(t * sr, 1)) in Q30, t in seconds Q16 */
@@ -1164,6 +1223,8 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     case T_MIXER: m_mixer(nd, it, n); break;
     case T_DELAY: m_delay(nd, it, n); break;
     case T_REVERB: m_reverb(nd, it, n); break;
+    case T_GLIDE: m_glide(nd, it, n); break;
+    case T_SHAPE: m_shape(nd, it, n); break;
     default: break;                      /* output: read by eng_render */
     }
 }

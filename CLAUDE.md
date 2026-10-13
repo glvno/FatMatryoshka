@@ -135,3 +135,8 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 - Factory assemblies are exported files: to add one, build it in the editor, "save", export, commit the file; a test checks every factory file loads, inserts and plays. The three shipped were generated with a throwaway script (see git history of this section if needed).
 - Class names: `.pin` is the parameter-input row (pins), the expose / promote toggle button is `.tog`.
 
+## Sync, glide, shaper, spread (host-tested, golden 49 patches pass; not flashed)
+
+- `osc` / `lfo` input `sync` (rising edge restarts the phase), modules `glide` (one-pole slew, Q24 state in C) and `shape` (soft / hard / fold), panel output `spread` (-1..1 per voice, in `VOICE_PORTS` and `port_poly`). Appended to `ALL` in `modules.ts` so type indices stay; binary format 8. Golden adds `sync-glide-shape` and `spread` (3 voices).
+- Lesson: a Q16 one-pole with a small coefficient stalls about 1 % short of its target (the step rounds to 0); keep such states in Q24 / Q30 as the ADSR does.
+

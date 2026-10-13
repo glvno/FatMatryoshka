@@ -180,6 +180,56 @@ kit('fm-2op', (add, wire) => {
   wire(avca, 'out', out, 'l');
   wire(avca, 'out', out, 'r');
 });
+kit('sync-glide-shape', (add, wire) => {
+  // key-synced oscillator, a glide on its pitch, a synced LFO on the filter, the result through the shaper in each mode
+  const kb = add('fm1', 0, 0);
+  const gl = add('glide', 0, 0, { time: 0.08 });
+  const osc = add('osc', 0, 0, { wave: 2 });
+  const lfo = add('lfo', 0, 0, { wave: 1, rate: 3, depth: 0.5 });
+  const flt = add('filter', 0, 0, { cutoff: 900, res: 0.4, cvamt: 2 });
+  const env = add('adsr', 0, 0, { a: 0.005, d: 0.3, s: 0.6, r: 0.2 });
+  const vca = add('vca', 0, 0, { gain: 0.9 });
+  const soft = add('shape', 0, 0, { drive: 4, mode: 0, level: 0.4 });
+  const hard = add('shape', 0, 0, { drive: 3, mode: 1, level: 0.3 });
+  const fold = add('shape', 0, 0, { drive: 6, mode: 2, level: 0.3 });
+  const mix = add('mixer', 0, 0);
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', gl, 'in');
+  wire(gl, 'out', osc, 'pitch');
+  wire(kb, 'gate', osc, 'sync');
+  wire(kb, 'gate', lfo, 'sync');
+  wire(kb, 'gate', env, 'gate');
+  wire(osc, 'out', flt, 'in');
+  wire(lfo, 'out', flt, 'cv');
+  wire(flt, 'lp12', vca, 'in');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', soft, 'in');
+  wire(vca, 'out', hard, 'in');
+  wire(vca, 'out', fold, 'in');
+  wire(soft, 'out', mix, 'in1');
+  wire(hard, 'out', mix, 'in2');
+  wire(fold, 'out', mix, 'in3');
+  wire(mix, 'out', out, 'l');
+});
+kit(
+  'spread',
+  (add, wire) => {
+    // three voices: spread detunes the oscillators (p1 -> fine) and sets each voice's level (p1 -> gain)
+    const kb = add('fm1', 0, 0);
+    const osc = add('osc', 0, 0, { wave: 2 }, { map: { p1: ['fine'] }, att: [0.2, 1] });
+    const env = add('adsr', 0, 0, { a: 0.005, d: 0.3, s: 0.6, r: 0.2 });
+    const vca = add('vca', 0, 0, { gain: 0.4 }, { map: { p1: ['gain'] }, att: [0.3, 1] });
+    const out = add('output', 0, 0);
+    wire(kb, 'pitch', osc, 'pitch');
+    wire(kb, 'spread', osc, 'p1');
+    wire(kb, 'spread', vca, 'p1');
+    wire(kb, 'gate', env, 'gate');
+    wire(osc, 'out', vca, 'in');
+    wire(env, 'env', vca, 'cv');
+    wire(vca, 'out', out, 'l');
+  },
+  3,
+);
 kit('summed-inputs', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const a = add('osc', 0, 0, { wave: 2, coarse: -12, level: 0.4 });
