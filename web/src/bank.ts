@@ -6,6 +6,7 @@ import { DEFS } from './modules';
 import { validatePatch, type Patch } from './patch';
 import { PRESETS } from './presets';
 import { SLOTS } from './protocol';
+import { decodeShare, shareCodeOf } from './share';
 
 interface Entry {
   name: string;
@@ -165,6 +166,24 @@ export function buildBankTab(root: HTMLElement, device: DeviceLink, currentPatch
       changed();
     },
   });
+  const linkIn = el('input', { type: 'text', placeholder: 'paste a patch link (…#p=…)' });
+  const importLink = el('button', {
+    textContent: 'Import link',
+    onclick: async () => {
+      const code = shareCodeOf(linkIn.value.trim()) ?? (/^[A-Za-z0-9_-]{16,}$/.test(linkIn.value.trim()) ? linkIn.value.trim() : null);
+      if (!code) return void (status.textContent = 'that is not a patch link');
+      if (list.length >= SLOTS) return void (status.textContent = 'the list is full');
+      try {
+        const p = await decodeShare(code, DEFS);
+        list.push({ name: p.name || 'PATCH', patch: p });
+        linkIn.value = '';
+        changed();
+        status.textContent = `"${p.name}" added to the list from the link.`;
+      } catch (e) {
+        status.textContent = `the link holds no patch: ${(e as Error).message}`;
+      }
+    },
+  });
   const reset = el('button', { textContent: 'All 32 factory patches', title: 'Replace the list with the factory patches', onclick: () => { list = Object.keys(PRESETS).slice(0, SLOTS).map((name) => ({ name })); changed(); } });
   const empty = el('button', { textContent: 'Empty the list', onclick: () => { list = []; changed(); } });
 
@@ -173,7 +192,7 @@ export function buildBankTab(root: HTMLElement, device: DeviceLink, currentPatch
     el(
       'div',
       { class: 'bank-cols' },
-      el('div', { class: 'card' }, el('h2', { textContent: 'Factory patches' }), el('div', { class: 'toolbar' }, addCurrent), libEl),
+      el('div', { class: 'card' }, el('h2', { textContent: 'Factory patches' }), el('div', { class: 'toolbar' }, addCurrent), el('div', { class: 'toolbar' }, linkIn, importLink), libEl),
       el('div', { class: 'card' }, el('h2', { textContent: 'Bank to upload ' }, countEl), el('div', { class: 'toolbar' }, reset, empty), bankEl),
     ),
     el('div', { class: 'card' }, el('h2', { textContent: 'On the FM-1' }), onDevice),

@@ -106,6 +106,10 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - **Compressor** is an envelope follower and compressor in one: `env` outputs the follower (a control: an oscillator's loudness as a CV, a sidechain pump from a kick into a VCA), `out` the signal compressed above `thresh` by `ratio` with `attack`, `release` and makeup `gain`. The `side` input is the sidechain; without it the detector listens to `in`.
 
+## Share a patch as a link
+
+- **Share link** (toolbar) copies a link that opens this patch: the JSON, layout and assemblies included, deflated into the URL fragment (`#p=…`, about 800 characters for a factory patch). Opening the link loads the patch into the editor without replacing the patch the browser remembers until you change something; the Patches page has an "Import link" field that puts a linked patch into the bank list. A patch too big for a link (over 8000 characters) travels without its card positions and assembly overlay, and opens on a grid.
+
 ## Diff and A/B
 
 - **Diff** (toolbar) lists what changed since the patch was last loaded, uploaded or stored on the FM-1: parameters as old → new, modules and cables added or removed, and switches, attenuverters, matrix, macro ranges, voices and arpeggiator changes as one line each.

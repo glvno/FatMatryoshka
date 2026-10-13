@@ -17,6 +17,7 @@ The merge of the four-voice firmware (1.0.2) with the polyphony, assembly and mo
 - Module **Ladder**: a four-pole ladder low pass with drive and self-oscillating resonance (outputs `lp24`, `lp12`; the saturator sits inside the loop). Cutoff modulation per block.
 - The LFO's restart input is `reset` (it was `sync` on the development branch; patches are converted on load) next to upstream's `clk`.
 - **Filter** outputs `notch`, `peak` and `ap` (allpass) after `mix`, from the same states (no patch format change).
+- **Share link:** a patch as a URL (deflated JSON in the fragment); opening it loads the patch, the Patches page imports one into the bank list.
 - **Diff and A/B:** a Diff panel against the patch as last loaded / uploaded / stored; Set A / Set B and a toggle (Tab) that swaps the values in place when the structure matches.
 - **Keyboard:** a command palette (`/`, Ctrl/Cmd+K: add module, insert assembly, load patch), click-to-connect, Delete / B / G / Ctrl+D / arrows on the selection, Space for the arpeggiator, `?` for the list.
 - **Scope:** a ◎ on every output jack puts the signal on a panel at the bottom of the canvas: time view (triggered for audio, min / max / mean for control signals) and spectrum (FFT, peak readout), several probes in colours.

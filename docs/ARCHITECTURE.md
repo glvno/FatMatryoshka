@@ -170,6 +170,10 @@ Rules: `reconcile` keeps an assembly consistent after every structural change (d
 
 - `dyn`: inputs `in`, `side`; outputs `out`, `env`. The detector is a one-pole peak follower of |side| (|in| when side is not connected) with the ADSR's rate formula (99 % in `attack` up, `release` down); it rides a little under the peak of a steady tone and ripples at the signal's frequency. Gain above `thresh` (dB): 2^(makeup − slope·(log2 env − log2 thresh)), slope = 1 − 1/ratio; below it only the makeup `gain` (dB). C: env Q24, rates Q30 (`env_rate`), dB → octaves by 1/6.0206 in Q16, one `log2_q16` + `exp2_q16` per sample while above the threshold (`exp2_q16` gives a plain integer: the Q16 / Q24 offsets are added to its argument). Golden kit `dyn` (gated saw into the compressor, its env output on a second VCA): 0.3 % rel rms.
 
+## Share links
+
+- `web/src/share.ts`: `encodeShare` = JSON → `CompressionStream('deflate-raw')` → base64url (no padding); over `LINK_MAX` (8000) characters the positions and `assemblies` are dropped first. `decodeShare` inflates and runs `validatePatch`. `shareCodeOf(url)` reads `p=` from the fragment, `shareLink(code)` builds the URL on the page's own address (so a Pages deployment makes stable links). main.ts loads the fragment at start and on `hashchange` with `suppressSave` set (the remembered patch stays until the user acts) and clears the fragment with `replaceState`; the Patches page imports a pasted link into the bank list. The binary form was not used: it has no layout, and the deflated JSON of every factory patch is under 1 KB (`share.test.ts`).
+
 ## Diff, A/B, shortcuts, palette
 
 - `web/src/diff.ts`: `diffPatches(a, b, defs)` walks the modules by id (parameters, bypass, attenuverters, matrix, ranges, morph side) and the cables by endpoint, plus voices, arpeggiator and name; `diffLines` / `diffCount` for the panel (`#diff`, main.ts `showDiff`). The baseline is the JSON of the patch at the last `setPatch` (preset, file, palette), upload or store.

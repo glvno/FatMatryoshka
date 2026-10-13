@@ -14,6 +14,7 @@ import { Scope } from './scope';
 import { diffCount, diffLines, diffPatches } from './diff';
 import { FACTORY, loadLibrary } from './assemblies';
 import type { AssemblyDef } from './assembly';
+import { decodeShare, encodeShare, shareCodeOf, shareLink } from './share';
 import { PRESETS } from './presets';
 import { deviceBudget, DEVICE } from './patchbin';
 
@@ -43,7 +44,10 @@ host.onError = (m) => (status.textContent = `engine: ${m}`);
 
 let currentTab = 'patch';
 let saveTimer = 0;
+/** set while a patch from a link is loaded: it must not replace the remembered patch until the user acts */
+let suppressSave = false;
 const queueSave = (p: Patch): void => {
+  if (suppressSave) return;
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => save(p), 300);
 };
@@ -409,6 +413,35 @@ $('dev-store').onclick = async () => {
     devStatus((e as Error).message);
   }
 };
+
+$('share-btn').onclick = async () => {
+  try {
+    const { code, full } = await encodeShare(editor.patch);
+    const link = shareLink(code);
+    await navigator.clipboard.writeText(link);
+    status.textContent = `link copied (${link.length} characters${full ? '' : '; too long with the layout: the cards open on a grid'})`;
+  } catch (e) {
+    status.textContent = `share failed: ${(e as Error).message}`;
+  }
+};
+// a link with a patch in its fragment: load it (it is not saved over the remembered patch until something is changed)
+const loadFromHash = (): void => {
+  const shared = shareCodeOf(location.href);
+  if (!shared) return;
+  void decodeShare(shared, DEFS)
+    .then((p) => {
+      suppressSave = true;
+      editor.setPatch(p);
+      suppressSave = false;
+      setBaseline();
+      nameInput.value = p.name;
+      status.textContent = `patch "${p.name}" from the link`;
+      history.replaceState(null, '', location.pathname + location.search);
+    })
+    .catch((e: Error) => (status.textContent = `the link holds no patch: ${e.message}`));
+};
+loadFromHash();
+window.addEventListener('hashchange', loadFromHash);
 
 $('save-btn').onclick = () => {
   const blob = new Blob([JSON.stringify(editor.patch, null, 2)], { type: 'application/json' });
