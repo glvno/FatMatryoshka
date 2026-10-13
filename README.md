@@ -3,7 +3,7 @@ I always liked the concept of the Nord Modular (never used one though) so i deci
 
 ## Webapp
 
-There's a Webappp here: https://wiggismodular.github.io/Modular-1/ that allows you to make patches, like you would do on a modular system and upload it to the FM-1
+There's a Webappp here: https://wiggismodular.github.io/Modular-1/ that allows you to make patches, like you would do on a modular system and upload it to the FM-1. The development fork (branch `dev`: the modules, assemblies, morphing, scope and editor work of the changelog) deploys to https://glvno.github.io/Modular-1/ from the same workflow; its firmware package has not been installed on a device.
 
 Modules have two parameter inputs: p1 and p2 with an attenuverter
 

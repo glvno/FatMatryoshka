@@ -4,7 +4,7 @@ name: pages
 # One-time setup: repository Settings > Pages > Source: GitHub Actions.
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:
