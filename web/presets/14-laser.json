@@ -11,7 +11,8 @@
     "k1": 0.5,
     "k2": 0.4981,
     "k3": 0.5,
-    "k4": 0.3
+    "k4": 0.3,
+    "morph": 0
    }
   },
   {
@@ -25,7 +26,10 @@
     "coarse": 0,
     "fine": 0,
     "pm": 0,
-    "level": 0.7
+    "level": 0.7,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     1,
@@ -187,7 +191,9 @@
    "params": {
     "time": 180,
     "fb": 0.4,
-    "mix": 0
+    "mix": 0,
+    "sync": 0,
+    "pingpong": 0
    },
    "att": [
     1,
@@ -352,6 +358,88 @@
     "module": 7,
     "port": "p1"
    }
+  }
+ ],
+ "assemblies": [
+  {
+   "v": 1,
+   "id": 1,
+   "name": "adsr operator",
+   "label": "adsr operator",
+   "x": 299,
+   "y": 26,
+   "open": false,
+   "modules": [
+    2,
+    5,
+    6
+   ],
+   "inputs": [
+    {
+     "module": 5,
+     "port": "gate",
+     "label": "gate"
+    },
+    {
+     "module": 2,
+     "port": "pitch",
+     "label": "pitch"
+    },
+    {
+     "module": 5,
+     "port": "p1",
+     "label": "p1"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 6,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 2,
+     "param": "wave",
+     "label": "wave"
+    },
+    {
+     "module": 2,
+     "param": "coarse",
+     "label": "coarse"
+    },
+    {
+     "module": 2,
+     "param": "pm",
+     "label": "pm"
+    },
+    {
+     "module": 2,
+     "param": "level",
+     "label": "level"
+    },
+    {
+     "module": 5,
+     "param": "a",
+     "label": "a"
+    },
+    {
+     "module": 5,
+     "param": "d",
+     "label": "d"
+    },
+    {
+     "module": 5,
+     "param": "s",
+     "label": "s"
+    },
+    {
+     "module": 5,
+     "param": "r",
+     "label": "r"
+    }
+   ]
   }
  ]
 }

@@ -11,7 +11,8 @@
     "k1": 0.5,
     "k2": 0.038,
     "k3": 0.35,
-    "k4": 0.4
+    "k4": 0.4,
+    "morph": 0
    }
   },
   {
@@ -25,7 +26,10 @@
     "coarse": 0,
     "fine": 0,
     "pm": 0,
-    "level": 0.6
+    "level": 0.6,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     1,
@@ -63,7 +67,10 @@
     "coarse": 12,
     "fine": 0,
     "pm": 0,
-    "level": 0.3
+    "level": 0.3,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     1,
@@ -195,7 +202,9 @@
    "params": {
     "time": 400,
     "fb": 0.55,
-    "mix": 0
+    "mix": 0,
+    "sync": 0,
+    "pingpong": 0
    },
    "att": [
     1,
@@ -228,7 +237,9 @@
    "params": {
     "size": 0.8,
     "damp": 0.3,
-    "mix": 0
+    "mix": 0,
+    "pre": 0,
+    "mod": 0.3
    },
    "att": [
     1,
@@ -403,6 +414,72 @@
     "module": 7,
     "port": "p1"
    }
+  }
+ ],
+ "assemblies": [
+  {
+   "v": 1,
+   "id": 1,
+   "name": "echo",
+   "label": "echo",
+   "x": 1391,
+   "y": 26,
+   "open": false,
+   "modules": [
+    7,
+    8
+   ],
+   "inputs": [
+    {
+     "module": 7,
+     "port": "in",
+     "label": "in"
+    },
+    {
+     "module": 8,
+     "port": "p1",
+     "label": "p1"
+    },
+    {
+     "module": 7,
+     "port": "p1",
+     "label": "p1 2"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 8,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 7,
+     "param": "time",
+     "label": "time"
+    },
+    {
+     "module": 7,
+     "param": "fb",
+     "label": "fb"
+    },
+    {
+     "module": 7,
+     "param": "mix",
+     "label": "mix"
+    },
+    {
+     "module": 8,
+     "param": "size",
+     "label": "size"
+    },
+    {
+     "module": 8,
+     "param": "mix",
+     "label": "mix 2"
+    }
+   ]
   }
  ]
 }

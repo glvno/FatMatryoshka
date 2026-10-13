@@ -11,7 +11,8 @@
     "k1": 0.5,
     "k2": 0.5,
     "k3": 0.5,
-    "k4": 0.5
+    "k4": 0.5,
+    "morph": 0
    }
   },
   {
@@ -25,7 +26,10 @@
     "coarse": 0,
     "fine": 0,
     "pm": 0,
-    "level": 1
+    "level": 1,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     0.25,
@@ -124,7 +128,10 @@
     "coarse": 0,
     "fine": 0,
     "pm": 1,
-    "level": 1
+    "level": 1,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     0.5,
@@ -362,6 +369,188 @@
     "module": 7,
     "port": "p1"
    }
+  }
+ ],
+ "assemblies": [
+  {
+   "v": 1,
+   "id": 1,
+   "name": "adsr operator",
+   "label": "adsr operator",
+   "x": 286,
+   "y": 26,
+   "open": false,
+   "modules": [
+    2,
+    3,
+    4
+   ],
+   "inputs": [
+    {
+     "module": 2,
+     "port": "pitch",
+     "label": "pitch"
+    },
+    {
+     "module": 3,
+     "port": "gate",
+     "label": "gate"
+    },
+    {
+     "module": 2,
+     "port": "p1",
+     "label": "p1"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 4,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 2,
+     "param": "wave",
+     "label": "wave"
+    },
+    {
+     "module": 2,
+     "param": "coarse",
+     "label": "coarse"
+    },
+    {
+     "module": 2,
+     "param": "pm",
+     "label": "pm"
+    },
+    {
+     "module": 2,
+     "param": "level",
+     "label": "level"
+    },
+    {
+     "module": 3,
+     "param": "a",
+     "label": "a"
+    },
+    {
+     "module": 3,
+     "param": "d",
+     "label": "d"
+    },
+    {
+     "module": 3,
+     "param": "s",
+     "label": "s"
+    },
+    {
+     "module": 3,
+     "param": "r",
+     "label": "r"
+    }
+   ]
+  },
+  {
+   "v": 1,
+   "id": 2,
+   "name": "adsr operator",
+   "label": "adsr operator 2",
+   "x": 858,
+   "y": 26,
+   "open": false,
+   "modules": [
+    5,
+    6,
+    7
+   ],
+   "inputs": [
+    {
+     "module": 5,
+     "port": "pitch",
+     "label": "pitch"
+    },
+    {
+     "module": 6,
+     "port": "gate",
+     "label": "gate"
+    },
+    {
+     "module": 5,
+     "port": "pm",
+     "label": "pm"
+    },
+    {
+     "module": 5,
+     "port": "p1",
+     "label": "p1"
+    },
+    {
+     "module": 6,
+     "port": "p1",
+     "label": "p1 2"
+    },
+    {
+     "module": 7,
+     "port": "p1",
+     "label": "p1 3"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 7,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 5,
+     "param": "wave",
+     "label": "wave"
+    },
+    {
+     "module": 5,
+     "param": "coarse",
+     "label": "coarse"
+    },
+    {
+     "module": 5,
+     "param": "pm",
+     "label": "pm"
+    },
+    {
+     "module": 5,
+     "param": "level",
+     "label": "level"
+    },
+    {
+     "module": 6,
+     "param": "a",
+     "label": "a"
+    },
+    {
+     "module": 6,
+     "param": "d",
+     "label": "d"
+    },
+    {
+     "module": 6,
+     "param": "s",
+     "label": "s"
+    },
+    {
+     "module": 6,
+     "param": "r",
+     "label": "r"
+    },
+    {
+     "module": 7,
+     "param": "gain",
+     "label": "gain"
+    }
+   ]
   }
  ]
 }

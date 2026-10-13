@@ -11,7 +11,8 @@
     "k1": 0.5,
     "k2": 0.5,
     "k3": 0.5,
-    "k4": 0.5
+    "k4": 0.5,
+    "morph": 0
    }
   },
   {
@@ -25,7 +26,10 @@
     "coarse": 7,
     "fine": -33,
     "pm": 0,
-    "level": 1
+    "level": 1,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     0.5,
@@ -63,7 +67,10 @@
     "coarse": 0,
     "fine": 0,
     "pm": 4,
-    "level": 0.7
+    "level": 0.7,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     0.5,
@@ -271,6 +278,108 @@
     "module": 5,
     "port": "p1"
    }
+  }
+ ],
+ "assemblies": [
+  {
+   "v": 1,
+   "id": 1,
+   "name": "adsr operator",
+   "label": "adsr operator",
+   "x": 572,
+   "y": 26,
+   "open": false,
+   "modules": [
+    3,
+    4,
+    5
+   ],
+   "inputs": [
+    {
+     "module": 4,
+     "port": "gate",
+     "label": "gate"
+    },
+    {
+     "module": 3,
+     "port": "pitch",
+     "label": "pitch"
+    },
+    {
+     "module": 3,
+     "port": "pm",
+     "label": "pm"
+    },
+    {
+     "module": 3,
+     "port": "p1",
+     "label": "p1"
+    },
+    {
+     "module": 4,
+     "port": "p1",
+     "label": "p1 2"
+    },
+    {
+     "module": 5,
+     "port": "p1",
+     "label": "p1 3"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 5,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 3,
+     "param": "wave",
+     "label": "wave"
+    },
+    {
+     "module": 3,
+     "param": "coarse",
+     "label": "coarse"
+    },
+    {
+     "module": 3,
+     "param": "pm",
+     "label": "pm"
+    },
+    {
+     "module": 3,
+     "param": "level",
+     "label": "level"
+    },
+    {
+     "module": 4,
+     "param": "a",
+     "label": "a"
+    },
+    {
+     "module": 4,
+     "param": "d",
+     "label": "d"
+    },
+    {
+     "module": 4,
+     "param": "s",
+     "label": "s"
+    },
+    {
+     "module": 4,
+     "param": "r",
+     "label": "r"
+    },
+    {
+     "module": 5,
+     "param": "gain",
+     "label": "gain"
+    }
+   ]
   }
  ]
 }

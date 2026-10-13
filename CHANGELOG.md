@@ -17,6 +17,7 @@ The merge of the four-voice firmware (1.0.2) with the polyphony, assembly and mo
 - Module **Ladder**: a four-pole ladder low pass with drive and self-oscillating resonance (outputs `lp24`, `lp12`; the saturator sits inside the loop). Cutoff modulation per block.
 - The LFO's restart input is `reset` (it was `sync` on the development branch; patches are converted on load) next to upstream's `clk`.
 - **Filter** outputs `notch`, `peak` and `ap` (allpass) after `mix`, from the same states (no patch format change).
+- **Factory patches open as assemblies:** five recipe assemblies (filter voice, adsr operator, noise voice, stack voice, vibrato) and an `assemblies` overlay in 29 of the 33 factory patches (binaries unchanged, checked by a test).
 - **Phone / tablet:** canvas zoom (pinch, Ctrl + wheel, buttons, fit), one-finger pan, bigger jacks and controls on touch screens, long-press card actions, a floating palette button, narrow-screen toolbars.
 - **Share link:** a patch as a URL (deflated JSON in the fragment); opening it loads the patch, the Patches page imports one into the bank list.
 - **Diff and A/B:** a Diff panel against the patch as last loaded / uploaded / stored; Set A / Set B and a toggle (Tab) that swaps the values in place when the structure matches.

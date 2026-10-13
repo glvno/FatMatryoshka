@@ -1,0 +1,201 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "noise voice",
+  "modules": [
+    {
+      "id": 1,
+      "type": "noise",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "level": 0.6,
+        "color": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "level"
+        ],
+        "p2": [
+          "color"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "filter",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "cutoff": 2000,
+        "res": 0.4,
+        "cvamt": 1,
+        "track": 0,
+        "morph": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "cutoff"
+        ],
+        "p2": [
+          "res"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "adsr",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "a": 0.01,
+        "d": 0.2,
+        "s": 0.5,
+        "r": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "a"
+        ],
+        "p2": [
+          "d"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "vca",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "gain": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "bp"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "env"
+      },
+      "to": {
+        "module": 4,
+        "port": "cv"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 3,
+      "port": "gate",
+      "label": "gate"
+    },
+    {
+      "module": 2,
+      "port": "cv",
+      "label": "cutoff cv"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 4,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "color",
+      "label": "color"
+    },
+    {
+      "module": 2,
+      "param": "cutoff",
+      "label": "cutoff"
+    },
+    {
+      "module": 2,
+      "param": "res",
+      "label": "res"
+    },
+    {
+      "module": 3,
+      "param": "a",
+      "label": "a"
+    },
+    {
+      "module": 3,
+      "param": "d",
+      "label": "d"
+    },
+    {
+      "module": 3,
+      "param": "s",
+      "label": "s"
+    },
+    {
+      "module": 3,
+      "param": "r",
+      "label": "r"
+    }
+  ]
+}

@@ -11,7 +11,8 @@
     "k1": 0.7794,
     "k2": 0.5,
     "k3": 0.35,
-    "k4": 0.3
+    "k4": 0.3,
+    "morph": 0
    }
   },
   {
@@ -20,7 +21,8 @@
    "x": 299,
    "y": 26,
    "params": {
-    "level": 0.7
+    "level": 0.7,
+    "color": 0
    },
    "att": [
     1,
@@ -47,7 +49,10 @@
    "params": {
     "wave": 0,
     "rate": 0.15,
-    "depth": 1
+    "depth": 1,
+    "sync": 0,
+    "div": 6,
+    "bpm": 120
    },
    "att": [
     1,
@@ -178,7 +183,9 @@
    "params": {
     "time": 500,
     "fb": 0.5,
-    "mix": 0
+    "mix": 0,
+    "sync": 0,
+    "pingpong": 0
    },
    "att": [
     1,
@@ -211,7 +218,9 @@
    "params": {
     "size": 0.8,
     "damp": 0.5,
-    "mix": 0
+    "mix": 0,
+    "pre": 0,
+    "mod": 0.3
    },
    "att": [
     1,
@@ -366,6 +375,153 @@
     "module": 7,
     "port": "p1"
    }
+  }
+ ],
+ "assemblies": [
+  {
+   "v": 1,
+   "id": 1,
+   "name": "noise voice",
+   "label": "noise voice",
+   "x": 299,
+   "y": 26,
+   "open": false,
+   "modules": [
+    2,
+    4,
+    5,
+    6
+   ],
+   "inputs": [
+    {
+     "module": 5,
+     "port": "gate",
+     "label": "gate"
+    },
+    {
+     "module": 4,
+     "port": "cv",
+     "label": "cv"
+    },
+    {
+     "module": 4,
+     "port": "p1",
+     "label": "p1"
+    },
+    {
+     "module": 4,
+     "port": "p2",
+     "label": "p2"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 6,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 2,
+     "param": "color",
+     "label": "color"
+    },
+    {
+     "module": 4,
+     "param": "cutoff",
+     "label": "cutoff"
+    },
+    {
+     "module": 4,
+     "param": "res",
+     "label": "res"
+    },
+    {
+     "module": 5,
+     "param": "a",
+     "label": "a"
+    },
+    {
+     "module": 5,
+     "param": "d",
+     "label": "d"
+    },
+    {
+     "module": 5,
+     "param": "s",
+     "label": "s"
+    },
+    {
+     "module": 5,
+     "param": "r",
+     "label": "r"
+    }
+   ]
+  },
+  {
+   "v": 1,
+   "id": 2,
+   "name": "echo",
+   "label": "echo",
+   "x": 1391,
+   "y": 26,
+   "open": false,
+   "modules": [
+    7,
+    8
+   ],
+   "inputs": [
+    {
+     "module": 7,
+     "port": "in",
+     "label": "in"
+    },
+    {
+     "module": 8,
+     "port": "p1",
+     "label": "p1"
+    },
+    {
+     "module": 7,
+     "port": "p1",
+     "label": "p1 2"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 8,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 7,
+     "param": "time",
+     "label": "time"
+    },
+    {
+     "module": 7,
+     "param": "fb",
+     "label": "fb"
+    },
+    {
+     "module": 7,
+     "param": "mix",
+     "label": "mix"
+    },
+    {
+     "module": 8,
+     "param": "size",
+     "label": "size"
+    },
+    {
+     "module": 8,
+     "param": "mix",
+     "label": "mix 2"
+    }
+   ]
   }
  ]
 }

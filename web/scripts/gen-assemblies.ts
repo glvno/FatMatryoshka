@@ -425,6 +425,100 @@ asm('vowel voice', (b) => {
   b.param('release', env, 'r');
 });
 
+// ---- the recipes of the factory patches (presets.ts voice() / toOut()), so a patch opens as a few cards
+
+// one oscillator through a filter into a VCA with one ADSR (the filter's cv is exposed for an envelope or LFO)
+asm('filter voice', (b) => {
+  const osc = b.add('osc', 0, 0, { wave: 2, level: 0.8 });
+  const flt = b.add('filter', 1, 0, { cutoff: 1200, res: 0.3 });
+  const env = b.add('adsr', 0, 1, { a: 0.01, d: 0.2, s: 0.6, r: 0.3 });
+  const vca = b.add('vca', 1, 1);
+  b.wire(osc, 'out', flt, 'in');
+  b.wire(flt, 'lp12', vca, 'in');
+  b.wire(env, 'env', vca, 'cv');
+  b.input('pitch', osc, 'pitch');
+  b.input('gate', env, 'gate');
+  b.input('cutoff cv', flt, 'cv');
+  b.output('out', vca, 'out');
+  b.param('wave', osc, 'wave');
+  b.param('cutoff', flt, 'cutoff');
+  b.param('res', flt, 'res');
+  for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
+});
+
+// an oscillator into a VCA with an ADSR: the operator of the FM patches, a plain voice without a filter
+asm('adsr operator', (b) => {
+  const osc = b.add('osc', 0, 0, { wave: 0, level: 0.8 });
+  const env = b.add('adsr', 1, 0, { a: 0.01, d: 0.2, s: 0.6, r: 0.3 });
+  const vca = b.add('vca', 2, 0);
+  b.wire(osc, 'out', vca, 'in');
+  b.wire(env, 'env', vca, 'cv');
+  b.input('pitch', osc, 'pitch');
+  b.input('gate', env, 'gate');
+  b.input('pm', osc, 'pm');
+  b.output('out', vca, 'out');
+  b.param('wave', osc, 'wave');
+  b.param('ratio', osc, 'coarse');
+  b.param('index', osc, 'pm');
+  b.param('level', osc, 'level');
+  for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
+});
+
+// noise through a filter into a VCA with an ADSR: wind, hats, sweeps
+asm('noise voice', (b) => {
+  const nz = b.add('noise', 0, 0, { level: 0.6 });
+  const flt = b.add('filter', 1, 0, { cutoff: 2000, res: 0.4 });
+  const env = b.add('adsr', 0, 1, { a: 0.01, d: 0.2, s: 0.5, r: 0.3 });
+  const vca = b.add('vca', 1, 1);
+  b.wire(nz, 'out', flt, 'in');
+  b.wire(flt, 'bp', vca, 'in');
+  b.wire(env, 'env', vca, 'cv');
+  b.input('gate', env, 'gate');
+  b.input('cutoff cv', flt, 'cv');
+  b.output('out', vca, 'out');
+  b.param('color', nz, 'color');
+  b.param('cutoff', flt, 'cutoff');
+  b.param('res', flt, 'res');
+  for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
+});
+
+// two oscillators into a mixer, a filter and a VCA with an ADSR (a third oscillator can go into the mixer's in3)
+asm('stack voice', (b) => {
+  const o1 = b.add('osc', 0, 0, { wave: 2, level: 0.7 });
+  const o2 = b.add('osc', 0, 1, { wave: 2, fine: 8, level: 0.7 });
+  const mix = b.add('mixer', 1, 0, { l1: 0.7, l2: 0.7, l3: 0.7, l4: 0 });
+  const flt = b.add('filter', 2, 0, { cutoff: 1500, res: 0.2 });
+  const env = b.add('adsr', 1, 1, { a: 0.05, d: 0.3, s: 0.7, r: 0.4 });
+  const vca = b.add('vca', 2, 1);
+  b.wire(o1, 'out', mix, 'in1');
+  b.wire(o2, 'out', mix, 'in2');
+  b.wire(mix, 'out', flt, 'in');
+  b.wire(flt, 'lp12', vca, 'in');
+  b.wire(env, 'env', vca, 'cv');
+  b.input('pitch', o1, 'pitch', [o2, 'pitch']);
+  b.input('gate', env, 'gate');
+  b.input('in3', mix, 'in3');
+  b.input('cutoff cv', flt, 'cv');
+  b.output('out', vca, 'out');
+  b.param('detune', o2, 'fine');
+  b.param('cutoff', flt, 'cutoff');
+  b.param('res', flt, 'res');
+  for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
+});
+
+// an LFO through a Scale: vibrato (into a pitch input), tremolo (into a VCA's cv with an offset), a filter sweep
+asm('vibrato', (b) => {
+  const lfo = b.add('lfo', 0, 0, { wave: 0, rate: 5, depth: 1 });
+  const sc = b.add('scale', 1, 0, { gain: 0.03, offset: 0 });
+  b.wire(lfo, 'out', sc, 'in');
+  b.input('reset', lfo, 'reset');
+  b.output('out', sc, 'out');
+  b.param('rate', lfo, 'rate');
+  b.param('depth', sc, 'gain');
+  b.param('offset', sc, 'offset');
+  b.param('wave', lfo, 'wave');
+});
+
 // a step sequencer with its own clock: pitch (quantized) and gate out; add its pitch to Main's into an oscillator
 asm('step sequencer', (b) => {
   const clk = b.add('lfo', 0, 0, { wave: 3, rate: 8, depth: 1 });

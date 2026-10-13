@@ -11,7 +11,8 @@
     "k1": 0.9725,
     "k2": 0.4167,
     "k3": 0.5,
-    "k4": 0.2
+    "k4": 0.2,
+    "morph": 0
    }
   },
   {
@@ -25,7 +26,10 @@
     "coarse": 0,
     "fine": 0,
     "pm": 0,
-    "level": 0.7
+    "level": 0.7,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     0.5,
@@ -158,7 +162,9 @@
    "params": {
     "time": 250,
     "fb": 0.3,
-    "mix": 0
+    "mix": 0,
+    "sync": 0,
+    "pingpong": 0
    },
    "att": [
     1,
@@ -303,6 +309,99 @@
     "module": 6,
     "port": "p1"
    }
+  }
+ ],
+ "assemblies": [
+  {
+   "v": 1,
+   "id": 1,
+   "name": "filter voice",
+   "label": "filter voice",
+   "x": 299,
+   "y": 26,
+   "open": false,
+   "modules": [
+    2,
+    3,
+    4,
+    5
+   ],
+   "inputs": [
+    {
+     "module": 4,
+     "port": "gate",
+     "label": "gate"
+    },
+    {
+     "module": 2,
+     "port": "pitch",
+     "label": "pitch"
+    },
+    {
+     "module": 3,
+     "port": "p1",
+     "label": "p1"
+    },
+    {
+     "module": 3,
+     "port": "p2",
+     "label": "p2"
+    },
+    {
+     "module": 2,
+     "port": "p1",
+     "label": "p1 2"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 5,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 2,
+     "param": "wave",
+     "label": "wave"
+    },
+    {
+     "module": 3,
+     "param": "cutoff",
+     "label": "cutoff"
+    },
+    {
+     "module": 3,
+     "param": "res",
+     "label": "res"
+    },
+    {
+     "module": 4,
+     "param": "a",
+     "label": "a"
+    },
+    {
+     "module": 4,
+     "param": "d",
+     "label": "d"
+    },
+    {
+     "module": 4,
+     "param": "s",
+     "label": "s"
+    },
+    {
+     "module": 4,
+     "param": "r",
+     "label": "r"
+    },
+    {
+     "module": 2,
+     "param": "pw",
+     "label": "pw"
+    }
+   ]
   }
  ]
 }

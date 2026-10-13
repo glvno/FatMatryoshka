@@ -1267,17 +1267,22 @@
     {
      "module": 9,
      "port": "gate",
-     "label": "gate",
-     "also": [
-      {
-       "module": 7,
-       "port": "gate"
-      },
-      {
-       "module": 13,
-       "port": "gate"
-      }
-     ]
+     "label": "gate"
+    },
+    {
+     "module": 7,
+     "port": "gate",
+     "label": "gate 2"
+    },
+    {
+     "module": 13,
+     "port": "gate",
+     "label": "gate 3"
+    },
+    {
+     "module": 9,
+     "port": "p1",
+     "label": "p1"
     }
    ],
    "outputs": [
@@ -1291,32 +1296,32 @@
     {
      "module": 6,
      "param": "coarse",
-     "label": "tune"
+     "label": "coarse"
     },
     {
      "module": 8,
      "param": "gain",
-     "label": "drop"
+     "label": "gain"
     },
     {
      "module": 7,
      "param": "r2",
-     "label": "drop time"
+     "label": "r2"
     },
     {
      "module": 9,
      "param": "r3",
-     "label": "decay"
+     "label": "r3"
     },
     {
      "module": 9,
      "param": "r2",
-     "label": "punch"
+     "label": "r2 2"
     },
     {
      "module": 15,
      "param": "l2",
-     "label": "click"
+     "label": "l2"
     },
     {
      "module": 11,
@@ -1347,13 +1352,22 @@
     {
      "module": 19,
      "port": "gate",
-     "label": "gate",
-     "also": [
-      {
-       "module": 22,
-       "port": "gate"
-      }
-     ]
+     "label": "gate"
+    },
+    {
+     "module": 22,
+     "port": "gate",
+     "label": "gate 2"
+    },
+    {
+     "module": 17,
+     "port": "p1",
+     "label": "p1"
+    },
+    {
+     "module": 19,
+     "port": "p1",
+     "label": "p1 2"
     }
    ],
    "outputs": [
@@ -1367,27 +1381,27 @@
     {
      "module": 17,
      "param": "cutoff",
-     "label": "snap"
+     "label": "cutoff"
     },
     {
      "module": 19,
      "param": "r3",
-     "label": "decay"
+     "label": "r3"
     },
     {
      "module": 23,
      "param": "l1",
-     "label": "noise"
+     "label": "l1"
     },
     {
      "module": 23,
      "param": "l2",
-     "label": "body"
+     "label": "l2"
     },
     {
      "module": 20,
      "param": "coarse",
-     "label": "body tune"
+     "label": "coarse"
     }
    ]
   },
@@ -1410,6 +1424,11 @@
      "module": 27,
      "port": "gate",
      "label": "gate"
+    },
+    {
+     "module": 27,
+     "port": "p1",
+     "label": "p1"
     }
    ],
    "outputs": [
@@ -1423,17 +1442,17 @@
     {
      "module": 27,
      "param": "r3",
-     "label": "decay"
+     "label": "r3"
     },
     {
      "module": 25,
      "param": "cutoff",
-     "label": "tone"
+     "label": "cutoff"
     },
     {
      "module": 26,
      "param": "gain",
-     "label": "level"
+     "label": "gain"
     }
    ]
   }

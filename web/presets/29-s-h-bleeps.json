@@ -11,7 +11,8 @@
     "k1": 0.5,
     "k2": 0.5,
     "k3": 0.198,
-    "k4": 0.3
+    "k4": 0.3,
+    "morph": 0
    }
   },
   {
@@ -25,7 +26,10 @@
     "coarse": 0,
     "fine": 0,
     "pm": 0,
-    "level": 0.6
+    "level": 0.6,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     1,
@@ -60,7 +64,10 @@
    "params": {
     "wave": 4,
     "rate": 4.002,
-    "depth": 1
+    "depth": 1,
+    "sync": 0,
+    "div": 6,
+    "bpm": 120
    },
    "att": [
     0.2,
@@ -184,7 +191,9 @@
    "params": {
     "time": 190,
     "fb": 0.45,
-    "mix": 0
+    "mix": 0,
+    "sync": 0,
+    "pingpong": 0
    },
    "att": [
     1,
@@ -339,6 +348,142 @@
     "module": 7,
     "port": "p1"
    }
+  }
+ ],
+ "assemblies": [
+  {
+   "v": 1,
+   "id": 1,
+   "name": "adsr operator",
+   "label": "adsr operator",
+   "x": 299,
+   "y": 26,
+   "open": false,
+   "modules": [
+    2,
+    5,
+    6
+   ],
+   "inputs": [
+    {
+     "module": 5,
+     "port": "gate",
+     "label": "gate"
+    },
+    {
+     "module": 2,
+     "port": "pitch",
+     "label": "pitch"
+    },
+    {
+     "module": 5,
+     "port": "p1",
+     "label": "p1"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 6,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 2,
+     "param": "wave",
+     "label": "wave"
+    },
+    {
+     "module": 2,
+     "param": "coarse",
+     "label": "coarse"
+    },
+    {
+     "module": 2,
+     "param": "pm",
+     "label": "pm"
+    },
+    {
+     "module": 2,
+     "param": "level",
+     "label": "level"
+    },
+    {
+     "module": 5,
+     "param": "a",
+     "label": "a"
+    },
+    {
+     "module": 5,
+     "param": "d",
+     "label": "d"
+    },
+    {
+     "module": 5,
+     "param": "s",
+     "label": "s"
+    },
+    {
+     "module": 5,
+     "param": "r",
+     "label": "r"
+    }
+   ]
+  },
+  {
+   "v": 1,
+   "id": 2,
+   "name": "vibrato",
+   "label": "vibrato",
+   "x": 299,
+   "y": 546,
+   "open": false,
+   "modules": [
+    3,
+    4
+   ],
+   "inputs": [
+    {
+     "module": 3,
+     "port": "p1",
+     "label": "p1"
+    },
+    {
+     "module": 4,
+     "port": "p1",
+     "label": "p1 2"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 4,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 3,
+     "param": "rate",
+     "label": "rate"
+    },
+    {
+     "module": 4,
+     "param": "gain",
+     "label": "gain"
+    },
+    {
+     "module": 4,
+     "param": "offset",
+     "label": "offset"
+    },
+    {
+     "module": 3,
+     "param": "wave",
+     "label": "wave"
+    }
+   ]
   }
  ]
 }

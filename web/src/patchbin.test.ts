@@ -5,6 +5,18 @@ import { deviceBudget, DEVICE, encodePatch, MAX_CABLES, TYPE_ORDER } from './pat
 import { PRESETS } from './presets';
 
 describe('binary patch format', () => {
+  it('the assembly overlay of the factory patches never reaches the binary (it is editor-only)', () => {
+    let grouped = 0;
+    for (const [name, make] of Object.entries(PRESETS)) {
+      const p = make();
+      const flat = { ...p, assemblies: undefined };
+      delete flat.assemblies;
+      expect(Array.from(encodePatch(p)), name).toEqual(Array.from(encodePatch(flat)));
+      if (p.assemblies?.length) grouped++;
+    }
+    expect(grouped).toBeGreaterThanOrEqual(25); // 29 of 33 open as a few cards; subtractive saw, snare, organ and drone stay flat
+  });
+
   it('encodes every preset with the documented layout', () => {
     for (const [name, make] of Object.entries(PRESETS)) {
       const p = make();

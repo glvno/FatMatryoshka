@@ -11,7 +11,8 @@
     "k1": 0.758,
     "k2": 0.5,
     "k3": 0.0621,
-    "k4": 0.5
+    "k4": 0.5,
+    "morph": 0
    }
   },
   {
@@ -25,7 +26,10 @@
     "coarse": -12,
     "fine": 0,
     "pm": 0,
-    "level": 0.9
+    "level": 0.9,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     1,
@@ -63,7 +67,10 @@
     "coarse": -24,
     "fine": 0,
     "pm": 0,
-    "level": 0.1
+    "level": 0.1,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     0.6,
@@ -364,6 +371,116 @@
     "module": 7,
     "port": "p1"
    }
+  }
+ ],
+ "assemblies": [
+  {
+   "v": 1,
+   "id": 1,
+   "name": "stack voice",
+   "label": "stack voice",
+   "x": 299,
+   "y": 26,
+   "open": false,
+   "modules": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "inputs": [
+    {
+     "module": 6,
+     "port": "gate",
+     "label": "gate"
+    },
+    {
+     "module": 2,
+     "port": "pitch",
+     "label": "pitch"
+    },
+    {
+     "module": 3,
+     "port": "pitch",
+     "label": "pitch 2"
+    },
+    {
+     "module": 5,
+     "port": "p1",
+     "label": "p1"
+    },
+    {
+     "module": 3,
+     "port": "p1",
+     "label": "p1 2"
+    },
+    {
+     "module": 6,
+     "port": "p1",
+     "label": "p1 3"
+    },
+    {
+     "module": 7,
+     "port": "p1",
+     "label": "p1 4"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 7,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 3,
+     "param": "fine",
+     "label": "fine"
+    },
+    {
+     "module": 5,
+     "param": "cutoff",
+     "label": "cutoff"
+    },
+    {
+     "module": 5,
+     "param": "res",
+     "label": "res"
+    },
+    {
+     "module": 6,
+     "param": "a",
+     "label": "a"
+    },
+    {
+     "module": 6,
+     "param": "d",
+     "label": "d"
+    },
+    {
+     "module": 6,
+     "param": "s",
+     "label": "s"
+    },
+    {
+     "module": 6,
+     "param": "r",
+     "label": "r"
+    },
+    {
+     "module": 3,
+     "param": "level",
+     "label": "level"
+    },
+    {
+     "module": 7,
+     "param": "gain",
+     "label": "gain"
+    }
+   ]
   }
  ]
 }

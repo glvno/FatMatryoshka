@@ -11,7 +11,8 @@
     "k1": 0.9419,
     "k2": 0.5,
     "k3": 0.3,
-    "k4": 0.35
+    "k4": 0.35,
+    "morph": 0
    }
   },
   {
@@ -61,7 +62,10 @@
     "coarse": 0,
     "fine": -9,
     "pm": 0,
-    "level": 0.8
+    "level": 0.8,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     1,
@@ -99,7 +103,10 @@
     "coarse": 0,
     "fine": 0,
     "pm": 0,
-    "level": 0.8
+    "level": 0.8,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     1,
@@ -137,7 +144,10 @@
     "coarse": 0,
     "fine": 9,
     "pm": 0,
-    "level": 0.8
+    "level": 0.8,
+    "fb": 0,
+    "unison": 1,
+    "detune": 10
    },
    "att": [
     1,
@@ -172,7 +182,10 @@
    "params": {
     "wave": 0,
     "rate": 0.6,
-    "depth": 0
+    "depth": 0,
+    "sync": 0,
+    "div": 6,
+    "bpm": 120
    },
    "att": [
     0.6,
@@ -303,7 +316,9 @@
    "params": {
     "time": 35,
     "fb": 0.2,
-    "mix": 0
+    "mix": 0,
+    "sync": 0,
+    "pingpong": 0
    },
    "att": [
     1,
@@ -336,7 +351,9 @@
    "params": {
     "size": 0.75,
     "damp": 0.5,
-    "mix": 0
+    "mix": 0,
+    "pre": 0,
+    "mod": 0.3
    },
    "att": [
     1,
@@ -551,6 +568,165 @@
     "module": 10,
     "port": "p1"
    }
+  }
+ ],
+ "assemblies": [
+  {
+   "v": 1,
+   "id": 1,
+   "name": "stack voice",
+   "label": "stack voice",
+   "x": 299,
+   "y": 26,
+   "open": false,
+   "modules": [
+    3,
+    4,
+    2,
+    7,
+    8,
+    9
+   ],
+   "inputs": [
+    {
+     "module": 3,
+     "port": "pitch",
+     "label": "pitch"
+    },
+    {
+     "module": 4,
+     "port": "pitch",
+     "label": "pitch 2"
+    },
+    {
+     "module": 2,
+     "port": "in3",
+     "label": "in3"
+    },
+    {
+     "module": 8,
+     "port": "gate",
+     "label": "gate"
+    },
+    {
+     "module": 7,
+     "port": "cv",
+     "label": "cv"
+    },
+    {
+     "module": 7,
+     "port": "p1",
+     "label": "p1"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 9,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 4,
+     "param": "fine",
+     "label": "fine"
+    },
+    {
+     "module": 7,
+     "param": "cutoff",
+     "label": "cutoff"
+    },
+    {
+     "module": 7,
+     "param": "res",
+     "label": "res"
+    },
+    {
+     "module": 8,
+     "param": "a",
+     "label": "a"
+    },
+    {
+     "module": 8,
+     "param": "d",
+     "label": "d"
+    },
+    {
+     "module": 8,
+     "param": "s",
+     "label": "s"
+    },
+    {
+     "module": 8,
+     "param": "r",
+     "label": "r"
+    }
+   ]
+  },
+  {
+   "v": 1,
+   "id": 2,
+   "name": "echo",
+   "label": "echo",
+   "x": 1664,
+   "y": 26,
+   "open": false,
+   "modules": [
+    10,
+    11
+   ],
+   "inputs": [
+    {
+     "module": 10,
+     "port": "in",
+     "label": "in"
+    },
+    {
+     "module": 11,
+     "port": "p1",
+     "label": "p1"
+    },
+    {
+     "module": 10,
+     "port": "p1",
+     "label": "p1 2"
+    }
+   ],
+   "outputs": [
+    {
+     "module": 11,
+     "port": "out",
+     "label": "out"
+    }
+   ],
+   "params": [
+    {
+     "module": 10,
+     "param": "time",
+     "label": "time"
+    },
+    {
+     "module": 10,
+     "param": "fb",
+     "label": "fb"
+    },
+    {
+     "module": 10,
+     "param": "mix",
+     "label": "mix"
+    },
+    {
+     "module": 11,
+     "param": "size",
+     "label": "size"
+    },
+    {
+     "module": 11,
+     "param": "mix",
+     "label": "mix 2"
+    }
+   ]
   }
  ]
 }

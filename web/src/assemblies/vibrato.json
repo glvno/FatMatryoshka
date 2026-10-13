@@ -1,0 +1,111 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "vibrato",
+  "modules": [
+    {
+      "id": 1,
+      "type": "lfo",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 0,
+        "rate": 5,
+        "depth": 1,
+        "sync": 0,
+        "div": 6,
+        "bpm": 120
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "scale",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "gain": 0.03,
+        "offset": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [
+          "offset"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "in"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "reset",
+      "label": "reset"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 2,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "rate",
+      "label": "rate"
+    },
+    {
+      "module": 2,
+      "param": "gain",
+      "label": "depth"
+    },
+    {
+      "module": 2,
+      "param": "offset",
+      "label": "offset"
+    },
+    {
+      "module": 1,
+      "param": "wave",
+      "label": "wave"
+    }
+  ]
+}
