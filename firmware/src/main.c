@@ -96,9 +96,11 @@ static void state_unpack(uint32_t w)
     cfg.prog_chg = w >> 12 & 1u;
     if (!(w >> 7 & 1u)) {                               /* the mixer of a record from before (voices 1 and 2) */
         mix_vol[0] = (uint8_t)(w >> 16 & 127u) > 100u ? 100u : (uint8_t)(w >> 16 & 127u);
-        mix_vol[1] = (uint8_t)(w >> 23 & 127u) > 100u ? 100u : (uint8_t)(w >> 23 & 127u);
         mix_mute[0] = w >> 30 & 1u;
+#if ENG_VOICES > 1
+        mix_vol[1] = (uint8_t)(w >> 23 & 127u) > 100u ? 100u : (uint8_t)(w >> 23 & 127u);
         mix_mute[1] = w >> 31 & 1u;
+#endif
     }
     mix_apply_all();
 }
@@ -110,9 +112,16 @@ static void state_unpack(uint32_t w)
  * With the header's words: octave and settings (state_pack), the selected module of each voice (byte per voice in word 1) and
  * the preset of each (word 2). Version 1 (two voices, before the four-voice firmware) is still read: its lengths are 2..5,
  * its arpeggiators follow at 6, its tail is the two channels and the LED mode. An even older record holds just voice 1's
- * patch (starts with 0xA1). */
+ * patch (starts with 0xA1).
+ * The record always has BLOB_NV = 4 voice slots, whatever the build's ENG_VOICES: a one-voice build writes voice 1 and
+ * leaves the other slots empty (length 0, default arp, channel, level), and reads the first ENG_VOICES slots of a record
+ * a four-voice build wrote; so a record moves between the builds. */
 #define BLOB_MAGIC 0xB2u
 #define ARP_PACK 13u
+#define BLOB_NV 4u                                /* voice slots in the record (the panel's most) */
+#if ENG_VOICES > BLOB_NV
+#error "the state record holds BLOB_NV voices"
+#endif
 static uint8_t blob[PS_MAX] ENG_POOL;
 
 static void arp_pack(uint8_t *d, const arp_cfg_t *c)
@@ -133,11 +142,12 @@ static void arp_unpack(uint32_t v, const uint8_t *d)
     arp_p = keep;
 }
 
-#define BLOB_HDR (2u + 2u * ENG_VOICES)
-#define BLOB_TAIL (ENG_VOICES + 1u + ENG_VOICES + 1u)
+#define BLOB_HDR (2u + 2u * BLOB_NV)
+#define BLOB_TAIL (BLOB_NV + 1u + BLOB_NV + 1u)
 static uint32_t blob_build(void)                /* 0 if it does not fit */
 {
-    uint32_t n = BLOB_HDR, v, i, total = BLOB_HDR + ENG_VOICES * ARP_PACK + BLOB_TAIL;
+    static const arp_cfg_t arp_default = ARP_CFG_DEFAULT;
+    uint32_t n = BLOB_HDR, v, i, total = BLOB_HDR + BLOB_NV * ARP_PACK + BLOB_TAIL;
     uint8_t mutes = 0;
     for (v = 0; v < ENG_VOICES; v++)
         total += m1_cur_lenv[v];
@@ -145,21 +155,23 @@ static uint32_t blob_build(void)                /* 0 if it does not fit */
         return 0;
     blob[0] = BLOB_MAGIC;
     blob[1] = 2;
-    for (v = 0; v < ENG_VOICES; v++) {
-        blob[2u + 2u * v] = (uint8_t)m1_cur_lenv[v];
-        blob[3u + 2u * v] = (uint8_t)(m1_cur_lenv[v] >> 8);
+    for (v = 0; v < BLOB_NV; v++) {             /* the slots of voices this build lacks are empty */
+        uint32_t l = v < ENG_VOICES ? m1_cur_lenv[v] : 0u;
+        blob[2u + 2u * v] = (uint8_t)l;
+        blob[3u + 2u * v] = (uint8_t)(l >> 8);
     }
-    for (v = 0; v < ENG_VOICES; v++, n += ARP_PACK)
-        arp_pack(blob + n, &AV[v].cfg);
+    for (v = 0; v < BLOB_NV; v++, n += ARP_PACK)
+        arp_pack(blob + n, v < ENG_VOICES ? &AV[v].cfg : &arp_default);
     for (v = 0; v < ENG_VOICES; v++)
         for (i = 0; i < m1_cur_lenv[v]; i++)
             blob[n++] = m1_curv[v][i];
-    for (v = 0; v < ENG_VOICES; v++)
-        blob[n++] = cfg.ch[v];
+    for (v = 0; v < BLOB_NV; v++)
+        blob[n++] = v < ENG_VOICES ? cfg.ch[v] : (uint8_t)(v + 1u);
     blob[n++] = cfg.leds;
-    for (v = 0; v < ENG_VOICES; v++) {
-        blob[n++] = mix_vol[v];
-        mutes |= (uint8_t)(mix_mute[v] << v);
+    for (v = 0; v < BLOB_NV; v++) {
+        blob[n++] = v < ENG_VOICES ? mix_vol[v] : 100u;
+        if (v < ENG_VOICES)
+            mutes |= (uint8_t)(mix_mute[v] << v);
     }
     blob[n++] = mutes;
     return n;
@@ -323,13 +335,13 @@ static void boot_step(const char *what)
 static const char *boot_msg;                    /* shown in the bar once the pages are up */
 static uint32_t boot_msg_ms;
 
-static const char *const VOICE_LINE[ENG_VOICES] = {"VOICE 1", "VOICE 2", "VOICE 3", "VOICE 4"};
+static const char *const VOICE_LINE[ENG_VOICES] = ENG_VOICE_INIT("VOICE 1", "VOICE 2", "VOICE 3", "VOICE 4");
 static void voice_step(uint32_t v)              /* the loading screen's line for voice v (0..3) */
 {
-    boot_step(VOICE_LINE[v]);
+    boot_step(ENG_VOICES > 1 ? VOICE_LINE[v] : "PATCH");
 }
 
-static void voices_boot(uint32_t from)           /* voices from..4 run the factory presets (voice n the n-th) */
+static void voices_boot(uint32_t from)           /* voices from..ENG_VOICES run the factory presets (voice n the n-th) */
 {
     uint32_t v;
     for (v = from; v < ENG_VOICES; v++) {
@@ -360,7 +372,9 @@ static int voice_restore(uint32_t v, const uint8_t *p, uint32_t len, uint32_t mo
 
 static int boot_blob(const uint8_t *b, uint32_t len)    /* the saved state (blob_build); 0 = restored */
 {
-    uint32_t nv = b[1] == 1u ? 2u : 4u, hdr = 2u + 2u * nv, at = hdr + nv * ARP_PACK, v, l[ENG_VOICES] = {0, 0, 0, 0}, total;
+    uint32_t nv = b[1] == 1u ? 2u : BLOB_NV, hdr = 2u + 2u * nv, at = hdr + nv * ARP_PACK, v, l[BLOB_NV] = {0}, total;
+    uint32_t nrest = nv < ENG_VOICES ? nv : ENG_VOICES;    /* the record's voices this build has */
+    int booted = 0;                                         /* voices_boot ran for an empty slot (and the voices after it) */
     if (len < at || (b[1] != 1u && b[1] != 2u))
         return -1;
     for (v = 0, total = at; v < nv; v++) {
@@ -371,7 +385,7 @@ static int boot_blob(const uint8_t *b, uint32_t len)    /* the saved state (blob
         return -1;
     {
         const uint8_t *p = b + at;
-        for (v = 0; v < nv; p += l[v], v++) {
+        for (v = 0; v < nrest; p += l[v], v++) {
             uint32_t module, preset;
             if (b[1] == 1u) {                           /* two voices: 16 bit modules, voice 2's preset + 1 in word 3 */
                 module = v ? ps_loaded[1] >> 16 : ps_loaded[1] & 0xFFFFu;
@@ -385,29 +399,30 @@ static int boot_blob(const uint8_t *b, uint32_t len)    /* the saved state (blob
                     return -2;
             } else {
                 voices_boot(v);
+                booted = 1;
                 break;
             }
         }
     }
-    if (nv < ENG_VOICES)
-        voices_boot(nv);
+    if (nrest < ENG_VOICES && !booted)
+        voices_boot(nrest);
     {                                                   /* the tail: channels, LED mode, mixer */
         const uint8_t *t = b + total;
         uint32_t left = len - total;
         if (b[1] == 1u && left >= 3u) {
-            cfg.ch[0] = t[0] > 16u ? 1u : t[0];
-            cfg.ch[1] = t[1] > 16u ? 2u : t[1];
+            for (v = 0; v < nrest; v++)
+                cfg.ch[v] = t[v] > 16u ? (uint8_t)(v + 1u) : t[v];
             cfg.leds = t[2] > 2u ? 2u : t[2];
         } else if (b[1] == 2u && left >= BLOB_TAIL) {
-            for (v = 0; v < ENG_VOICES; v++) {
+            for (v = 0; v < nrest; v++) {
                 cfg.ch[v] = t[v] > 16u ? (uint8_t)(v + 1u) : t[v];
-                mix_vol[v] = t[ENG_VOICES + 1u + v] > 100u ? 100u : t[ENG_VOICES + 1u + v];
-                mix_mute[v] = t[2u * ENG_VOICES + 1u] >> v & 1u;
+                mix_vol[v] = t[BLOB_NV + 1u + v] > 100u ? 100u : t[BLOB_NV + 1u + v];
+                mix_mute[v] = t[2u * BLOB_NV + 1u] >> v & 1u;
             }
-            cfg.leds = t[ENG_VOICES] > 2u ? 2u : t[ENG_VOICES];
+            cfg.leds = t[BLOB_NV] > 2u ? 2u : t[BLOB_NV];
         }
     }
-    for (v = 0; v < nv; v++)
+    for (v = 0; v < nrest; v++)
         arp_unpack(v, b + hdr + v * ARP_PACK);
     arp_sync_scale();
     mix_apply_all();
@@ -491,7 +506,7 @@ static void midi_drain(void)                    /* USB-MIDI events -> the engine
         if (st == 0xF0u) {                      /* realtime: the clock comes from the arpeggiator while it runs, else from MIDI in */
             uint32_t rt = (pkt >> 8) & 0xFFu;
             if (rt == 0xF8u) {
-                if (midi_clk_run && cfg.clock_in && !(AV[0].play | AV[1].play | AV[2].play | AV[3].play))
+                if (midi_clk_run && cfg.clock_in && !arp_any_play())
                     eng_clock_tick();
             } else {
                 midi_clk_run = rt != 0xFCu;
@@ -725,7 +740,7 @@ static void keys_poll(void)                     /* the FM-1's 27 keys (bit 0 = F
 /* PLAY: red while the arpeggiator is stopped, green while it runs. The green LED sits at matrix column 8, row bit 1,
  * where there is no key (found on the hardware by Felucca); the red one is PLAY's own. ARP / SEQ / LFO light up
  * while their page shows. */
-#define BTN_SEL 3u                  /* the next voice (1 -> 2 -> 3 -> 4 -> 1) */
+#define BTN_SEL 3u                  /* the next voice (1 -> 2 -> 3 -> 4 -> 1); nothing in a one-voice build */
 #define BTN_GLO 7u                  /* the mixer page */
 #define BTN_ARP 10u
 #define BTN_SEQ 11u
@@ -831,7 +846,7 @@ static void leds_avail(void)                        /* the page buttons glow dim
     led_glow(BTN_ARP, on);
     led_glow(BTN_SEQ, on);
     led_glow(BTN_LFO, on);
-    led_glow(BTN_SEL, on);
+    led_glow(BTN_SEL, on && ENG_VOICES > 1);
     led_glow(BTN_GLO, on);
 }
 
@@ -854,6 +869,8 @@ static void home_press(void)
 static void voice_switch(void)
 {
     uint32_t v = (eng_voice() + 1u) % ENG_VOICES;
+    if (ENG_VOICES == 1)
+        return;
     eng_all_notes_off_v(eng_voice());
     eng_voice_select(v);
     arp_p = &AV[v];                                 /* the arpeggiator pages and PLAY act on this voice's */

@@ -17,20 +17,32 @@
 /* Per voice (a patch): modules, cables, summed inputs. The memories below them are one pool for all ENG_VOICES voices:
  * each slot has an owner, a load frees the loading voice's slots and takes free ones (slot_take), so a big polyphonic
  * patch on one voice and small ones on the others share what the FM-1 has. A patch that finds no free slot does not load
- * (-4 lines, -6 buffers, -7 instances): NO ROOM on the panel, the voice falls back to its old patch. */
+ * (-4 lines, -6 buffers, -7 instances): NO ROOM on the panel, the voice falls back to its old patch.
+ * The pool sizes follow the voice count (engine.h ENG_VOICES): the one-voice build gives its one patch more signal
+ * buffers and instances and keeps one delay and one reverb (docs/HANDOFF.md); the four-voice build has the sizes of
+ * the 1.0.2 panel. Keep DEVICE in web/src/patchbin.ts, the HELLO reply (proto.c) and the MEMORY lines of manual.c in step. */
 #define ENG_MAX_MODULES 32          /* per voice */
 #define ENG_MAX_CABLES 192
 #define MAX_SUM 128                 /* summed inputs per voice (an input of an instance with two or more sources) */
 #define MAX_SRC 256                 /* their sources: a shared input reading a per-note output has one per note */
+#if ENG_VOICES == 1
+#define ENG_MAX_INST 128            /* module instances: a shared module has one, a per-note module one per note */
+#define ENG_NBUF 255u               /* signal buffers of ENG_BLOCK samples (a connected output, a summed input) */
+#define ENG_NDELAY 1                /* delay lines */
+#define ENG_NREV 1                  /* reverb memories */
+#define ENG_NSTRING 8               /* string lines (a per-note module: one per note) */
+#define ENG_NCHORUS 1               /* chorus lines (a shared module, like the delay) */
+#else
 #define ENG_MAX_INST 96             /* module instances, all voices: a shared module has one, a per-note module one per note */
 #define ENG_NBUF 128u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
 #define ENG_NDELAY 4                /* delay lines, all voices (one each when every voice has a delay) */
 #define ENG_NREV 2                  /* reverb memories, all voices */
+#define ENG_NSTRING 6               /* string lines, all voices (a per-note module: one per note) */
+#define ENG_NCHORUS 1               /* chorus lines, all voices (a shared module, like the delay) */
+#endif
 #define RV_LEN 5934u                /* the four combs (1116 1188 1277 1356) and two allpasses (556 441), int16 Q13 */
 #define DELAY_LEN 23000u            /* 521 ms (the reference engine, web/src/modules.ts, has the same length; ping-pong halves it) */
-#define ENG_NSTRING 6               /* string lines, all voices (a per-note module: one per note) */
 #define STR_LEN 1104u               /* ceil(ENG_SR / 40) + 1: the lowest string is 40 Hz, as the reference */
-#define ENG_NCHORUS 1               /* chorus lines, all voices (a shared module, like the delay) */
 #define CH_LEN 927u                 /* ceil(ENG_SR * 0.021): 12 ms +- 8 ms of sweep */
 #define MAX_HELD 16
 
@@ -1985,7 +1997,7 @@ void eng_voice_select(uint32_t v)
 
 uint32_t eng_voice(void) { return VOICE_NO; }
 
-static volatile int32_t vgain[ENG_VOICES] = {ENG_ONE, ENG_ONE, ENG_ONE, ENG_ONE};   /* the mixer: each voice's level, Q16 (0 = muted) */
+static volatile int32_t vgain[ENG_VOICES] = ENG_VOICE_INIT(ENG_ONE, ENG_ONE, ENG_ONE, ENG_ONE);   /* the mixer: each voice's level, Q16 (0 = muted) */
 
 void eng_voice_gain(uint32_t v, int32_t q16)
 {

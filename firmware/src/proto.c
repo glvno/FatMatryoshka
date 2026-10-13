@@ -181,10 +181,10 @@ static int m1_handle(const uint8_t *f, uint32_t n)
     case C_HELLO: {
         uint8_t p[5];
         p[0] = M1_VERSION;
-        p[1] = 32;                                           /* ENG_MAX_MODULES */
-        p[2] = 192;                                          /* ENG_MAX_CABLES */
+        p[1] = ENG_MAX_MODULES;
+        p[2] = ENG_MAX_CABLES;
         p[3] = (uint8_t)((m1_flash_ok() ? 1u : 0u) | (m1_cur_len ? 2u : 0u));
-        p[4] = 4;                                            /* ENG_NDELAY (delay lines shared by the voices) */
+        p[4] = ENG_NDELAY;                                   /* delay lines (shared by the voices) */
         m1_reply(R_INFO, p, 5);
         break;
     }

@@ -3,7 +3,8 @@
 /* Two pages of the panel, after ui.c and before main.c:
  *
  * MIXER (GLO): K1..K4 the level of voice 1..4, the black keys F# G# A# C# (OP1..OP4) mute them (and play no notes then),
- * ALGORITHM sets the polyphony of the selected voice's patch (main.c poly_set).
+ * ALGORITHM sets the polyphony of the selected voice's patch (main.c poly_set). A build with fewer voices (engine.h
+ * ENG_VOICES) has that many rows, mute keys and channel rows.
  *
  * MENU (HOME held 0.7 s, HOME again closes it): the settings, in tabs like Felucca's menu (its layout, its rows are ours).
  * ALGORITHM steps between the tabs, PRESET and SELECT between the rows, K1..K4 and OCT- / OCT+ change the value of the
@@ -32,10 +33,10 @@ static int voice_poly(uint32_t v)       /* the polyphony of voice v's patch (0: 
 }
 
 /* the keys that mute voice 1..4: the black keys F#3, G#3, A#3, C#4 (OP1..OP4) */
-static const uint8_t MIX_KEY_BIT[ENG_VOICES] = {1, 3, 5, 8};
-#define MIX_KEYS ((1u << 1) | (1u << 3) | (1u << 5) | (1u << 8))
+static const uint8_t MIX_KEY_BIT[ENG_VOICES] = ENG_VOICE_INIT(1, 3, 5, 8);
+#define MIX_KEYS ((1u << 1) | (ENG_VOICES > 1 ? 1u << 3 : 0u) | (ENG_VOICES > 2 ? 1u << 5 : 0u) | (ENG_VOICES > 3 ? 1u << 8 : 0u))
 
-static uint8_t mix_vol[ENG_VOICES] = {100, 100, 100, 100};   /* percent, square law (so the lower half has some travel) */
+static uint8_t mix_vol[ENG_VOICES] = ENG_VOICE_INIT(100, 100, 100, 100);   /* percent, square law (so the lower half has some travel) */
 static uint8_t mix_mute[ENG_VOICES];
 
 static void mix_apply(uint32_t v)
@@ -59,8 +60,12 @@ static void mix_row(uint32_t v, int32_t y)
     uint32_t w = (uint32_t)mix_vol[v] * 216u / 100u;
     p = put(p, "K");
     *p++ = (char)('1' + v);
-    p = put(p, "  VOICE ");
-    *p++ = (char)('1' + v);
+    if (ENG_VOICES > 1) {
+        p = put(p, "  VOICE ");
+        *p++ = (char)('1' + v);
+    } else {
+        p = put(p, "  LEVEL");
+    }
     p = put(p, "  (OP");
     *p++ = (char)('1' + v);
     p = put(p, ": MUTE)");
@@ -95,7 +100,7 @@ static void mixer_draw(int full)
 {
     uint32_t v;
     if (full)
-        text5x7(12, 226, "K1-4: LEVEL  OP1-4: MUTE  ALGO: POLY", 1, 0x4208u, C_BG);
+        text5x7(12, 226, ENG_VOICES > 1 ? "K1-4: LEVEL  OP1-4: MUTE  ALGO: POLY" : "K1: LEVEL  OP1: MUTE  ALGO: POLY", 1, 0x4208u, C_BG);
     for (v = 0; v < ENG_VOICES; v++)
         mix_row(v, 32 + 48 * (int32_t)v);
 }
@@ -121,9 +126,16 @@ static void mix_toggle(uint32_t v)
 
 enum { MR_LEDS, MR_CPU, MR_ACCEL, MR_OCT, MR_CH1, MR_CH2, MR_CH3, MR_CH4, MR_CLOCK, MR_PROG, MR_VERSION, MR_PEAK, MR_UPDATE, MR_DEFAULTS, MR_COUNT };
 enum { MT_DISPLAY, MT_CONTROL, MT_MIDI, MT_SYSTEM, MT_MANUAL, MT_COUNT };   /* (MANUAL has no rows: a text) */
-static const char *const ROW_NAME[MR_COUNT] = {"LEDS", "CPU IN BAR", "KNOB ACCEL", "OCTAVE", "V1 CHANNEL", "V2 CHANNEL", "V3 CHANNEL", "V4 CHANNEL", "CLOCK IN", "PROG CHANGE",
+#define MT_NONE MT_COUNT                         /* the tab of a row this build has not (a channel row of a voice it lacks): never shown */
+#define CH_TAB(v) ((v) < ENG_VOICES ? MT_MIDI : MT_NONE)
+#if ENG_VOICES > 1
+#define CH_ROW_NAMES "V1 CHANNEL", "V2 CHANNEL", "V3 CHANNEL", "V4 CHANNEL"
+#else
+#define CH_ROW_NAMES "MIDI CHANNEL", "", "", ""
+#endif
+static const char *const ROW_NAME[MR_COUNT] = {"LEDS", "CPU IN BAR", "KNOB ACCEL", "OCTAVE", CH_ROW_NAMES, "CLOCK IN", "PROG CHANGE",
                                               "VERSION", "CPU PEAK", "UPDATE MODE", "DEFAULTS"};
-static const uint8_t ROW_TAB[MR_COUNT] = {MT_DISPLAY, MT_DISPLAY, MT_CONTROL, MT_CONTROL, MT_MIDI, MT_MIDI, MT_MIDI, MT_MIDI, MT_MIDI, MT_MIDI, MT_SYSTEM, MT_SYSTEM, MT_SYSTEM, MT_SYSTEM};
+static const uint8_t ROW_TAB[MR_COUNT] = {MT_DISPLAY, MT_DISPLAY, MT_CONTROL, MT_CONTROL, CH_TAB(0), CH_TAB(1), CH_TAB(2), CH_TAB(3), MT_MIDI, MT_MIDI, MT_SYSTEM, MT_SYSTEM, MT_SYSTEM, MT_SYSTEM};
 static const char *const TAB_NAME[MT_COUNT] = {"DISPLAY", "CONTROL", "MIDI", "SYSTEM", "MANUAL"};
 
 static uint8_t menu_tab, menu_sel = MR_LEDS;     /* the tab and the selected row (a row number) */
@@ -144,6 +156,23 @@ static uint32_t menu_count(uint32_t tab)
     for (r = 0; r < MR_COUNT; r++)
         n += ROW_TAB[r] == tab;
     return n;
+}
+
+static uint32_t menu_row_at(uint32_t tab, uint32_t k)   /* the k-th row of the tab (its rows need not be contiguous: CH_TAB) */
+{
+    uint32_t r;
+    for (r = 0; r < MR_COUNT; r++)
+        if (ROW_TAB[r] == tab && k-- == 0u)
+            return r;
+    return menu_first(tab);
+}
+
+static uint32_t menu_pos(uint32_t row)                  /* the position of a row within its tab */
+{
+    uint32_t r, k = 0;
+    for (r = 0; r < row; r++)
+        k += ROW_TAB[r] == ROW_TAB[row];
+    return k;
 }
 
 static void menu_value(uint32_t row, char *out)
@@ -262,7 +291,7 @@ static void manual_scroll(int32_t s)
 static void menu_draw(int full)
 {
     static uint8_t shown = 255;
-    uint32_t t, r, n = menu_count(menu_tab), y = 72u, first = menu_first(menu_tab);
+    uint32_t t, r, n = menu_count(menu_tab), y = 72u;
     if (full || shown != menu_tab) {                /* (a new tab: the page is cleared, the hint changes) */
         lcd_fill(0, 24, 240, 216, C_BG);
         text5x7(12, 230, menu_tab == MT_MANUAL ? "SELECT: SCROLL      ALGO: TAB" : "ALGO: TAB  PRESET: ROW  K1-4: VALUE", 1, 0x4208u, C_BG);
@@ -279,8 +308,10 @@ static void menu_draw(int full)
         manual_draw();
         return;
     }
-    for (r = 0; r < n; r++)
-        menu_row_draw(first + r, y + r * 24u, first + r == menu_sel);
+    for (r = 0; r < n; r++) {
+        uint32_t row = menu_row_at(menu_tab, r);
+        menu_row_draw(row, y + r * 24u, row == menu_sel);
+    }
     if (y + n * 24u < 224u)
         lcd_fill(0, y + n * 24u, 240, 224u - (y + n * 24u), C_BG);   /* (the rows a longer tab had) */
 }
@@ -343,11 +374,11 @@ static void menu_set_row(uint32_t row, int32_t s)       /* s > 0: the next value
 
 static void menu_move(int32_t s)                        /* PRESET / SELECT: the next / previous row of the tab */
 {
-    uint32_t first = menu_first(menu_tab), n = menu_count(menu_tab), k = menu_sel - first;
+    uint32_t n = menu_count(menu_tab), k = menu_pos(menu_sel);
     if (!n)
         return;
     k = (k + (s > 0 ? 1u : n - 1u)) % n;
-    menu_sel = (uint8_t)(first + k);
+    menu_sel = (uint8_t)menu_row_at(menu_tab, k);
     update_arm = 0;
     ui_dirty = 1;
 }

@@ -9,7 +9,7 @@
 #define C_BG 0x0000u
 #define C_FG 0xFFFFu
 /* the accent: each voice has its own colour (orange, purple, cyan, green) */
-static const uint16_t VOICE_COLOR[ENG_VOICES] = {0xFD20u, 0xA19Fu, 0x07FFu, 0x7FE0u};
+static const uint16_t VOICE_COLOR[ENG_VOICES] = ENG_VOICE_INIT(0xFD20u, 0xA19Fu, 0x07FFu, 0x7FE0u);
 #define C_ACC (VOICE_COLOR[eng_voice()])
 #define C_DIM 0x7BEFu
 #define C_RED 0xF800u
@@ -35,15 +35,14 @@ static struct {
     uint8_t ch[ENG_VOICES];             /* the MIDI channel of each voice: 1..16, 0 all (omni) */
     uint8_t clock_in;                   /* MIDI clock drives the clock output */
     uint8_t prog_chg;                   /* MIDI program change loads a preset */
-} cfg = {2, 1, 1, {1, 2, 3, 4}, 1, 1};
+} cfg = {2, 1, 1, ENG_VOICE_INIT(1, 2, 3, 4), 1, 1};
 static void cfg_defaults(void)
 {
+    uint32_t v;
     cfg.cpu_bar = cfg.accel = cfg.clock_in = cfg.prog_chg = 1;
     cfg.leds = 2;
-    cfg.ch[0] = 1;
-    cfg.ch[1] = 2;
-    cfg.ch[2] = 3;
-    cfg.ch[3] = 4;
+    for (v = 0; v < ENG_VOICES; v++)
+        cfg.ch[v] = (uint8_t)(v + 1u);
 }
 static uint32_t cpu_pct;                /* the audio ISR's peak time over the last half second, in % of the 2.9 ms half buffer */
 #define sel (vs[eng_voice()].module)
@@ -357,8 +356,10 @@ static void header_draw(void)
         bar_text(b, C_RED);
     } else {
         char b[40], *p = b;
-        *p++ = (char)('1' + eng_voice());
+#if ENG_VOICES > 1
+        *p++ = (char)('1' + eng_voice());     /* the voice's number before the name */
         *p++ = ' ';
+#endif
         p = put(p, patch_label ? patch_label : "");
         *p = 0;
         if (cfg.cpu_bar) {

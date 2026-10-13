@@ -35,7 +35,17 @@ Proposed one-voice sizes: `ENG_NBUF` 255, `ENG_MAX_INST` 128, `ENG_NSTRING` 8, `
 `ENG_NCHORUS` 1, plus the grain buffer. Keep `DEVICE` in `web/src/patchbin.ts` and the MEMORY lines of
 `firmware/src/manual.c` in step with the defines at the top of `firmware/src/engine.c`.
 
-## Step 1: the `ENG_VOICES` build switch (not started)
+## Step 1: the `ENG_VOICES` build switch (DONE 2026-10-13, host-tested; not built with the JieLi toolchain)
+
+Done as planned below, with two deviations: (a) the saved-state record stays version 2 with four voice slots (`BLOB_NV`)
+instead of a version 3 with a voice count, so a record moves between the builds (a one-voice build writes voice 1 plus
+empty slots and reads the first slot of a four-voice record); (b) initialisers use `ENG_VOICE_INIT(a, b, c, d)` (engine.h)
+instead of loops. Rows of the menu's MIDI tab are no longer contiguous (`CH_TAB`), so the menu walks them by membership
+(`menu_row_at`, `menu_pos`). Stand-in sizes: one voice 302,338 B of 417,792 (115 KB free; the handoff's "about 230 KB"
+below had left out the 255 buffers, 128 KB), four voices 408,482 B as before. `tools/pool_sizes.sh [-DENG_VOICES=4]` prints that estimate. Build: `M1_VOICES=4 python3 tools/build.py`;
+host tests: `M1_VOICES=4 tools/golden.sh` etc. (default: one voice). Both pass golden (65), arp, proto, previews.
+
+### The plan as written before
 
 `ENG_VOICES` is defined in `firmware/src/engine.h`. Places that assume four (C initialisers with four elements fail to
 compile with fewer; found with grep in the last session):

@@ -7,10 +7,11 @@
 set -e
 cd "$(dirname "$0")/.."
 TOL="${1:-0.05}"
+CF="${M1_VOICES:+-DENG_VOICES=$M1_VOICES}"     # M1_VOICES=4: the four-voice build (default: engine.h, one voice)
 (cd web && npx vite-node scripts/golden.ts)
 mkdir -p build
-gcc -O1 -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -o build/host_test firmware/test/host_test.c -lm
-gcc -O1 -Wall -Wextra -Wno-unused-parameter -Wno-unused-result -o build/proto_test firmware/test/proto_test.c -lm
+gcc -O1 -Wall -Wextra -Wno-unused-parameter -Wno-unused-result $CF -o build/host_test firmware/test/host_test.c -lm
+gcc -O1 -Wall -Wextra -Wno-unused-parameter -Wno-unused-result $CF -o build/proto_test firmware/test/proto_test.c -lm
 fail=0
 build/proto_test build/golden/303-acid.m1p build/golden/proto.syx $(cat build/golden/proto.args) build/golden/proto-slot.syx || fail=1
 for p in build/golden/*.m1p; do

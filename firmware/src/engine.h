@@ -2,7 +2,7 @@
  * Copyright (C) 2026 morgulbrut */
 /* Fixed-point patch engine: the C port of web/src/engine.ts and modules.ts. Integer only (the FM-1 has no FPU).
  * Signals and parameters are Q16.16 (1.0 = 65536); the sample rate is ENG_SR. ENG_VOICES patches play at once (the
- * panel's "voices"), each polyphonic with 1..ENG_MAX_POLY notes, as the reference. */
+ * panel's "voices"; 1 unless the build says otherwise), each polyphonic with 1..ENG_MAX_POLY notes, as the reference. */
 #pragma once
 #include <stdint.h>
 
@@ -46,7 +46,23 @@ void eng_all_notes_off(void);
  * _v calls name the voice (the arpeggiator plays its own). eng_render mixes all voices. The memories (signal buffers,
  * module instances, delay / reverb / string / chorus lines) are pools shared by the voices: a patch loads when enough is
  * free (engine.c). */
-#define ENG_VOICES 4                  /* patches that play at once, voices 1..4 */
+#ifndef ENG_VOICES
+#define ENG_VOICES 1                  /* patches that play at once, voices 1..ENG_VOICES (build switch: -DENG_VOICES=4 for the four-voice panel) */
+#endif
+#if ENG_VOICES < 1 || ENG_VOICES > 4
+#error "ENG_VOICES is 1..4 (the panel has four voice colours, mute keys and channel rows)"
+#endif
+/* an initialiser with one entry per voice: ENG_VOICE_INIT(a, b, c, d) is {a} .. {a, b, c, d} (entries with commas go
+ * through a macro of their own, so the commas are inside parentheses) */
+#if ENG_VOICES == 1
+#define ENG_VOICE_INIT(a, b, c, d) {a}
+#elif ENG_VOICES == 2
+#define ENG_VOICE_INIT(a, b, c, d) {a, b}
+#elif ENG_VOICES == 3
+#define ENG_VOICE_INIT(a, b, c, d) {a, b, c}
+#else
+#define ENG_VOICE_INIT(a, b, c, d) {a, b, c, d}
+#endif
 void eng_voice_select(uint32_t v);
 void eng_voice_gain(uint32_t v, int32_t q16);        /* the mixer: a voice's level, Q16 (0 = muted) */
 uint32_t eng_voice(void);

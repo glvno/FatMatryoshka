@@ -11,7 +11,9 @@ Then there's a matrix for to map p1 and p2 as well as k1-4 to some parameter of 
 
 ### Voices
 
-A patch is mono unless you pick a voice count (2..8) on the Main module's card (or on the FM-1: GLO opens the mixer, where the ALGORITHM encoder sets the polyphony of the selected voice's patch, SAVE keeps it). The FM-1 itself plays four patches at once, which its panel calls voices 1..4 (SEL switches between them); each of them can be polyphonic. Like on the Nord Modular you don't patch the voices yourself: every module that hears the Main module's pitch, gate or vel (through any chain of cables, p1 / p2 included) runs once per voice, marked `×4` on its card. Delay, reverb and output always run once and receive the sum of the voices; a module that hears no voice signal (a free-running LFO, a noise) runs once and feeds every voice. Notes take a free voice first, then the oldest sounding one. On the FM-1 each voice costs the CPU time of the per-voice modules, so 3 or 4 voices of a typical patch is the realistic range; the voices row on the Main card shows the buffer count and turns red when a patch needs more than the firmware has (the buffers, instances and effect lines are shared by the four patches the FM-1 plays, so what fits also depends on the other three).
+A patch is mono unless you pick a voice count (2..8) on the Main module's card (or on the FM-1: GLO opens the mixer, where the ALGORITHM encoder sets the polyphony of the patch, SAVE keeps it). Like on the Nord Modular you don't patch the voices yourself: every module that hears the Main module's pitch, gate or vel (through any chain of cables, p1 / p2 included) runs once per voice, marked `×4` on its card. Delay, reverb and output always run once and receive the sum of the voices; a module that hears no voice signal (a free-running LFO, a noise) runs once and feeds every voice. Notes take a free voice first, then the oldest sounding one. On the FM-1 each voice costs the CPU time of the per-voice modules, so 3 or 4 voices of a typical patch is the realistic range; the voices row on the Main card shows the buffer count and turns red when a patch needs more than the firmware has.
+
+The firmware plays one patch at a time (the default build). The four-patch firmware of upstream 1.0.2, where the panel calls the four patches voices 1..4 (SEL switches between them, each with its own MIDI channel, arpeggiator and mixer level, the pools shared between them), is a build switch: `M1_VOICES=4 python3 tools/build.py`.
 
 ## FM-1
 
@@ -26,8 +28,8 @@ Knobs and stuff.
 * **SEQ** opens the arpeggiator's rhythm page (euclid steps, pulses, rotation, rate)
 * **LFO** opens arpeggiator's chaos page, adds some randomness and lets select how many octaves the arpeggio spans.
 * **HOME** opens the main page of the patch
-* **GLO** opens the mixer: K1-K4 set the level of the four voices (patches), the black keys F# G# A# C# mute them, ALGORITHM sets the polyphony of the selected one (the patch reloads with the new count)
-* **SEL** switches to the next voice (patch); keys, knobs, LCD and the editor act on it
+* **GLO** opens the mixer: K1 sets the level, the black key F# mutes, ALGORITHM sets the polyphony (the patch reloads with the new count). Four-voice build: K1-K4 and F# G# A# C# for the four voices (patches), ALGORITHM acts on the selected one
+* **SEL** switches to the next voice (patch) in the four-voice build; keys, knobs, LCD and the editor act on it. Unused in the one-voice build
 
 ## Hack it
 
@@ -55,7 +57,7 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 ## Level/rate envelope, string, wavetable, chorus
 
 - **Env L/R** is the DX7 envelope: on a gate it runs to `l1`, `l2`, `l3` in `r1`, `r2`, `r3`, holds `l3`, and releases to `l4` in `r4`. Rising segments are linear (the rate that covers 0..1 in `r`), falling ones exponential (99 % in `r`). Put it on a VCA for percussion, and through a Scale on an oscillator's `pitch` for a drum's pitch drop.
-- **String** is a plucked string (Karplus-Strong). Main `pitch` and `gate` play it: a `gate` fires a one-period burst of `noise` or a `pulse` into a loop that decays to −60 dB in `decay`; `damp` darkens it. Anything into `exc` plucks or rings it too, so a short oscillator click is a different pick, and a steady signal makes it a tuned resonator. Lowest note 40 Hz; the FM-1 has 6 string lines, shared by its four voices.
+- **String** is a plucked string (Karplus-Strong). Main `pitch` and `gate` play it: a `gate` fires a one-period burst of `noise` or a `pulse` into a loop that decays to −60 dB in `decay`; `damp` darkens it. Anything into `exc` plucks or rings it too, so a short oscillator click is a different pick, and a steady signal makes it a tuned resonator. Lowest note 40 Hz; the FM-1 has 8 string lines (6 in the four-voice build, shared by its voices).
 - **Wavetable** is an oscillator with four banks of eight single-cycle frames (`analog`: sine, triangle, saw, square, pulses; `organ`: drawbar sets; `formant`: a moving bump of harmonics; `digital`: steps and corners). `pos` sweeps the frames with crossfades; an LFO into `p1` on `pos` is the classic wavetable sweep. It has `pm` and `sync` like the Oscillator (the FM path is not oversampled), and it is band-limited in three steps so high notes stay clean.
 - **Chorus** is a stereo chorus (two taps in quadrature around 12 ms, swept up to ±8 ms) with `l` and `r` outputs for the Output. Like the Delay it runs once for all voices; one per patch on the FM-1.
 

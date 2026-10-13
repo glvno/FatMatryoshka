@@ -3,11 +3,12 @@
 # Render the device LCD of a factory preset on the host:
 #   tools/ui_preview.sh OUT.png PRESET [MODULE [OCTAVE [PAGE [ARP_STEP [MENU_TAB [MANUAL_LINE [POLY]]]]]]]
 # PAGE 0 module, 1..3 arpeggiator, 4 mixer, 5 menu (MENU_TAB 0..4, 4 = MANUAL from MANUAL_LINE); POLY = the patch's polyphony
+# M1_VOICES=4 previews the four-voice build (default: engine.h, one voice)
 set -e
 cd "$(dirname "$0")/.."
 out="$1"; shift
 mkdir -p build
-gcc -O1 -Wno-unused-function -Wno-unused-result -o build/ui_preview firmware/test/ui_preview.c
+gcc -O1 -Wno-unused-function -Wno-unused-result ${M1_VOICES:+-DENG_VOICES=$M1_VOICES} -o build/ui_preview firmware/test/ui_preview.c
 build/ui_preview build/ui_preview.ppm "$@"
 python3 -I - "$out" <<'PY'
 import sys, zlib, struct

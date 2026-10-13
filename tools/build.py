@@ -200,6 +200,9 @@ def build_app():
     flags.append(f'-DFELUCCA_ID="{PRODUCT}"')
     if VERSION:
         flags.append(f'-DFELUCCA_VERSION="{VERSION}"')
+    v = os.environ.get("M1_VOICES")             # firmware/src/engine.h ENG_VOICES: patches that play at once (unset: one)
+    if v in ("1", "2", "3", "4"):
+        flags.append(f"-DENG_VOICES={v}")
     # modular.c goes to LLVM IR without the optimizer, the main-loop functions (UI, stores, editor) are
     # marked minsize (tools/size_fns.py), then the IR is compiled at -Os. FELUCCA_SIZE=0: -Os everywhere
     size = os.environ.get("FELUCCA_SIZE") == "1"       # tools/size_fns.py is not part of Modular-1 (yet)

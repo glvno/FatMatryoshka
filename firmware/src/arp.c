@@ -140,9 +140,9 @@ typedef struct {
 } arp_t;
 
 #define ARP_CFG_DEFAULT {ARP_UP, 5, 60, 1, 0, 0, 0, 16, 16, 0, RATE_1_16, 120}   /* Maj Pentatonic, as the original's default set */
-#define ARP_N 4u                        /* one per voice (ENG_VOICES) */
-static arp_t AV[ARP_N] = {{ARP_CFG_DEFAULT, 1, 0, 0, 0, {.rng = 0x2545F491u}}, {ARP_CFG_DEFAULT, 1, 0, 0, 0, {.rng = 0x6C8E9CF5u}},
-                          {ARP_CFG_DEFAULT, 1, 0, 0, 0, {.rng = 0x1B873593u}}, {ARP_CFG_DEFAULT, 1, 0, 0, 0, {.rng = 0x3C6EF372u}}};
+#define ARP_N ((uint32_t)ENG_VOICES)   /* one per voice (engine.h) */
+#define ARP_INIT(seed) {ARP_CFG_DEFAULT, 1, 0, 0, 0, {.rng = seed}}
+static arp_t AV[ARP_N] = ENG_VOICE_INIT(ARP_INIT(0x2545F491u), ARP_INIT(0x6C8E9CF5u), ARP_INIT(0x1B873593u), ARP_INIT(0x3C6EF372u));
 static arp_t *arp_p = AV;
 #define arp_c (arp_p->cfg)
 #define arp_dirty (arp_p->dirty)
@@ -160,6 +160,15 @@ static void arp_sync_scale(void)
         AV[v].cfg.scale = AV[0].cfg.scale;
         AV[v].dirty = 1;
     }
+}
+
+static int arp_any_play(void)           /* an arpeggiator runs on some voice (its clock, not MIDI's, drives the clock output) */
+{
+    uint32_t v;
+    for (v = 0; v < ARP_N; v++)
+        if (AV[v].play)
+            return 1;
+    return 0;
 }
 
 static uint32_t euclid_gate(uint32_t steps, uint32_t pulses, uint32_t i)    /* floor((i+1)p/n) - floor(ip/n) */

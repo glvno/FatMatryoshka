@@ -222,3 +222,10 @@ SysEx over USB MIDI. The device *pulls* blocks: it sends read requests (cmd 0x30
 ## Handoff
 
 - `docs/HANDOFF.md` (2026-10-13): the decisions after the upstream merge (one-voice build via `ENG_VOICES`, one delay + one reverb, granular budget, feature order) and the plan for the first new modules. Read it before continuing that work.
+
+## One-voice build switch (handoff step 1, done 2026-10-13; host-tested, NOT built with the JieLi toolchain, not flashed)
+
+- `ENG_VOICES` (engine.h) defaults to 1; `M1_VOICES=4 python3 tools/build.py` and `M1_VOICES=4 tools/golden.sh | arp_test.sh | ui_preview.sh` build the four-voice panel. Pool sizes follow the count (`#if ENG_VOICES == 1` at the top of engine.c: 255 buffers, 128 instances, 1 delay, 1 reverb, 8 strings, 1 chorus; else the 1.0.2 sizes). `ENG_VOICE_INIT(a, b, c, d)` makes per-voice initialisers (arp.c `ARP_INIT`, menu.c, ui.c, main.c, engine.c `vgain`).
+- Panel with one voice: SEL does nothing (LED off), no voice number in the top bar, the mixer has one row `K1 LEVEL (OP1: MUTE)`, the MIDI tab one `MIDI CHANNEL` row (`CH_TAB`, hidden rows have tab `MT_NONE`; the menu walks rows by `menu_row_at` / `menu_pos`, not `first + r`), loading line `PATCH`, manual text under `#if ENG_VOICES > 1`. `arp_any_play()` (arp.c) is the clock-source test.
+- Saved state: record version 2 with `BLOB_NV` 4 slots in both builds (the handoff's "version 3" was not needed). HELLO reply uses the defines; `DEVICE` in patchbin.ts is 255 / 128 (the one-voice build).
+- `tools/pool_sizes.sh [-DENG_VOICES=4]` is the stand-in pool estimate (clang for riscv32 `-S` on modular.c, sums the `.size` of `.pool` symbols; runs on this Mac): one voice 302,338 B of 417,792 B (115 KB free; the granular buffer of 88 KB fits), four voices 408,482 B.

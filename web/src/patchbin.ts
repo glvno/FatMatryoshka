@@ -71,9 +71,9 @@ export function encodePatch(p: Patch): Uint8Array {
   return out;
 }
 
-/** what the firmware engine (firmware/src/engine.c) can hold */
-/** the FM-1's pools, shared by its four voices (firmware/src/engine.c): what one patch may use at most, with the other voices empty */
-export const DEVICE = { buffers: 128, instances: 96, voices: 8 } as const;
+/** the FM-1's pools (firmware/src/engine.c, the one-voice build: ENG_NBUF, ENG_MAX_INST, ENG_MAX_POLY); the four-voice
+ * build (-DENG_VOICES=4) has 128 buffers and 96 instances shared by its four patches */
+export const DEVICE = { buffers: 255, instances: 128, voices: 8 } as const;
 
 /**
  * What a patch costs on the FM-1, counted the way eng_load allocates: one instance per shared module, one per voice for
