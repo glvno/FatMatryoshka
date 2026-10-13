@@ -9,7 +9,7 @@
 #define ENG_SR 44100u
 #define ENG_BLOCK 128u
 #define ENG_ONE 65536
-#define ENG_PATCH_VERSION 11
+#define ENG_PATCH_VERSION 12
 #define ENG_MAX_POLY 8                /* notes a patch plays at once (its header byte 3) */
 
 /* Install a patch from its binary form (web/src/patchbin.ts) into the selected voice. 0 on success, negative on error
@@ -21,6 +21,8 @@ int32_t eng_get_param(uint32_t module, uint32_t param);
 int32_t eng_get_eff(uint32_t module, uint32_t param);               /* what the last block used: base + modulation */
 void eng_set_att(uint32_t module, uint32_t input, int32_t q16);      /* attenuverter of p1 / p2, Q16 */
 int32_t eng_att(uint32_t module, uint32_t input);
+void eng_set_bypass(uint32_t module, int on);                        /* bypass: the outputs carry the through input (defs.h thru) or silence; the state is kept */
+int eng_bypass(uint32_t module);
 int eng_nmodules(void);
 int eng_ncables(void);
 void eng_cable(uint32_t i, uint32_t *from, uint32_t *from_port, uint32_t *to, uint32_t *to_port);   /* cable i of the patch */

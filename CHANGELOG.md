@@ -16,11 +16,13 @@ The merge of the four-voice firmware (1.0.2) with the polyphony, assembly and mo
 - Module **Compressor** (`dyn`): a peak envelope follower with an `env` output and a compressor (threshold, ratio, attack, release, makeup) with a `side` input.
 - Module **Ladder**: a four-pole ladder low pass with drive and self-oscillating resonance (outputs `lp24`, `lp12`; the saturator sits inside the loop). Cutoff modulation per block.
 - The LFO's restart input is `reset` (it was `sync` on the development branch; patches are converted on load) next to upstream's `clk`.
+- **Module on / off (bypass):** the ⏻ button on a card (editor), the FX button for the selected module (FM-1). A bypassed module passes its main input to every output (or is muted when it has none) and keeps its state. Binary patch format 12 (bit 7 of the type byte), protocol command BYPASS (0x22).
 
 ### Changed
 - **One patch at a time:** the voice count is a build switch (`ENG_VOICES`, engine.h; `M1_VOICES=4` for `tools/build.py` and the host test scripts) and the default build has one voice. With one voice SEL does nothing, the top bar shows the patch name without a voice number, the mixer has one row (K1 level, F# mute, ALGORITHM polyphony), the MIDI tab one `MIDI CHANNEL` row, the loading screen says `PATCH`, and the manual reads accordingly. The saved state record keeps four voice slots, so it moves between the builds (a one-voice build reads voice 1 of a four-voice record and writes empty slots for the rest).
 - **Memory:** the signal buffers, module instances, delay / reverb / string / chorus lines are pools shared by the voices (each slot has an owner; a load frees and takes its voice's slots). A patch loads when enough is free, else NO ROOM. One-voice build: 255 buffers, 128 instances, 1 delay (521 ms), 1 reverb, 8 strings, 1 chorus, 1 granular line (about 391 KB of the 418 KB pool in a stand-in compile). Four-voice build: 126 buffers, 92 instances, 4 delays, 2 reverbs, 6 strings, 1 chorus, no granular line. Per voice: 32 modules, 192 cables, patch size 3072 bytes. The HELLO reply and the editor's budget (`DEVICE`) follow the build.
 - Binary patch format 10 (the Main module's outputs are pitch gate vel k1..k4 clock spread). Older stored patches fall back to the factory patch.
+- **Sliders and ranges:** logarithmic sliders in the editor no longer round to whole numbers (glide time, envelope rates, chorus / phaser rate, drive, grain size, decays were stuck on 0, 1, 2 ...). Filter and Ladder cutoff go to 16 kHz (was 4 kHz). LFO rate and the ADSR times are logarithmic. The Delay's time knob ends at 520 ms, the length of its line (it went to 1000 ms and did nothing beyond 521).
 - The manual's MEMORY section lists the shared limits.
 
 ### Not verified

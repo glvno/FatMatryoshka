@@ -104,6 +104,12 @@ const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw']
     if (live() && !uploading) device.param(editor.patch, id, name, value);
     else if (live()) dirty = true;
   },
+  onBypass(id, on) {
+    host.send({ t: 'bypass', id, on });
+    queueSave(editor.patch);
+    if (live() && !uploading) device.bypass(editor.patch, id, on);
+    else if (live()) dirty = true;
+  },
   onLayout(p) {
     queueSave(p);
   },

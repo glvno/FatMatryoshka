@@ -8,7 +8,7 @@
 // FM-1 panel is shared but its pitch / gate / vel outputs are per voice. With one voice this is exactly the mono engine.
 
 import { IMPLS, type Ctx, type ModuleImpl, type Voice } from './modules';
-import { defaultMap, modulate, processingOrder, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Cable, type Patch, type Source } from './patch';
+import { defaultMap, modulate, processingOrder, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Cable, type Patch, type Source, thruInput } from './patch';
 
 export const BLOCK = 128;
 
@@ -32,6 +32,9 @@ interface Node {
   sources: { port: string; from: Node; fromPort: string }[];
   /** runs once per voice */
   poly: boolean;
+  /** bypassed: run() copies `thru` (or silence) to the outputs instead of processing */
+  bypass: boolean;
+  thru: string | undefined;
   inst: Inst[];
   /** the FM-1 panel with several voices: its pitch / gate / vel, one buffer per voice */
   vout: Record<string, Float32Array[]> | null;
@@ -119,12 +122,15 @@ export class Engine {
             connected: {},
             sources: [],
             poly: isPoly,
+            bypass: false,
+            thru: thruInput(impl.def),
             inst: Array.from({ length: ninst }, () => this.newInst(impl)),
             vout: panelVoices ? Object.fromEntries([...VOICE_PORTS].map((p) => [p, Array.from({ length: panelVoices }, () => new Float32Array(BLOCK))])) : null,
           };
       node.params = { ...m.params };
       node.att = m.att ? [m.att[0], m.att[1]] : [1, 1];
       node.map = Object.fromEntries(SOURCES.map((s) => [s, [...(m.map?.[s] ?? [])]])) as Record<Source, string[]>;
+      node.bypass = !!m.bypass;
       node.sources = [];
       node.connected = {};
       next.set(m.id, node);
@@ -149,6 +155,12 @@ export class Engine {
   setAtt(id: number, index: number, value: number): void {
     const n = this.nodes.get(id);
     if (n && (index === 0 || index === 1)) n.att[index] = value;
+  }
+
+  /** bypass a module (its state is kept: it resumes where it stopped) */
+  setBypass(id: number, on: boolean): void {
+    const n = this.nodes.get(id);
+    if (n && n.type !== 'fm1' && n.type !== 'output') n.bypass = on;
   }
 
   /** does this output differ per voice? */
@@ -312,6 +324,12 @@ export class Engine {
   }
 
   private run(node: Node, inst: Inst, voice: VoiceState, out: Record<string, Float32Array>, n: number): void {
+    if (node.bypass) {
+      const src = node.thru ? inst.inp[node.thru] : undefined;
+      for (const name in out) if (src) out[name].set(src.subarray(0, n));
+      else out[name].fill(0, 0, n);
+      return;
+    }
     const ctx: Ctx = { sr: this.sampleRate, n, inp: inst.inp, out, connected: node.connected, p: inst.eff, voice };
     node.impl.process(ctx, inst.state);
     if (node.type === 'fm1' && voice.retrig) {

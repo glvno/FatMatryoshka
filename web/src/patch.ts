@@ -65,7 +65,12 @@ export interface ModuleDef {
   params: ParamDef[];
   /** the module has the two parameter inputs p1, p2 (attenuverters) and the source matrix: every module but the FM-1 panel (the input) and the output */
   paramInputs?: boolean;
+  /** the input a bypassed module passes to all of its outputs; default: the input called `in`, or none (the outputs are silent) */
+  thru?: string;
 }
+
+/** the input a bypassed module of this definition passes through, undefined when it mutes instead */
+export const thruInput = (def: ModuleDef): string | undefined => def.thru ?? (def.inputs.some((p) => p.name === 'in') ? 'in' : undefined);
 
 export interface Endpoint {
   module: number;
@@ -88,6 +93,8 @@ export interface ModuleInst {
   /** the matrix: the parameters each source controls. p1 / p2 add (input mean x attenuverter x range) to them, k1..k4 are
    * the FM-1 knobs, which nudge them while the module is selected on the device (only on modules with paramInputs) */
   map?: Record<Source, string[]>;
+  /** bypassed: the module does not run; its outputs carry its through input (thruInput) or silence. Not on the panel or the output. */
+  bypass?: boolean;
 }
 
 export interface Patch {
@@ -258,6 +265,8 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
       delete m.att;
       delete m.map;
     }
+    if (m.bypass && m.type !== 'fm1' && m.type !== 'output') m.bypass = true;
+    else delete m.bypass;
     fixMatrix(m, def);
   }
   if (p.version === 1) {

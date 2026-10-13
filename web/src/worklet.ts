@@ -13,6 +13,7 @@ export type HostMsg =
   | { t: 'patch'; patch: Patch }
   | { t: 'param'; id: number; name: string; value: number }
   | { t: 'att'; id: number; index: number; value: number }
+  | { t: 'bypass'; id: number; on: boolean }
   | { t: 'on'; note: number; vel: number }
   | { t: 'off'; note: number }
   | { t: 'clock' }
@@ -36,6 +37,7 @@ class ModularProcessor extends AudioWorkletProcessor {
         }
         else if (m.t === 'param') this.engine.setParam(m.id, m.name, m.value);
         else if (m.t === 'att') this.engine.setAtt(m.id, m.index, m.value);
+        else if (m.t === 'bypass') this.engine.setBypass(m.id, m.on);
         else if (m.t === 'on') this.engine.noteOn(m.note, m.vel);
         else if (m.t === 'off') this.engine.noteOff(m.note);
         else if (m.t === 'clock') this.engine.clockTick();

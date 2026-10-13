@@ -29,6 +29,7 @@ static int m1_store(const uint8_t *p, uint32_t n)
     return 0;
 }
 static int m1_flash_ok(void) { return 1; }
+static void m1_ui_changed(void) {}
 static int m1_slot_write(uint32_t slot, const char *name, const uint8_t *p, uint32_t len)
 {
     slot_writes++;

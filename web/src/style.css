@@ -87,6 +87,10 @@ progress { width: 100%; }
 .module.assembly { border-color: var(--accent); }
 .module.assembly .mhead { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); border-radius: 8px 8px 0 0; }
 .mhead .tools, .fhead .tools { display: flex; gap: 2px; align-items: center; }
+button.pw { padding: 0 4px; line-height: 1.3; font-size: 12px; border: 1px solid var(--muted); border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; }
+button.pw.on { color: var(--accent); border-color: var(--accent); }
+.module.off .mbody { opacity: 0.45; }
+.module.off .mhead { background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--muted) 18%, transparent) 6px 8px); }
 button.sm { padding: 0 5px; line-height: 1.4; font-size: 11px; font-weight: normal; }
 button.tog { padding: 0 2px; line-height: 1; border: none; background: transparent; color: var(--accent); font-size: 11px; cursor: pointer; }
 .rename { cursor: text; }

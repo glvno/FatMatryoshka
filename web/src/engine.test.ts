@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import { Engine } from './engine';
-import { DEFS } from './modules';
+import { DEFS, DELAY_TIME_MAX, DELAY_TIME_MIN } from './modules';
 import { addModule, connect, disconnect, emptyPatch, fromUnit, modulate, processingOrder, removeModule, toUnit, validatePatch, voiceSplit, type Patch } from './patch';
 import { PRESETS } from './presets';
 import { encodePatch, recordSize } from './patchbin';
@@ -288,11 +288,11 @@ describe('engine', () => {
     const cutoff = DEFS.filter.params.find((q) => q.name === 'cutoff')!;
     expect(cutoff.log).toBe(true);
     expect(toUnit(cutoff, 20)).toBeCloseTo(0, 6);
-    expect(toUnit(cutoff, 4000)).toBeCloseTo(1, 6);
+    expect(toUnit(cutoff, 16000)).toBeCloseTo(1, 6);
     expect(cutoff.bend).toBe(true); // inverse logarithmic: the position is the square root of the octave fraction
-    expect(fromUnit(cutoff, 0.5)).toBeCloseTo(20 * Math.pow(200, 0.25), 3);
+    expect(fromUnit(cutoff, 0.5)).toBeCloseTo(20 * Math.pow(800, 0.25), 3);
     expect(toUnit(cutoff, fromUnit(cutoff, 0.3))).toBeCloseTo(0.3, 9);
-    expect(modulate(cutoff, 200, 5)).toBeCloseTo(4000, 6);
+    expect(modulate(cutoff, 200, 5)).toBeCloseTo(16000, 6);
     const level = DEFS.osc.params.find((q) => q.name === 'level')!;
     expect(modulate(level, 0.5, 0.25)).toBeCloseTo(0.75, 9); // the others stay linear
   });
@@ -728,6 +728,93 @@ describe('frequency shifter', () => {
     expect(rms(up)).toBeCloseTo(0.5 / Math.SQRT2, 2);
     expect(Math.abs(freq(rig({ shift: -100, mix: 1 }, 'up')) - 340)).toBeLessThan(12);
     expect(Math.abs(freq(rig({ shift: 0, mix: 0 }, 'up')) - 440)).toBeLessThan(5);
+  });
+});
+
+describe('bypass', () => {
+  /** osc (440 Hz saw) -> filter at 100 Hz -> output; the filter's bypass flag as given */
+  function rig(bypass: boolean, live?: boolean): { e: Engine; p: Patch; f: number } {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    const f = addModule(p, DEFS.filter, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    Object.assign(o.params, { wave: 2, level: 0.5, coarse: 9 });
+    Object.assign(f.params, { cutoff: 100, res: 0 });
+    out.params.level = 1;
+    if (bypass && !live) f.bypass = true;
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: f.id, port: 'in' });
+    connect(p, DEFS, { module: f.id, port: 'lp24' }, { module: out.id, port: 'l' });
+    e.load(p);
+    if (bypass && live) e.setBypass(f.id, true);
+    return { e, p, f: f.id };
+  }
+
+  it('passes the input to every output of a bypassed processor and keeps its state', () => {
+    const on = rig(false);
+    render(on.e, 4800);
+    expect(rms(render(on.e, SR).l)).toBeLessThan(0.1); // a 440 Hz saw through a 100 Hz low pass
+    const off = rig(true);
+    render(off.e, 4800);
+    const dry = render(off.e, SR).l;
+    expect(rms(dry)).toBeCloseTo(0.5 / Math.sqrt(3), 1); // the saw itself
+    expect(Math.abs(freq(dry) - 440)).toBeLessThan(5);
+    const live = rig(true, true); // the live switch does the same
+    render(live.e, 4800);
+    expect(rms(render(live.e, SR).l)).toBeCloseTo(0.5 / Math.sqrt(3), 1);
+    live.e.setBypass(live.f, false); // back on: the filter resumes
+    render(live.e, 4800);
+    expect(rms(render(live.e, SR).l)).toBeLessThan(0.1);
+  });
+
+  it('mutes a bypassed source and copies the through input to both outputs of a pan', () => {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    const lfo = addModule(p, DEFS.lfo, 0, 0);
+    const pan = addModule(p, DEFS.pan, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    Object.assign(o.params, { wave: 0, level: 0.5 });
+    Object.assign(lfo.params, { wave: 1, rate: 3, depth: 1 });
+    pan.params.pan = 1; // hard right when it runs
+    out.params.level = 1;
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: pan.id, port: 'in' });
+    connect(p, DEFS, { module: lfo.id, port: 'out' }, { module: pan.id, port: 'pos' });
+    connect(p, DEFS, { module: pan.id, port: 'l' }, { module: out.id, port: 'l' });
+    connect(p, DEFS, { module: pan.id, port: 'r' }, { module: out.id, port: 'r' });
+    e.load(p);
+    render(e, 4800);
+    const a = render(e, SR);
+    expect(rms(a.l)).toBeLessThan(rms(a.r)); // panned right, swinging with the LFO
+    lfo.bypass = true;
+    pan.bypass = true;
+    e.load(p);
+    render(e, 4800);
+    const b = render(e, SR);
+    expect(rms(b.l)).toBeCloseTo(0.5 / Math.SQRT2, 2); // the sine on both sides, untouched
+    expect(rms(b.r)).toBeCloseTo(0.5 / Math.SQRT2, 2);
+    for (let i = 0; i < 100; i++) expect(b.l[i]).toBe(b.r[i]);
+    pan.bypass = false; // the pan runs again, its pos input is silent: hard right
+    e.load(p);
+    render(e, 4800);
+    const c = render(e, SR);
+    expect(rms(c.l)).toBeLessThan(0.01);
+    expect(rms(c.r)).toBeCloseTo(0.5 / Math.SQRT2, 2);
+  });
+
+  it('is validated, encoded in the type byte and refused on the panel and the output', () => {
+    const { p } = rig(true);
+    const mods = p.modules.map((m) => ({ ...m }));
+    mods[0].bypass = true; // fm1
+    mods[3].bypass = true; // output
+    const v = validatePatch({ ...p, modules: mods }, DEFS);
+    expect(v.modules.map((m) => !!m.bypass)).toEqual([false, false, true, false]);
+    const b = encodePatch(v);
+    const at = 8 + recordSize('fm1') + recordSize('osc');
+    expect(b[at]).toBe(DEFS.filter ? (Object.keys(DEFS).indexOf('filter') | 0x80) : -1);
+    expect(b[8] & 0x80).toBe(0);
   });
 });
 
@@ -1626,7 +1713,7 @@ describe('delay sync and ping-pong', () => {
   };
   it('a synced delay follows the clock: 1/4 is one beat', () => {
     // 24 ticks per beat, a tick every 460 samples = 11040 samples per beat; the delayed constant 1 appears after that
-    const { first } = run({ sync: 1, time: 1 + (6 / 10) * 999 }, 460);
+    const { first } = run({ sync: 1, time: DELAY_TIME_MIN + (6 / 10) * (DELAY_TIME_MAX - DELAY_TIME_MIN) }, 460);
     const at = first.findIndex((v) => v > 0.5);
     expect(at * 128).toBeGreaterThan(11040 - 400);
     expect(at * 128).toBeLessThan(11040 + 400);

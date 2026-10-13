@@ -251,6 +251,7 @@ typedef struct {
 
 typedef struct {
     uint8_t type, conn;
+    uint8_t bypass;                  /* 1: process() is skipped, the outputs copy the through input (DEFS[].thru) or are silent */
     uint8_t inst0, ninst;            /* its instances in inst_pool[]: ninst > 1 = it runs once per voice (the panel too: its
                                         pitch / gate / vel are per voice, its knob outputs one buffer shared by its instances) */
     uint16_t map[6];                 /* the matrix: bit j of map[s] = source s controls parameter j. s: p1 p2 k1 k2 k3 k4 */
@@ -473,9 +474,11 @@ int eng_load(const uint8_t *p, uint32_t len)
         uint8_t *z = (uint8_t *)nd;
         for (j = 0; j < sizeof *nd; j++)
             z[j] = 0;
-        if (at >= len || p[at] >= N_TYPES)
+        if (at >= len || (p[at] & 0x7Fu) >= N_TYPES)
             return -3;
-        nd->type = p[at++];
+        nd->type = p[at] & 0x7Fu;
+        nd->bypass = (uint8_t)(p[at] >> 7 && nd->type != T_FM1 && nd->type != T_OUTPUT);   /* bit 7: bypassed (never the panel or the output) */
+        at++;
         d = &DEFS[nd->type];
         if (at + eng_record_extra(d) + 4u * d->npar > len)
             return -3;
@@ -682,6 +685,14 @@ void eng_set_att(uint32_t module, uint32_t input, int32_t q16)
     if (module < E.nmod && input < 2u)
         E.node[module].att[input] = q16;
 }
+
+void eng_set_bypass(uint32_t module, int on)
+{
+    if (module < E.nmod && E.node[module].type != T_FM1 && E.node[module].type != T_OUTPUT)
+        E.node[module].bypass = (uint8_t)(on != 0);
+}
+
+int eng_bypass(uint32_t module) { return module < E.nmod ? E.node[module].bypass : 0; }
 
 /* what turning knob k (0..3) changes on a module: the matrix column of k1..k4, and on the modules that have no matrix
  * (fm1, output) the n-th parameter */
@@ -2333,6 +2344,22 @@ static void apply_cv(const node_t *nd, inst_t *it, uint32_t n)
     }
 }
 
+/* a bypassed module: every output carries the through input (the definition's `thru`, e.g. the filter's `in`), or silence
+ * for a module without one (an oscillator or envelope is muted). Its state is untouched, so it resumes where it stopped. */
+static void m_bypass(const node_t *nd, inst_t *it, uint32_t n)
+{
+    const def_t *d = &DEFS[nd->type];
+    const esig_t *src = d->thru >= 0 ? it->in[d->thru] : zero_buf;
+    uint32_t j, i;
+    for (j = 0; j < d->nout; j++) {
+        esig_t *o = it->out[j];
+        if (o == dummy_out)
+            continue;
+        for (i = 0; i < n; i++)
+            o[i] = src[i];
+    }
+}
+
 static void process(const node_t *nd, inst_t *it, uint32_t n)
 {
     switch (nd->type) {
@@ -2402,7 +2429,10 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
                     }
                 }
                 apply_cv(nd, it, n);
-                process(nd, it, n);
+                if (nd->bypass)
+                    m_bypass(nd, it, n);
+                else
+                    process(nd, it, n);
             }
         }
         for (k = 0; k < E.nout; k++) {

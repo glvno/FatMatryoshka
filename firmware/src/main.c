@@ -905,6 +905,27 @@ static void voice_switch(void)
     }
 }
 
+/* FX: the selected module on / off (bypass): its outputs carry its through input (a filter's IN) or silence. Stored with the
+ * patch (bit 7 of the record's type byte), so SAVE keeps it. Not on the Main module or the output. */
+static void bypass_toggle(void)
+{
+    int t = eng_type(sel), on;
+    char m[24], *q;
+    if (t < 0 || t == T_FM1 || t == T_OUTPUT) {
+        ui_msg("NOT ON THIS MODULE", 1000);
+        return;
+    }
+    on = !eng_bypass(sel);
+    eng_set_bypass(sel, on);
+    m1_patch_bypass(sel, on);
+    q = put(m, DEFS[t].name);
+    put(q, on ? " OFF" : " ON");
+    ui_msg(m, 1000);
+    ui_dirty = 2;
+}
+
+static void m1_ui_changed(void) { ui_dirty = 2; }    /* proto.c: the editor bypassed a module: title and picture */
+
 static void buttons_poll(void)
 {
     static uint32_t home_t0;                        /* fm1_ms | 1 of the HOME press, 0: not held; bit 1: the hold fired */
@@ -934,6 +955,8 @@ static void buttons_poll(void)
     }
     if (p & (1u << BTN_SAVE))
         save_state();
+    if (p & (1u << BTN_FX))
+        bypass_toggle();
     if (p & (1u << BTN_SEL))
         voice_switch();
     if (p & (1u << BTN_HOME))

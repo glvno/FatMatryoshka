@@ -278,7 +278,7 @@ static void thumb_draw(void)
     }
     for (i = 0; i < n; i++) {
         int t = eng_type(i);
-        uint16_t col = t >= 0 ? TYPE_COLOR[t] : C_DIM;
+        uint16_t col = t >= 0 && !eng_bypass(i) ? TYPE_COLOR[t] : C_DIM;   /* a bypassed module is grey */
         th_rect(px[i], py[i], bw, bh, col);
         if (t >= 0 && bh >= 9 && bw >= 14) {                                 /* the module's name, as much as fits, black on its colour */
             char nm[8];
@@ -485,6 +485,8 @@ static void module_draw(int full)
             p = put(p, "  POLY ");
             p = put(p, num);
         }
+        if (eng_bypass(sel))                            /* bypassed (FX button) */
+            p = put(p, " OFF");
         pad(p, line, 15);
         text_mid(12, 30, line, C_ACC, C_BG);
         thumb_show();

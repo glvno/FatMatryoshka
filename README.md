@@ -125,3 +125,7 @@ The Assemblies page ships fifteen, made by `web/scripts/gen-assemblies.ts` (edit
 - Sequencing: **clock** (square LFO with /2 /4 /8 /div), **step sequencer** (clock, eight steps, quantizer: `pitch` and `gate` out, add its `pitch` to Main's into an oscillator), **random melody** (clocked S&H on noise, quantizer, pulse gate).
 - Utilities: **auto pan** (LFO on a Pan: `in` to `l` `r`), **echo** (delay into reverb).
 
+
+## Module on / off
+
+Every module except Main and Output has a power button in its card header: off, the module is bypassed like a device in a DAW rack. Its main input (`in`, the mixer's `in1`, the crossfade's `a`) goes straight to every output, so a filter, delay, reverb, shaper or compressor drops out of the chain without a repatch; a module without such an input (an oscillator, LFO or envelope) is muted. The module keeps its state and resumes when turned on again. On the FM-1 the FX button toggles the selected module; the switch is saved with the patch.

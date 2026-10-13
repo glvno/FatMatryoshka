@@ -16,7 +16,7 @@
 #define M1_PATCH_MAX 3072u
 #define M1_VERSION 1
 
-enum { C_HELLO = 0x01, C_CHUNK = 0x10, C_COMMIT = 0x11, C_STORE = 0x12, C_PARAM = 0x20, C_ATT = 0x21, C_SLOT = 0x13, C_SLOT_ERASE = 0x14, C_SLOT_INFO = 0x15, R_ACK = 0x40, R_INFO = 0x41, R_SLOT = 0x42 };
+enum { C_HELLO = 0x01, C_CHUNK = 0x10, C_COMMIT = 0x11, C_STORE = 0x12, C_PARAM = 0x20, C_ATT = 0x21, C_BYPASS = 0x22, C_SLOT = 0x13, C_SLOT_ERASE = 0x14, C_SLOT_INFO = 0x15, R_ACK = 0x40, R_INFO = 0x41, R_SLOT = 0x42 };
 #define M1_SLOTS 32u
 #define M1_NAME 20u
 enum { S_OK, S_RANGE, S_CRC, S_LOAD, S_FLASH, S_CMD, S_NONE };
@@ -106,6 +106,9 @@ static void m1_set_current(const uint8_t *p, uint32_t len)
     m1_cur_len = len;
 }
 
+#define M1_BYPASS 0x80u                                     /* bit 7 of a record's type byte: the module is bypassed */
+#define M1_TYPE(b) ((b) & 0x7Fu)
+
 /* byte offset of module `mod`'s record in the patch binary, 0 if the binary is malformed */
 static uint32_t m1_record(uint32_t mod)
 {
@@ -114,12 +117,12 @@ static uint32_t m1_record(uint32_t mod)
         return 0;
     for (i = 0; i < mod; i++) {
         const def_t *d;
-        if (at >= m1_cur_len || m1_cur[at] >= N_TYPES)
+        if (at >= m1_cur_len || M1_TYPE(m1_cur[at]) >= N_TYPES)
             return 0;
-        d = &DEFS[m1_cur[at]];
+        d = &DEFS[M1_TYPE(m1_cur[at])];
         at += 1u + 4u * d->npar + (d->cvbase >= 0 ? 20u : 0u);
     }
-    return at < m1_cur_len && m1_cur[at] < N_TYPES ? at : 0;
+    return at < m1_cur_len && M1_TYPE(m1_cur[at]) < N_TYPES ? at : 0;
 }
 
 static void m1_put32(uint32_t at, int32_t v)
@@ -134,7 +137,7 @@ static void m1_put32(uint32_t at, int32_t v)
 static void m1_patch_param(uint32_t mod, uint32_t par, int32_t v)
 {
     uint32_t at = m1_record(mod);
-    if (!at || par >= DEFS[m1_cur[at]].npar)
+    if (!at || par >= DEFS[M1_TYPE(m1_cur[at])].npar)
         return;
     m1_put32(at + 1u + 4u * par, v);
 }
@@ -142,9 +145,17 @@ static void m1_patch_param(uint32_t mod, uint32_t par, int32_t v)
 static void m1_patch_att(uint32_t mod, uint32_t input, int32_t v)
 {
     uint32_t at = m1_record(mod);
-    if (!at || input >= 2u || DEFS[m1_cur[at]].cvbase < 0)
+    if (!at || input >= 2u || DEFS[M1_TYPE(m1_cur[at])].cvbase < 0)
         return;
-    m1_put32(at + 1u + 4u * DEFS[m1_cur[at]].npar + 4u * input, v);
+    m1_put32(at + 1u + 4u * DEFS[M1_TYPE(m1_cur[at])].npar + 4u * input, v);
+}
+
+static void m1_patch_bypass(uint32_t mod, int on)
+{
+    uint32_t at = m1_record(mod);
+    if (!at)
+        return;
+    m1_cur[at] = (uint8_t)(on ? m1_cur[at] | M1_BYPASS : m1_cur[at] & ~M1_BYPASS);
 }
 
 /* a patch binary that eng_load would at least not reject for its framing: header, record sizes add up to the length */
@@ -159,9 +170,9 @@ static int m1_valid(const uint8_t *p, uint32_t len)
         return 0;
     for (i = 0; i < nmod; i++) {
         const def_t *d;
-        if (at >= len || p[at] >= N_TYPES)
+        if (at >= len || M1_TYPE(p[at]) >= N_TYPES)
             return 0;
-        d = &DEFS[p[at]];
+        d = &DEFS[M1_TYPE(p[at])];
         at += 1u + 4u * d->npar + (d->cvbase >= 0 ? 20u : 0u);
     }
     return at + 4u * ncab == len;
@@ -319,6 +330,13 @@ static int m1_handle(const uint8_t *f, uint32_t n)
             int32_t v = (int32_t)((uint32_t)d[2] | (uint32_t)d[3] << 8 | (uint32_t)d[4] << 16 | (uint32_t)d[5] << 24);
             eng_set_att(d[0], d[1], v);
             m1_patch_att(d[0], d[1], v);
+        }
+        break;
+    case C_BYPASS:
+        if (len >= 2u) {
+            eng_set_bypass(d[0], d[1]);
+            m1_patch_bypass(d[0], d[1]);
+            m1_ui_changed();
         }
         break;
     default:

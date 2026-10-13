@@ -230,6 +230,25 @@ kit('shift', (add, wire) => {
   wire(sh, 'up', out, 'l');
   wire(sh, 'down', out, 'r');
 });
+kit('bypass', (add, wire) => {
+  // a bypassed filter (in -> every output), pan (in -> l, r) and LFO (silent, so the level stays at its base)
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.7 }, { map: { p1: ['level'] } });
+  const lfo = add('lfo', 0, 0, { wave: 1, rate: 3, depth: 1 });
+  const flt = add('filter', 0, 0, { cutoff: 120, res: 0.5 });
+  const lad = add('ladder', 0, 0, { cutoff: 900, res: 0.3, drive: 2 });
+  const pan = add('pan', 0, 0, { pan: 0.8 });
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(lfo, 'out', osc, 'p1');
+  wire(osc, 'out', flt, 'in');
+  wire(flt, 'lp24', lad, 'in');
+  wire(flt, 'hp', pan, 'pos');
+  wire(lad, 'lp24', pan, 'in');
+  wire(pan, 'l', out, 'l');
+  wire(pan, 'r', out, 'r');
+});
+for (const m of tests.bypass.modules) if (['filter', 'pan', 'lfo'].includes(m.type)) m.bypass = true;
 kit('ladder', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.8 });

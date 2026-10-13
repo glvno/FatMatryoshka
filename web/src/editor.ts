@@ -67,6 +67,13 @@ import {
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const HISTORY = 40;
+/** a logarithmic slider's value rounded to the parameter's step (a glide time to the ms, a cutoff to the Hz), not to a whole number */
+function snapTo(pd: ParamDef, v: number): number {
+  const step = pd.step ?? 0;
+  const x = step > 0 ? Math.round(v / step) * step : v;
+  return Math.min(pd.max, Math.max(pd.min, Number(x.toFixed(6))));
+}
+
 /** the frame around an open assembly: padding around its cards and the height of its header */
 const FRAME_PAD = 12;
 const FRAME_HEAD = 30;
@@ -78,6 +85,8 @@ export interface EditorEvents {
   onParam(id: number, name: string, value: number): void;
   /** an attenuverter of a parameter input moved (index 0 = p1, 1 = p2) */
   onAtt(id: number, index: number, value: number): void;
+  /** a module's bypass switch (the structure is unchanged: the engine keeps its state) */
+  onBypass(id: number, on: boolean): void;
   /** cards were moved: positions changed, nothing the engine needs */
   onLayout(p: Patch): void;
   /** a message for the status line */
@@ -301,7 +310,12 @@ export class Editor {
     title.textContent = def.label;
     if (perVoice) title.append(' ', this.badge());
     const del = this.button('×', `Remove ${def.label}`, () => this.change(() => removeModule(this.patch, m.id)), 'x');
-    head.append(title, del);
+    const tools = document.createElement('span');
+    tools.className = 'tools';
+    if (def.type !== 'fm1' && def.type !== 'output') tools.append(this.bypassButton(m, def, el));
+    tools.append(del);
+    head.append(title, tools);
+    el.classList.toggle('off', !!m.bypass);
     this.moduleDrag(head, m);
 
     const body = document.createElement('div');
@@ -325,6 +339,23 @@ export class Editor {
     body.append(params);
     el.append(head, body);
     return el;
+  }
+
+  /** the power button of a card: bypass on / off (the through input, or silence, replaces the module's outputs) */
+  private bypassButton(m: ModuleInst, def: ModuleDef, card: HTMLElement): HTMLButtonElement {
+    const b = this.button('⏻', `${def.label} on / off (bypass)`, () => {
+      this.history.push(JSON.stringify(this.patch));
+      if (this.history.length > HISTORY) this.history.shift();
+      this.future = [];
+      m.bypass = !m.bypass;
+      if (!m.bypass) delete m.bypass;
+      card.classList.toggle('off', !!m.bypass);
+      b.classList.toggle('on', !m.bypass);
+      this.ev.onBypass(m.id, !!m.bypass);
+    }, 'pw');
+    b.classList.toggle('on', !m.bypass);
+    b.setAttribute('aria-pressed', String(!m.bypass));
+    return b;
   }
 
   /** one parameter slider (or check box); `label` overrides the name (a promoted parameter on an assembly card) */
@@ -375,7 +406,7 @@ export class Editor {
     }
     input.setAttribute('aria-label', `${def.label} ${o.label ?? pd.name}`);
     input.oninput = () => {
-      const v = pd.log ? Math.round(fromUnit(pd, Number(input.value) / 1000)) : Number(input.value);
+      const v = pd.log ? snapTo(pd, fromUnit(pd, Number(input.value) / 1000)) : Number(input.value);
       m.params[pd.name] = v;
       val.textContent = fmt(v);
       this.ev.onParam(m.id, pd.name, v);

@@ -258,6 +258,10 @@ export const DELAY_DIVS: { name: string; num: number; den: number }[] = [
 /** the clock input is the Main module's clock: 24 pulses per quarter note */
 export const DELAY_CLK_PPQN = 24;
 
+/** the delay's time knob, ms: as long as its line (DELAY_LEN; ping-pong halves it) */
+export const DELAY_TIME_MIN = 1;
+export const DELAY_TIME_MAX = 520;
+
 /** which note length the time knob selects when the delay is synced: its range split into DELAY_DIVS.length steps */
 export function delayDivIndex(time: number, tmin: number, tmax: number): number {
   return Math.max(0, Math.min(DELAY_DIVS.length - 1, Math.round(((time - tmin) / (tmax - tmin)) * (DELAY_DIVS.length - 1))));
@@ -292,7 +296,7 @@ const lfo: ModuleImpl<LfoState> = {
     outputs: [control('out')],
     params: [
       param('wave', 0, 4, 0, { step: 1, choices: LFO_WAVES }),
-      param('rate', 0.02, 40, 4, { unit: 'Hz', step: 0.01 }),
+      param('rate', 0.02, 40, 4, { unit: 'Hz', step: 0.01, log: true }),
       param('depth', 0, 1, 1, { step: 0.01 }),
       param('sync', 0, 1, 0, { step: 1, choices: ['free', 'sync'], toggle: true }),
       param('div', 0, DELAY_DIVS.length - 1, 6, { step: 1, choices: DELAY_DIVS.map((d) => d.name) }),
@@ -398,10 +402,10 @@ const adsr: ModuleImpl<AdsrState> = {
     inputs: [gate('gate')],
     outputs: [control('env')],
     params: [
-      param('a', 0.001, 5, 0.01, { unit: 's', step: 0.001 }),
-      param('d', 0.001, 5, 0.2, { unit: 's', step: 0.001 }),
+      param('a', 0.001, 5, 0.01, { unit: 's', step: 0.001, log: true }),
+      param('d', 0.001, 5, 0.2, { unit: 's', step: 0.001, log: true }),
       param('s', 0, 1, 0.6, { step: 0.01 }),
-      param('r', 0.001, 8, 0.3, { unit: 's', step: 0.001 }),
+      param('r', 0.001, 8, 0.3, { unit: 's', step: 0.001, log: true }),
     ],
   },
   init: () => ({ stage: 0, v: 0, prev: 0 }),
@@ -467,7 +471,7 @@ const filter: ModuleImpl<{ ic1: number; ic2: number; jc1: number; jc2: number }>
     inputs: [audio('in'), control('cv'), control('morph')],
     outputs: [audio('lp24'), audio('lp12'), audio('bp'), audio('hp'), audio('mix')],
     params: [
-      param('cutoff', 20, 4000, 1200, { unit: 'Hz', step: 1, log: true, bend: true }),
+      param('cutoff', 20, 16000, 1200, { unit: 'Hz', step: 1, log: true, bend: true }),
       param('res', 0, 1, 0.2, { step: 0.01 }),
       param('cvamt', 0, 4, 1, { unit: 'oct', step: 0.01 }),
       param('track', 0, 1, 0, { step: 1, choices: ['off', 'on'], toggle: true }),
@@ -526,7 +530,7 @@ const ladder: ModuleImpl<{ s: Float64Array }> = {
     inputs: [audio('in'), control('cv')],
     outputs: [audio('lp24'), audio('lp12')],
     params: [
-      param('cutoff', 20, 4000, 1200, { unit: 'Hz', step: 1, log: true, bend: true }),
+      param('cutoff', 20, 16000, 1200, { unit: 'Hz', step: 1, log: true, bend: true }),
       param('res', 0, 1, 0.2, { step: 0.01 }),
       param('drive', 1, 8, 1, { step: 0.01, log: true }),
       param('cvamt', 0, 4, 1, { unit: 'oct', step: 0.01 }),
@@ -945,6 +949,7 @@ const mixer: ModuleImpl<null> = {
     type: 'mixer',
     label: 'Mixer 4',
     inputs: [audio('in1'), audio('in2'), audio('in3'), audio('in4')],
+    thru: 'in1',
     outputs: [audio('out')],
     params: [1, 2, 3, 4].map((n) => param(`l${n}`, 0, 1, 0.7, { step: 0.01 })),
   },
@@ -982,7 +987,7 @@ const delay: ModuleImpl<DelayState> = {
     inputs: [audio('in'), gate('clk')],
     outputs: [audio('out'), audio('r')],
     params: [
-      param('time', 1, 1000, 250, { unit: 'ms', step: 1, altText: { when: 'sync', text: (v) => DELAY_DIVS[delayDivIndex(v, 1, 1000)].name } }),
+      param('time', DELAY_TIME_MIN, DELAY_TIME_MAX, 250, { unit: 'ms', step: 1, altText: { when: 'sync', text: (v) => DELAY_DIVS[delayDivIndex(v, DELAY_TIME_MIN, DELAY_TIME_MAX)].name } }),
       param('fb', 0, 0.95, 0.4, { step: 0.01 }),
       param('mix', 0, 1, 0.3, { step: 0.01 }),
       param('sync', 0, 1, 0, { step: 1, choices: ['free', 'sync'], toggle: true }),
@@ -1012,7 +1017,7 @@ const delay: ModuleImpl<DelayState> = {
     }
     let samples: number;
     if ((c.p.sync ?? 0) >= 0.5) {
-      const div = DELAY_DIVS[delayDivIndex(c.p.time ?? 250, 1, 1000)];
+      const div = DELAY_DIVS[delayDivIndex(c.p.time ?? 250, DELAY_TIME_MIN, DELAY_TIME_MAX)];
       samples = Math.round((div.num * s.beat) / div.den);
     } else samples = Math.round(((c.p.time ?? 250) / 1000) * c.sr);
     const fb = c.p.fb ?? 0;
@@ -1655,6 +1660,7 @@ const xfade: ModuleImpl<null> = {
     type: 'xfade',
     label: 'Crossfade',
     inputs: [audio('a'), audio('b'), control('pos')],
+    thru: 'a',
     outputs: [audio('out')],
     params: [param('mix', 0, 1, 0.5, { step: 0.01 })],
   },

@@ -3,7 +3,7 @@
 import { DEFS } from './modules';
 import type { Patch } from './patch';
 import { encodePatch, toQ16 } from './patchbin';
-import { attFrame, chunkFrames, CMD, parseSlot, slotEraseFrame, slotFrame, slotInfoFrame, SLOTS, type SlotInfo, commitFrame, helloFrame, paramFrame, parse, parseAck, parseInfo, STATUS_TEXT, storeFrame, type Ack, type Info } from './protocol';
+import { attFrame, bypassFrame, chunkFrames, CMD, parseSlot, slotEraseFrame, slotFrame, slotInfoFrame, SLOTS, type SlotInfo, commitFrame, helloFrame, paramFrame, parse, parseAck, parseInfo, STATUS_TEXT, storeFrame, type Ack, type Info } from './protocol';
 
 const NAME = /felucca|fm-?1|modular/i;
 const ACK_TIMEOUT = 700;
@@ -167,6 +167,13 @@ export class DeviceLink {
     if (!this.connected) return;
     const mi = patch.modules.findIndex((m) => m.id === moduleId);
     if (mi >= 0) this.out!.send(attFrame(mi, index, toQ16(value)));
+  }
+
+  /** a module's bypass switch */
+  bypass(patch: Patch, moduleId: number, on: boolean): void {
+    if (!this.connected) return;
+    const mi = patch.modules.findIndex((m) => m.id === moduleId);
+    if (mi >= 0) this.out!.send(bypassFrame(mi, on));
   }
 
   note(msg: { t: string; note?: number; vel?: number }): void {
