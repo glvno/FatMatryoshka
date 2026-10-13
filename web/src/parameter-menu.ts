@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import { setFixedInput, setParameterInput } from './parameter-routing';
+import { setInputRoute, setParameterInput, parameterInputs } from './parameter-routing';
 import { paramValue, rangeOf, type ModuleDef, type ModuleInst, type ParamDef, type Source } from './patch';
 
 interface Events {
@@ -54,13 +54,13 @@ export function parameterMenu(m: ModuleInst, def: ModuleDef, pd: ParamDef, ev: E
     label.append(box, source.toUpperCase());
     parent.append(label);
   };
-  if (pd.input) {
+  for (const port of def.inputs.filter((p) => p.name !== 'p1' && p.name !== 'p2')) {
     const label = document.createElement('label');
     const box = document.createElement('input'); box.type = 'checkbox';
-    box.checked = !m.disabledInputs?.includes(pd.input);
-    box.setAttribute('aria-label', `${def.label}: ${pd.input} input controls ${pd.name}`);
-    box.onchange = () => ev.change(() => setFixedInput(m, pd, box.checked));
-    label.append(box, `${pd.input} → ${pd.name}`); content.append(label);
+    box.checked = parameterInputs(m, pd).includes(port.name);
+    box.setAttribute('aria-label', `${def.label}: ${port.name} input controls ${pd.name}`);
+    box.onchange = () => ev.change(() => setInputRoute(m, def, port.name, pd.name, box.checked));
+    label.append(box, `${port.name} → ${pd.name}${port.name === pd.input ? '' : ' (additive)'}`); content.append(label);
   }
   if (def.paramInputs) {
     for (const [index, pin] of (['p1', 'p2'] as const).entries()) {

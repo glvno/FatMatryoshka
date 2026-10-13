@@ -183,7 +183,7 @@ int main(int argc, char **argv)
         CHECK(!(patch[6] & 6u)); /* this fixture has no ranges or fixed-link masks */
         memcpy(m1_cur, patch, base);
         memset(m1_cur + base, 0, count);
-        m1_cur[1] = ENG_PATCH_VERSION;
+        m1_cur[1] = 17;
         m1_cur[6] |= 4u;
         m1_cur[base + mod] = 1u << FILTER_I_CV;
         m1_cur_len = base + count;
@@ -201,6 +201,35 @@ int main(int argc, char **argv)
         m1_patch_range(mod, 0, par, 0, 0, 0);
         CHECK(m1_cur_len == base + count && m1_valid(m1_cur, m1_cur_len));
         m1_cur[base + mod] = 0x80; /* not a fixed input */
+        CHECK(eng_load(m1_cur, m1_cur_len) != 0);
+        CHECK(eng_load(patch, base) == 0);
+        /* Version 18 retains the raw CV buffer for extra destinations when the fixed link is off. */
+        memcpy(m1_cur, patch, base);
+        memset(m1_cur + base, 0, count);
+        m1_cur[1] = 18; m1_cur[6] |= 12u;
+        m1_cur[base + mod] = 1u << FILTER_I_CV;
+        m1_cur_len = base + count + 5u;
+        m1_cur[base + count] = 1;
+        m1_cur[base + count + 1] = (uint8_t)mod;
+        m1_cur[base + count + 2] = FILTER_I_CV;
+        m1_cur[base + count + 3] = (1u << FILTER_P_RES) | (1u << FILTER_P_CVAMT);
+        m1_cur[base + count + 4] = 0;
+        CHECK(m1_valid(m1_cur, m1_cur_len));
+        CHECK(!m1_valid(m1_cur, m1_cur_len - 1));
+        CHECK(eng_load(m1_cur, m1_cur_len) == 0);
+        CHECK(E.node[mod].input_map[FILTER_I_CV] == ((1u << FILTER_P_RES) | (1u << FILTER_P_CVAMT)));
+        CHECK(!(E.node[mod].conn & (1u << FILTER_I_CV)));
+        m1_patch_range(mod, 0, par, 1, 20, 220);
+        CHECK(m1_range_section() == base + count + 5u);
+        CHECK(m1_valid(m1_cur, m1_cur_len) && eng_load(m1_cur, m1_cur_len) == 0);
+        m1_patch_range(mod, 0, par, 0, 0, 0);
+        CHECK(m1_cur_len == base + count + 5u);
+        m1_cur[1] = 17; CHECK(!m1_valid(m1_cur, m1_cur_len));
+        CHECK(eng_load(m1_cur, m1_cur_len) != 0); m1_cur[1] = 18;
+        m1_cur[base + count + 2] = FILTER_I_P1;
+        CHECK(eng_load(m1_cur, m1_cur_len) != 0);
+        m1_cur[base + count + 2] = FILTER_I_CV;
+        m1_cur[base + count + 4] = 0x80;
         CHECK(eng_load(m1_cur, m1_cur_len) != 0);
         CHECK(eng_load(patch, base) == 0);
         printf("fixed input routing and legacy patch framing ok\n");

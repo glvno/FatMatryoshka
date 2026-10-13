@@ -257,6 +257,7 @@ typedef struct {
     uint8_t inst0, ninst;            /* its instances in inst_pool[]: ninst > 1 = it runs once per voice (the panel too: its
                                         pitch / gate / vel are per voice, its knob outputs one buffer shared by its instances) */
     uint16_t map[6];                 /* the matrix: bit j of map[s] = source s controls parameter j. s: p1 p2 k1 k2 k3 k4 */
+    uint16_t input_map[MAX_IN];      /* additional side-input destinations, independent of fixed links */
     int32_t att[2];                  /* attenuverters of p1, p2: Q16, -1..1 */
     int32_t par[MAX_PAR];
     uint16_t parb[MAX_PAR];          /* the morph B side as unit positions (0..65535 of the range, octaves for a log parameter), when E.has_b */
@@ -467,9 +468,9 @@ int eng_load(const uint8_t *p, uint32_t len)
 #if ENG_NGRAIN > 0
     pool_free(gr_own, ENG_NGRAIN);
 #endif
-    if (len < 8u || p[0] != 0xA1 || (p[1] != ENG_PATCH_VERSION && p[1] != ENG_PATCH_COMPAT_VERSION))
+    if (len < 8u || p[0] != 0xA1 || (p[1] > ENG_PATCH_VERSION || p[1] < ENG_PATCH_COMPAT_VERSION))
         return -1;
-    if ((p[6] & ~7u) || p[7] || (p[1] == ENG_PATCH_COMPAT_VERSION && (p[6] & 4u)))
+    if ((p[6] & ~15u) || p[7] || (p[1] < 17u && (p[6] & 4u)) || (p[1] < 18u && (p[6] & 8u)))
         return -1;
     E.nmod = p[2];
     nv = p[3] ? p[3] : 1u;                       /* 0: a patch from before polyphony */
@@ -552,6 +553,21 @@ int eng_load(const uint8_t *p, uint32_t len)
                 return -3;
             nd->disabled_inputs = mask;
             nd->conn &= (uint8_t)~mask;
+        }
+    }
+    if (p[6] & 8u) {                             /* additional side-input routes: module, input, u16 parameter mask */
+        uint32_t count;
+        if (at >= len) return -3;
+        count = p[at++];
+        if (at + 4u * count > len) return -3;
+        for (i = 0; i < count; i++, at += 4) {
+            uint32_t mod = p[at], input = p[at + 1];
+            uint16_t mask = (uint16_t)((uint32_t)p[at + 2] | (uint32_t)p[at + 3] << 8);
+            const def_t *d;
+            if (mod >= E.nmod) return -3;
+            d = &DEFS[E.node[mod].type];
+            if (input >= d->nin || (d->cvbase >= 0 && input >= (uint32_t)d->cvbase) || !mask || (mask >> d->npar)) return -3;
+            E.node[mod].input_map[input] |= mask;
         }
     }
     if (p[6] & 2u) {                             /* the macro ranges: u8 count, then module / pin / parameter / lo / hi each */
@@ -698,7 +714,7 @@ int eng_load(const uint8_t *p, uint32_t len)
             for (j = 0; j < DEFS[nd->type].nin; j++) {
                 uint32_t n = 0, first = E.nsrc;
                 const esig_t *one = 0;
-                if (nd->disabled_inputs & (1u << j)) {
+                if ((nd->disabled_inputs & (1u << j)) && !nd->input_map[j]) {
                     it->in[j] = zero_buf;
                     continue;
                 }
@@ -2640,7 +2656,7 @@ static void m_crush(const node_t *nd, inst_t *it, uint32_t n)
 static void apply_cv(const node_t *nd, inst_t *it, uint32_t n)
 {
     const def_t *d = &DEFS[nd->type];
-    int32_t mean[2] = {0, 0};
+    int32_t mean[2] = {0, 0}, extra[MAX_IN] = {0};
     uint32_t j, i, s, have = 0;
     if (d->cvbase >= 0)
         for (s = 0; s < 2u; s++) {
@@ -2654,6 +2670,11 @@ static void apply_cv(const node_t *nd, inst_t *it, uint32_t n)
             mean[s] = mul16((int32_t)(sum / (int64_t)n), nd->att[s]);
             have |= 1u << s;
         }
+    for (s = 0; s < d->nin; s++) if (nd->input_map[s]) {
+        int64_t sum = 0;
+        for (i = 0; i < n; i++) sum += it->in[s][i];
+        extra[s] = (int32_t)(sum / (int64_t)n);
+    }
     for (j = 0; j < d->npar; j++) {
         int32_t v = E.has_b && E.morph > 0 && nd->type != T_FM1 ? morph_of(d, j, nd->par[j], nd->parb[j], E.morph) : nd->par[j];
         uint32_t touched = 0;
@@ -2672,6 +2693,10 @@ static void apply_cv(const node_t *nd, inst_t *it, uint32_t n)
                 mod += mean[s];
                 touched = 1;
             }
+        for (s = 0; s < d->nin; s++) if (nd->input_map[s] >> j & 1u) {
+            mod += extra[s];
+            touched = 1;
+        }
         if (rg) {
             int32_t lo = (int32_t)rg->lo * 257, hi = (int32_t)rg->hi * 257;   /* 0..255 -> Q16 0..1 */
             v = morph_value(d, j, lo + mul16(clampi(rv, 0, ENG_ONE), hi - lo));
@@ -2773,7 +2798,16 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
                 apply_cv(nd, it, n);
                 if (nd->bypass)
                     m_bypass(nd, it, n);
-                else
+                else if (nd->disabled_inputs) {
+                    const esig_t *raw[MAX_IN];
+                    uint32_t input;
+                    for (input = 0; input < DEFS[nd->type].nin; input++) {
+                        raw[input] = it->in[input];
+                        if (nd->disabled_inputs & (1u << input)) it->in[input] = zero_buf;
+                    }
+                    process(nd, it, n);
+                    for (input = 0; input < DEFS[nd->type].nin; input++) it->in[input] = raw[input];
+                } else
                     process(nd, it, n);
             }
         }

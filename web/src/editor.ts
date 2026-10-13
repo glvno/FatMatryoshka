@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Patch editor: module cards on a canvas, SVG cables, drag-to-connect, a selection, assemblies and undo.
 import { DEFS } from './modules';
-import { parameterInputs, connectParameter, setParameterInput, setFixedInput } from './parameter-routing';
+import { parameterInputs, connectParameter, setInputRoute } from './parameter-routing';
 import { parameterMenu } from './parameter-menu';
 import { sliderJack } from './slider-jack';
 import type { ParameterValues } from './engine';
@@ -747,6 +747,7 @@ export class Editor {
         if (m.range) copy.range = JSON.parse(JSON.stringify(m.range));
         if (m.bypass) copy.bypass = true;
         if (m.disabledInputs) copy.disabledInputs = [...m.disabledInputs];
+        if (m.inputMap) copy.inputMap = structuredClone(m.inputMap);
         map.set(id, copy.id);
       }
       for (const c of [...this.patch.cables]) if (map.has(c.from.module) && map.has(c.to.module)) connect(this.patch, DEFS, { module: map.get(c.from.module)!, port: c.from.port }, { module: map.get(c.to.module)!, port: c.to.port });
@@ -1504,8 +1505,7 @@ export class Editor {
       const side = this.inputJack({ module: m.id, port });
       if (!side) continue;
       add(side, jack, 'control', () => this.change(() => {
-        if (port === pd.input) setFixedInput(m, pd, false);
-        else setParameterInput(m, port as 'p1' | 'p2', pd.name, false);
+        setInputRoute(m, DEFS[m.type], port, pd.name, false);
       }), `Disconnect ${DEFS[m.type].label} ${port} → ${pd.name}`, true);
     }
     const physicalCables = new Set<string>();
@@ -1557,9 +1557,7 @@ export class Editor {
           ...(side.dataset.also ? JSON.parse(side.dataset.also) as Target[] : [])];
         const target = targets.find((t) => t.module === m.id);
         if (!target) throw new Error('Use a side input belonging to this parameter’s module.');
-        if (target.port === 'p1' || target.port === 'p2') setParameterInput(m, target.port, pd.name, true);
-        else if (target.port === pd.input) setFixedInput(m, pd, true);
-        else throw new Error('That input has a different fixed destination. Use p1 / p2 for assignable routing.');
+        setInputRoute(m, DEFS[m.type], target.port, pd.name, true);
       });
       return;
     }

@@ -34,6 +34,41 @@ describe('binary patch format', () => {
     expect(p.cables).toEqual(cables);
   });
 
+  it('encodes side-input fan-out after morph and fixed links, before macro ranges', () => {
+    const p = PRESETS['Wobble 2']();
+    const filter = p.modules.find((m) => m.type === 'filter')!;
+    filter.paramsB = { ...filter.params, cutoff: 4000 };
+    filter.disabledInputs = ['cv'];
+    const before = encodePatch(p);
+    filter.inputMap = { cv: ['res', 'cvamt'], in: ['track'] };
+    filter.range = { p1: { cutoff: [.2, .8] } }; filter.map!.p1 = ['cutoff'];
+    const b = encodePatch(p);
+    expect(b[1]).toBe(18); expect(b[6]).toBe(15);
+    expect(b.length).toBe(before.length + 9 + 6);
+    expect(b[before.length]).toBe(2);
+    const dv = new DataView(b.buffer);
+    for (const [i, port] of ['in', 'cv'].entries()) {
+      const at = before.length + 1 + i * 4;
+      expect(b[at]).toBe(p.modules.indexOf(filter));
+      expect(b[at + 1]).toBe(DEFS.filter.inputs.findIndex((pd) => pd.name === port));
+      expect(dv.getUint16(at + 2, true)).toBe(DEFS.filter.params.reduce((mask, pd, j) => mask | (filter.inputMap![port].includes(pd.name) ? 1 << j : 0), 0));
+    }
+    expect(b[before.length + 9]).toBe(1);
+  });
+
+  it('keeps summing buffers for disabled fixed inputs with additional destinations', () => {
+    const p = PRESETS['Wobble 2']();
+    const filter = p.modules.find((m) => m.type === 'filter')!;
+    const cable = p.cables.find((c) => c.to.module === filter.id && c.to.port === 'cv')!;
+    p.cables.push(structuredClone(cable));
+    filter.disabledInputs = ['cv'];
+    const disabled = deviceBudget(p);
+    filter.inputMap = { cv: ['res'] };
+    expect(deviceBudget(p).buffers).toBe(disabled.buffers + 1);
+    delete filter.disabledInputs;
+    expect(deviceBudget(p).buffers).toBe(disabled.buffers + 1);
+  });
+
   it('encodes every preset with the documented layout', () => {
     for (const [name, make] of Object.entries(PRESETS)) {
       const p = make();

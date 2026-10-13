@@ -163,9 +163,9 @@ static void m1_patch_bypass(uint32_t mod, int on)
 static int m1_valid(const uint8_t *p, uint32_t len)
 {
     uint32_t at = 8, i, nmod, ncab, npar = 0;
-    if (len < 8u || p[0] != 0xA1 || (p[1] != ENG_PATCH_VERSION && p[1] != ENG_PATCH_COMPAT_VERSION))
+    if (len < 8u || p[0] != 0xA1 || (p[1] > ENG_PATCH_VERSION || p[1] < ENG_PATCH_COMPAT_VERSION))
         return 0;
-    if ((p[6] & ~7u) || p[7] || (p[1] == ENG_PATCH_COMPAT_VERSION && (p[6] & 4u)))
+    if ((p[6] & ~15u) || p[7] || (p[1] < 17u && (p[6] & 4u)) || (p[1] < 18u && (p[6] & 8u)))
         return 0;
     nmod = p[2];
     ncab = (uint32_t)p[4] | (uint32_t)p[5] << 8;
@@ -181,6 +181,10 @@ static int m1_valid(const uint8_t *p, uint32_t len)
     }
     at += 4u * ncab + ((p[6] & 1u) ? 4u * npar : 0u);           /* flag bit 0: the morph B set after the cables */
     if (p[6] & 4u) at += nmod;                              /* switched fixed-input links, before ranges */
+    if (p[6] & 8u) {
+        if (at >= len) return 0;
+        at += 1u + 4u * p[at];
+    }
     if (p[6] & 2u) {                                            /* flag bit 1: the macro ranges after that */
         if (at >= len)
             return 0;
@@ -207,6 +211,10 @@ static uint32_t m1_range_section(void)
     }
     at += 4u * ncab + ((m1_cur[6] & 1u) ? 4u * npar : 0u);
     if (m1_cur[6] & 4u) at += nmod;
+    if (m1_cur[6] & 8u) {
+        if (at >= m1_cur_len) return 0;
+        at += 1u + 4u * m1_cur[at];
+    }
     return at < m1_cur_len ? at : 0;
 }
 

@@ -880,6 +880,25 @@ kit('fixed-links-disabled', (add, wire) => {
   filter.range = { p1: { cutoff: [.2, .8] } }; // exercises all optional sections together
 }
 
+// A physical input fans out independently of the native CV switch, alongside morph and macro ranges.
+for (const disabled of [false, true]) {
+  const p = structuredClone(tests['fixed-links-disabled']);
+  tests[`side-input-fanout-${disabled ? 'off' : 'on'}`] = p;
+  const source = p.modules.find((m) => m.type === 'const')!; source.params.value = .015625;
+  const amp = p.modules.find((m) => m.type === 'vca')!;
+  const second = { ...structuredClone(source), id: Math.max(...p.modules.map((m) => m.id)) + 1 };
+  p.modules.push(second);
+  p.cables.push({ from: { module: second.id, port: 'out' }, to: { module: p.modules.find((m) => m.type === 'filter')!.id, port: 'cv' } });
+  p.cables = p.cables.filter((c) => !(c.to.module === amp.id && c.to.port === 'cv')); // keep the reference audible through the chain
+  for (const m of p.modules) {
+    if (!disabled) delete m.disabledInputs;
+    if (m.type === 'filter') m.inputMap = { cv: ['res', 'cvamt'], in: ['track'] };
+    if (m.type === 'ladder') m.inputMap = { cv: ['res', 'drive'] };
+    if (m.type === 'vca') m.inputMap = { in: ['gain'] };
+    if (m.type === 'output') m.inputMap = { l: ['level'] };
+  }
+}
+
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 for (const [name, patch] of Object.entries(tests)) {
   const e = new Engine(SR);

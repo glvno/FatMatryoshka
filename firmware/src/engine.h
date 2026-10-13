@@ -9,7 +9,7 @@
 #define ENG_SR 44100u
 #define ENG_BLOCK 128u
 #define ENG_ONE 65536
-#define ENG_PATCH_VERSION 17
+#define ENG_PATCH_VERSION 18
 #define ENG_PATCH_COMPAT_VERSION 16
 #define ENG_MAX_POLY 8                /* notes a patch plays at once (its header byte 3) */
 

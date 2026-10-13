@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { makeAssembly, toDef, validateAssemblyDef, insertAssembly } from './assembly';
 import { DEFS } from './modules';
 import { addModule, connect, emptyPatch, validatePatch } from './patch';
-import { connectParameter, parameterInputs, setParameterInput, setFixedInput } from './parameter-routing';
+import { connectParameter, parameterInputs, setParameterInput, setFixedInput, setInputRoute } from './parameter-routing';
 
 function setup() {
   const p = emptyPatch();
@@ -31,6 +31,36 @@ describe('slider jack routing', () => {
     setParameterInput(target, 'p1', 'res', true);
     expect(target.map!.p1).toEqual(['cutoff', 'res']);
     expect(p.cables).toEqual(cables);
+  });
+
+  it('fans any side input out to multiple thumbs and removes branches independently', () => {
+    const { p, target, from } = setup();
+    connect(p, DEFS, from, { module: target.id, port: 'cv' });
+    for (const port of ['cv', 'in', 'p1', 'p2']) {
+      for (const param of ['res', 'cvamt']) setInputRoute(target, DEFS.filter, port, param, true);
+      setInputRoute(target, DEFS.filter, port, 'res', true);
+      expect(parameterInputs(target, DEFS.filter.params.find((pd) => pd.name === 'res')!)).toContain(port);
+      setInputRoute(target, DEFS.filter, port, 'res', false);
+      expect(parameterInputs(target, DEFS.filter.params.find((pd) => pd.name === 'cvamt')!)).toContain(port);
+    }
+    setInputRoute(target, DEFS.filter, 'cv', 'cutoff', false);
+    expect(target.inputMap).toEqual({ cv: ['cvamt'], in: ['cvamt'] });
+    expect(target.disabledInputs).toEqual(['cv']);
+    expect(p.cables).toHaveLength(1);
+    connectParameter(p, DEFS, from, target.id, 'cvamt');
+    expect(p.cables).toHaveLength(1); // dropping on an already routed thumb reuses that side input
+    expect(validatePatch(JSON.parse(JSON.stringify(p)), DEFS)).toEqual(p);
+    const prefab = validateAssemblyDef(toDef(p, makeAssembly(p, [target.id], 'Fan-out')), DEFS);
+    const copy = emptyPatch(); insertAssembly(copy, DEFS, prefab, 0, 0);
+    expect(copy.modules[0].inputMap).toEqual(target.inputMap);
+    setInputRoute(copy.modules[0], DEFS.filter, 'cv', 'cvamt', false);
+    expect(target.inputMap!.cv).toEqual(['cvamt']);
+  });
+
+  it('repairs invalid additional routes without duplicating native or p1/p2 modulation', () => {
+    const { p, target } = setup();
+    target.inputMap = { cv: ['cutoff', 'res', 'res', 'missing'], in: [], p1: ['cutoff'], missing: ['res'] };
+    expect(validatePatch(p, DEFS).modules.find((m) => m.id === target.id)!.inputMap).toEqual({ cv: ['res'] });
   });
 
   it('round-trips disabled fixed links through patches and reusable assemblies', () => {

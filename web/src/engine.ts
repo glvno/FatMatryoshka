@@ -23,6 +23,8 @@ interface Inst {
   /** Overrides captured by DSP for dedicated CV inputs, after the parameter matrix. */
   display: Record<string, number>;
   inp: Record<string, Float32Array>;
+  /** Native DSP inputs: aliases of raw buffers, except disabled fixed links receive silence. */
+  dspInp: Record<string, Float32Array>;
   out: Record<string, Float32Array>;
 }
 
@@ -34,6 +36,7 @@ interface Node {
   att: [number, number];
   map: Record<Source, string[]>;
   connected: Record<string, boolean>;
+  inputRoutes: { port: string; params: string[]; mean: number }[];
   sources: { port: string; from: Node; fromPort: string }[];
   /** runs once per voice */
   poly: boolean;
@@ -102,6 +105,7 @@ export class Engine {
       state: impl.init(this.sampleRate),
       eff: {},
       display: {},
+      dspInp: {},
       inp: Object.fromEntries(impl.def.inputs.map((p) => [p.name, new Float32Array(BLOCK)])),
       out: Object.fromEntries(impl.def.outputs.map((p) => [p.name, new Float32Array(BLOCK)])),
     };
@@ -134,6 +138,7 @@ export class Engine {
             att: [1, 1],
             map: defaultMap(impl.def),
             connected: {},
+            inputRoutes: [],
             sources: [],
             poly: isPoly,
             bypass: false,
@@ -149,17 +154,18 @@ export class Engine {
       node.bypass = !!m.bypass;
       node.paramsB = m.paramsB && m.type !== 'fm1' ? { ...m.paramsB } : null;
       node.range = [{ ...(m.range?.p1 ?? {}) }, { ...(m.range?.p2 ?? {}) }];
+      node.inputRoutes = Object.entries(m.inputMap ?? {}).map(([port, params]) => ({ port, params: [...params], mean: 0 }));
+      for (const inst of node.inst) inst.dspInp = Object.fromEntries(Object.entries(inst.inp).map(([port, buf]) => [port, m.disabledInputs?.includes(port) ? new Float32Array(BLOCK) : buf]));
       node.sources = [];
       node.connected = {};
       next.set(m.id, node);
     }
     const disabled = new Map(patch.modules.map((m) => [m.id, new Set(m.disabledInputs)]));
     for (const c of patch.cables) {
-      if (disabled.get(c.to.module)?.has(c.to.port)) continue;
       const to = next.get(c.to.module)!;
       const from = next.get(c.from.module)!;
       to.sources.push({ port: c.to.port, from, fromPort: c.from.port });
-      to.connected[c.to.port] = true;
+      if (!disabled.get(c.to.module)?.has(c.to.port)) to.connected[c.to.port] = true;
     }
     this.nodes = next;
     const { order } = processingOrder(patch);
@@ -264,7 +270,7 @@ export class Engine {
     }
   }
 
-  /** Block-rate parameter modulation: the mean of p1 and p2 over the block, times their attenuverters, added to the parameters the matrix assigns them to. */
+  /** Block-rate parameter modulation: side-input means add to their destinations; p1/p2 also apply their depth and macro ranges. */
   private applyCv(node: Node, inst: Inst, n: number): void {
     const pins: (number | null)[] = [null, null];
     if (node.impl.def.paramInputs)
@@ -274,6 +280,11 @@ export class Engine {
         for (let i = 0; i < n; i++) sum += inst.inp[name][i];
         pins[s] = (sum / n) * node.att[s];
       });
+    for (const route of node.inputRoutes) {
+      let sum = 0;
+      for (let i = 0; i < n; i++) sum += inst.inp[route.port][i];
+      route.mean = sum / n;
+    }
     for (const pd of node.impl.def.params) {
       const a = node.params[pd.name] ?? pd.default;
       let base = node.paramsB && this.morphT > 0 ? morphValue(pd, a, node.paramsB[pd.name] ?? a, this.morphT) : a;
@@ -294,6 +305,10 @@ export class Engine {
           touched = true;
         }
       });
+      for (const route of node.inputRoutes) if (route.params.includes(pd.name)) {
+        mod += route.mean;
+        touched = true;
+      }
       if (ranged) {
         const [lo, hi] = ranged as Range;
         base = paramValue(pd, lo + Math.min(1, Math.max(0, rv)) * (hi - lo));
@@ -418,7 +433,7 @@ export class Engine {
       else out[name].fill(0, 0, n);
       return;
     }
-    const ctx: Ctx = { sr: this.sampleRate, n, inp: inst.inp, out, connected: node.connected, p: inst.eff, voice, display: inst.display };
+    const ctx: Ctx = { sr: this.sampleRate, n, inp: inst.dspInp, out, connected: node.connected, p: inst.eff, voice, display: inst.display };
     node.impl.process(ctx, inst.state);
     if (node.type === 'fm1' && voice.retrig) {
       out.gate[0] = 0; // one low sample: the envelopes of a stolen voice see a new gate
