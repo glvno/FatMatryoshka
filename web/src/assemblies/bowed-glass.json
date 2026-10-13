@@ -1,0 +1,269 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "bowed glass",
+  "modules": [
+    {
+      "id": 1,
+      "type": "noise",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "level": 1,
+        "color": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "level"
+        ],
+        "p2": [
+          "color"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "adsr",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "a": 0.4,
+        "d": 0.3,
+        "s": 0.8,
+        "r": 0.6
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "a"
+        ],
+        "p2": [
+          "d"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "vca",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "gain": 0.5
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "ladder",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "cutoff": 1500,
+        "res": 0.6,
+        "drive": 1,
+        "cvamt": 1,
+        "track": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "cutoff"
+        ],
+        "p2": [
+          "res"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "modal",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "coarse": 0,
+        "decay": 1,
+        "struct": 0.5,
+        "bright": 0.5,
+        "damp": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "decay"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "dyn",
+      "x": 540,
+      "y": 560,
+      "params": {
+        "thresh": -24,
+        "ratio": 6,
+        "attack": 0.01,
+        "release": 0.2,
+        "gain": 6
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "thresh"
+        ],
+        "p2": [
+          "ratio"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "env"
+      },
+      "to": {
+        "module": 3,
+        "port": "cv"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "lp24"
+      },
+      "to": {
+        "module": 5,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 5,
+        "port": "out"
+      },
+      "to": {
+        "module": 6,
+        "port": "in"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 2,
+      "port": "gate",
+      "label": "gate"
+    },
+    {
+      "module": 5,
+      "port": "pitch",
+      "label": "pitch"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 6,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 3,
+      "param": "gain",
+      "label": "pressure"
+    },
+    {
+      "module": 2,
+      "param": "a",
+      "label": "attack"
+    },
+    {
+      "module": 4,
+      "param": "cutoff",
+      "label": "brightness"
+    },
+    {
+      "module": 5,
+      "param": "decay",
+      "label": "decay"
+    },
+    {
+      "module": 2,
+      "param": "r",
+      "label": "release"
+    }
+  ]
+}

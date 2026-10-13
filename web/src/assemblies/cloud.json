@@ -1,0 +1,95 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "cloud",
+  "modules": [
+    {
+      "id": 1,
+      "type": "grain",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "position": 0.3,
+        "size": 0.15,
+        "density": 25,
+        "pitch": 0,
+        "spray": 0.6,
+        "freeze": 0,
+        "mix": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "position"
+        ],
+        "p2": [
+          "size"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "in",
+      "label": "in"
+    },
+    {
+      "module": 1,
+      "port": "trig",
+      "label": "trig"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 1,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "freeze",
+      "label": "freeze"
+    },
+    {
+      "module": 1,
+      "param": "position",
+      "label": "position"
+    },
+    {
+      "module": 1,
+      "param": "pitch",
+      "label": "pitch"
+    },
+    {
+      "module": 1,
+      "param": "spray",
+      "label": "spray"
+    },
+    {
+      "module": 1,
+      "param": "size",
+      "label": "size"
+    },
+    {
+      "module": 1,
+      "param": "density",
+      "label": "density"
+    },
+    {
+      "module": 1,
+      "param": "mix",
+      "label": "mix"
+    }
+  ]
+}

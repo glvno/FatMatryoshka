@@ -15,7 +15,9 @@
         "fine": 0,
         "pm": 0,
         "level": 1,
-        "fb": 0
+        "fb": 0,
+        "unison": 1,
+        "detune": 10
       },
       "att": [
         1,

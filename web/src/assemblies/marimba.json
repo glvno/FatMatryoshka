@@ -1,0 +1,355 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "marimba",
+  "modules": [
+    {
+      "id": 1,
+      "type": "pulse",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "time": 0.002
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "time"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "scale",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "gain": 0.02,
+        "offset": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [
+          "offset"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "modal",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "coarse": 0,
+        "decay": 0.4,
+        "struct": 0,
+        "bright": 0.6,
+        "damp": 0.4
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "decay"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "modal",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "coarse": -12,
+        "decay": 0.7,
+        "struct": 0,
+        "bright": 0.2,
+        "damp": 0.9
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "decay"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "xfade",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "mix": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "mix"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "lfo",
+      "x": 540,
+      "y": 560,
+      "params": {
+        "wave": 0,
+        "rate": 5,
+        "depth": 1,
+        "sync": 0,
+        "div": 6,
+        "bpm": 120
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "scale",
+      "x": 810,
+      "y": 560,
+      "params": {
+        "gain": 0,
+        "offset": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [
+          "offset"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "vca",
+      "x": 810,
+      "y": 0,
+      "params": {
+        "gain": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 5,
+        "port": "a"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "out"
+      },
+      "to": {
+        "module": 5,
+        "port": "b"
+      }
+    },
+    {
+      "from": {
+        "module": 5,
+        "port": "out"
+      },
+      "to": {
+        "module": 8,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 6,
+        "port": "out"
+      },
+      "to": {
+        "module": 7,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 7,
+        "port": "out"
+      },
+      "to": {
+        "module": 8,
+        "port": "cv"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "trig",
+      "label": "gate"
+    },
+    {
+      "module": 3,
+      "port": "pitch",
+      "label": "pitch",
+      "also": [
+        {
+          "module": 4,
+          "port": "pitch"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "module": 8,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 3,
+      "param": "decay",
+      "label": "decay"
+    },
+    {
+      "module": 5,
+      "param": "mix",
+      "label": "tube"
+    },
+    {
+      "module": 7,
+      "param": "gain",
+      "label": "motor"
+    },
+    {
+      "module": 6,
+      "param": "rate",
+      "label": "motor rate"
+    },
+    {
+      "module": 3,
+      "param": "bright",
+      "label": "bright"
+    },
+    {
+      "module": 2,
+      "param": "gain",
+      "label": "hit"
+    }
+  ]
+}

@@ -1,0 +1,324 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "gamelan",
+  "modules": [
+    {
+      "id": 1,
+      "type": "noise",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "level": 1,
+        "color": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "level"
+        ],
+        "p2": [
+          "color"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "env",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "l1": 1,
+        "r1": 0.001,
+        "l2": 0,
+        "r2": 0.015,
+        "l3": 0,
+        "r3": 0.01,
+        "l4": 0,
+        "r4": 0.01
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "l1"
+        ],
+        "p2": [
+          "r1"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "vca",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "gain": 0.05
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "modal",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "coarse": 0,
+        "decay": 2.5,
+        "struct": 1,
+        "bright": 0.5,
+        "damp": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "decay"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "scale",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "gain": 1,
+        "offset": 0.015
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [
+          "offset"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "modal",
+      "x": 540,
+      "y": 560,
+      "params": {
+        "coarse": 7,
+        "decay": 2,
+        "struct": 1,
+        "bright": 0.4,
+        "damp": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "decay"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "mixer",
+      "x": 810,
+      "y": 0,
+      "params": {
+        "l1": 0.7,
+        "l2": 0.5,
+        "l3": 0,
+        "l4": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "l1"
+        ],
+        "p2": [
+          "l2"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "env"
+      },
+      "to": {
+        "module": 3,
+        "port": "cv"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 6,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 5,
+        "port": "out"
+      },
+      "to": {
+        "module": 6,
+        "port": "pitch"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "out"
+      },
+      "to": {
+        "module": 7,
+        "port": "in1"
+      }
+    },
+    {
+      "from": {
+        "module": 6,
+        "port": "out"
+      },
+      "to": {
+        "module": 7,
+        "port": "in2"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 2,
+      "port": "gate",
+      "label": "gate"
+    },
+    {
+      "module": 4,
+      "port": "pitch",
+      "label": "pitch",
+      "also": [
+        {
+          "module": 5,
+          "port": "in"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "module": 7,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 4,
+      "param": "decay",
+      "label": "decay"
+    },
+    {
+      "module": 5,
+      "param": "offset",
+      "label": "detune"
+    },
+    {
+      "module": 6,
+      "param": "coarse",
+      "label": "interval"
+    },
+    {
+      "module": 7,
+      "param": "l2",
+      "label": "balance"
+    },
+    {
+      "module": 3,
+      "param": "gain",
+      "label": "hit"
+    }
+  ]
+}

@@ -1,0 +1,186 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "rim",
+  "modules": [
+    {
+      "id": 1,
+      "type": "pulse",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "time": 0.002
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "time"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "scale",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "gain": 0.06,
+        "offset": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [
+          "offset"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "modal",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "coarse": 12,
+        "decay": 0.06,
+        "struct": 0.6,
+        "bright": 0.8,
+        "damp": 0.2
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "decay"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "comb",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "coarse": 24,
+        "fb": 0.6,
+        "damp": 0.5,
+        "mix": 0.5
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "fb"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "trig",
+      "label": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 4,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 3,
+      "param": "coarse",
+      "label": "tune"
+    },
+    {
+      "module": 3,
+      "param": "decay",
+      "label": "decay"
+    },
+    {
+      "module": 4,
+      "param": "mix",
+      "label": "stick"
+    },
+    {
+      "module": 3,
+      "param": "struct",
+      "label": "body"
+    },
+    {
+      "module": 2,
+      "param": "gain",
+      "label": "hit"
+    }
+  ]
+}

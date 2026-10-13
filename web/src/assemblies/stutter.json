@@ -1,0 +1,246 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "stutter",
+  "modules": [
+    {
+      "id": 1,
+      "type": "lfo",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 3,
+        "rate": 8,
+        "depth": 1,
+        "sync": 0,
+        "div": 6,
+        "bpm": 120
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "clkdiv",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "div": 2
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "div"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "lfo",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "wave": 3,
+        "rate": 0.7,
+        "depth": 1,
+        "sync": 0,
+        "div": 6,
+        "bpm": 120
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "scale",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "gain": 0.2,
+        "offset": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [
+          "offset"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "grain",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "position": 0.3,
+        "size": 0.12,
+        "density": 0,
+        "pitch": 0,
+        "spray": 0,
+        "freeze": 0,
+        "mix": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "position"
+        ],
+        "p2": [
+          "size"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "clock"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 5,
+        "port": "trig"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "out"
+      },
+      "to": {
+        "module": 5,
+        "port": "p1"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 5,
+      "port": "in",
+      "label": "in"
+    },
+    {
+      "module": 1,
+      "port": "reset",
+      "label": "reset",
+      "also": [
+        {
+          "module": 2,
+          "port": "reset"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "module": 5,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "rate",
+      "label": "rate"
+    },
+    {
+      "module": 2,
+      "param": "div",
+      "label": "div"
+    },
+    {
+      "module": 5,
+      "param": "size",
+      "label": "size"
+    },
+    {
+      "module": 5,
+      "param": "pitch",
+      "label": "pitch"
+    },
+    {
+      "module": 4,
+      "param": "gain",
+      "label": "jump"
+    },
+    {
+      "module": 5,
+      "param": "freeze",
+      "label": "freeze"
+    }
+  ]
+}

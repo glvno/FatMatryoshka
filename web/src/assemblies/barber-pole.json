@@ -1,0 +1,186 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "barber pole",
+  "modules": [
+    {
+      "id": 1,
+      "type": "shift",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "shift": 0.3,
+        "cvamt": 100,
+        "mix": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "shift"
+        ],
+        "p2": [
+          "cvamt"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "lfo",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "wave": 1,
+        "rate": 0.08,
+        "depth": 1,
+        "sync": 0,
+        "div": 6,
+        "bpm": 120
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "scale",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "gain": 0.5,
+        "offset": 0.5
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [
+          "offset"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "xfade",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "mix": 0.5
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "mix"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "up"
+      },
+      "to": {
+        "module": 4,
+        "port": "a"
+      }
+    },
+    {
+      "from": {
+        "module": 1,
+        "port": "down"
+      },
+      "to": {
+        "module": 4,
+        "port": "b"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "pos"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "in",
+      "label": "in"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 4,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "shift",
+      "label": "speed"
+    },
+    {
+      "module": 2,
+      "param": "rate",
+      "label": "sweep"
+    },
+    {
+      "module": 3,
+      "param": "gain",
+      "label": "depth"
+    }
+  ]
+}

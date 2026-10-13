@@ -1,0 +1,235 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "time smear",
+  "modules": [
+    {
+      "id": 1,
+      "type": "delay",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "time": 400,
+        "fb": 0.5,
+        "mix": 1,
+        "sync": 0,
+        "pingpong": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "time"
+        ],
+        "p2": [
+          "fb"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "lfo",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "wave": 1,
+        "rate": 0.1,
+        "depth": 1,
+        "sync": 0,
+        "div": 6,
+        "bpm": 120
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "scale",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "gain": 0.3,
+        "offset": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [
+          "offset"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "grain",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "position": 0.5,
+        "size": 0.3,
+        "density": 8,
+        "pitch": -12,
+        "spray": 0.2,
+        "freeze": 0,
+        "mix": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "position"
+        ],
+        "p2": [
+          "size"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "xfade",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "mix": 0.5
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "mix"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "p1"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "out"
+      },
+      "to": {
+        "module": 5,
+        "port": "b"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "in",
+      "label": "in",
+      "also": [
+        {
+          "module": 5,
+          "port": "a"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "module": 5,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 5,
+      "param": "mix",
+      "label": "smear"
+    },
+    {
+      "module": 1,
+      "param": "time",
+      "label": "time"
+    },
+    {
+      "module": 1,
+      "param": "fb",
+      "label": "feedback"
+    },
+    {
+      "module": 4,
+      "param": "pitch",
+      "label": "pitch"
+    },
+    {
+      "module": 2,
+      "param": "rate",
+      "label": "drift"
+    }
+  ]
+}

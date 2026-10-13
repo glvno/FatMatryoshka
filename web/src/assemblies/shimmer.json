@@ -1,0 +1,168 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "shimmer",
+  "modules": [
+    {
+      "id": 1,
+      "type": "mixer",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "l1": 1,
+        "l2": 0.4,
+        "l3": 0,
+        "l4": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "l1"
+        ],
+        "p2": [
+          "l2"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "reverb",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "size": 0.8,
+        "damp": 0.3,
+        "mix": 0.5,
+        "pre": 10,
+        "mod": 0.4
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "size"
+        ],
+        "p2": [
+          "damp"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "grain",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "position": 0.05,
+        "size": 0.25,
+        "density": 12,
+        "pitch": 12,
+        "spray": 0,
+        "freeze": 0,
+        "mix": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "position"
+        ],
+        "p2": [
+          "size"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 1,
+        "port": "in2"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "in1",
+      "label": "in"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 2,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "l2",
+      "label": "shimmer"
+    },
+    {
+      "module": 2,
+      "param": "size",
+      "label": "decay"
+    },
+    {
+      "module": 3,
+      "param": "pitch",
+      "label": "interval"
+    },
+    {
+      "module": 2,
+      "param": "damp",
+      "label": "damp"
+    },
+    {
+      "module": 2,
+      "param": "mix",
+      "label": "mix"
+    }
+  ]
+}

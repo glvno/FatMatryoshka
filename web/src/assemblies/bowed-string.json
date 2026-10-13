@@ -1,0 +1,262 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "bowed string",
+  "modules": [
+    {
+      "id": 1,
+      "type": "glide",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "time": 0.08
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "time"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "noise",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "level": 1,
+        "color": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "level"
+        ],
+        "p2": [
+          "color"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "adsr",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "a": 0.15,
+        "d": 0.3,
+        "s": 0.8,
+        "r": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "a"
+        ],
+        "p2": [
+          "d"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "vca",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "gain": 0.4
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "ladder",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "cutoff": 2500,
+        "res": 0.3,
+        "drive": 1,
+        "cvamt": 1,
+        "track": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "cutoff"
+        ],
+        "p2": [
+          "res"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "comb",
+      "x": 540,
+      "y": 560,
+      "params": {
+        "coarse": 0,
+        "fb": 0.95,
+        "damp": 0.3,
+        "mix": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "fb"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 6,
+        "port": "pitch"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "env"
+      },
+      "to": {
+        "module": 4,
+        "port": "cv"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "out"
+      },
+      "to": {
+        "module": 5,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 5,
+        "port": "lp24"
+      },
+      "to": {
+        "module": 6,
+        "port": "in"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "in",
+      "label": "pitch"
+    },
+    {
+      "module": 3,
+      "port": "gate",
+      "label": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 6,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 4,
+      "param": "gain",
+      "label": "pressure"
+    },
+    {
+      "module": 5,
+      "param": "cutoff",
+      "label": "brightness"
+    },
+    {
+      "module": 6,
+      "param": "damp",
+      "label": "damp"
+    },
+    {
+      "module": 1,
+      "param": "time",
+      "label": "glide"
+    },
+    {
+      "module": 3,
+      "param": "a",
+      "label": "attack"
+    }
+  ]
+}

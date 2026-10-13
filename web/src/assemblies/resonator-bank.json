@@ -1,0 +1,225 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "resonator bank",
+  "modules": [
+    {
+      "id": 1,
+      "type": "modal",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "coarse": 0,
+        "decay": 1.5,
+        "struct": 0,
+        "bright": 0.5,
+        "damp": 0.4
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "decay"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "modal",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "coarse": 7,
+        "decay": 1.5,
+        "struct": 0,
+        "bright": 0.5,
+        "damp": 0.4
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "decay"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "modal",
+      "x": 0,
+      "y": 1120,
+      "params": {
+        "coarse": 12,
+        "decay": 1.5,
+        "struct": 0,
+        "bright": 0.5,
+        "damp": 0.4
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "coarse"
+        ],
+        "p2": [
+          "decay"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "mixer",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "l1": 0.05,
+        "l2": 0.04,
+        "l3": 0.03,
+        "l4": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "l1"
+        ],
+        "p2": [
+          "l2"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in1"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in2"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
+        "port": "in3"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "in",
+      "label": "in",
+      "also": [
+        {
+          "module": 2,
+          "port": "in"
+        },
+        {
+          "module": 3,
+          "port": "in"
+        }
+      ]
+    },
+    {
+      "module": 1,
+      "port": "pitch",
+      "label": "pitch",
+      "also": [
+        {
+          "module": 2,
+          "port": "pitch"
+        },
+        {
+          "module": 3,
+          "port": "pitch"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "module": 4,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "decay",
+      "label": "decay"
+    },
+    {
+      "module": 2,
+      "param": "decay",
+      "label": "decay 5th"
+    },
+    {
+      "module": 3,
+      "param": "decay",
+      "label": "decay oct"
+    },
+    {
+      "module": 1,
+      "param": "struct",
+      "label": "struct"
+    },
+    {
+      "module": 1,
+      "param": "bright",
+      "label": "bright"
+    },
+    {
+      "module": 4,
+      "param": "l1",
+      "label": "level"
+    }
+  ]
+}

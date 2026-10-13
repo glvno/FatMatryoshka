@@ -233,7 +233,7 @@ describe('assemblies', () => {
 
   it('ships factory assemblies that load, insert and play', () => {
     expect(FACTORY.map((d) => d.name)).toEqual([
-      'auto pan', 'clock', 'echo', 'fm pair', 'hihat', 'kick', 'operator', 'pluck', 'random melody', 'snare', 'step sequencer', 'sub bass', 'voice', 'vowel voice', 'wavetable pad',
+      'auto pan', 'barber pole', 'bowed glass', 'bowed string', 'clap', 'clock', 'cloud', 'cowbell', 'echo', 'fm pair', 'gamelan', 'glass bell', 'hats', 'hihat', 'kalimba', 'kick', 'marimba', 'operator', 'pluck', 'rain', 'random melody', 'resonator bank', 'reverse pad', 'rim', 'shimmer', 'sidechain pump', 'slicer', 'snare', 'step sequencer', 'stutter', 'sub bass', 'tabla', 'talking filter', 'time smear', 'tom', 'voice', 'vowel voice', 'wavetable pad',
     ]);
     for (const d of FACTORY) {
       expect(d.modules.every((m) => m.map === undefined || ['k1', 'k2', 'k3', 'k4'].every((k) => m.map![k as 'k1'].length === 0)), d.name).toBe(true);
@@ -255,7 +255,13 @@ describe('assemblies', () => {
       };
       feed('pitch', 'pitch');
       feed('gate', 'gate');
-      if (inp('in')) connect(p, DEFS, { module: kb, port: 'gate' }, inp('in')!); // a held key is a steady signal to pan
+      if (inp('in')) {
+        // a held key is a steady signal to pan / smear / shift: at a quarter, so a dense granular cloud of it stays below the clamp
+        const sc = addModule(p, DEFS.scale, 0, 0);
+        sc.params.gain = 0.25;
+        connect(p, DEFS, { module: kb, port: 'gate' }, { module: sc.id, port: 'in' });
+        for (const t of targetsOf(inp('in')!)) expect(connect(p, DEFS, { module: sc.id, port: 'out' }, t), `${d.name} in`).toBe(true);
+      }
       const o = a.outputs.find((r) => ['out', 'l', 'pitch', 'clock'].includes(r.label))!;
       expect(connect(p, DEFS, o, { module: out, port: 'l' }), d.name).toBe(true);
       const l = render(p, 24000);

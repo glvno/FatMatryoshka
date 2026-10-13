@@ -1,0 +1,157 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "reverse pad",
+  "modules": [
+    {
+      "id": 1,
+      "type": "grain",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "position": 0.2,
+        "size": 0.15,
+        "density": 12,
+        "pitch": 0,
+        "spray": 0,
+        "freeze": 0,
+        "mix": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "position"
+        ],
+        "p2": [
+          "size"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "adsr",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "a": 0.5,
+        "d": 0.5,
+        "s": 1,
+        "r": 1.5
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "a"
+        ],
+        "p2": [
+          "d"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "vca",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "gain": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "env"
+      },
+      "to": {
+        "module": 3,
+        "port": "cv"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "in",
+      "label": "in"
+    },
+    {
+      "module": 2,
+      "port": "gate",
+      "label": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 3,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 2,
+      "param": "a",
+      "label": "attack"
+    },
+    {
+      "module": 2,
+      "param": "r",
+      "label": "release"
+    },
+    {
+      "module": 1,
+      "param": "position",
+      "label": "age"
+    },
+    {
+      "module": 1,
+      "param": "size",
+      "label": "size"
+    },
+    {
+      "module": 1,
+      "param": "pitch",
+      "label": "pitch"
+    }
+  ]
+}

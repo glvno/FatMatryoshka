@@ -1,0 +1,153 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "talking filter",
+  "modules": [
+    {
+      "id": 1,
+      "type": "dyn",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "thresh": 0,
+        "ratio": 1,
+        "attack": 0.005,
+        "release": 0.08,
+        "gain": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "thresh"
+        ],
+        "p2": [
+          "ratio"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "scale",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "gain": 4,
+        "offset": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [
+          "offset"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "vowel",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "vowel": 0,
+        "res": 0.6,
+        "level": 0.8
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "vowel"
+        ],
+        "p2": [
+          "res"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "env"
+      },
+      "to": {
+        "module": 2,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "vowel"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "in",
+      "label": "in",
+      "also": [
+        {
+          "module": 3,
+          "port": "in"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "module": 3,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 2,
+      "param": "gain",
+      "label": "depth"
+    },
+    {
+      "module": 3,
+      "param": "res",
+      "label": "res"
+    },
+    {
+      "module": 1,
+      "param": "release",
+      "label": "release"
+    },
+    {
+      "module": 3,
+      "param": "vowel",
+      "label": "start"
+    }
+  ]
+}
