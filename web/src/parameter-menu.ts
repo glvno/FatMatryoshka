@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import { positionPopover } from './popover';
 import { setInputRoute, setParameterInput, parameterInputs } from './parameter-routing';
 import { paramValue, rangeOf, type ModuleDef, type ModuleInst, type ParamDef, type Source } from './patch';
 
@@ -21,7 +22,11 @@ export function parameterMenu(m: ModuleInst, def: ModuleDef, pd: ParamDef, ev: E
   const refreshers: (() => void)[] = [];
   menu.ontoggle = () => {
     if (!menu.isConnected) return;
-    if (menu.open) for (const refresh of refreshers) refresh();
+    if (menu.open) {
+      for (const refresh of refreshers) refresh();
+      content.showPopover();
+      positionPopover(content, summary);
+    } else if (content.matches(':popover-open')) content.hidePopover();
     onToggle(menu.open);
   };
   const summary = document.createElement('summary');
@@ -30,6 +35,10 @@ export function parameterMenu(m: ModuleInst, def: ModuleDef, pd: ParamDef, ev: E
   summary.setAttribute('aria-label', summary.title);
   const content = document.createElement('div');
   content.className = 'routing-controls';
+  content.popover = 'auto';
+  content.addEventListener('toggle', () => {
+    if (!content.matches(':popover-open') && menu.isConnected) menu.open = false;
+  });
   const hint = (text: string): void => {
     const p = document.createElement('p');
     p.textContent = text;

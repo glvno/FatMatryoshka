@@ -16,6 +16,8 @@ FatMatryoshka-1 is an independent project grown from Modular-1, which builds on 
 
 [Open the FatMatryoshka-1 editor](https://glvno.github.io/FatMatryoshka-1/) to make patches and upload them to the FM-1. The editor currently deploys from branch `dev`; its firmware package has not been installed on a device. The [original Modular-1 editor](https://wiggismodular.github.io/Modular-1/) is also available.
 
+The sidebar switches between **Patch**, **Library**, **Flash** and **About**. The larger header holds audio controls and command search. **File** contains save/load/share actions, **Edit** contains grouping, changes and A/B snapshots, and **FM-1 & MIDI** holds hardware connections. The patch canvas scrolls independently; zoom and Fit keep cards and their cables together. **Tab** moves through controls; **Alt+B** switches A/B.
+
 Slider thumbs are input jacks: **drag normally to adjust, Alt-drag to patch**, or drop an output cable onto a thumb. External cables plug into side jacks, which route to the moving thumbs through internal cables. **Click an internal cable to disconnect that parameter**, leaving the incoming cable and other destinations intact. **Drag the same side input to several thumbs to add multiple destinations** (or Alt-drag from the thumb to the side input). Thumb positions pause while patching so the targets stay still.
 
 Open the **⋯** menu beside a parameter for p1/p2 routing, modulation depth, macro ranges and K1–K4 hardware assignments. The matrix grid is gone. Existing patches retain their routing; fixed input links such as `cv → cutoff` can also be switched off independently, saved and restored. Any side input can also feed additional parameters; these extra routes add the signal’s block average across the parameter range. P1/P2 retain their shared depth controls and per-parameter macro ranges. Extra routes and disabled fixed links on an FM-1 require the updated bundled firmware. Dedicated controls use their own input (for example, Filter cutoff uses `cv`). Other thumbs reuse a suitable p1/p2 route or allocate an unused input; the editor reports when both are occupied. Depth is shared by every parameter assigned to that input. K1–K4 assignments apply while that module is selected on the FM-1.
@@ -129,17 +131,17 @@ During browser playback, sliders and their readouts follow dedicated CV inputs (
 
 ## Share a patch as a link
 
-- **Share link** (toolbar) copies a link that opens this patch: the JSON, layout and assemblies included, deflated into the URL fragment (`#p=…`, about 800 characters for a factory patch). Opening the link loads the patch into the editor without replacing the patch the browser remembers until you change something; the Patches page has an "Import link" field that puts a linked patch into the bank list. A patch too big for a link (over 8000 characters) travels without its card positions and assembly overlay, and opens on a grid.
+- **File → Share link** copies a link that opens this patch: the JSON, layout and assemblies included, deflated into the URL fragment (`#p=…`, about 800 characters for a factory patch). Opening the link loads the patch into the editor without replacing the patch the browser remembers until you change something; the Patches page has an "Import link" field that puts a linked patch into the bank list. A patch too big for a link (over 8000 characters) travels without its card positions and assembly overlay, and opens on a grid.
 
 ## Diff and A/B
 
-- **Diff** (toolbar) lists what changed since the patch was last loaded, uploaded or stored on the FM-1: parameters as old → new, modules and cables added or removed, and switches, attenuverters, parameter routing, macro ranges, voices and arpeggiator changes as one line each.
-- **A/B**: "Set A" and "Set B" keep two versions of the patch; the A/B button (or Tab) flips between them while you play. When both versions have the same modules and cables only the values move, so notes keep sounding through the flip (the side you leave keeps whatever you changed on it); otherwise the other version is loaded whole.
+- **Edit → Show changes** lists what changed since the patch was last loaded, uploaded or stored on the FM-1: parameters as old → new, modules and cables added or removed, and switches, attenuverters, parameter routing, macro ranges, voices and arpeggiator changes as one line each.
+- **A/B** (in **Edit**): "Set A" and "Set B" keep two versions of the patch; the A/B button (or Alt+B) flips between them while you play. When both versions have the same modules and cables only the values move, so notes keep sounding through the flip (the side you leave keeps whatever you changed on it); otherwise the other version is loaded whole.
 
 ## Keyboard
 
 - `/` or Ctrl/Cmd+K opens a **command palette**: type part of a name to add a module, insert an assembly (library or factory), load a patch or start a new one; Enter runs the first match, arrows choose. `?` lists every shortcut.
-- Click a jack, then a jack of the other kind, to connect them (Esc cancels; dragging works as before). With cards selected (shift-click or a box): Delete removes them, B bypasses them, G groups them into an assembly, Ctrl/Cmd+D duplicates them with their settings and the cables among them, the arrows nudge them (Shift: ×10). Space starts and stops the arpeggiator, Tab flips A/B, Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z undo and redo. The shortcuts are off while a text field has focus; the note keys (A W S E D F T G Y H U J K) still play when they are not taken.
+- Click a jack, then a jack of the other kind, to connect them (Esc cancels; dragging works as before). With cards selected (shift-click or a box): Delete removes them, B bypasses them, G groups them into an assembly, Ctrl/Cmd+D duplicates them with their settings and the cables among them, the arrows nudge them (Shift: ×10). Space starts and stops the arpeggiator, Alt+B flips A/B, Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z undo and redo. The shortcuts are off while a text field has focus; the note keys (A W S E D F T G Y H U J K) still play when they are not taken.
 
 ## Scope
 

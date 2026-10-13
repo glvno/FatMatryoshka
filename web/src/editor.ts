@@ -126,6 +126,9 @@ export class Editor {
   readonly selected = new Set<number>();
   private modulesEl: HTMLElement;
   private svg: SVGSVGElement;
+  private preview: SVGSVGElement;
+  private world: HTMLElement;
+  private space: HTMLElement;
   private ports = new Map<string, HTMLElement>();
   private cards = new Map<number, HTMLElement>();
   private frames = new Map<number, HTMLElement>();
@@ -133,7 +136,7 @@ export class Editor {
   private containers = new Map<number, HTMLElement>();
   private drag: { path: SVGPathElement; cancel: () => void } | null = null;
   private sliderPorts: { m: ModuleInst; pd: ParamDef; jack: HTMLElement }[] = [];
-  private cablePaths: { path: SVGPathElement; from: HTMLElement; to: HTMLElement }[] = [];
+  private cablePaths: { path: SVGPathElement; from: HTMLElement; to: HTMLElement; origin: HTMLElement }[] = [];
   private routingOpen = new Set<string>();
   private history: string[] = [];
   private future: string[] = [];
@@ -151,8 +154,11 @@ export class Editor {
     this.patch = patch;
     this.modulesEl = canvas.querySelector('#modules')!;
     this.svg = canvas.querySelector('#cables')! as unknown as SVGSVGElement;
+    this.preview = canvas.querySelector('#patch-preview')! as unknown as SVGSVGElement;
+    this.world = canvas.querySelector('#patch-world')!;
+    this.space = canvas.querySelector('#canvas-space')!;
     this.report(fixAssemblies(this.patch, DEFS));
-    window.addEventListener('resize', () => this.drawCables());
+    new ResizeObserver(() => { this.sizeCanvas(); this.positionCables(); }).observe(canvas);
     canvas.addEventListener('pointerdown', (e) => this.rubberBand(e));
     this.touchGestures();
     window.addEventListener('keydown', (e) => {
@@ -281,7 +287,9 @@ export class Editor {
     this.parameterDisplays = [];
     this.sliderPorts = [];
     this.cablePaths = [];
+    this.drag?.cancel();
     this.svg.replaceChildren();
+    this.preview.replaceChildren();
     this.modulesEl.replaceChildren();
     this.ports.clear();
     this.cards.clear();
@@ -304,15 +312,19 @@ export class Editor {
     this.sizeCanvas();
     requestAnimationFrame(() => {
       this.layoutFrames();
+      this.sizeCanvas();
       this.drawCables();
     });
   }
 
   private sizeCanvas(): void {
-    const xs = [...this.patch.modules.map((m) => m.x), ...assembliesOf(this.patch).map((a) => a.x)];
-    const ys = [...this.patch.modules.map((m) => m.y), ...assembliesOf(this.patch).map((a) => a.y)];
-    this.canvas.style.minWidth = `${Math.max(900, ...xs.map((x) => x + 270))}px`;
-    this.canvas.style.minHeight = `${Math.max(520, ...ys.map((y) => y + 560))}px`;
+    const elements = [...this.cards.values(), ...this.containers.values(), ...this.frames.values()];
+    const w = Math.max(this.canvas.clientWidth / this.zoom, ...elements.map((el) => el.offsetLeft + el.offsetWidth + 32));
+    const h = Math.max(this.canvas.clientHeight / this.zoom, ...elements.map((el) => el.offsetTop + el.offsetHeight + 32));
+    this.world.style.width = `${w}px`;
+    this.world.style.height = `${h}px`;
+    this.space.style.width = `${Math.ceil(w * this.zoom)}px`;
+    this.space.style.height = `${Math.ceil(h * this.zoom)}px`;
   }
 
   private badge(): HTMLElement {
@@ -476,7 +488,7 @@ export class Editor {
         this.ev.onParam(m.id, pd.name, v);
       };
     }
-    const canPatch = !!(pd.input || def.paramInputs);
+    const canPatch = def.inputs.length > 0;
     const thumb = canPatch && !pd.toggle ? sliderJack(input, (e, jack) => this.beginDrag(e, jack)) : null;
     const gesture = thumb ? 'Drag to adjust; Alt-drag to patch. Drop a cable on the thumb to connect.' : '';
     input.title = gesture;
@@ -594,22 +606,18 @@ export class Editor {
 
   setZoom(z: number): void {
     this.zoom = Math.min(2, Math.max(0.3, Math.round(z * 100) / 100));
-    for (const el of [this.modulesEl, this.svg as unknown as HTMLElement]) {
-      el.style.transformOrigin = '0 0';
-      el.style.transform = this.zoom === 1 ? '' : `scale(${this.zoom})`;
-    }
+    this.world.style.transform = this.zoom === 1 ? '' : `scale(${this.zoom})`;
+    this.sizeCanvas();
     this.drawCables();
     this.onZoom(this.zoom);
   }
 
   /** every card in view: the zoom that fits the whole patch into the canvas */
   zoomToFit(): void {
-    let w = 0, h = 0;
-    for (const m of this.patch.modules) {
-      w = Math.max(w, m.x + CARD_W);
-      h = Math.max(h, m.y + CARD_H * 0.7);
-    }
-    if (!w) return;
+    const elements = [...this.cards.values(), ...this.containers.values(), ...this.frames.values()];
+    if (!elements.length) return;
+    const w = Math.max(...elements.map((el) => el.offsetLeft + el.offsetWidth + 24));
+    const h = Math.max(...elements.map((el) => el.offsetTop + el.offsetHeight + 24));
     this.setZoom(Math.min(1.5, (this.canvas.clientWidth - 16) / w, (this.canvas.clientHeight - 16) / h));
     this.canvas.scrollTo(0, 0);
   }
@@ -1459,10 +1467,10 @@ export class Editor {
 
   // ---- cables
 
-  private center(el: HTMLElement): Pt {
+  private center(el: HTMLElement, origin = this.world): Pt {
     const r = el.getBoundingClientRect();
-    const c = this.canvas.getBoundingClientRect();
-    return { x: (r.left - c.left + r.width / 2) / this.zoom, y: (r.top - c.top + r.height / 2) / this.zoom };
+    const c = origin.getBoundingClientRect();
+    return { x: (r.left - c.left + r.width / 2) / this.zoom - origin.clientLeft, y: (r.top - c.top + r.height / 2) / this.zoom - origin.clientTop };
   }
 
   private curve(a: Pt, b: Pt): string {
@@ -1472,7 +1480,7 @@ export class Editor {
 
   /** Cable paths are retained so animation only moves their endpoints. */
   private positionCables(): void {
-    for (const { path, from, to } of this.cablePaths) path.setAttribute('d', this.curve(this.center(from), this.center(to)));
+    for (const { path, from, to, origin } of this.cablePaths) path.setAttribute('d', this.curve(this.center(from, origin), this.center(to, origin)));
   }
 
   private inputJack(to: Endpoint): HTMLElement | undefined {
@@ -1484,6 +1492,8 @@ export class Editor {
   drawCables(): void {
     for (const { path } of this.cablePaths) path.remove();
     this.cablePaths = [];
+    for (const svg of this.modulesEl.querySelectorAll('.internal-cables')) svg.remove();
+    const internalLayers = new Map<HTMLElement, SVGSVGElement>();
     for (const dot of [...this.ports.values(), ...this.sliderPorts.map((p) => p.jack)]) dot.classList.remove('connected');
     const add = (from: HTMLElement, to: HTMLElement, kind: string, remove: () => void, title: string, internal = false): void => {
       const path = document.createElementNS(SVGNS, 'path');
@@ -1497,8 +1507,23 @@ export class Editor {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); remove(); }
       });
       const hint = document.createElementNS(SVGNS, 'title'); hint.textContent = title; path.append(hint);
-      this.svg.prepend(path);
-      this.cablePaths.push({ path, from, to });
+      let layer = this.svg;
+      let origin = this.world;
+      if (internal || to.classList.contains('slider-port')) {
+        const card = to.closest<HTMLElement>('.module');
+        if (card) {
+          origin = card;
+          let local = internalLayers.get(card);
+          if (!local) {
+            local = document.createElementNS(SVGNS, 'svg');
+            local.setAttribute('class', 'cables internal-cables');
+            card.append(local); internalLayers.set(card, local);
+          }
+          layer = local;
+        }
+      }
+      layer.prepend(path);
+      this.cablePaths.push({ path, from, to, origin });
     };
     // Show the assignment even without an upstream cable, so it can be edited before patching a source.
     for (const { m, pd, jack } of this.sliderPorts) for (const port of parameterInputs(m, pd)) {
@@ -1595,10 +1620,10 @@ export class Editor {
     const kind = start.dataset.dir;
     const path = document.createElementNS(SVGNS, 'path');
     path.setAttribute('class', 'cable pending');
-    this.svg.append(path);
+    this.preview.append(path);
     this.canvas.classList.add('patching');
     const move = (ev: PointerEvent): void => {
-      const c = this.canvas.getBoundingClientRect();
+      const c = this.world.getBoundingClientRect();
       const p = { x: (ev.clientX - c.left) / this.zoom, y: (ev.clientY - c.top) / this.zoom };
       const s = this.center(start);
       path.setAttribute('d', kind === 'out' ? this.curve(s, p) : this.curve(p, s));

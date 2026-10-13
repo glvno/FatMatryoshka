@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import { setupWorkspaceMenus } from './popover';
 import { AudioHost } from './audio';
 import type { HostMsg } from './worklet';
 import { DeviceLink } from './device';
@@ -182,6 +183,7 @@ host.setPatch(editor.patch);
 host.onValues = (values) => editor.showParameterValues(values);
 
 // toolbar
+setupWorkspaceMenus();
 const presetSel = $<HTMLSelectElement>('preset');
 presetSel.append(new Option('Load patch…', ''), new Option('New patch', '__new'), ...Object.keys(PRESETS).map((n) => new Option(n, n)));
 presetSel.onchange = () => {
@@ -267,7 +269,7 @@ const showAB = (): void => {
   abToggle.textContent = editor.side;
   abToggle.classList.toggle('b', editor.side === 'B');
   abToggle.disabled = !(editor.snapshots.A && editor.snapshots.B);
-  abToggle.title = abToggle.disabled ? 'set A and B first' : `flip to ${editor.side === 'A' ? 'B' : 'A'} (Tab)`;
+  abToggle.title = abToggle.disabled ? 'set A and B first' : `flip to ${editor.side === 'A' ? 'B' : 'A'} (Alt+B)`;
 };
 $('ab-a').onclick = () => {
   editor.takeSnapshot('A');
@@ -350,6 +352,7 @@ const palRun = (c: Command): void => {
   c.run();
 };
 const openPalette = (): void => {
+  if (currentTab !== 'patch') document.querySelector<HTMLButtonElement>('#tabs button[data-tab="patch"]')?.click();
   palInput.value = '';
   palSel = 0;
   palRender();
@@ -383,10 +386,15 @@ $('help-btn').onclick = () => help.showModal();
 
 // ---- keyboard shortcuts (off while typing in a field; the note keyboard in input.ts gets what is left)
 window.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) {
+    e.preventDefault(); e.stopImmediatePropagation(); openPalette(); return;
+  }
   if (currentTab !== 'patch') return;
   const t = e.target as HTMLElement | null;
   const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') && (t as HTMLInputElement).type !== 'range' && (t as HTMLInputElement).type !== 'checkbox';
-  if (palette.open || help.open || typing) return;
+  if (document.querySelector('dialog[open], [popover]:popover-open') || typing) return;
+  const control = t?.closest('button, summary, [role=tab], input, select');
+  if (control && [' ', 'Enter', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
   const mod = e.metaKey || e.ctrlKey;
   const k = e.key;
   let done = false;
@@ -395,9 +403,9 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'Escape') (editor.cancelArm(), (diffPanel.hidden = true), (done = true));
   else if (k === 'Delete' || k === 'Backspace') done = editor.removeSelected();
   else if (mod && k.toLowerCase() === 'd') done = editor.duplicateSelected();
+  else if (e.altKey && k.toLowerCase() === 'b') (flipAB(), (done = true));
   else if (!mod && k.toLowerCase() === 'b') done = editor.bypassSelected();
   else if (!mod && k.toLowerCase() === 'g' && editor.selected.size) (editor.makeAssembly(), (done = true));
-  else if (k === 'Tab') (flipAB(), (done = true));
   else if (k === ' ') {
     editor.arpPlay = !editor.arpPlay;
     host.send({ t: 'arpplay', on: editor.arpPlay });
@@ -471,6 +479,7 @@ const loadFromHash = (): void => {
 loadFromHash();
 window.addEventListener('hashchange', loadFromHash);
 
+$('load-btn').onclick = () => $<HTMLInputElement>('load-file').click();
 $('save-btn').onclick = () => {
   const blob = new Blob([JSON.stringify(editor.patch, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -503,7 +512,7 @@ $('audio-btn').onclick = async () => {
     status.textContent = `audio failed: ${e}`;
   }
 };
-attachKeyboard(sink, () => currentTab === 'patch');
+attachKeyboard(sink, () => currentTab === 'patch' && !document.querySelector('dialog[open], [popover]:popover-open'));
 // Web MIDI is only asked for on request: while a page holds MIDI access, Chromium's ALSA backend tracks every MIDI port on the
 // system and aborts the whole browser (SIGILL in midi::MidiManager::SetInputPortState) when the ports change, for example when
 // the FM-1 re-enumerates after a reset or a firmware update.
@@ -543,11 +552,21 @@ $('tab-about').innerHTML = `
   <p><a href="https://github.com/WiggisModular/Modular-1">Modular-1</a>, by <a href="https://github.com/morgulbrut">@morgulbrut</a> / <a href="https://github.com/WiggisModular">WiggisModular</a>, is the modular synthesizer this project grew from.</p>
   <p class="muted">GPL-3.0-only. Not affiliated with M-VAVE or Clavia.</p></div>`;
 for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) {
+  b.onkeydown = (e) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const tabs = [...document.querySelectorAll<HTMLButtonElement>('#tabs button')];
+    const index = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (tabs.indexOf(b) + (e.key === 'ArrowDown' ? 1 : tabs.length - 1)) % tabs.length;
+    tabs[index].click(); tabs[index].focus();
+  };
   b.onclick = () => {
     currentTab = b.dataset.tab!;
-    for (const x of document.querySelectorAll<HTMLButtonElement>('#tabs button')) x.setAttribute('aria-selected', String(x === b));
+    for (const x of document.querySelectorAll<HTMLButtonElement>('#tabs button')) {
+      x.setAttribute('aria-selected', String(x === b));
+      x.tabIndex = x === b ? 0 : -1;
+    }
     for (const t of document.querySelectorAll<HTMLElement>('.tab')) t.hidden = t.id !== `tab-${currentTab}`;
-    if (currentTab === 'patch') editor.drawCables();
+    if (currentTab === 'patch') requestAnimationFrame(() => editor.drawCables());
   };
 }
 
