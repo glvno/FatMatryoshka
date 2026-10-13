@@ -144,6 +144,7 @@ export class Editor {
     this.report(fixAssemblies(this.patch, DEFS));
     window.addEventListener('resize', () => this.drawCables());
     canvas.addEventListener('pointerdown', (e) => this.rubberBand(e));
+    this.touchGestures();
     window.addEventListener('keydown', (e) => {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
       const t = e.target as HTMLElement | null;
@@ -511,6 +512,109 @@ export class Editor {
 
   /** the arpeggiator's transport (editor state) */
   arpPlay = false;
+
+  // ---- zoom and touch: the cards and cables are scaled by `zoom`; offsets stay in layout pixels, pointer deltas are divided by it
+
+  zoom = 1;
+  onZoom: (z: number) => void = () => {};
+
+  setZoom(z: number): void {
+    this.zoom = Math.min(2, Math.max(0.3, Math.round(z * 100) / 100));
+    for (const el of [this.modulesEl, this.svg as unknown as HTMLElement]) {
+      el.style.transformOrigin = '0 0';
+      el.style.transform = this.zoom === 1 ? '' : `scale(${this.zoom})`;
+    }
+    this.drawCables();
+    this.onZoom(this.zoom);
+  }
+
+  /** every card in view: the zoom that fits the whole patch into the canvas */
+  zoomToFit(): void {
+    let w = 0, h = 0;
+    for (const m of this.patch.modules) {
+      w = Math.max(w, m.x + CARD_W);
+      h = Math.max(h, m.y + CARD_H * 0.7);
+    }
+    if (!w) return;
+    this.setZoom(Math.min(1.5, (this.canvas.clientWidth - 16) / w, (this.canvas.clientHeight - 16) / h));
+    this.canvas.scrollTo(0, 0);
+  }
+
+  /** pinch to zoom and one-finger pan on the empty canvas (touch), Ctrl / Cmd + wheel to zoom (trackpads) */
+  private touchGestures(): void {
+    const pts = new Map<number, Pt>();
+    let pinch: { d: number; z: number } | null = null;
+    this.canvas.addEventListener('wheel', (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      this.setZoom(this.zoom * Math.exp(-e.deltaY / 400));
+    }, { passive: false });
+    this.canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) {
+        const [a, b] = [...pts.values()];
+        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), z: this.zoom };
+      }
+    });
+    const end = (e: PointerEvent): void => {
+      pts.delete(e.pointerId);
+      if (pts.size < 2) pinch = null;
+    };
+    this.canvas.addEventListener('pointerup', end);
+    this.canvas.addEventListener('pointercancel', end);
+    this.canvas.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'touch' || !pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && pts.size === 2) {
+        const [a, b] = [...pts.values()];
+        this.setZoom(pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.d));
+        e.preventDefault();
+      }
+    });
+  }
+
+  /** a long press on a card header (touch): the context actions */
+  private contextMenu(m: ModuleInst, def: ModuleDef, at: Pt): void {
+    document.querySelector('.ctx')?.remove();
+    const menu = document.createElement('div');
+    menu.className = 'ctx';
+    const item = (text: string, run: () => void): void => {
+      const b = document.createElement('button');
+      b.textContent = text;
+      b.onclick = (e) => {
+        e.stopPropagation();
+        menu.remove();
+        run();
+      };
+      menu.append(b);
+    };
+    if (def.type !== 'fm1' && def.type !== 'output') item(m.bypass ? 'turn on' : 'bypass', () => {
+      this.selected.clear();
+      this.selected.add(m.id);
+      this.bypassSelected();
+    });
+    item('duplicate', () => {
+      this.selected.clear();
+      this.selected.add(m.id);
+      this.duplicateSelected();
+    });
+    item('select', () => {
+      this.selected.add(m.id);
+      this.showSelection();
+    });
+    item('remove', () => this.change(() => removeModule(this.patch, m.id)));
+    item('cancel', () => {});
+    Object.assign(menu.style, { left: `${at.x}px`, top: `${at.y}px` });
+    this.modulesEl.append(menu);
+    const away = (e: Event): void => {
+      if (!menu.contains(e.target as Node)) {
+        menu.remove();
+        window.removeEventListener('pointerdown', away, true);
+      }
+    };
+    setTimeout(() => window.addEventListener('pointerdown', away, true));
+  }
 
   // ---- keyboard actions (main.ts shortcuts): the selection
 
@@ -1148,12 +1252,30 @@ export class Editor {
       e.preventDefault();
       let lx = e.clientX;
       let ly = e.clientY;
+      // a long press (touch, no movement) opens the context menu instead of dragging
+      const card = handle.closest('.module') as HTMLElement | null;
+      const sx = e.clientX, sy = e.clientY;
+      let press = 0;
+      if (e.pointerType === 'touch' && card?.dataset.id) {
+        press = window.setTimeout(() => {
+          press = 0;
+          onUp();
+          const m = this.patch.modules.find((x) => x.id === Number(card.dataset.id));
+          if (m) this.contextMenu(m, DEFS[m.type], { x: m.x + 20, y: m.y + 30 });
+        }, 500);
+      }
       const onMove = (ev: PointerEvent): void => {
-        move(ev.clientX - lx, ev.clientY - ly);
+        if (press && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) {
+          clearTimeout(press);
+          press = 0;
+        }
+        move((ev.clientX - lx) / this.zoom, (ev.clientY - ly) / this.zoom);
         lx = ev.clientX;
         ly = ev.clientY;
       };
       const onUp = (): void => {
+        if (press) clearTimeout(press);
+        press = 0;
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onUp);
@@ -1319,10 +1441,29 @@ export class Editor {
   /** a drag on empty canvas selects the cards it touches; a click on empty canvas clears the selection */
   private rubberBand(e: PointerEvent): void {
     const t = e.target as HTMLElement;
-    if (e.button !== 0 || t.closest('.module, .fhead, .dot, button, input, select')) return;
+    if (e.button !== 0 || t.closest('.module, .fhead, .dot, button, input, select, .scope, .ctx')) return;
     e.preventDefault();
+    if (e.pointerType === 'touch') {
+      // one finger on the empty canvas pans it (a rubber band needs a mouse or shift)
+      let lx = e.clientX, ly = e.clientY;
+      const pan = (ev: PointerEvent): void => {
+        if (ev.pointerId !== e.pointerId) return;
+        this.canvas.scrollBy(lx - ev.clientX, ly - ev.clientY);
+        lx = ev.clientX;
+        ly = ev.clientY;
+      };
+      const stop = (): void => {
+        window.removeEventListener('pointermove', pan);
+        window.removeEventListener('pointerup', stop);
+        window.removeEventListener('pointercancel', stop);
+      };
+      window.addEventListener('pointermove', pan);
+      window.addEventListener('pointerup', stop);
+      window.addEventListener('pointercancel', stop);
+      return;
+    }
     const base = this.canvas.getBoundingClientRect();
-    const at = (ev: PointerEvent): Pt => ({ x: ev.clientX - base.left + this.canvas.scrollLeft, y: ev.clientY - base.top + this.canvas.scrollTop });
+    const at = (ev: PointerEvent): Pt => ({ x: (ev.clientX - base.left) / this.zoom + this.canvas.scrollLeft / this.zoom, y: (ev.clientY - base.top) / this.zoom + this.canvas.scrollTop / this.zoom });
     const o = at(e);
     const box = document.createElement('div');
     box.className = 'rubber';
@@ -1357,7 +1498,7 @@ export class Editor {
   private center(el: HTMLElement): Pt {
     const r = el.getBoundingClientRect();
     const c = this.canvas.getBoundingClientRect();
-    return { x: r.left - c.left + r.width / 2, y: r.top - c.top + r.height / 2 };
+    return { x: (r.left - c.left + r.width / 2) / this.zoom, y: (r.top - c.top + r.height / 2) / this.zoom };
   }
 
   private curve(a: Pt, b: Pt): string {
@@ -1424,7 +1565,7 @@ export class Editor {
     this.drag = { from, kind, path };
     const move = (ev: PointerEvent): void => {
       const c = this.canvas.getBoundingClientRect();
-      const p = { x: ev.clientX - c.left, y: ev.clientY - c.top };
+      const p = { x: (ev.clientX - c.left) / this.zoom, y: (ev.clientY - c.top) / this.zoom };
       const s = this.center(start);
       path.setAttribute('d', kind === 'out' ? this.curve(s, p) : this.curve(p, s));
     };

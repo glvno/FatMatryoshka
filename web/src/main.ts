@@ -350,6 +350,12 @@ palInput.onkeydown = (e) => {
   e.stopPropagation();
 };
 $('palette-btn').onclick = openPalette;
+$('fab').onclick = openPalette;
+const zoomLabel = $('zoom-fit');
+editor.onZoom = (z) => (zoomLabel.textContent = `${Math.round(z * 100)}%`);
+$('zoom-in').onclick = () => editor.setZoom(editor.zoom * 1.2);
+$('zoom-out').onclick = () => editor.setZoom(editor.zoom / 1.2);
+zoomLabel.onclick = () => (editor.zoom === 1 ? editor.zoomToFit() : editor.setZoom(1));
 const help = $<HTMLDialogElement>('help');
 $('help-btn').onclick = () => help.showModal();
 

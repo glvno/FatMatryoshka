@@ -38,6 +38,11 @@
         </span>
         <button id="diff-btn" title="what changed since the last load, upload or store">Diff</button>
         <button id="palette-btn" title="command palette: add a module, insert an assembly, load a patch (/ or Ctrl/Cmd+K)">⌘</button>
+        <span class="zoom" title="zoom the canvas (pinch, or Ctrl/Cmd + wheel)">
+          <button id="zoom-out" aria-label="zoom out">−</button>
+          <button id="zoom-fit" title="fit the whole patch">100%</button>
+          <button id="zoom-in" aria-label="zoom in">+</button>
+        </span>
         <button id="help-btn" title="keyboard shortcuts (?)">?</button>
         <span class="spacer"></span>
         <button id="share-btn" title="copy a link that opens this patch">Share link</button>
@@ -56,6 +61,7 @@
       </div>
       <div id="canvas" class="canvas"><svg id="cables" class="cables"></svg><div id="modules"></div><div id="scope" class="scope" hidden></div></div>
       <div id="diff" class="panel" hidden></div>
+      <button id="fab" class="fab" title="add a module, insert an assembly, load a patch" aria-label="command palette">+</button>
       <dialog id="palette" class="palette">
         <input id="palette-input" type="text" placeholder="add a module, insert an assembly, load a patch…" autocomplete="off" />
         <ul id="palette-list"></ul>

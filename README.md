@@ -106,6 +106,10 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - **Compressor** is an envelope follower and compressor in one: `env` outputs the follower (a control: an oscillator's loudness as a CV, a sidechain pump from a kick into a VCA), `out` the signal compressed above `thresh` by `ratio` with `attack`, `release` and makeup `gain`. The `side` input is the sidechain; without it the detector listens to `in`.
 
+## On a phone or tablet
+
+- The canvas zooms: pinch, Ctrl/Cmd + wheel, or the − / + buttons (the percentage button fits the whole patch, then back to 100 %). One finger on empty canvas pans; cards drag by their header as before. On touch screens the jacks are bigger, the controls taller, and a long press on a card header opens its actions (bypass, duplicate, select, remove); a round **+** at the bottom right opens the palette to add a module, insert an assembly or load a patch. Below 640 px the toolbars wrap and the panels go full width. Web MIDI over USB works on Android Chrome in principle; the FM-1 link from a phone has not been tried.
+
 ## Share a patch as a link
 
 - **Share link** (toolbar) copies a link that opens this patch: the JSON, layout and assemblies included, deflated into the URL fragment (`#p=…`, about 800 characters for a factory patch). Opening the link loads the patch into the editor without replacing the patch the browser remembers until you change something; the Patches page has an "Import link" field that puts a linked patch into the bank list. A patch too big for a link (over 8000 characters) travels without its card positions and assembly overlay, and opens on a grid.
