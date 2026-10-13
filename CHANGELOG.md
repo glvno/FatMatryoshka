@@ -16,6 +16,7 @@ The merge of the four-voice firmware (1.0.2) with the polyphony, assembly and mo
 - Module **Compressor** (`dyn`): a peak envelope follower with an `env` output and a compressor (threshold, ratio, attack, release, makeup) with a `side` input.
 - Module **Ladder**: a four-pole ladder low pass with drive and self-oscillating resonance (outputs `lp24`, `lp12`; the saturator sits inside the loop). Cutoff modulation per block.
 - The LFO's restart input is `reset` (it was `sync` on the development branch; patches are converted on load) next to upstream's `clk`.
+- **Filter** outputs `notch`, `peak` and `ap` (allpass) after `mix`, from the same states (no patch format change).
 - **Module on / off (bypass):** the ⏻ button on a card (editor), the FX button for the selected module (FM-1). A bypassed module passes its main input to every output (or is muted when it has none) and keeps its state. Binary patch format 12 (bit 7 of the type byte), protocol command BYPASS (0x22). An assembly's ⏻ switches all of its modules and restores their own switches when it comes back.
 
 ### Changed

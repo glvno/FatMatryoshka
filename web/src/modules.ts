@@ -469,7 +469,7 @@ const filter: ModuleImpl<{ ic1: number; ic2: number; jc1: number; jc2: number }>
     type: 'filter',
     label: 'Filter',
     inputs: [audio('in'), control('cv'), control('morph')],
-    outputs: [audio('lp24'), audio('lp12'), audio('bp'), audio('hp'), audio('mix')],
+    outputs: [audio('lp24'), audio('lp12'), audio('bp'), audio('hp'), audio('mix'), audio('notch'), audio('peak'), audio('ap')],
     params: [
       param('cutoff', 20, 16000, 1200, { unit: 'Hz', step: 1, log: true, bend: true }),
       param('res', 0, 1, 0.2, { step: 0.01 }),
@@ -495,7 +495,8 @@ const filter: ModuleImpl<{ ic1: number; ic2: number; jc1: number; jc2: number }>
       const v2 = s.ic2 + a2 * s.ic1 + a3 * v3;
       s.ic1 = 2 * v1 - s.ic1;
       s.ic2 = 2 * v2 - s.ic2;
-      const hp = v0 - k * v1 - v2;
+      const kv1 = k * v1;
+      const hp = v0 - kv1 - v2;
       const b1 = 1 / (1 + g * (g + k2));
       const b2 = g * b1;
       const b3 = g * b2;
@@ -510,6 +511,9 @@ const filter: ModuleImpl<{ ic1: number; ic2: number; jc1: number; jc2: number }>
       c.out.hp[i] = hp;
       c.out.lp24[i] = w2;
       c.out.mix[i] = w2 + (hp - w2) * m; // morph 0 = 24 dB low pass, 1 = high pass
+      c.out.notch[i] = v0 - kv1; // = lp12 + hp: a null at the cutoff
+      c.out.peak[i] = v2 - hp; // = lp12 - hp: a resonant bump at the cutoff over a flat response
+      c.out.ap[i] = v0 - 2 * kv1; // = notch - k bp: flat magnitude, the phase turns through 360 degrees around the cutoff
     }
   },
 };

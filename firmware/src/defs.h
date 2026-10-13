@@ -174,13 +174,16 @@ enum {
 #define FILTER_O_BP 2
 #define FILTER_O_HP 3
 #define FILTER_O_MIX 4
+#define FILTER_O_NOTCH 5
+#define FILTER_O_PEAK 6
+#define FILTER_O_AP 7
 #define FILTER_P_CUTOFF 0
 #define FILTER_P_RES 1
 #define FILTER_P_CVAMT 2
 #define FILTER_P_TRACK 3
 #define FILTER_P_MORPH 4
 #define FILTER_NIN 5
-#define FILTER_NOUT 5
+#define FILTER_NOUT 8
 #define FILTER_NPAR 5
 #define FILTER_CVBASE 3
 

@@ -1300,7 +1300,8 @@ static int32_t svf_g(uint32_t rinc)
 
 #define SQRT2_24 23726566   /* stage 2's k: sqrt(2) in Q24 (Q 0.7), the resonance comes from stage 1 only */
 
-/* Two stages: stage 1 (12 dB) gives lp12, bp, hp; stage 2 filters lp12 again (lp24); mix fades lp24 -> hp by morph.
+/* Two stages: stage 1 (12 dB) gives lp12, bp, hp (and notch, peak, allpass from the same values, only when a cable
+ * leaves them); stage 2 filters lp12 again (lp24); mix fades lp24 -> hp by morph.
  * The integrator states are Q20 (+-2048: room for the resonance peak), the signals Q16; products are rounded.
  * Key tracking moves the cutoff by the voice pitch (octaves, C4 = as set), like the host engine, once per block. */
 static void m_filter(const node_t *nd, inst_t *it, uint32_t n)
@@ -1308,6 +1309,7 @@ static void m_filter(const node_t *nd, inst_t *it, uint32_t n)
     const esig_t *in = it->in[FILTER_I_IN], *cv = it->in[FILTER_I_CV], *mo = it->in[FILTER_I_MORPH];
     esig_t *lp = it->out[FILTER_O_LP12], *bp = it->out[FILTER_O_BP], *hp = it->out[FILTER_O_HP];
     esig_t *lp24 = it->out[FILTER_O_LP24], *mix = it->out[FILTER_O_MIX];
+    esig_t *notch = it->out[FILTER_O_NOTCH], *peak = it->out[FILTER_O_PEAK], *apo = it->out[FILTER_O_AP];
     int32_t k24 = (2 << 24) - mulq(EF(it, FILTER_P_RES), 33218888, 16);   /* 2 - 1.98 res */
     int32_t cvamt = EF(it, FILTER_P_CVAMT), ic1 = it->s.flt.ic1, ic2 = it->s.flt.ic2, jc1 = it->s.flt.jc1, jc2 = it->s.flt.jc2;
     int32_t morph = EF(it, FILTER_P_MORPH), tr = EF(it, FILTER_P_TRACK) >= 32768 ? E.vc[cur_v].pitch : 0;
@@ -1315,6 +1317,7 @@ static void m_filter(const node_t *nd, inst_t *it, uint32_t n)
     svf_coef_t c, d;
     int fixed = !(nd->conn & (1u << FILTER_I_CV));
     int msig = nd->conn & (1u << FILTER_I_MORPH);
+    int ext = notch != dummy_out || peak != dummy_out || apo != dummy_out;   /* the notch / peak / allpass outputs are in use */
     if (tr)
         base = exp2_scale(base, tr);
     if (fixed) {
@@ -1323,7 +1326,7 @@ static void m_filter(const node_t *nd, inst_t *it, uint32_t n)
         svf_stage(&d, g, SQRT2_24);
     }
     for (i = 0; i < n; i++) {
-        int32_t v0 = in[i] << 4, v3, v1, v2, w3, w1, w2, h, m;               /* Q20 */
+        int32_t v0 = in[i] << 4, v3, v1, v2, w3, w1, w2, h, m, kv1;          /* Q20 */
         if (!fixed) {
             int32_t g = svf_g(exp2_scale(base, mul16(cv[i], cvamt)));
             svf_stage(&c, g, k24);
@@ -1334,7 +1337,8 @@ static void m_filter(const node_t *nd, inst_t *it, uint32_t n)
         v2 = ic2 + mulr(c.a2, ic1, 24) + mulr(c.a3, v3, 24);
         ic1 = clampi(2 * v1 - ic1, -(1 << 30), 1 << 30);
         ic2 = clampi(2 * v2 - ic2, -(1 << 30), 1 << 30);
-        h = v0 - mulr(v1, k24, 24) - v2;
+        kv1 = mulr(v1, k24, 24);
+        h = v0 - kv1 - v2;
         w3 = v2 - jc2;
         w1 = mulr(d.a1, jc1, 24) + mulr(d.a2, w3, 24);
         w2 = jc2 + mulr(d.a2, jc1, 24) + mulr(d.a3, w3, 24);
@@ -1346,6 +1350,11 @@ static void m_filter(const node_t *nd, inst_t *it, uint32_t n)
         hp[i] = (h + 8) >> 4;
         lp24[i] = (w2 + 8) >> 4;
         mix[i] = (w2 + mul16(h - w2, m) + 8) >> 4;
+        if (ext) {                                                        /* from the same states: notch = in - k bp, peak = lp12 - hp, allpass = in - 2 k bp */
+            notch[i] = (v0 - kv1 + 8) >> 4;
+            peak[i] = (v2 - h + 8) >> 4;
+            apo[i] = (v0 - 2 * kv1 + 8) >> 4;
+        }
     }
     it->s.flt.ic1 = ic1;
     it->s.flt.ic2 = ic2;

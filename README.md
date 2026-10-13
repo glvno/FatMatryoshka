@@ -106,7 +106,12 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - **Compressor** is an envelope follower and compressor in one: `env` outputs the follower (a control: an oscillator's loudness as a CV, a sidechain pump from a kick into a VCA), `out` the signal compressed above `thresh` by `ratio` with `attack`, `release` and makeup `gain`. The `side` input is the sidechain; without it the detector listens to `in`.
 
+## Filter: notch, peak, allpass
+
+- The **Filter** has three more outputs after `mix`: `notch` (a null at the cutoff, the rest passes: the opposite of `bp`), `peak` (flat, with a resonant bump at the cutoff set by `res`: a parametric boost) and `ap` (allpass: everything passes, the phase turns through 360° around the cutoff; summed with `in` it is a phaser stage, modulated and summed with the dry signal a one-stage phaser). They come from the same two integrators, so they cost nothing extra when unused.
+
 ## Ladder filter
+
 
 - **Ladder** is a four-pole low pass of the Moog kind with `drive`: four one-pole stages in a feedback loop with a soft saturator inside it, so `res` goes up to self-oscillation (at 1) and `drive` (1..8) pushes the signal into the saturator for grit. Outputs `lp24` and `lp12`; `cv` with `cvamt` and `track` as on the Filter. Its cutoff modulation is updated once per block (fine for envelopes and LFOs; the Filter is the one for audio-rate cutoff).
 

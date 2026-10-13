@@ -384,6 +384,39 @@ describe('filter', () => {
     expect(rms(rig('lp12', { cutoff: 300, track: 1 }, 60))).toBeCloseTo(rms(rig('lp12', { cutoff: 300, track: 0 }, 60)), 6); // C4: no shift
   });
 
+  /** a sine at `hz` through the given filter output, rms over a second after a short settling */
+  function sineThrough(port: string, hz: number, params: Record<string, number>): number {
+    const e = new Engine(SR);
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const o = addModule(p, DEFS.osc, 0, 0);
+    const f = addModule(p, DEFS.filter, 0, 0);
+    const out = addModule(p, DEFS.output, 0, 0);
+    o.params.coarse = Math.round(12 * Math.log2(hz / 261.6255653)); // the nearest semitone
+    o.params.fine = 100 * (12 * Math.log2(hz / 261.6255653) - o.params.coarse);
+    o.params.level = 0.1; // room for the resonant peak below the output's clamp
+    Object.assign(f.params, { res: 0, ...params });
+    connect(p, DEFS, { module: o.id, port: 'out' }, { module: f.id, port: 'in' });
+    connect(p, DEFS, { module: f.id, port }, { module: out.id, port: 'l' });
+    e.load(p);
+    render(e, 4800);
+    return rms(render(e, SR).l);
+  }
+
+  it('the notch output nulls the cutoff and passes the rest; the allpass passes everything; the peak output bumps the cutoff', () => {
+    const ref = sineThrough('ap', 1000, { cutoff: 1000 });
+    expect(sineThrough('notch', 1000, { cutoff: 1000 })).toBeLessThan(ref * 0.05);
+    expect(sineThrough('notch', 8000, { cutoff: 1000 })).toBeGreaterThan(ref * 0.9);
+    expect(sineThrough('notch', 125, { cutoff: 1000 })).toBeGreaterThan(ref * 0.9);
+    // the allpass has a flat magnitude: a sine at the cutoff comes out as loud as far away from it (and as loud as it went in)
+    expect(sineThrough('ap', 125, { cutoff: 1000 })).toBeCloseTo(ref, 2);
+    expect(sineThrough('ap', 8000, { cutoff: 1000 })).toBeCloseTo(ref, 2);
+    // the peak output: flat far from the cutoff, louder at it with resonance
+    const far = sineThrough('peak', 125, { cutoff: 1000, res: 0.8 });
+    expect(far).toBeCloseTo(ref, 1);
+    expect(sineThrough('peak', 1000, { cutoff: 1000, res: 0.8 })).toBeGreaterThan(far * 3);
+  });
+
   it('loads old patches whose cables leave the filter at "lp"', () => {
     const p = PRESETS['303 Acid']();
     const q = JSON.parse(JSON.stringify(p));

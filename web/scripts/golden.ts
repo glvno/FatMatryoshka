@@ -103,6 +103,21 @@ kit('noise-svf', (add, wire) => {
   wire(flt, 'hp', mix, 'in3');
   wire(mix, 'out', out, 'l');
 });
+kit('filter-notch', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.7 });
+  const lfo = add('lfo', 0, 0, { wave: 0, rate: 0.7, depth: 1 });
+  const flt = add('filter', 0, 0, { cutoff: 900, res: 0.6, cvamt: 2 });
+  const mix = add('mixer', 0, 0, { l1: 0.4, l2: 0.3, l3: 0.3 });
+  const out = add('output', 0, 0, { level: 0.8 });
+  wire(kb, 'pitch', osc, 'pitch');
+  wire(osc, 'out', flt, 'in');
+  wire(lfo, 'out', flt, 'cv');
+  wire(flt, 'notch', mix, 'in1');
+  wire(flt, 'peak', mix, 'in2');
+  wire(flt, 'ap', mix, 'in3');
+  wire(mix, 'out', out, 'l');
+});
 kit('filter-morph', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.8 });
