@@ -2093,7 +2093,7 @@ static void m_string(const node_t *nd, inst_t *it, uint32_t n)
     fr = d & 0xFFFF;
     e = -(((int64_t)LOG2_1000_Q16 * per) >> 16);                           /* -log2(1000) * period, Q16 */
     e = (e << 16) / ((int64_t)EF(it, STRING_P_DECAY) * ENG_SR);           /* / (decay * sr): octaves, Q16 */
-    g = (int32_t)exp2_scale(ENG_ONE, (int32_t)(e < -(60 << 16) ? -(60 << 16) : e));
+    g = (int32_t)exp2_scale(ENG_ONE, (int32_t)(e < -(47 << 16) ? -(47 << 16) : e));
     bl = (per + 32768) >> 16;
     for (i = 0; i < n; i++) {
         int32_t x = exc[i], r0, r1, r, y, wq;
@@ -2205,7 +2205,7 @@ static void m_modal(const node_t *nd, inst_t *it, uint32_t n)
             continue;
         dec_i = (int32_t)(((int64_t)decay << 16) / (ENG_ONE + 2 * (int32_t)i * damp));      /* decay / (1 + 2 damp i) */
         e = -(((int64_t)LOG2_1000_Q16 << 16) / ((int64_t)dec_i * ENG_SR));                   /* octaves per sample, Q16 */
-        r30 = (int32_t)exp2_scale(1u << 30, (int32_t)(e < -(60 << 16) ? -(60 << 16) : e));
+        r30 = (int32_t)exp2_scale(1u << 30, (int32_t)(e < -(47 << 16) ? -(47 << 16) : e));
         s30 = sin_turn30(dt);
         sh = sin_turn30(dt >> 1);                                                            /* cos th = 1 - 2 sin^2(th / 2): the pole's */
         co30 = (1 << 30) - mulq(sh, sh, 29);                                                 /* frequency needs cos accurate near 1 */
