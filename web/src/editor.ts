@@ -511,6 +511,136 @@ export class Editor {
 
   /** the arpeggiator's transport (editor state) */
   arpPlay = false;
+
+  // ---- keyboard actions (main.ts shortcuts): the selection
+
+  /** remove the selected modules (and their cables) */
+  removeSelected(): boolean {
+    const ids = [...this.selected];
+    if (!ids.length) return false;
+    return this.change(() => {
+      for (const id of ids) removeModule(this.patch, id);
+    });
+  }
+
+  /** flip the bypass of the selected modules (all on if any was off) */
+  bypassSelected(): boolean {
+    const ms = this.patch.modules.filter((m) => this.selected.has(m.id) && m.type !== 'fm1' && m.type !== 'output');
+    if (!ms.length) return false;
+    const on = ms.some((m) => !m.bypass);
+    this.history.push(JSON.stringify(this.patch));
+    if (this.history.length > HISTORY) this.history.shift();
+    this.future = [];
+    for (const m of ms) {
+      if (on) m.bypass = true;
+      else delete m.bypass;
+      this.ev.onBypass(m.id, on);
+    }
+    this.rebuild();
+    this.ev.onLayout(this.patch);
+    return true;
+  }
+
+  /** move the selected cards by (dx, dy) pixels */
+  nudgeSelected(dx: number, dy: number): boolean {
+    const ms = this.patch.modules.filter((m) => this.selected.has(m.id));
+    if (!ms.length) return false;
+    for (const m of ms) {
+      m.x = Math.max(0, m.x + dx);
+      m.y = Math.max(0, m.y + dy);
+    }
+    this.rebuild();
+    this.ev.onLayout(this.patch);
+    return true;
+  }
+
+  /** copies of the selected modules with their parameters, matrix and the cables among them, placed below the originals and selected */
+  duplicateSelected(): boolean {
+    const ids = [...this.selected].filter((id) => this.patch.modules.some((m) => m.id === id && m.type !== 'fm1'));
+    if (!ids.length) return false;
+    return this.change(() => {
+      const map = new Map<number, number>();
+      for (const id of ids) {
+        const m = this.patch.modules.find((x) => x.id === id)!;
+        const copy = addModule(this.patch, DEFS[m.type], m.x, m.y + CARD_H / 2);
+        copy.params = { ...m.params };
+        if (m.att) copy.att = [m.att[0], m.att[1]];
+        if (m.map) copy.map = JSON.parse(JSON.stringify(m.map));
+        if (m.range) copy.range = JSON.parse(JSON.stringify(m.range));
+        if (m.bypass) copy.bypass = true;
+        map.set(id, copy.id);
+      }
+      for (const c of [...this.patch.cables]) if (map.has(c.from.module) && map.has(c.to.module)) connect(this.patch, DEFS, { module: map.get(c.from.module)!, port: c.from.port }, { module: map.get(c.to.module)!, port: c.to.port });
+      this.selected.clear();
+      for (const id of map.values()) this.selected.add(id);
+    });
+  }
+
+  // ---- click-to-connect: a click on a jack arms it, a click on a jack of the other direction connects; Esc cancels
+
+  private armed: { from: Endpoint; kind: 'out' | 'in' } | null = null;
+
+  cancelArm(): void {
+    if (!this.armed) return;
+    this.ports.get(this.key(this.armed.from.module, this.armed.from.port, this.armed.kind))?.classList.remove('armed');
+    this.armed = null;
+  }
+
+  // ---- A / B: two snapshots; the toggle swaps them, as a parameter-only update when the structure matches
+
+  readonly snapshots: { A: string | null; B: string | null } = { A: null, B: null };
+  side: 'A' | 'B' = 'A';
+
+  /** keep the current patch as snapshot A or B */
+  takeSnapshot(which: 'A' | 'B'): void {
+    this.snapshots[which] = JSON.stringify(this.patch);
+    this.side = which;
+  }
+
+  /** go to the other snapshot (false when it is empty) */
+  toggleAB(): boolean {
+    const other = this.side === 'A' ? 'B' : 'A';
+    const s = this.snapshots[other];
+    if (s === null) return false;
+    this.snapshots[this.side] = JSON.stringify(this.patch); // the side we leave keeps what we did to it
+    this.side = other;
+    this.applyLive(JSON.parse(s) as Patch);
+    return true;
+  }
+
+  /** switch to `target`: with the same structure only the values move (onParam / onAtt / onBypass / onRange, no reload, the voices keep sounding), else a full load */
+  applyLive(target: Patch): void {
+    if (!sameStructure(this.patch, target) || this.patch.modules.some((m, i) => m.id !== target.modules[i].id)) {
+      this.history.push(JSON.stringify(this.patch));
+      this.patch = target;
+      this.selected.clear();
+      this.rebuild();
+      this.ev.onStructure(this.patch);
+      return;
+    }
+    this.history.push(JSON.stringify(this.patch));
+    if (this.history.length > HISTORY) this.history.shift();
+    this.future = [];
+    target.modules.forEach((t, i) => {
+      const m = this.patch.modules[i];
+      for (const pd of DEFS[m.type].params) if ((m.params[pd.name] ?? pd.default) !== (t.params[pd.name] ?? pd.default)) this.ev.onParam(m.id, pd.name, t.params[pd.name] ?? pd.default);
+      if (m.att && t.att) for (const k of [0, 1] as const) if (m.att[k] !== t.att[k]) this.ev.onAtt(m.id, k, t.att[k]);
+      if (!!m.bypass !== !!t.bypass) this.ev.onBypass(m.id, !!t.bypass);
+      for (const s of ['p1', 'p2'] as const) {
+        const names = new Set([...Object.keys(m.range?.[s] ?? {}), ...Object.keys(t.range?.[s] ?? {})]);
+        for (const name of names) {
+          const r = t.range?.[s]?.[name] ?? null;
+          if (JSON.stringify(r) !== JSON.stringify(m.range?.[s]?.[name] ?? null)) this.ev.onRange(m.id, s === 'p1' ? 0 : 1, name, r);
+        }
+      }
+    });
+    const keepLayout = this.patch.modules.map((m) => [m.x, m.y]);
+    this.patch = target;
+    this.patch.modules.forEach((m, i) => ([m.x, m.y] = keepLayout[i]));
+    if (target.arp) this.ev.onArp(target.arp);
+    this.rebuild();
+    this.ev.onLayout(this.patch);
+  }
   /** the outputs with a scope probe (probeKey) */
   readonly probes = new Set<string>();
 
@@ -1273,6 +1403,21 @@ export class Editor {
     e.preventDefault();
     e.stopPropagation();
     const start = this.ports.get(this.key(from.module, from.port, kind))!;
+    if (this.armed) {
+      // the second click of a click-to-connect
+      const a = this.armed;
+      this.cancelArm();
+      if (a.kind !== kind) {
+        const [o, i] = kind === 'out' ? [from, a.from] : [a.from, from];
+        const ins = [i, ...(start.dataset.also && kind === 'in' ? (JSON.parse(start.dataset.also) as Target[]) : [])];
+        this.change(() => {
+          let any = false;
+          for (const t of ins) any = connect(this.patch, DEFS, o, t) || any;
+          if (!any) throw new Error('cannot connect these ports');
+        });
+        return;
+      }
+    }
     const path = document.createElementNS(SVGNS, 'path');
     path.setAttribute('class', 'cable pending');
     this.svg.append(path);
@@ -1290,6 +1435,12 @@ export class Editor {
       this.drag = null;
       const t = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
       const dot = t?.closest?.('.dot') as HTMLElement | null;
+      if (dot === start) {
+        // released on the jack it started on: arm it, the next click on a jack of the other kind connects (Esc cancels)
+        this.armed = { from, kind };
+        start.classList.add('armed');
+        return;
+      }
       if (!dot || !dot.dataset.mod) return;
       const other: Endpoint = { module: Number(dot.dataset.mod), port: dot.dataset.port! };
       const otherDir = dot.dataset.dir as 'out' | 'in';

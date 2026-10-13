@@ -11,6 +11,9 @@ import { DEFS } from './modules';
 import { emptyPatch, validatePatch, voicesOf, type Patch } from './patch';
 import { ARP_DEFAULT } from './arp';
 import { Scope } from './scope';
+import { diffCount, diffLines, diffPatches } from './diff';
+import { FACTORY, loadLibrary } from './assemblies';
+import type { AssemblyDef } from './assembly';
 import { PRESETS } from './presets';
 import { deviceBudget, DEVICE } from './patchbin';
 
@@ -66,6 +69,7 @@ async function sendPatch(): Promise<void> {
       dirty = false;
       devStatus('sending patch…');
       await device.upload(editor.patch);
+      baseline = JSON.stringify(editor.patch);
       devStatus('patch on the FM-1');
     } while (dirty);
   } catch (e) {
@@ -87,6 +91,17 @@ const sink = {
 };
 
 let refreshAssemblies: () => void = () => {};
+/** the factory patches and the Patches page's own copies (the morph picker keeps those of the same structure; the palette loads any) */
+const patchCandidates = (): { name: string; patch: Patch }[] => {
+  const seen = new Set<string>();
+  const out: { name: string; patch: Patch }[] = [];
+  for (const c of [...bankPatches(), ...Object.entries(PRESETS).map(([name, make]) => ({ name, patch: make() }))])
+    if (!seen.has(c.name)) {
+      seen.add(c.name);
+      out.push(c);
+    }
+  return out;
+};
 const scope = new Scope($('scope'));
 scope.onRemove = (key) => {
   scope.remove(key);
@@ -155,17 +170,7 @@ const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw']
     status.textContent = r === 'cancelled' ? 'not saved' : `"${def.name}" ${r === 'replaced' ? 'replaced in' : 'saved to'} the assembly library`;
     refreshAssemblies();
   },
-  morphCandidates() {
-    // the factory patches and the Patches page's own copies; the picker keeps those of the same structure
-    const seen = new Set<string>();
-    const out: { name: string; patch: Patch }[] = [];
-    for (const c of [...bankPatches(), ...Object.entries(PRESETS).map(([name, make]) => ({ name, patch: make() }))])
-      if (!seen.has(c.name)) {
-        seen.add(c.name);
-        out.push(c);
-      }
-    return out;
-  },
+  morphCandidates: patchCandidates,
 });
 host.setPatch(editor.patch);
 
@@ -175,6 +180,7 @@ presetSel.append(new Option('Load patch…', ''), ...Object.keys(PRESETS).map((n
 presetSel.onchange = () => {
   const v = presetSel.value;
   if (v) editor.setPatch(v === '__empty' ? emptyPatch() : PRESETS[v]());
+  setBaseline();
   presetSel.value = '';
   $<HTMLInputElement>('patch-name').value = editor.patch.name;
 };
@@ -195,6 +201,187 @@ $('add-btn').onclick = () => editor.add(typeSel.value);
 $('asm-btn').onclick = () => editor.makeAssembly();
 $('undo-btn').onclick = () => editor.undo();
 $('redo-btn').onclick = () => editor.redo();
+
+// ---- diff against the baseline (the patch as last loaded, uploaded or stored) and A / B
+let baseline = JSON.stringify(editor.patch);
+const setBaseline = (): void => {
+  baseline = JSON.stringify(editor.patch);
+};
+const diffPanel = $('diff');
+const showDiff = (): void => {
+  const d = diffPatches(JSON.parse(baseline) as Patch, editor.patch, DEFS);
+  const lines = diffLines(d);
+  diffPanel.replaceChildren();
+  const h = document.createElement('h3');
+  h.textContent = lines.length ? `${lines.length} change${lines.length === 1 ? '' : 's'} since the last load / upload` : 'no changes since the last load / upload';
+  const x = document.createElement('button');
+  x.textContent = '×';
+  x.onclick = () => (diffPanel.hidden = true);
+  h.append(x);
+  const ul = document.createElement('ul');
+  const cls = (s: string): string => (s.startsWith('+') ? 'add' : s.startsWith('−') ? 'rm' : s.includes(' → ') && !s.includes(':') ? 'o' : 'p');
+  for (const s of lines) {
+    const li = document.createElement('li');
+    li.className = cls(s);
+    li.textContent = s;
+    ul.append(li);
+  }
+  diffPanel.append(h, ul);
+  diffPanel.hidden = false;
+};
+$('diff-btn').onclick = () => (diffPanel.hidden ? showDiff() : (diffPanel.hidden = true));
+const abToggle = $<HTMLButtonElement>('ab-toggle');
+const showAB = (): void => {
+  abToggle.textContent = editor.side;
+  abToggle.classList.toggle('b', editor.side === 'B');
+  abToggle.disabled = !(editor.snapshots.A && editor.snapshots.B);
+  abToggle.title = abToggle.disabled ? 'set A and B first' : `flip to ${editor.side === 'A' ? 'B' : 'A'} (Tab)`;
+};
+$('ab-a').onclick = () => {
+  editor.takeSnapshot('A');
+  status.textContent = 'A = this patch';
+  showAB();
+};
+$('ab-b').onclick = () => {
+  editor.takeSnapshot('B');
+  status.textContent = 'B = this patch';
+  showAB();
+};
+const flipAB = (): void => {
+  if (editor.toggleAB()) {
+    status.textContent = `${editor.side}${diffCount(diffPatches(JSON.parse(editor.snapshots[editor.side === 'A' ? 'B' : 'A']!) as Patch, editor.patch, DEFS)) ? '' : ' (same as the other side)'}`;
+    queueSave(editor.patch);
+  } else status.textContent = 'set A and B first';
+  showAB();
+};
+abToggle.onclick = flipAB;
+
+// ---- the command palette: modules, assemblies, patches
+const palette = $<HTMLDialogElement>('palette');
+const palInput = $<HTMLInputElement>('palette-input');
+const palList = $('palette-list');
+interface Cmd {
+  kind: string;
+  label: string;
+  run: () => void;
+}
+const commands = (): Cmd[] => {
+  const seen = new Set<string>();
+  const asms: AssemblyDef[] = [...loadLibrary(), ...FACTORY].filter((d) => (seen.has(d.name) ? false : (seen.add(d.name), true)));
+  return [
+    ...Object.values(DEFS).map((d) => ({ kind: 'add module', label: d.label, run: () => editor.add(d.type) })),
+    ...asms.map((d) => ({ kind: 'insert', label: d.name, run: () => editor.insert(d) })),
+    ...patchCandidates().map((c) => ({ kind: 'load patch', label: c.name, run: () => loadNamed(c.patch) })),
+    { kind: 'command', label: 'Empty patch', run: () => loadNamed(emptyPatch()) },
+    { kind: 'command', label: 'Diff since the last load / upload', run: showDiff },
+    { kind: 'command', label: 'Make assembly from the selection', run: () => editor.makeAssembly() },
+  ];
+};
+const loadNamed = (p: Patch): void => {
+  editor.setPatch(p);
+  setBaseline();
+  nameInput.value = editor.patch.name;
+};
+/** fuzzy: every character of the query in order; a run of adjacent matches and a match at a word start score higher */
+const score = (q: string, s: string): number => {
+  s = s.toLowerCase();
+  let i = 0, sc = 0, last = -2;
+  for (const ch of q) {
+    const j = s.indexOf(ch, i);
+    if (j < 0) return -1;
+    sc += j === last + 1 ? 3 : j === 0 || s[j - 1] === ' ' ? 2 : 1;
+    last = j;
+    i = j + 1;
+  }
+  return sc;
+};
+let palSel = 0;
+let palItems: Cmd[] = [];
+const palRender = (): void => {
+  const q = palInput.value.trim().toLowerCase();
+  palItems = commands()
+    .map((c) => ({ c, s: q ? score(q, c.label) : 0 }))
+    .filter((x) => x.s >= 0)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 12)
+    .map((x) => x.c);
+  palSel = Math.min(palSel, Math.max(0, palItems.length - 1));
+  palList.replaceChildren(
+    ...palItems.map((c, i) => {
+      const li = document.createElement('li');
+      li.className = i === palSel ? 'sel' : '';
+      const k = document.createElement('span');
+      k.className = 'k';
+      k.textContent = c.kind;
+      li.append(k, c.label);
+      li.onclick = () => palRun(c);
+      return li;
+    }),
+  );
+};
+const palRun = (c: Cmd): void => {
+  palette.close();
+  c.run();
+};
+const openPalette = (): void => {
+  palInput.value = '';
+  palSel = 0;
+  palRender();
+  palette.showModal();
+  palInput.focus();
+};
+palInput.oninput = () => {
+  palSel = 0;
+  palRender();
+};
+palInput.onkeydown = (e) => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    palSel = (palSel + (e.key === 'ArrowDown' ? 1 : palItems.length - 1)) % Math.max(1, palItems.length);
+    palRender();
+    e.preventDefault();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (palItems[palSel]) palRun(palItems[palSel]);
+  }
+  e.stopPropagation();
+};
+$('palette-btn').onclick = openPalette;
+const help = $<HTMLDialogElement>('help');
+$('help-btn').onclick = () => help.showModal();
+
+// ---- keyboard shortcuts (off while typing in a field; the note keyboard in input.ts gets what is left)
+window.addEventListener('keydown', (e) => {
+  if (currentTab !== 'patch') return;
+  const t = e.target as HTMLElement | null;
+  const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') && (t as HTMLInputElement).type !== 'range' && (t as HTMLInputElement).type !== 'checkbox';
+  if (palette.open || help.open || typing) return;
+  const mod = e.metaKey || e.ctrlKey;
+  const k = e.key;
+  let done = false;
+  if (k === '/' || (mod && k.toLowerCase() === 'k')) (openPalette(), (done = true));
+  else if (k === '?') (help.showModal(), (done = true));
+  else if (k === 'Escape') (editor.cancelArm(), (diffPanel.hidden = true), (done = true));
+  else if (k === 'Delete' || k === 'Backspace') done = editor.removeSelected();
+  else if (mod && k.toLowerCase() === 'd') done = editor.duplicateSelected();
+  else if (!mod && k.toLowerCase() === 'b') done = editor.bypassSelected();
+  else if (!mod && k.toLowerCase() === 'g' && editor.selected.size) (editor.makeAssembly(), (done = true));
+  else if (k === 'Tab') (flipAB(), (done = true));
+  else if (k === ' ') {
+    editor.arpPlay = !editor.arpPlay;
+    host.send({ t: 'arpplay', on: editor.arpPlay });
+    if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, editor.arpPlay);
+    status.textContent = editor.arpPlay ? 'arpeggiator playing' : 'arpeggiator stopped';
+    editor.rebuild();
+    done = true;
+  } else if (k.startsWith('Arrow')) {
+    const d = e.shiftKey ? 100 : 10;
+    done = editor.nudgeSelected(k === 'ArrowLeft' ? -d : k === 'ArrowRight' ? d : 0, k === 'ArrowUp' ? -d : k === 'ArrowDown' ? d : 0);
+  }
+  if (done) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+}, true);
 $('panic-btn').onclick = () => sink.send({ t: 'panic' });
 
 // FM-1 link
@@ -216,6 +403,7 @@ $('dev-store').onclick = async () => {
   try {
     await sendPatch();
     await device.store();
+    setBaseline();
     devStatus('stored: the FM-1 starts with this patch');
   } catch (e) {
     devStatus((e as Error).message);
@@ -237,6 +425,7 @@ $<HTMLInputElement>('load-file').onchange = async (e) => {
   if (!f) return;
   try {
     editor.setPatch(validatePatch(JSON.parse(await f.text()), DEFS));
+    setBaseline();
     nameInput.value = editor.patch.name;
   } catch (err) {
     status.textContent = `load failed: ${(err as Error).message}`;

@@ -106,6 +106,16 @@ Assemblies are an editor-only overlay: the patch stays a flat list of modules an
 
 - **Compressor** is an envelope follower and compressor in one: `env` outputs the follower (a control: an oscillator's loudness as a CV, a sidechain pump from a kick into a VCA), `out` the signal compressed above `thresh` by `ratio` with `attack`, `release` and makeup `gain`. The `side` input is the sidechain; without it the detector listens to `in`.
 
+## Diff and A/B
+
+- **Diff** (toolbar) lists what changed since the patch was last loaded, uploaded or stored on the FM-1: parameters as old → new, modules and cables added or removed, and switches, attenuverters, matrix, macro ranges, voices and arpeggiator changes as one line each.
+- **A/B**: "Set A" and "Set B" keep two versions of the patch; the A/B button (or Tab) flips between them while you play. When both versions have the same modules and cables only the values move, so notes keep sounding through the flip (the side you leave keeps whatever you changed on it); otherwise the other version is loaded whole.
+
+## Keyboard
+
+- `/` or Ctrl/Cmd+K opens a **command palette**: type part of a name to add a module, insert an assembly (library or factory) or load a patch; Enter runs the first match, arrows choose. `?` lists every shortcut.
+- Click a jack, then a jack of the other kind, to connect them (Esc cancels; dragging works as before). With cards selected (shift-click or a box): Delete removes them, B bypasses them, G groups them into an assembly, Ctrl/Cmd+D duplicates them with their settings and the cables among them, the arrows nudge them (Shift: ×10). Space starts and stops the arpeggiator, Tab flips A/B, Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z undo and redo. The shortcuts are off while a text field has focus; the note keys (A W S E D F T G Y H U J K) still play when they are not taken.
+
 ## Scope
 
 - Every output jack has a small **◎**: click it and the signal appears in the scope panel at the bottom of the canvas, several at once in their own colours (the jack gets a ring). The **time** view auto-scales; audio signals are triggered on a rising zero crossing so the wave stands still, control and gate signals show the whole last 85 ms with a min / max / mean readout. The **spectrum** view is a 2048-point FFT (log frequency, 0 dB = a full-scale sine) with the peak's frequency in the readout, so an oscillator can be tuned by eye. Probes cost nothing on the FM-1: they live in the browser's engine.
