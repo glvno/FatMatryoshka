@@ -62,8 +62,7 @@ import {
   type AssemblyInst,
   type PortRef,
   type Rect,
-  type Target,
-} from './assembly';
+  type Target, bypassAssembly } from './assembly';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const HISTORY = 40;
@@ -620,7 +619,19 @@ export class Editor {
   }
 
   private assemblyButtons(a: AssemblyInst): HTMLElement[] {
+    const pw = this.button('⏻', `${a.label} on / off (bypass every module inside)`, () => {
+      this.history.push(JSON.stringify(this.patch));
+      if (this.history.length > HISTORY) this.history.shift();
+      this.future = [];
+      const changed = bypassAssembly(this.patch, a, !a.bypass);
+      for (const id of changed) this.ev.onBypass(id, !!this.patch.modules.find((m) => m.id === id)?.bypass);
+      this.rebuild();
+      this.ev.onLayout(this.patch);
+    }, 'pw');
+    pw.classList.toggle('on', !a.bypass);
+    pw.setAttribute('aria-pressed', String(!a.bypass));
     return [
+      pw,
       this.button(a.open ? 'close' : 'open', a.open ? 'Collapse to one card' : 'Open: show and edit the modules inside', () =>
         this.change(() => {
           a.open = !a.open;
@@ -649,7 +660,7 @@ export class Editor {
    */
   private container(a: AssemblyInst, perVoice: boolean, open?: AssemblyInst): HTMLElement {
     const el = document.createElement('div');
-    el.className = 'module assembly' + (open ? ' member' : '');
+    el.className = 'module assembly' + (open ? ' member' : '') + (a.bypass ? ' off' : '');
     el.style.left = `${a.x}px`;
     el.style.top = `${a.y}px`;
     el.dataset.asm = String(a.id);
@@ -711,7 +722,7 @@ export class Editor {
   /** the frame around an open assembly's cards, with its header; placed by layoutFrames() once the cards have a size */
   private frame(a: AssemblyInst, perVoice: boolean): HTMLElement {
     const el = document.createElement('div');
-    el.className = 'frame';
+    el.className = 'frame' + (a.bypass ? ' off' : '');
     el.dataset.asm = String(a.id);
     const head = document.createElement('div');
     head.className = 'fhead';

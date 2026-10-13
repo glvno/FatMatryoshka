@@ -58,6 +58,10 @@ export interface AssemblyInst {
   inputs: PortRef[];
   outputs: PortRef[];
   params: ParamRef[];
+  /** the group switch is off: every member module is bypassed (editor only, like the rest of the overlay) */
+  bypass?: boolean;
+  /** with `bypass`: the members that were bypassed on their own before the group went off; they stay off when it comes back */
+  kept?: number[];
 }
 
 /** a nested assembly inside a saved definition: local module ids and local assembly ids, positions relative like the modules */
@@ -134,6 +138,38 @@ export function allModules(p: Patch, a: AssemblyInst): number[] {
   const ids = [...a.modules];
   for (const d of descendants(p, a)) ids.push(...d.modules);
   return ids;
+}
+
+/**
+ * The group switch: off bypasses every member (nested ones too) and remembers which were already off; on restores exactly
+ * that, so a member you switched off yourself stays off. Returns the ids of the modules whose flag changed.
+ */
+export function bypassAssembly(p: Patch, a: AssemblyInst, off: boolean): number[] {
+  const changed: number[] = [];
+  const members = allModules(p, a);
+  const mods = members.map((id) => p.modules.find((m) => m.id === id)!);
+  if (off) {
+    a.kept = mods.filter((m) => m.bypass).map((m) => m.id);
+    for (const m of mods) if (!m.bypass) {
+      m.bypass = true;
+      changed.push(m.id);
+    }
+    a.bypass = true;
+    for (const d of descendants(p, a)) if (d.bypass) delete d.kept; // a nested group's own switch is superseded: it comes back with this one
+  } else {
+    const keep = new Set(a.kept ?? []);
+    for (const m of mods) if (m.bypass && !keep.has(m.id)) {
+      delete m.bypass;
+      changed.push(m.id);
+    }
+    delete a.bypass;
+    delete a.kept;
+    for (const d of descendants(p, a)) {
+      delete d.bypass;
+      delete d.kept;
+    }
+  }
+  return changed;
 }
 
 /** 1 for a top-level assembly, 2 inside one, ... */
@@ -257,6 +293,10 @@ export function reconcile(p: Patch, a: AssemblyInst, defs?: Record<string, Modul
   const members = allModules(p, a);
   if (!members.length) return false;
   const member = new Set(members);
+  if (a.kept) {
+    a.kept = a.kept.filter((id) => member.has(id));
+    if (!a.bypass) delete a.kept;
+  }
   const typeOf = (id: number): string => p.modules.find((m) => m.id === id)!.type;
   const portOk = (dir: 'in' | 'out', t: Target): boolean => {
     if (!member.has(t.module)) return false;
@@ -563,7 +603,12 @@ export function toDef(p: Patch, a: AssemblyInst): AssemblyDef {
   const localAsm = new Map(nested.map((d, i) => [d.id, i + 1]));
   const x0 = Math.min(...ms.map((m) => m.x));
   const y0 = Math.min(...ms.map((m) => m.y));
+  const kept = a.bypass ? new Set(a.kept ?? []) : null; // a group that is off: the definition gets the members' own switches
   for (const m of ms) {
+    if (kept) {
+      if (kept.has(m.id)) m.bypass = true;
+      else delete m.bypass;
+    }
     m.id = local.get(m.id)!;
     m.x -= x0;
     m.y -= y0;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
+  bypassAssembly,
   addChild,
   addMember,
   allModules,
@@ -87,6 +88,31 @@ describe('assemblies', () => {
     expect(() => makeAssembly(p, [])).toThrow(/select/);
     makeAssembly(p, [osc]);
     expect(() => makeAssembly(p, [osc, env])).toThrow(/already in/);
+  });
+
+  it('the group switch bypasses every member and restores their own switches', () => {
+    const p = emptyPatch();
+    addModule(p, DEFS.fm1, 0, 0);
+    const osc = addModule(p, DEFS.osc, 0, 0);
+    const flt = addModule(p, DEFS.filter, 0, 0);
+    const dly = addModule(p, DEFS.delay, 0, 0);
+    connect(p, DEFS, { module: osc.id, port: 'out' }, { module: flt.id, port: 'in' });
+    connect(p, DEFS, { module: flt.id, port: 'lp24' }, { module: dly.id, port: 'in' });
+    const a = makeAssembly(p, [flt.id, dly.id], 'fx');
+    dly.bypass = true; // off on its own
+    expect(bypassAssembly(p, a, true).sort()).toEqual([flt.id]);
+    expect(a.bypass).toBe(true);
+    expect(a.kept).toEqual([dly.id]);
+    expect(flt.bypass).toBe(true);
+    expect(dly.bypass).toBe(true);
+    const def = toDef(p, a); // a saved definition carries the members' own switches, not the group's
+    expect(def.modules.map((m) => !!m.bypass)).toEqual([false, true]);
+    expect(bypassAssembly(p, a, false)).toEqual([flt.id]);
+    expect(a.bypass).toBeUndefined();
+    expect(a.kept).toBeUndefined();
+    expect(flt.bypass).toBeUndefined();
+    expect(dly.bypass).toBe(true);
+    expect(validatePatch(JSON.parse(JSON.stringify(p)), DEFS).modules.filter((m) => m.bypass).length).toBe(1);
   });
 
   it('does not change the sound or the binary: engine and FM-1 see the flat patch', () => {
