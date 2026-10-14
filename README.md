@@ -8,9 +8,16 @@
 
 # FatMatryoshka-1
 
-A modular synthesizer for the **M-VAVE FM-1**, with a browser patch editor and reusable, nested assemblies. Build a sound, wrap it into an instrument, then nest it inside something bigger. 
+A modular synthesizer for the **M-VAVE FM-1**, with a browser patch editor and reusable, nested assemblies. 
 
-FatMatryoshka-1 is an independent project grown from Modular-1, which builds on Felucca's flashing tools and hardware support.
+**Modules** are the building blocks -- a single oscillator, a VCA, a filter, a delay, whatever.
+
+**Assemblies** are groups of modules. The provided "operator" assembly, for example, is a single oscillator, an eight-step envelope, and a VCA. Like presets, they can be saved and reused. Did you build a really perverted granular synth that sounds like the voice of the metatron? Select its modules, save it as an assembly, and now that's an instrument you can use in your presets whenever you want.
+
+Assembly inputs, outputs, and sliders are just whatever inputs, outputs, and sliders from its contained modules you want to promote to being part of the assembly's user interface.
+
+A handful of patch presets are provided. Use them to learn, then replace them with something you made.
+
 
 ## Webapp
 
