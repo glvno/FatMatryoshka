@@ -88,14 +88,16 @@ select.over { border-color: var(--danger); color: var(--danger); }
 .x { padding: 0 6px; line-height: 1.2; border: none; background: transparent; color: var(--muted); font-size: 16px; }
 .io { display: flex; justify-content: space-between; padding: 6px 0; }
 .ports { display: flex; flex-direction: column; gap: 4px; }
-.port { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.port { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
 .port.out { justify-content: flex-end; }
 .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; background: var(--panel); cursor: crosshair; touch-action: none; }
 .in .dot { margin-left: -8px; } .out .dot { margin-right: -8px; }
 .dot.audio { color: var(--audio); } .dot.control { color: var(--control); } .dot.gate { color: var(--gate); }
 .dot:hover { background: currentColor; }
-.params { padding: 4px 8px 8px; display: grid; gap: 4px; border-top: 1px solid var(--line); }
-.param { display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: 6px; font-size: 12px; }
+.params { padding: 4px 10px 6px; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.param { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 8px; font-size: 14px; }
+.param > span:not(.slider-jack) { min-width: 0; overflow-wrap: anywhere; }
+.param > output { text-align: right; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
 .pins { padding: 2px 8px 6px; display: flex; gap: 12px; border-top: 1px solid var(--line); }
 .dot.armed { background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 40%, transparent); }
 .panel { position: fixed; right: 16px; bottom: 16px; z-index: 20; width: 420px; max-width: calc(100% - 32px); max-height: 50vh; overflow: auto; background: var(--panel); border: 1px solid var(--muted); border-radius: 8px; box-shadow: 0 2px 8px var(--shadow); padding: 8px 10px; font-size: 12px; }
@@ -153,7 +155,7 @@ button.prb { padding: 0 2px; line-height: 1; border: none; background: transpare
 button.prb.on { color: var(--accent); }
 .dot.probed { box-shadow: 0 0 0 2px var(--accent); }
 details.arp { margin: 4px 8px 6px; border-top: 1px solid var(--line); padding-top: 4px; }
-details.arp summary { cursor: pointer; color: var(--muted); font-size: 11px; padding: 2px 0; }
+details.arp summary { cursor: pointer; color: var(--ink); font-size: 14px; padding: 5px 0; }
 details.arp .param select { grid-column: 1 / -1; width: 100%; }
 details.arp .hint { font-size: 10px; color: var(--muted); margin: 2px 0 0; }
 .param input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
@@ -231,8 +233,8 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .credits h2 { color: var(--accent); }
 
 /* Native range interaction, with a visible jack following its thumb. */
-.slider-jack { --jack-size: 18px; grid-column: 1 / -1; position: relative; height: 24px; z-index: 2; }
-.param .jack-range { appearance: none; -webkit-appearance: none; width: 100%; height: 24px; margin: 0; padding: 0; border: 0; background: transparent; cursor: ew-resize; touch-action: none; }
+.slider-jack { --jack-size: 18px; grid-column: 1 / -1; position: relative; height: 22px; z-index: 2; }
+.param .jack-range { appearance: none; -webkit-appearance: none; width: 100%; height: 22px; margin: 0; padding: 0; border: 0; background: transparent; cursor: ew-resize; touch-action: none; }
 .jack-range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--line); }
 .jack-range::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
 .jack-range::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: var(--jack-size); height: var(--jack-size); margin-top: calc((4px - var(--jack-size)) / 2); border: 0; background: transparent; }
@@ -312,6 +314,27 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .resize-handle { position: absolute; right: 0; bottom: 0; width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--secondary); cursor: nwse-resize; touch-action: none; pointer-events: auto; z-index: 4; }
 
 @font-face { font-family: 'Alegreya SC'; src: url('/fonts/AlegreyaSC-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Barlow'; src: url('/fonts/Barlow-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Barlow Semi Condensed'; src: url('/fonts/BarlowSemiCondensed-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+/* Names, values, and actions have separate type roles inside the patch field. */
+.module, .fhead, .scope { font-family: 'Barlow', system-ui, sans-serif; font-weight: 500; }
+.mhead { min-height: 40px; gap: 8px; padding: 7px 10px; }
+.mhead > span:first-child, .fhead > span:first-child { font: 700 20px/1.1 'Barlow Semi Condensed', system-ui, sans-serif; }
+.mhead > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.mhead .tools, .fhead .tools { flex-shrink: 0; }
+.module.assembly .mhead { flex-wrap: wrap; row-gap: 6px; }
+.module.assembly .mhead > span:first-child { flex: 1 1 120px; }
+.module.assembly .mhead .tools { margin-left: auto; }
+.fhead > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mhead .voices, .fhead .voices { font: 500 12px/1.2 'Barlow', system-ui, sans-serif; white-space: nowrap; }
+.module .port > span:not(.dot) { line-height: 1.35; }
+.module :is(select, .routing-controls, .empty) { font-family: 'Barlow', system-ui, sans-serif; font-weight: 500; font-size: 14px; }
+.module .parameter-routing summary { font-size: 12px; line-height: 1.2; padding: 1px 5px; }
+.module .morph-row select { grid-column: 1 / -1; width: 100%; }
+.module .prb { font-size: 13px; }
+.module button.sm, .fhead button.sm { font: 500 12px/1.5 'Barlow', system-ui, sans-serif; }
+.module button.pw { font-size: 14px; }
+.module .x { font-size: 20px; }
 .brand .wordmark { width: 100%; margin: 0; line-height: 1; }
 .brand-mark { display: block; width: 100%; height: auto; overflow: visible; }
 .brand-mark .brand-ink { fill: var(--ink); }

@@ -161,6 +161,9 @@ export class Editor {
     this.space = canvas.querySelector('#canvas-space')!;
     this.report(fixAssemblies(this.patch, DEFS));
     new ResizeObserver(() => { this.sizeCanvas(); this.positionCables(); }).observe(canvas);
+    document.fonts.addEventListener('loadingdone', () => {
+      this.layoutFrames(); this.sizeCanvas(); this.positionCables();
+    });
     canvas.addEventListener('pointerdown', (e) => this.rubberBand(e));
     this.touchGestures();
     const raise = (event: Event): void => {

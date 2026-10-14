@@ -20,4 +20,10 @@ GitHub repository renames do not forward project Pages URLs; a separate old-addr
 https://developer.chrome.com/blog/web-audio-autoplay
 Browser Web Audio autoplay and user-gesture resume behavior.
 https://github.com/google/fonts/tree/main/ofl/alegreyasc
-Self-hosted wordmark font; local OFL text included.
+Self-hosted tour heading font; local OFL text included.
+
+Follow-up corrections: internal cable gaps reproduced with opaque range-input backgrounds, then fixed by excluding slider ranges from the panel-background rule. Browser checks cover visible paths, branch removal, fan-out, normal drag and Alt-drag, and round-trip routing. New patch has its own sidebar button; Examples contains only example patches. Tutorial copy now explains the actual controls and connections.
+
+Typography: Barlow Medium for controls and Barlow Semi Condensed Bold for module/assembly headings; 14px labels, 20px headings, right-aligned tabular values, wrapping assembly actions, and font-load cable repositioning. Measured the oscillator against the previous stylesheet: 532px versus 544px at its saved example position, so its last slider now clears the adjacent envelope card. Light/dark, mobile, tutorial/assembly resize and slider gestures checked. 190 web tests and the production build pass.
+
+Brand follow-up: current wordmark is an outlined SVG with equal-height small caps, teal F and M and a footless numeral 1 replacing the K stem. Twelve wordmarks and twelve additional pictorial studies live in brand/round-two/, with sidebar-size pairing, background and size controls, download links and shareable selections. Pictorial studies are candidates and include specific remaining drawing issues. The production illustration is unchanged.

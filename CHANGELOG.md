@@ -2,6 +2,8 @@
 
 ## FatMatryoshka workspace and identity
 
+- Use Barlow for patch controls and Barlow Semi Condensed for module and assembly names. Enlarge labels, align tabular values, and wrap assembly actions when needed. Reposition cables when fonts finish loading.
+- Keep the wordmark’s 1-shaped K stem at the same height as all the small caps. Add a second comparison gallery with twelve outlined wordmarks and twelve pictorial studies, including pair previews and shareable selections.
 - Keep slider backgrounds transparent so internal routes remain visible all the way to their thumbs. Add a separate New patch sidebar button and keep the Examples dropdown for examples.
 - Explain the tutorial in plain language. Draw the wordmark as sans-serif small caps in SVG, with teal F, M, and a footless 1 for the K stem; keep its diagonals in the regular text color.
 - Rename the project to **FatMatryoshka**. A self-hosted small-caps wordmark integrates “1” into the K ascender. Pages deploys only `main` at `/FatMatryoshka/`; the old URL has a small forwarding page.

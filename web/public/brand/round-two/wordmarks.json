@@ -1,0 +1,98 @@
+[
+  {
+    "id": "w01",
+    "name": "Compact",
+    "file": "w01.svg",
+    "description": "Compact proportions, close to the current wordmark.",
+    "risk": "The 1 is subtle at sidebar size.",
+    "font": "../../fonts/BarlowSemiCondensed-Bold.ttf"
+  },
+  {
+    "id": "w02",
+    "name": "Wide",
+    "file": "w02.svg",
+    "description": "Wider letters with a larger opening inside each shape.",
+    "risk": "Takes more horizontal space.",
+    "font": "fonts/Barlow-Bold.ttf"
+  },
+  {
+    "id": "w03",
+    "name": "Condensed",
+    "file": "w03.svg",
+    "description": "Narrow letters let the name be taller in the same sidebar.",
+    "risk": "The narrow A and R need a small-size check.",
+    "font": "fonts/BarlowCondensed-Bold.ttf"
+  },
+  {
+    "id": "w04",
+    "name": "Geometric",
+    "file": "w04.svg",
+    "description": "Rounder O and a broad, straight-sided M.",
+    "risk": "Less room for the symbol at the same total height.",
+    "font": "fonts/SpaceGrotesk.ttf"
+  },
+  {
+    "id": "w05",
+    "name": "Square",
+    "file": "w05.svg",
+    "description": "Squared curves and lighter strokes, like instrument lettering.",
+    "risk": "The lighter strokes may lose contrast when very small.",
+    "font": "fonts/Rajdhani-SemiBold.ttf"
+  },
+  {
+    "id": "w06",
+    "name": "Heavy",
+    "file": "w06.svg",
+    "description": "Thick strokes match the pictorial mark\u2019s outlines.",
+    "risk": "Small counters close sooner at 175 pixels.",
+    "font": "fonts/ArchivoBlack-Regular.ttf"
+  },
+  {
+    "id": "w07",
+    "name": "Spaced",
+    "file": "w07.svg",
+    "description": "More space between letters makes the name easier to scan at large sizes.",
+    "risk": "The extra width makes letters smaller in the sidebar.",
+    "font": "fonts/SpaceGrotesk.ttf"
+  },
+  {
+    "id": "w08",
+    "name": "Narrow square",
+    "file": "w08.svg",
+    "description": "Narrow square letters with a tall visual rhythm.",
+    "risk": "More technical and less friendly.",
+    "font": "fonts/Rajdhani-SemiBold.ttf"
+  },
+  {
+    "id": "w09",
+    "name": "Stencil",
+    "file": "w09.svg",
+    "description": "Two narrow stencil cuts through the lettering.",
+    "risk": "Cuts can disappear at small sizes; better for print or large use.",
+    "font": "fonts/BarlowCondensed-Bold.ttf"
+  },
+  {
+    "id": "w10",
+    "name": "Two lines",
+    "file": "w10.svg",
+    "description": "FAT sits above MATRYOSHKA at the same letter height.",
+    "risk": "The short first line changes the balance with the icon.",
+    "font": "../../fonts/BarlowSemiCondensed-Bold.ttf"
+  },
+  {
+    "id": "w11",
+    "name": "Forward",
+    "file": "w11.svg",
+    "description": "A slight forward slant with straight, equal-height letters.",
+    "risk": "Leans away from the calm shape of the dolls.",
+    "font": "fonts/Barlow-Bold.ttf"
+  },
+  {
+    "id": "w12",
+    "name": "Rounded lines",
+    "file": "w12.svg",
+    "description": "Custom single-width strokes, drawn like patch cables.",
+    "risk": "The line-built letters are less dense and need more width.",
+    "font": null
+  }
+]

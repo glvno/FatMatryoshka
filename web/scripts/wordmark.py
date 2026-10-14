@@ -28,14 +28,14 @@ for char in "FatMatryoshka":
     scale = .78
     color = "brand-accent" if char in "FM" else "brand-ink"
     d = outline(char.upper(), (scale, 0, 0, scale, 0, 0))
-    paths.append(f'  <path class="{color}" transform="translate({x:.2f} 720) scale(1 -1)" d="{d}"/>')
+    paths.append(f'  <path class="{color}" transform="translate({x:.2f} 565) scale(1 -1)" d="{d}"/>')
     if char == "k":
         # Align the footless numeral's stem with K's stem; retain the dark diagonals.
-        d = outline("1", (.78, 0, 0, 1, -61.62, 0))
-        paths.append(f'  <path class="brand-accent" transform="translate({x:.2f} 720) scale(1 -1)" d="{d}"/>')
+        d = outline("1", (.78, 0, 0, .78, -61.62, 0))
+        paths.append(f'  <path class="brand-accent" transform="translate({x:.2f} 565) scale(1 -1)" d="{d}"/>')
     x += glyphs[cmap[ord(char.upper())]].width * scale + 8
 
-svg = f'''<svg xmlns="http://www.w3.org/2000/svg" class="brand-mark" viewBox="0 0 {x:.2f} 750" role="img" aria-label="FatMatryoshka">
+svg = f'''<svg xmlns="http://www.w3.org/2000/svg" class="brand-mark" viewBox="0 0 {x:.2f} 590" role="img" aria-label="FatMatryoshka">
   <title>FatMatryoshka</title>
   <desc>Small-cap letters, with teal F and M and a teal numeral 1 forming the stem of K.</desc>
   <!-- Outlines from Barlow Semi Condensed Bold, SIL OFL 1.1; see fonts/OFL-BarlowSemiCondensed.txt. -->

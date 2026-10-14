@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FatMatryoshka logo studies — round two</title>
+<link rel="stylesheet" href="studies.css">
+</head>
+<body>
+<header>
+<a href="../../">Back to the app</a>
+<h1>FatMatryoshka logo studies</h1>
+<p>12 wordmarks and 12 more pictorial logos. Pick one of each to see them together at sidebar size.</p>
+<p>For a first comparison, try <a href="?wordmark=w03&amp;icon=11-compact-wide&amp;theme=light">W03 + 11</a> for readable lettering and short leads, or <a href="?wordmark=w05&amp;icon=18-soft-corners&amp;theme=dark">W05 + 18</a> for lighter lettering and simpler faces.</p>
+<nav aria-label="Studies"><a href="#wordmarks">Wordmarks</a><a href="#icons">Pictorial logos</a><a href="../candidates/">Earlier 10 candidates</a></nav>
+</header>
+<div class="layout">
+<main>
+<section id="wordmarks"><h2>Wordmarks</h2><p>All letters have the same cap height. F, M, and the footless 1 inside K are teal. The K’s diagonal strokes stay in the regular text color.</p>
+<div class="grid wordmarks" id="wordmark-list"></div></section>
+<section id="icons"><h2>Pictorial logos</h2><p>These explore wider shells, shorter leads, simpler shapes, and different drawing styles. Each note identifies anything still needing correction.</p>
+<div class="grid" id="icon-list"></div></section>
+<section class="method"><h2>How these were made</h2><p>I used the <a href="https://github.com/nickpdawson/claude-studio-design-partner-skill/blob/main/SKILL.md">design-partner skill</a>: vary one or two constraints, compare the resulting concepts, then test them at their intended size. The wordmarks are editable SVG outlines. The pictorial studies were made with the built-in image generator.</p><p>Check the name first at 175 pixels, then the doll at 96 pixels. A direction can be worth keeping even if its cables still need to be redrawn.</p><a href="prompts.json">Exact pictorial prompts</a> · <a href="wordmarks.json">Wordmark details</a></section>
+<noscript><p>JavaScript is needed for the comparison controls. Download the studies from <a href="wordmarks.json">the wordmark list</a> and <a href="prompts.json">the pictorial list</a>.</p></noscript>
+</main>
+<aside id="pair" class="preview-panel" aria-label="Selected logo preview">
+<div class="preview-controls"><h2>Try a pair</h2><label>Background <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label><label>Study icon size <input id="icon-size" type="range" min="64" max="240" value="192"><output id="size-value">192 px</output></label></div>
+<div class="sidebar-preview">
+<img id="selected-icon" alt="Selected pictorial logo">
+<div id="selected-wordmark"></div>
+<div class="preview-tab">Patch</div>
+<div class="preview-button">New patch</div>
+<strong>My first voice</strong>
+<div class="preview-button add">+ Add module</div>
+<div class="preview-button assembly">+ Add assembly</div>
+</div>
+<p class="caption">208 px sidebar · 175 px artwork</p>
+<p id="selection" role="status"></p>
+<button id="copy">Copy link to this pair</button>
+<p id="copy-status" role="status"></p>
+<p class="caption">The controls preview these studies here. They don’t replace the app’s logo.</p>
+</aside>
+</div>
+<a id="view-pair" href="#pair">View selected pair</a>
+<script type="module" src="studies.js"></script>
+</body>
+</html>
