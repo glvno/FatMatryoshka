@@ -1493,12 +1493,9 @@ static void m_vca(const node_t *nd, inst_t *it, uint32_t n)
     esig_t *out = it->out[0];
     int32_t g = EF(it, VCA_P_GAIN);
     uint32_t i;
-    if (!(nd->conn & (1u << VCA_I_CV)))
-        for (i = 0; i < n; i++)
-            out[i] = mul16(in[i], g);
-    else
-        for (i = 0; i < n; i++)
-            out[i] = mul16(mul16(in[i], cv[i]), g);
+    (void)nd; /* an unplugged cv reads the zero buffer: a VCA with no control is closed */
+    for (i = 0; i < n; i++)
+        out[i] = mul16(mul16(in[i], cv[i]), g);
 }
 
 typedef struct {

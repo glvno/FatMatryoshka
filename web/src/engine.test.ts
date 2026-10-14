@@ -2117,6 +2117,9 @@ describe('live parameter displays', () => {
     amp.params.gain = 0.5;
     amp.map!.p1 = ['gain'];
     connect(p, DEFS, { module: source.id, port: 'out' }, { module: amp.id, port: 'p1' });
+    const open = addModule(p, DEFS.const, 0, 0); // an unplugged cv is closed: hold it open to read the gain
+    open.params.value = 1;
+    connect(p, DEFS, { module: open.id, port: 'out' }, { module: amp.id, port: 'cv' });
     const original = JSON.stringify(p);
     const e = new Engine(SR);
     e.load(p);
@@ -2163,6 +2166,9 @@ describe('live parameter displays', () => {
     amp.params.gain = 0;
     amp.map!.p1 = ['gain'];
     connect(p, DEFS, { module: main.id, port: 'vel' }, { module: amp.id, port: 'p1' });
+    const open = addModule(p, DEFS.const, 0, 0);
+    open.params.value = 1;
+    connect(p, DEFS, { module: open.id, port: 'out' }, { module: amp.id, port: 'cv' });
     const e = new Engine(SR);
     e.load(p);
     e.noteOn(60, 0.2);

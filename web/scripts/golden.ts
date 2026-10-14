@@ -885,7 +885,11 @@ kit('fixed-links', (add, wire) => {
   const second = { ...structuredClone(source), id: Math.max(...p.modules.map((m) => m.id)) + 1 };
   p.modules.push(second);
   p.cables.push({ from: { module: second.id, port: 'out' }, to: { module: p.modules.find((m) => m.type === 'filter')!.id, port: 'cv' } });
-  p.cables = p.cables.filter((c) => !(c.to.module === amp.id && c.to.port === 'cv')); // keep the reference audible through the chain
+  // the tiny source would close the VCA (an unplugged or near-zero cv is silence): hold it open with its own constant
+  const open = { ...structuredClone(source), id: second.id + 1, params: { value: 1 } };
+  p.modules.push(open);
+  p.cables = p.cables.filter((c) => !(c.to.module === amp.id && c.to.port === 'cv'));
+  p.cables.push({ from: { module: open.id, port: 'out' }, to: { module: amp.id, port: 'cv' } });
   for (const m of p.modules) {
     if (m.type === 'filter') m.inputMap = { cv: ['res', 'cvamt'], in: ['track'] };
     if (m.type === 'ladder') m.inputMap = { cv: ['res', 'drive'] };

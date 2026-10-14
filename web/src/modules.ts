@@ -464,11 +464,11 @@ const vca: ModuleImpl<null> = {
     params: [param('gain', 0, 2, 1, { step: 0.01, input: 'cv', rest: (p, cv) => cv * (p.gain ?? 1) })],
   },
   init: () => null,
+  // an unplugged cv is silence (the buffer is zero): a VCA with no control is closed, as on a modular
   process(c) {
-    const open = !c.connected.cv;
-    let cv = 1;
+    let cv = 0;
     for (let i = 0; i < c.n; i++) {
-      cv = open ? 1 : c.inp.cv[i];
+      cv = c.inp.cv[i];
       c.out.out[i] = c.inp.in[i] * cv * (c.p.gain ?? 1);
     }
     if (c.display) c.display.gain = cv * (c.p.gain ?? 1);
