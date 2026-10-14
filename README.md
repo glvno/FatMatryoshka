@@ -1,6 +1,6 @@
-# **WE STAND ON THE SHOULDERS OF GIANTS.**
+# **WE STAND ON THE SHOULDERS OF GIANTS!!**
 
-**FatMatryoshka-1 exists thanks to [Leo Kuroshita (@kurogedelic)](https://github.com/kurogedelic) / [Hügelton Instruments](https://github.com/hugelton), creators of [Felucca](https://github.com/hugelton/Felucca), and [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), creators of [Modular-1](https://github.com/WiggisModular/Modular-1). Thank you for making this possible.**
+**FatMatryoshka is a fork of a fork of a fork. Thanks to [Leo Kuroshita (@kurogedelic)](https://github.com/kurogedelic) / [Hügelton Instruments](https://github.com/hugelton), creators of [Felucca](https://github.com/hugelton/Felucca), and [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), creators of [Modular-1](https://github.com/WiggisModular/Modular-1). Thank you for making this possible.**
 
 <p align="center">
   <img src="web/public/brand/fatmatryoshka-1.png" width="240" height="240" alt="FatMatryoshka-1: split coral and teal synth dolls wired to a gold doll inside, embraced by loose patch cables" />
