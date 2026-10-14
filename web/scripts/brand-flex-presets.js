@@ -1,4 +1,4 @@
-export const selectedPresetId = 'p09';
+export const selectedPresetId = 'p10';
 export const presets = [
   { id:'p01', name:'Broad FAT / tight lowercase', description:'Open, heavy FAT against condensed lowercase. Short ascenders and descenders keep the long word compact.',
     case:'contrast', layout:'line', ratio:1.25,
@@ -34,10 +34,15 @@ export const presets = [
     fat:{wght:800,wdth:100,opsz:96,XTRA:480,XOPQ:110,YOPQ:55,YTUC:650},
     mat:{wght:600,wdth:110,opsz:96,XTRA:480,XOPQ:95,YOPQ:55,YTUC:650},
     ryo:{wdth:35,XTRA:380,XOPQ:70,YOPQ:55} },
-  { id:'p09', name:'Current wordmark', description:'Selected wordmark: heavy FAT and lighter MATRYOSHKA on one line, with the teal R/1 signature. Exact saved settings, including the alternate line axes.',
+  { id:'p09', name:'Previous FatMatryoshka wordmark', description:'Selected wordmark: heavy FAT and lighter MATRYOSHKA on one line, with the teal R/1 signature. Exact saved settings, including the alternate line axes.',
     case:'caps', layout:'line', alignment:'left', ratio:1, gaps:[45,45,45],
     fat:{opsz:69,wght:1000,GRAD:150,wdth:25,slnt:0,XOPQ:175,YOPQ:135,XTRA:603,YTUC:650,YTLC:570,YTAS:649,YTDE:-203,YTFI:738},
     mat:{opsz:144,wght:517,GRAD:-139,wdth:151,slnt:0,XOPQ:126,YOPQ:135,XTRA:424,YTUC:650,YTLC:550,YTAS:649,YTDE:-98,YTFI:732},
     ryo:{opsz:72,wght:135,GRAD:-139,wdth:34,slnt:0,XOPQ:126,YOPQ:135,XTRA:432,YTUC:650,YTLC:550,YTAS:649,YTDE:-98,YTFI:732},
     shka:{opsz:72,wght:135,GRAD:-139,wdth:34,slnt:0,XOPQ:126,YOPQ:135,XTRA:432,YTUC:650,YTLC:550,YTAS:649,YTDE:-98,YTFI:732} },
 ];
+
+// Keep the approved MATRYOSHKA outlines and settings; remove only FAT.
+presets.push({...presets.find(preset => preset.id === 'p09'),
+  id:'p10', name:'Matryoshka', layout:'matryoshka',
+  description:'Current wordmark: the approved MATRYOSHKA lettering with its teal M and R/1 signature.'});

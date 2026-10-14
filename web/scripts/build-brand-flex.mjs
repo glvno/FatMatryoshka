@@ -21,7 +21,7 @@ const selected = manifest.find(preset => preset.id === selectedPresetId);
 if (!selected) throw new Error(`Missing selected wordmark: ${selectedPresetId}`);
 await writeFile(join(web,'public/brand/wordmark.svg'), renderWordmark(font,selected,'auto').svg+'\n');
 await writeFile(join(web,'public/brand/wordmark-settings.json'), JSON.stringify(selected,null,2)+'\n');
-await copyFile(join(web,'public/brand/round-three/29-hidden-arm-ends.png'), join(web,'public/brand/fatmatryoshka.png'));
+await copyFile(join(web,'public/brand/round-three/29-hidden-arm-ends.png'), join(web,'public/brand/matryoshka.png'));
 const bundled = await build({absWorkingDir:web,entryPoints:['scripts/brand-flex-lab.js'],outfile:'public/brand/round-four/lab.js',
   bundle:true,minify:true,format:'esm',platform:'browser',target:'es2022',legalComments:'linked',metafile:true});
 const packages = new Set();

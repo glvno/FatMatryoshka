@@ -1,13 +1,13 @@
 # Licensing
 
-FatMatryoshka is GPL-3.0-only (`LICENSE`). It is derived from [Modular-1](https://github.com/WiggisModular/Modular-1) by [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), also GPL-3.0-only. Original copyright and licence notices are retained.
+Matryoshka is GPL-3.0-only (`LICENSE`). It is derived from [Modular-1](https://github.com/WiggisModular/Modular-1) by [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), also GPL-3.0-only. Original copyright and licence notices are retained.
 
 ## Copied from Felucca
 
 Source: <https://github.com/hugelton/Felucca> at commit `a4d7ca2e5d52a4c35e2468401f00d883cadbda03`.
 Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments. GPL-3.0-only.
 
-Copied files, to be changed only as part of FatMatryoshka's own work:
+Copied files, to be changed only as part of Matryoshka's own work:
 
 - `firmware/hal/`, `firmware/loader/`, `firmware/crt0.S`, `firmware/app.ld`
 - `tools/build.py`, `tools/fm1_install.py`, `tools/fm1pkg_make.py`, `tools/lz4blk.py`, `tools/get_toolchain.sh`
@@ -23,9 +23,9 @@ The self-hosted Alegreya SC Bold heading font is by Juan Pablo del Peral / Huert
 
 The patch editor and earlier wordmark use Barlow Semi Condensed Bold and Barlow Medium by Jeremy Tribby, distributed under the SIL Open Font License 1.1. Their licences are included at `web/public/fonts/OFL-BarlowSemiCondensed.txt` and `web/public/fonts/OFL-Barlow.txt`; sources: https://github.com/google/fonts/tree/main/ofl/barlowsemicondensed and https://github.com/google/fonts/tree/main/ofl/barlow. `web/scripts/wordmark.py` regenerates the legacy K-stem wordmark as a study without replacing the current branding.
 
-The active SVG wordmark uses Roboto Flex under SIL OFL 1.1, with the selected axes and preset recorded in `web/public/brand/wordmark-settings.json`. `npm run brand:flex` generates its outlines from preset `p09` and promotes `round-three/29-hidden-arm-ends.png` to the app’s `brand/fatmatryoshka.png`. The app displays the outlined SVG without loading a font renderer or the variable font at runtime.
+The active SVG wordmark uses Roboto Flex under SIL OFL 1.1, with the selected axes and preset recorded in `web/public/brand/wordmark-settings.json`. `npm run brand:flex` generates its outlines from preset `p10` and promotes `round-three/29-hidden-arm-ends.png` to the app’s `brand/matryoshka.png`. The app displays the outlined SVG without loading a font renderer or the variable font at runtime.
 
-The ten logo concept PNGs in `web/public/brand/candidates/` were generated with the built-in image generation tool using the current project logo as reference. Their prompts are recorded in `docs/logo-candidate-prompts.json`. They are review candidates; the app continues to use `web/public/brand/fatmatryoshka.png`.
+The ten logo concept PNGs in `web/public/brand/candidates/` were generated with the built-in image generation tool using the current project logo as reference. Their prompts are recorded in `docs/logo-candidate-prompts.json`. They are review candidates; the app continues to use `web/public/brand/matryoshka.png`.
 
 The twelve further pictorial concepts in `web/public/brand/round-two/` were generated with the built-in image tool; their exact prompts are in `docs/logo-round-two-prompts.json`. The comparison uses Nick Dawson's [design-partner skill](https://github.com/nickpdawson/claude-studio-design-partner-skill/blob/main/SKILL.md). The twelve SVG wordmark studies use Barlow, Barlow Condensed, Barlow Semi Condensed, Space Grotesk, Rajdhani, Archivo Black, and one custom line drawing. The additional font sources and OFL licence texts are included in `web/public/brand/round-two/fonts/`.
 
@@ -42,3 +42,5 @@ The all-coral cable variant, `web/public/brand/round-three/27-coral-cables.png`,
 The doll-colored cable-arm variant, `web/public/brand/round-three/28-doll-colored-arms.png`, was edited with the built-in image generator. Its prompt is in `web/public/brand/round-three/doll-colored-arms-edit.json`.
 
 The hidden cable-end revision, `web/public/brand/round-three/29-hidden-arm-ends.png`, was edited with the built-in image generator. Its prompt is in `web/public/brand/round-three/hidden-arm-ends-edit.json`.
+
+The active Matryoshka wordmark uses preset p10: the approved MATRYOSHKA outlines from p09 with FAT removed. The earlier FM1 wordmarks remain historical studies. The active logo is `web/public/brand/matryoshka.png`.

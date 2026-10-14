@@ -312,7 +312,7 @@ describe('assemblies', () => {
   });
 
   it('rejects bad definitions', () => {
-    expect(() => validateAssemblyDef({ format: 'x' }, DEFS)).toThrow(/not a FatMatryoshka assembly/);
+    expect(() => validateAssemblyDef({ format: 'x' }, DEFS)).toThrow(/not a Matryoshka assembly/);
     const base = FACTORY[0];
     expect(() => validateAssemblyDef({ ...base, modules: [{ id: 1, type: 'fm1', x: 0, y: 0, params: {} }], cables: [] }, DEFS)).toThrow(/1 to 32/) /* the Main panel is stripped, nothing is left */;
     expect(() => validateAssemblyDef({ ...base, inputs: [{ module: 1, port: 'nope' }] }, DEFS)).toThrow(/does not exist/);

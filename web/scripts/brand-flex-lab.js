@@ -33,12 +33,15 @@ function draw() {
     const theme = $('theme').value;
     document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.layout = state.layout;
-    $('alignment').disabled = state.layout === 'line';
+    const single = state.layout === 'matryoshka';
+    $('alignment').disabled = single || state.layout === 'line';
+    $('fat-panel').hidden = single;
+    $('ratio-control').hidden = single;
     latest = renderWordmark(font, state, theme);
     $('large-preview').innerHTML = latest.svg;
     $('small-preview').innerHTML = latest.svg;
     const split = ['three','four'].includes(state.layout);
-    $('width-ratio').textContent = split
+    $('width-ratio').textContent = single ? 'MATRYOSHKA · current wordmark' : split
       ? `Line widths relative to FAT: ${latest.lineWidths.map((width,index)=>`${latest.lineNames[index]} ${(width/latest.lineWidths[0]).toFixed(2)}×`).join(' · ')}`
       : `MatRyoshka is ${latest.widthRatio.toFixed(2)}× the width of ${state.case === 'mixed' ? 'Fat' : 'FAT'}.`;
     for (const word of lineKeys) $(word+'-figures').innerHTML = renderFigures(font, state[word], theme);

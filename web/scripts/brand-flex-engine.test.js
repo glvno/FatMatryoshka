@@ -19,7 +19,7 @@ test('presets keep their independent layout, case and axis settings', () => {
     assert.ok(result.width>0 && result.height>0 && Number.isFinite(result.widthRatio));
     assert.ok(!/NaN|Infinity/.test(result.svg));
     assert.equal((result.svg.match(/class="accent numeral"/g)||[]).length,1);
-    assert.equal((result.svg.match(/class="accent"/g)||[]).length,2);
+    assert.equal((result.svg.match(/class="accent"/g)||[]).length,state.layout === 'matryoshka' ? 1 : 2);
     outlines.add(result.svg);
   }
   assert.equal(outlines.size,presets.length);
@@ -96,7 +96,7 @@ test('three- and four-line layouts preserve FM1 and independent line outlines', 
     const before=renderWordmark(font,state);
     assert.deepEqual(before.lineNames,names);
     assert.equal(before.lineWidths.length,names.length);
-    assert.equal((before.svg.match(/class="accent"/g)||[]).length,2);
+    assert.equal((before.svg.match(/class="accent"/g)||[]).length,state.layout === 'matryoshka' ? 1 : 2);
     assert.equal((before.svg.match(/class="accent numeral"/g)||[]).length,1);
     state.ryo.YOPQ=25;
     const after=renderWordmark(font,state);

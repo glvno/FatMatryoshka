@@ -1,9 +1,9 @@
 {
-  "id": "p09",
-  "name": "Current wordmark",
-  "description": "Selected wordmark: heavy FAT and lighter MATRYOSHKA on one line, with the teal R/1 signature. Exact saved settings, including the alternate line axes.",
+  "id": "p10",
+  "name": "Matryoshka",
+  "description": "Current wordmark: the approved MATRYOSHKA lettering with its teal M and R/1 signature.",
   "case": "caps",
-  "layout": "line",
+  "layout": "matryoshka",
   "alignment": "left",
   "ratio": 1,
   "gaps": [

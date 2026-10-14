@@ -279,7 +279,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Panic: stop all notes', keywords: 'silence stuck', run: () => sink.send({ t: 'panic' }) },
     { kind: 'command', label: 'FM-1 & MIDI settings', keywords: 'connect send store sync hardware keyboard release', run: () => $<HTMLDialogElement>('device-bar').showModal() },
     { kind: 'command', label: 'Flash firmware', keywords: 'install update hardware', run: () => switchTab('flash') },
-    { kind: 'command', label: 'About FatMatryoshka', keywords: 'credits', run: () => switchTab('about') },
+    { kind: 'command', label: 'About Matryoshka', keywords: 'credits', run: () => switchTab('about') },
     { kind: 'command', label: 'Keyboard shortcuts', keywords: 'help', detail: '?', run: () => help.showModal() },
     { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },
     { kind: 'command', label: 'Reset canvas scale', keywords: 'zoom 100%', run: inPatch(() => editor.setZoom(1)) },
@@ -556,8 +556,8 @@ refreshAssemblies = buildAssembliesTab($('tab-library'), {
 buildFlashTab($('tab-flash'));
 $('tab-about').innerHTML = `
   <div class="card about-brand">
-  <img src="./brand/fatmatryoshka.png" width="160" height="160" alt="Coral and yellow parent dolls with two teal siblings, connected by matching cable arms" />
-  <h2><img class="brand-mark" src="./brand/wordmark.svg" alt="FatMatryoshka" /></h2>
+  <img src="./brand/matryoshka.png" width="160" height="160" alt="Coral and yellow parent dolls with two teal siblings, connected by matching cable arms" />
+  <h2><img class="brand-mark" src="./brand/wordmark.svg" alt="Matryoshka" /></h2>
   <p>A patchable modular synth for the M-VAVE FM-1, with a browser editor. Build sounds from modules, wrap them into assemblies, and nest those assemblies inside bigger instruments. The module engine runs in your browser here and on the FM-1 itself.</p></div>
   <div class="card credits"><h2>We stand on the shoulders of giants.</h2>
   <p><a href="https://github.com/hugelton/Felucca">Felucca</a>, by <a href="https://github.com/kurogedelic">Leo Kuroshita (@kurogedelic)</a> / <a href="https://github.com/hugelton">Hügelton Instruments</a>, provides the foundation for the flasher, loader and hardware support.</p>

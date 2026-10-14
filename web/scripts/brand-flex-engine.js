@@ -15,7 +15,7 @@ export function normalizeState(font, input, fallback) {
       result[word][tag] = Number.isFinite(value) ? Math.max(axis.min, Math.min(axis.max, value)) : axis.default;
     }
   }
-  result.layout = ['line','stack','three','four'].includes(input?.layout) ? input.layout : fallback.layout;
+  result.layout = ['matryoshka','line','stack','three','four'].includes(input?.layout) ? input.layout : fallback.layout;
   const alignments = ['left','right','center','justify'];
   result.alignment = alignments.includes(input?.alignment) ? input.alignment
     : alignments.includes(fallback.alignment) ? fallback.alignment : 'center';
@@ -94,7 +94,11 @@ export function renderWordmark(font, state, theme = 'dark') {
   const fat = word(font, fatText, state.fat, 300*state.ratio);
   const mat = word(font, matText, state.mat, 300);
   let width, height, content, lineWidths, lineNames;
-  if (['three','four'].includes(state.layout)) {
+  if (state.layout === 'matryoshka') {
+    width = mat.width;
+    height = mat.above + mat.below;
+    content = alignedRow(mat,width,mat.above,'mat','left');
+  } else if (['three','four'].includes(state.layout)) {
     const three = state.layout === 'three';
     const rows = [fat, word(font,matText.slice(0,3),state.mat,300),
       word(font,three?matText.slice(3):matText.slice(3,6),state.ryo,300)];
@@ -124,8 +128,10 @@ export function renderWordmark(font, state, theme = 'dark') {
   const ink = theme === 'dark' ? '#fff7e8' : '#202a2c';
   const accent = theme === 'dark' ? '#79c7c1' : '#226669';
   const autoTheme = theme === 'auto' ? '@media(prefers-color-scheme:dark){.ink{fill:#fff7e8}.accent{fill:#79c7c1}}' : '';
+  const name = state.layout === 'matryoshka' ? 'Matryoshka' : 'FatMatryoshka';
+  const accents = state.layout === 'matryoshka' ? 'M and the' : 'F, M and the';
   return { widthRatio: mat.width/fat.width, lineWidths, lineNames, width, height,
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-12 -12 ${n(width+24)} ${n(height+24)}" role="img" aria-label="FatMatryoshka wordmark"><title>FatMatryoshka — Roboto Flex</title><desc>F, M and the full-height numeral 1 in the R stem use the original teal brand accent.</desc><style>.ink{fill:var(--wordmark-ink,${ink})}.accent{fill:var(--wordmark-accent,${accent})}${autoTheme}</style>${content}</svg>` };
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-12 -12 ${n(width+24)} ${n(height+24)}" role="img" aria-label="${name} wordmark"><title>${name} — Roboto Flex</title><desc>${accents} full-height numeral 1 in the R stem use the original teal brand accent.</desc><style>.ink{fill:var(--wordmark-ink,${ink})}.accent{fill:var(--wordmark-accent,${accent})}${autoTheme}</style>${content}</svg>` };
 }
 
 export function renderFigures(font, axes, theme) {

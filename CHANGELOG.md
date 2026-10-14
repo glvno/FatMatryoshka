@@ -1,5 +1,10 @@
 # Changelog
 
+## Matryoshka
+
+- Rename the project and active app branding to Matryoshka; remove FAT from the approved wordmark while preserving its MATRYOSHKA outlines and doll artwork. Make the shortened wordmark the type lab’s default.
+- Move the app and source repository to lowercase `matryoshka`. Point the existing `/FatMatryoshka-1` redirect directly to `/matryoshka`, preserving paths, queries and shared-patch fragments.
+
 ## FatMatryoshka workspace and identity
 
 - Ship the selected Roboto Flex R/1 wordmark and four-doll artwork in the sidebar, About screen, favicon and README. Generate the active assets from the saved selection and support light/dark wordmark colors; retain the full-axis lab and earlier studies.

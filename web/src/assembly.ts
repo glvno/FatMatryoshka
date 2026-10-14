@@ -763,7 +763,7 @@ export function stripPatchIO(d: AssemblyDef): number {
 }
 
 export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef>): AssemblyDef {
-  if (!isRec(raw) || raw.format !== ASSEMBLY_FORMAT || !Array.isArray(raw.modules) || !Array.isArray(raw.cables)) throw new Error('not a FatMatryoshka assembly');
+  if (!isRec(raw) || raw.format !== ASSEMBLY_FORMAT || !Array.isArray(raw.modules) || !Array.isArray(raw.cables)) throw new Error('not a Matryoshka assembly');
   const d = raw as unknown as AssemblyDef;
   const layout = assemblyLayout(d);
   delete d.size; delete d.frameSize;

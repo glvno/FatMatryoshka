@@ -32,7 +32,7 @@ export class DeviceLink {
     const pick = <T extends MIDIPort>(ports: Iterable<T>): T | null => [...ports].find((p) => NAME.test(p.name ?? '') && !/ota-/i.test(p.name ?? '')) ?? null;
     this.out = pick(access.outputs.values());
     this.inp = pick(access.inputs.values());
-    if (!this.out || !this.inp) throw new Error('FM-1 not found. Is it connected and running the FatMatryoshka firmware?');
+    if (!this.out || !this.inp) throw new Error('FM-1 not found. Is it connected and running the Matryoshka firmware?');
     this.inp.onmidimessage = (ev) => {
       const p = ev.data ? parse(ev.data) : null;
       if (p && this.waiter?.match(p)) {

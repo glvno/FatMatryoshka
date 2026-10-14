@@ -1,6 +1,6 @@
-FatMatryoshka active branding — approved 2026-10-14.
+Matryoshka active branding — approved 2026-10-14.
 
-Logo: web/public/brand/fatmatryoshka.png, copied unchanged from
+Logo: web/public/brand/matryoshka.png, copied unchanged from
 web/public/brand/round-three/29-hidden-arm-ends.png.
 Built-in image generation edit history and exact prompts are preserved in
 web/public/brand/round-three/*-edit.json and prompts.json.
@@ -13,9 +13,9 @@ parent. Yellow arms connect upward at the coral parent’s side ports, with
 upper cable terminations hidden behind its rim.
 
 Wordmark: web/public/brand/wordmark.svg. Outlined Roboto Flex, selected preset
-p09 in web/scripts/brand-flex-presets.js. Exact axes are also published in
-web/public/brand/wordmark-settings.json. One line, all capitals, independent
-FAT and MATRYOSHKA settings. The full-height teal numeral 1 forms R’s stem;
+p10 in web/scripts/brand-flex-presets.js. Exact axes are also published in
+web/public/brand/wordmark-settings.json. One line, all capitals; the approved MATRYOSHKA
+settings from p09, with FAT removed. The full-height teal numeral 1 forms R’s stem;
 its serif matches the font’s thin strokes. Automatic light/dark colors.
 
 Rebuild active assets and the type lab: cd web && npm run brand:flex.
