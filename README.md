@@ -1,6 +1,6 @@
 # **WE STAND ON THE SHOULDERS OF GIANTS!!**
 
-**FatMatryoshka is a fork of a fork of bootleg firmware. Thanks to [Leo Kuroshita (@kurogedelic)](https://github.com/kurogedelic) / [Hügelton Instruments](https://github.com/hugelton), creators of [Felucca](https://github.com/hugelton/Felucca), and [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), creators of [Modular-1](https://github.com/WiggisModular/Modular-1). Thank you for making this possible.**
+**FatMatryoshka is a fork of a fork of bootleg firmware. Big ups to [Leo Kuroshita (@kurogedelic)](https://github.com/kurogedelic) / [Hügelton Instruments](https://github.com/hugelton), creators of [Felucca](https://github.com/hugelton/Felucca), and [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), creators of [Modular-1](https://github.com/WiggisModular/Modular-1).**
 
 <p align="center">
   <img src="web/public/brand/fatmatryoshka-1.png" width="240" height="240" alt="FatMatryoshka-1: split coral and teal synth dolls wired to a gold doll inside, embraced by loose patch cables" />
@@ -16,11 +16,11 @@ FatMatryoshka-1 is an independent project grown from Modular-1, which builds on 
 
 [Open the FatMatryoshka-1 editor](https://glvno.github.io/FatMatryoshka-1/) to make patches and upload them to the FM-1. The editor currently deploys from branch `dev`; its firmware package has not been installed on a device. The [original Modular-1 editor](https://wiggismodular.github.io/Modular-1/) is also available.
 
-The sidebar holds the logo, patch name, preset picker, **Add to patch**, audio controls, and **Patch / Library** navigation. The canvas gets the full window height. **Commands** (Ctrl/Cmd+K) opens file operations, undo/redo, grouping, A/B snapshots, hardware settings, firmware installation, and help. The palette opens on actions; its Modules, Assemblies and Patches filters let you browse without guessing a name. On narrow screens, **Workspace** opens a sidebar drawer. **Tab** moves through controls; **Alt+B** switches A/B.
+The sidebar holds the logo, patch name, preset picker, **Add to patch**, audio controls, and **Patch / Library** navigation. **Commands** (Ctrl/Cmd+K) opens file operations, undo/redo, grouping, A/B snapshots, hardware settings, firmware installation, and help. The palette opens on actions; its Modules, Assemblies and Patches filters let you browse without guessing a name. On narrow screens, **Workspace** opens a sidebar drawer. **Tab** moves through controls; **Alt+B** switches A/B.
 
 Slider thumbs are input jacks: **drag normally to adjust, Alt-drag to patch**, or drop an output cable onto a thumb. External cables plug into side jacks, which route to the moving thumbs through internal cables. **Click an internal cable to disconnect that parameter**, leaving the incoming cable and other destinations intact. **Drag the same side input to several thumbs to add multiple destinations** (or Alt-drag from the thumb to the side input). Thumb positions pause while patching so the targets stay still.
 
-Open the **⋯** menu beside a parameter for p1/p2 routing, modulation depth, macro ranges and K1–K4 hardware assignments. The matrix grid is gone. Existing patches retain their routing; fixed input links such as `cv → cutoff` can also be switched off independently, saved and restored. Any side input can also feed additional parameters; these extra routes add the signal’s block average across the parameter range. P1/P2 retain their shared depth controls and per-parameter macro ranges. Extra routes and disabled fixed links on an FM-1 require the updated bundled firmware. Dedicated controls use their own input (for example, Filter cutoff uses `cv`). Other thumbs reuse a suitable p1/p2 route or allocate an unused input; the editor reports when both are occupied. Depth is shared by every parameter assigned to that input. K1–K4 assignments apply while that module is selected on the FM-1.
+Open the **⋯** menu beside a parameter for p1/p2 routing, modulation depth, macro ranges and K1–K4 hardware assignments. Any side input can also feed additional parameters; these extra routes add the signal’s block average across the parameter range. Dedicated controls use their own input (for example, Filter cutoff uses `cv`). Other thumbs reuse a suitable p1/p2 route or allocate an unused input; the editor reports when both are occupied. Depth is shared by every parameter assigned to that input. K1–K4 assignments apply while that module is selected on the FM-1.
 
 ### Voices
 
@@ -30,7 +30,7 @@ The firmware plays one patch at a time (the default build). The four-patch firmw
 
 ## FM-1
 
-In addition to the modular synth engine, there's also some complex arpeggiator. 
+In addition to the modular synth engine, there's also a deep arpeggiator. 
 
 Knobs and stuff.
 
