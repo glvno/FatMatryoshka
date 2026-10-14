@@ -5,11 +5,9 @@ type ProbeKind = 'audio' | 'control' | 'gate';
 interface Probe {
   key: string;
   kind: ProbeKind;
-  color: string;
   data: Float32Array | null;
   sr: number;
 }
-const COLORS = ['--scope-1', '--scope-2', '--scope-3', '--scope-4', '--scope-5', '--scope-6'];
 const FFT_N = 2048;
 
 /** in-place radix-2 FFT of re / im (length a power of two) */
@@ -81,9 +79,7 @@ export class Scope {
 
   add(key: string, kind: ProbeKind): void {
     if (this.probes.some((p) => p.key === key)) return;
-    const used = new Set(this.probes.map((p) => p.color));
-    const color = COLORS.find((candidate) => !used.has(candidate)) ?? COLORS[this.probes.length % COLORS.length];
-    this.probes.push({ key, kind, color, data: null, sr: 48000 });
+    this.probes.push({ key, kind, data: null, sr: 48000 });
     this.schedule();
   }
 
@@ -131,10 +127,11 @@ export class Scope {
     g.lineCap = 'round';
     g.lineJoin = 'round';
     g.globalAlpha = 1;
+    const traceHeight = H / 3, traceBottom = H / 2 + traceHeight / 2;
     for (const p of this.probes) {
       const d = p.data;
       if (!d?.length) continue;
-      g.strokeStyle = style.getPropertyValue(p.color).trim();
+      g.strokeStyle = style.getPropertyValue(`--${p.kind}`).trim();
       g.beginPath();
       if (this.mode === 'spectrum') {
         const s = spectrum(d);
@@ -143,7 +140,8 @@ export class Scope {
         for (let x = 0; x < W; x++) {
           const f = fmin * Math.pow(fmax / fmin, x / W);
           const bin = Math.min(n - 1, Math.round((f / (p.sr / 2)) * (n - 1)));
-          const y = H - ((Math.max(-96, s[bin]) + 96) / 96) * H;
+          const db = Math.max(-96, Math.min(0, s[bin]));
+          const y = traceBottom - ((db + 96) / 96) * traceHeight;
           if (x === 0) g.moveTo(x, y);
           else g.lineTo(x, y);
         }
@@ -152,9 +150,11 @@ export class Scope {
         for (const sample of d) amp = Math.max(amp, Math.abs(sample));
         let start = 0, len = d.length;
         if (p.kind === 'audio') {
-          len = Math.min(1024, d.length);
+          // About 64 ms: three times the previous window, with room to trigger.
+          len = Math.min(Math.round(p.sr * .064), d.length);
           start = Math.max(0, d.length - len);
-          for (let i = Math.max(1, Math.floor(d.length / 2)); i < d.length - len; i++) {
+          // Use the most recent rising crossing that leaves a complete window.
+          for (let i = start; i >= 1; i--) {
             if (d[i - 1] < 0 && d[i] >= 0) { start = i; break; }
           }
         }
@@ -163,7 +163,7 @@ export class Scope {
         // rounded sample index at every screen pixel produced visible stairs.
         for (let i = 0; i < len; i++) {
           const x = (i / Math.max(1, len - 1)) * (W - 1);
-          const y = H / 2 - (d[start + i] / scale) * H * .4;
+          const y = H / 2 - (d[start + i] / scale) * traceHeight / 2;
           if (i === 0) g.moveTo(x, y);
           else g.lineTo(x, y);
         }

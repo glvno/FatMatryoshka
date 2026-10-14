@@ -14,8 +14,6 @@
   --accent: var(--ref-rust); --accent-ink: var(--ref-white);
   --secondary: var(--ref-deep-teal); --audio: var(--accent); --control: var(--secondary); --gate: var(--ref-ochre);
   --danger: var(--ref-red); --warning: var(--gate);
-  --scope-1: var(--audio); --scope-2: var(--control); --scope-3: var(--gate);
-  --scope-4: var(--ref-lilac); --scope-5: var(--ref-blue); --scope-6: var(--ref-rose);
   --shadow: color-mix(in srgb, var(--ref-ink) 16%, transparent);
   --backdrop: color-mix(in srgb, var(--ref-night) 45%, transparent);
   --surface-tint: color-mix(in oklab, var(--secondary) 5%, var(--panel));
@@ -27,7 +25,6 @@
     --muted: var(--ref-mist); --line: var(--ref-slate);
     --accent: var(--ref-coral); --accent-ink: var(--ref-night);
     --secondary: var(--ref-seafoam); --gate: var(--ref-gold); --danger: var(--ref-red-light);
-    --scope-4: var(--ref-lilac-light); --scope-5: var(--ref-blue-light); --scope-6: var(--ref-rose-light);
     color-scheme: dark;
   }
 }

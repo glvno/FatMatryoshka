@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Match scope traces to their cable signal colors. Center traces in one-third of the canvas height and show roughly 64 ms of audio across the full width for a steadier view with more cycles.
+
 - Restore full-strength scope palette colors and use thicker, rounded traces. Draw waveforms through the original sample positions to eliminate pixel-stepped lines without filtering the signal.
 
 - Replace the floating oscilloscope window with a transparent, canvas-wide background. Scope the rendered stereo output by default for every preset; keep waveforms fixed while the dot grid zooms and pans with the patch. Retain extra jack probes and move scope mode/visibility controls to Commands.
