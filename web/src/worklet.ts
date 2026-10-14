@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // AudioWorklet wrapper around Engine.
 import { Engine } from './engine';
-import { OUTPUT_PROBES } from './scope';
 import { Arp, type ArpCfg } from './arp';
 import type { Patch } from './patch';
 
@@ -44,9 +43,7 @@ class ModularProcessor extends AudioWorkletProcessor {
   private revision = 0;
   private valuesRequested = false;
   /** scope probes: the last PROBE_LEN samples of an output, sent to the host about 30 times a second */
-  private probes = new Map<string, { id: number | null; port: string; ring: Float32Array; w: number }>(
-    OUTPUT_PROBES.map((key, channel) => [key, { id: null, port: String(channel), ring: new Float32Array(PROBE_LEN), w: 0 }]),
-  );
+  private probes = new Map<string, { id: number; port: string; ring: Float32Array; w: number }>();
   private probeBlocks = 0;
   constructor() {
     super();
@@ -92,7 +89,7 @@ class ModularProcessor extends AudioWorkletProcessor {
   }
   private feedProbes(n: number, outputs: Float32Array[]): void {
     for (const p of this.probes.values()) {
-      const src = p.id === null ? outputs[Number(p.port)] ?? outputs[0] : this.engine.probe(p.id, p.port);
+      const src = this.engine.probe(p.id, p.port);
       for (let i = 0; i < n; i++) {
         p.ring[p.w] = src?.[i] ?? 0;
         if (++p.w === PROBE_LEN) p.w = 0;

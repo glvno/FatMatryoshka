@@ -134,7 +134,7 @@ const ch1: Chapter = {
     },
     {
       id: 'scope', title: 'Look at the wave', transient: true,
-      text: 'Click ◎ beside the Oscillator’s out jack. The scope window shows the signal; the Spectrum button shows its harmonics.',
+      text: 'Click ◎ beside the Oscillator’s out jack. The scope window opens and traces that signal (the Oscillator runs all the time, so it shows even without a key); the Spectrum button shows its harmonics.',
       why: 'A sine has one harmonic, a saw has all of them, a square only the odd ones. What you see on the spectrum is what a filter will later take away.',
       ...need(['the scope probe ◎ on the Oscillator’s out', (s) => s.probes.has(`${mod(s.patch, 'osc')?.id}:out`), (s) => T.port(one('osc')(s), 'out', 'out')]),
       apply: (a) => { const o = mod(a.patch(), 'osc'); if (o) a.probe(o.id, 'out'); },

@@ -42,7 +42,7 @@ function stereoPatch(): Patch {
   return patch;
 }
 
-it('automatically scopes both rendered channels through every factory preset and polyphonic patch load', () => {
+it('traces nothing until a probe is set, then follows that output through every factory preset and a polyphonic load', () => {
   const processor = new Processor();
   const poly = PRESETS['Subtractive saw'](); poly.voices = 4;
   for (const [index, patch] of [...Object.values(PRESETS).map(make => make()), poly].entries()) {
@@ -50,25 +50,32 @@ it('automatically scopes both rendered channels through every factory preset and
     send(processor, { t: 'patch', patch, revision: index + 1 });
     send(processor, { t: 'on', note: 60, vel: .8 });
     send(processor, { t: 'on', note: 67, vel: .8 });
-    const channels = render(processor);
+    render(processor);
+    expect(probes(processor), `${patch.name}: a trace without a probe`).toEqual([]);
+    const m = patch.modules.find(m => DEFS[m.type].outputs.some(o => o.kind === 'audio'))!;
+    const port = DEFS[m.type].outputs.find(o => o.kind === 'audio')!.name;
+    send(processor, { t: 'probe', key: 'x', id: m.id, port });
+    render(processor);
     const messages = probes(processor);
-    expect(messages.map(p => p.probe), patch.name).toEqual(['output:left', 'output:right']);
-    for (const [channel, message] of messages.entries()) {
-      expect(message.revision).toBe(index + 1);
-      expect(message.data.slice(-128)).toEqual(channels[channel]);
-      expect(message.data.every(Number.isFinite)).toBe(true);
-    }
+    expect(messages.map(p => p.probe), patch.name).toEqual(['x']);
+    expect(messages[0].revision).toBe(index + 1);
+    expect(messages[0].data.every(Number.isFinite)).toBe(true);
+    send(processor, { t: 'unprobe', key: 'x' });
     expect(processor.port.postMessage.mock.calls.some(([m]) => m.error), patch.name).toBe(false);
   }
 });
 
-it('scopes the summed, level-adjusted stereo signal without cancellation or retaining samples from a previous patch', () => {
+it('a probe reads its output without cancellation and a new patch does not retain its samples', () => {
   const processor = new Processor();
-  send(processor, { t: 'patch', patch: stereoPatch(), revision: 1 });
+  const patch = stereoPatch();
+  const [left, right] = patch.modules;
+  send(processor, { t: 'patch', patch, revision: 1 });
+  send(processor, { t: 'probe', key: 'l', id: left.id, port: 'out' });
+  send(processor, { t: 'probe', key: 'r', id: right.id, port: 'out' });
   render(processor, 36); // Wrap the 4096-sample rings.
   const messages = probes(processor).slice(-2);
-  expect(messages[0].data.every(value => value === .375)).toBe(true);
-  expect(messages[1].data.every(value => value === -.375)).toBe(true);
+  expect(messages[0].data.every(value => value === .5)).toBe(true);
+  expect(messages[1].data.every(value => value === -.75)).toBe(true);
   processor.port.postMessage.mockClear();
   send(processor, { t: 'patch', patch: emptyPatch(), revision: 2 });
   render(processor);
