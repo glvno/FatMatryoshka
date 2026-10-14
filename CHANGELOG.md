@@ -2,6 +2,7 @@
 
 ## FatMatryoshka workspace and identity
 
+- Remove opaque backgrounds from parameter labels, values and port text so their grid cells no longer hide internal cable segments.
 - Use Barlow for patch controls and Barlow Semi Condensed for module and assembly names. Enlarge labels, align tabular values, and wrap assembly actions when needed. Reposition cables when fonts finish loading.
 - Keep the wordmark’s 1-shaped K stem at the same height as all the small caps. Add a second comparison gallery with twelve outlined wordmarks and twelve pictorial studies, including pair previews and shareable selections.
 - Keep slider backgrounds transparent so internal routes remain visible all the way to their thumbs. Add a separate New patch sidebar button and keep the Examples dropdown for examples.

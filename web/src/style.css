@@ -250,7 +250,6 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .module .port > span:not(.dot), .module .param > input { position: relative; z-index: 2; }
 .module:has(.parameter-routing[open]) { z-index: 3; }
 .module .mhead, .module .param > span, .module .param > output, .module .parameter-routing, .module .prb, .module .tog, .module .voices-row, .module .morph-row { position: relative; z-index: 2; }
-.module .param > span:not(.slider-jack), .module .param > output { background: var(--panel); }
 .cable.alias { stroke-width: 3; stroke-dasharray: 3 4; opacity: .6; pointer-events: stroke; }
 .cable.alias:hover, .cable.alias:focus { stroke-width: 6; opacity: 1; }
 .parameter-routing { position: relative; z-index: 2; justify-self: end; font-size: 11px; }
@@ -305,8 +304,9 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .internal-cables { overflow: hidden; border-radius: inherit; }
 .module .mbody { position: relative; z-index: 2; pointer-events: none; }
 .module .mbody :is(input, select, button, summary, label, .dot:not(.slider-port), .rename, .param > span:not(.slider-jack), output) { pointer-events: auto; }
-/* Range inputs cover the whole row. Keep them transparent so routes reach the thumb. */
-.module .mbody :is(input:not(.jack-range), select, button, summary, .param > span:not(.slider-jack), output, .port > span:not(.dot)) { background-color: var(--panel); }
+/* Only solid controls mask routes. Labels, values and ranges span grid cells;
+   keep their backgrounds transparent so they cannot cut gaps in the cables. */
+.module .mbody :is(input:not(.jack-range), select, button, summary) { background-color: var(--panel); }
 .module:has(.parameter-routing[open]) { isolation: isolate; }
 .patch-preview { z-index: 10000; }
 .rubber { z-index: 10001; }
