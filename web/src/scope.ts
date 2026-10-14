@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Transparent viewport-sized scope behind the patch. Drawing follows samples, not patch zoom.
+// Draggable scope window, anchored to the patch viewport independently of patch zoom.
 export const OUTPUT_PROBES = ['output:left', 'output:right'] as const;
 type ProbeKind = 'audio' | 'control' | 'gate';
 interface Probe {
@@ -57,24 +57,97 @@ export class Scope {
   private probes: Probe[] = [];
   private mode: 'time' | 'spectrum' = 'time';
   private raf = 0;
+  private cv: HTMLCanvasElement;
+  private position: { x: number; y: number } | null = null;
 
-  constructor(private cv: HTMLCanvasElement) {
+  constructor(private root: HTMLElement) {
+    this.cv = root.querySelector('canvas')!;
     for (const key of OUTPUT_PROBES) this.add(key, 'audio');
-    new ResizeObserver(() => this.schedule()).observe(cv);
+    for (const button of root.querySelectorAll<HTMLButtonElement>('[data-scope-mode]')) {
+      button.onclick = () => this.setMode(button.dataset.scopeMode === 'time' ? 'time' : 'spectrum');
+    }
+    root.querySelector<HTMLButtonElement>('.scope-close')!.onclick = () => this.setVisible(false);
+    this.setupDragging();
+    new ResizeObserver(() => { this.clampPosition(); this.schedule(); }).observe(root.parentElement!);
+    new ResizeObserver(() => this.schedule()).observe(this.cv);
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.schedule());
     document.addEventListener('visibilitychange', () => this.schedule());
   }
 
-  get visible(): boolean { return !this.cv.hidden; }
+  get visible(): boolean { return !this.root.hidden; }
 
   setVisible(visible: boolean): void {
-    this.cv.hidden = !visible;
+    this.root.hidden = !visible;
+    if (visible) this.clampPosition();
     this.schedule();
   }
 
   setMode(mode: 'time' | 'spectrum'): void {
     this.mode = mode;
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-scope-mode]')) {
+      button.setAttribute('aria-pressed', String(button.dataset.scopeMode === mode));
+    }
     this.setVisible(true);
+  }
+
+  private clampPosition(): void {
+    if (!this.position || !this.root.checkVisibility()) return;
+    const parent = this.root.parentElement!;
+    const maxX = Math.max(0, parent.clientWidth - this.root.offsetWidth);
+    const maxY = Math.max(0, parent.clientHeight - this.root.offsetHeight);
+    this.position.x = Math.max(0, Math.min(maxX, this.position.x));
+    this.position.y = Math.max(0, Math.min(maxY, this.position.y));
+    this.root.style.left = `${this.position.x}px`;
+    this.root.style.top = `${this.position.y}px`;
+    this.root.style.right = 'auto';
+    this.root.style.bottom = 'auto';
+  }
+
+  private currentPosition(): { x: number; y: number } {
+    const rect = this.root.getBoundingClientRect();
+    const parent = this.root.parentElement!.getBoundingClientRect();
+    return { x: rect.left - parent.left, y: rect.top - parent.top };
+  }
+
+  private setupDragging(): void {
+    const handle = this.root.querySelector<HTMLButtonElement>('.scope-handle')!;
+    let drag: { pointer: number; x: number; y: number; origin: { x: number; y: number } } | null = null;
+    handle.onpointerdown = (event) => {
+      if (event.button !== 0 || drag) return;
+      event.preventDefault();
+      handle.focus();
+      drag = { pointer: event.pointerId, x: event.clientX, y: event.clientY, origin: this.currentPosition() };
+      handle.setPointerCapture(event.pointerId);
+      handle.classList.add('dragging');
+    };
+    handle.onpointermove = (event) => {
+      if (!drag || event.pointerId !== drag.pointer) return;
+      this.position = { x: drag.origin.x + event.clientX - drag.x, y: drag.origin.y + event.clientY - drag.y };
+      this.clampPosition();
+    };
+    const end = (event: PointerEvent): void => {
+      if (!drag || event.pointerId !== drag.pointer) return;
+      drag = null;
+      handle.classList.remove('dragging');
+      if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+    };
+    handle.onpointerup = end;
+    handle.onpointercancel = end;
+    handle.onlostpointercapture = end;
+    handle.onkeydown = (event) => {
+      if (event.key === 'Home') {
+        this.position = null;
+        for (const property of ['left', 'top', 'right', 'bottom']) this.root.style.removeProperty(property);
+      } else {
+        const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+        if (!delta) return;
+        const origin = this.currentPosition(), step = event.shiftKey ? 40 : 10;
+        this.position = { x: origin.x + delta[0] * step, y: origin.y + delta[1] * step };
+        this.clampPosition();
+      }
+      event.preventDefault();
+      event.stopPropagation();
+    };
   }
 
   add(key: string, kind: ProbeKind): void {
@@ -127,7 +200,7 @@ export class Scope {
     g.lineCap = 'butt';
     g.lineJoin = 'miter';
     g.globalAlpha = .25;
-    const traceHeight = H / 3, traceBottom = H / 2 + traceHeight / 2;
+    const traceHeight = Math.max(1, H - 16), traceBottom = H / 2 + traceHeight / 2;
     for (const p of this.probes) {
       const d = p.data;
       if (!d?.length) continue;

@@ -112,7 +112,7 @@ const patchCandidates = (): { name: string; patch: Patch }[] => {
     }
   return out;
 };
-const scope = new Scope($<HTMLCanvasElement>('scope'));
+const scope = new Scope($('scope'));
 host.onProbe = (key, data, sr) => scope.feed(key, data, sr);
 const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   onStructure(p) {
@@ -280,7 +280,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Flash firmware', keywords: 'install update hardware', run: () => switchTab('flash') },
     { kind: 'command', label: 'About Matryoshka', keywords: 'credits', run: () => switchTab('about') },
     { kind: 'command', label: 'Keyboard shortcuts', keywords: 'help', detail: '?', run: () => help.showModal() },
-    { kind: 'command', label: scope.visible ? 'Hide oscilloscope' : 'Show oscilloscope', keywords: 'scope background waveform', run: inPatch(() => scope.setVisible(!scope.visible)) },
+    { kind: 'command', label: scope.visible ? 'Hide oscilloscope' : 'Show oscilloscope', keywords: 'scope window waveform', run: inPatch(() => scope.setVisible(!scope.visible)) },
     { kind: 'command', label: 'Scope: waveform', keywords: 'oscilloscope time', run: inPatch(() => scope.setMode('time')) },
     { kind: 'command', label: 'Scope: spectrum', keywords: 'oscilloscope frequency fft', run: inPatch(() => scope.setMode('spectrum')) },
     { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },

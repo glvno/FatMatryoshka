@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Restore the scope as an enabled-by-default compact window at the bottom right. Add mouse/touch dragging, keyboard movement, viewport bounds and header controls; retain automatic stereo output probes and the zooming dot grid.
+
 - Disable the scope smoothing changes: restore per-pixel sample selection and the original stroke caps/joins.
 
 - Lower scope trace opacity to 25%.

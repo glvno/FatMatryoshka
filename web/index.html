@@ -40,7 +40,15 @@
     </aside>
     <main>
     <section id="tab-patch" class="tab" role="tabpanel" aria-labelledby="nav-patch">
-      <canvas id="scope" class="scope-background" aria-hidden="true"></canvas>
+      <section id="scope" class="scope-window" aria-label="Oscilloscope">
+        <div class="scope-head">
+          <button type="button" class="scope-handle" aria-label="Move oscilloscope" title="Drag to move; arrow keys move; Home returns to bottom right">Scope</button>
+          <button type="button" data-scope-mode="time" aria-pressed="true">Waveform</button>
+          <button type="button" data-scope-mode="spectrum" aria-pressed="false">Spectrum</button>
+          <button type="button" class="scope-close" aria-label="Hide oscilloscope">×</button>
+        </div>
+        <canvas role="img" aria-label="Live oscilloscope traces"></canvas>
+      </section>
       <div id="canvas" class="canvas" aria-label="Patch canvas">
         <div id="canvas-space"><div id="patch-world"><svg id="cables" class="cables"></svg><div id="modules"></div><svg id="patch-preview" class="cables patch-preview"></svg></div></div>
       </div>
