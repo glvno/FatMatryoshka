@@ -81,7 +81,8 @@ export class Scope {
 
   add(key: string, kind: ProbeKind): void {
     if (this.probes.some((p) => p.key === key)) return;
-    const color = COLORS[this.probes.length % COLORS.length];
+    const used = new Set(this.probes.map((p) => p.color));
+    const color = COLORS.find((candidate) => !used.has(candidate)) ?? COLORS[this.probes.length % COLORS.length];
     this.probes.push({ key, kind, color, data: null, sr: 48000 });
     this.schedule();
   }
@@ -126,8 +127,10 @@ export class Scope {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
     const style = getComputedStyle(this.cv);
-    g.lineWidth = 1.5;
-    g.globalAlpha = .55;
+    g.lineWidth = 3;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.globalAlpha = 1;
     for (const p of this.probes) {
       const d = p.data;
       if (!d?.length) continue;
@@ -156,10 +159,12 @@ export class Scope {
           }
         }
         const scale = p.kind === 'audio' ? amp : Math.max(1, amp);
-        for (let x = 0; x < W; x++) {
-          const i = start + Math.floor((x / W) * len);
-          const y = H / 2 - (d[Math.min(d.length - 1, i)] / scale) * H * .4;
-          if (x === 0) g.moveTo(x, y);
+        // Join the original samples at fractional pixel positions. Repeating a
+        // rounded sample index at every screen pixel produced visible stairs.
+        for (let i = 0; i < len; i++) {
+          const x = (i / Math.max(1, len - 1)) * (W - 1);
+          const y = H / 2 - (d[start + i] / scale) * H * .4;
+          if (i === 0) g.moveTo(x, y);
           else g.lineTo(x, y);
         }
       }
