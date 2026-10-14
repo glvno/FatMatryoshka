@@ -72,6 +72,12 @@
       45,
       45
     ],
+    "tuning": {
+      "at": 0,
+      "tr": 0,
+      "leftArm": 100,
+      "rightArm": 100
+    },
     "widthRatio": 0.8959903228910364
   },
   {
@@ -147,6 +153,12 @@
       45,
       45
     ],
+    "tuning": {
+      "at": 0,
+      "tr": 0,
+      "leftArm": 100,
+      "rightArm": 100
+    },
     "widthRatio": 0.9639050667287062
   },
   {
@@ -222,6 +234,12 @@
       45,
       45
     ],
+    "tuning": {
+      "at": 0,
+      "tr": 0,
+      "leftArm": 100,
+      "rightArm": 100
+    },
     "widthRatio": 0.74810709288635
   },
   {
@@ -297,6 +315,12 @@
       45,
       45
     ],
+    "tuning": {
+      "at": 0,
+      "tr": 0,
+      "leftArm": 100,
+      "rightArm": 100
+    },
     "widthRatio": 0.797603683861575
   },
   {
@@ -372,6 +396,12 @@
       45,
       45
     ],
+    "tuning": {
+      "at": 0,
+      "tr": 0,
+      "leftArm": 100,
+      "rightArm": 100
+    },
     "widthRatio": 0.9116718352318663
   },
   {
@@ -447,6 +477,12 @@
       45,
       45
     ],
+    "tuning": {
+      "at": 0,
+      "tr": 0,
+      "leftArm": 100,
+      "rightArm": 100
+    },
     "widthRatio": 0.7264798074953676
   },
   {
@@ -522,6 +558,12 @@
       "YTFI": 738
     },
     "alignment": "center",
+    "tuning": {
+      "at": 0,
+      "tr": 0,
+      "leftArm": 100,
+      "rightArm": 100
+    },
     "widthRatio": 3.50947970455931
   },
   {
@@ -597,6 +639,12 @@
       "YTFI": 738
     },
     "alignment": "center",
+    "tuning": {
+      "at": 0,
+      "tr": 0,
+      "leftArm": 100,
+      "rightArm": 100
+    },
     "widthRatio": 3.50947970455931
   },
   {
@@ -672,6 +720,12 @@
       "YTDE": -98,
       "YTFI": 732
     },
+    "tuning": {
+      "at": 0,
+      "tr": 0,
+      "leftArm": 100,
+      "rightArm": 100
+    },
     "widthRatio": 3.8635064910161265
   },
   {
@@ -746,6 +800,12 @@
       "YTAS": 649,
       "YTDE": -98,
       "YTFI": 732
+    },
+    "tuning": {
+      "at": 0,
+      "tr": 0,
+      "leftArm": 100,
+      "rightArm": 100
     },
     "widthRatio": 3.8635064910161265
   }

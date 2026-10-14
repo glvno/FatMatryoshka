@@ -12,3 +12,5 @@ header{max-width:1250px}.live-preview{position:sticky;top:0;z-index:2;background
 :root:is([data-layout=three],[data-layout=four]) .small-lockup>img{width:48px;height:48px}
 @media(max-width:700px){.lab-main{padding-inline:16px}.live-preview{gap:10px;padding:12px;grid-template-columns:minmax(0,1fr) 175px}#large-preview,#large-preview svg,#large-preview>img{height:140px}.small-lockup>img{display:none}.composition{grid-template-columns:1fr 1fr}.axis-columns{gap:20px}.axis-heading{align-items:start;flex-direction:column}.axis-heading h2{font-size:24px}.axis label{font-size:15px}#presets{grid-template-columns:1fr}}
 @media(max-width:430px){.live-preview{grid-template-columns:1fr}#large-preview,#large-preview svg,#large-preview>img{height:110px}.axis-columns,.gap-controls{grid-template-columns:1fr}.live-preview{position:static}}
+
+#t-tuning{border:1px solid var(--line);border-radius:8px;padding:16px;margin:0 0 28px;min-width:0}#t-tuning legend{padding:0 8px}#t-tuning:disabled .axis{opacity:.5}

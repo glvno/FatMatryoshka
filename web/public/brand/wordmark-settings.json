@@ -71,5 +71,11 @@
     "YTDE": -98,
     "YTFI": 732
   },
+  "tuning": {
+    "at": 0,
+    "tr": 0,
+    "leftArm": 100,
+    "rightArm": 100
+  },
   "widthRatio": 3.8635064910161265
 }

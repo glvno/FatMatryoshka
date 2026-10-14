@@ -1,4 +1,4 @@
-import { loadFont, defaults, normalizeState, renderWordmark, renderFigures, lineKeys } from './brand-flex-engine.js';
+import { loadFont, defaults, normalizeState, renderWordmark, renderFigures, lineKeys, tControls } from './brand-flex-engine.js';
 import { presets, selectedPresetId } from './brand-flex-presets.js';
 
 const $ = id => document.getElementById(id);
@@ -20,7 +20,7 @@ function node(tag, text, className) {
   return result;
 }
 function updateURL() {
-  const compact = {case:state.case,layout:state.layout,alignment:state.alignment,ratio:state.ratio,gaps:state.gaps};
+  const compact = {case:state.case,layout:state.layout,alignment:state.alignment,ratio:state.ratio,gaps:state.gaps,tuning:state.tuning};
   for (const word of lineKeys) compact[word] = state[word];
   const url = new URL(location.href);
   url.searchParams.set('state', JSON.stringify(compact));
@@ -52,6 +52,12 @@ function draw() {
     $('ryo-title').textContent=state.layout==='three'?'RYOSHKA':'RYO';
     $('ryo-reset').textContent=state.layout==='three'?'Reset RYOSHKA axes':'Reset RYO axes';
     $('line-gaps').hidden=!split;
+    $('t-tuning').disabled = state.case !== 'caps';
+    $('t-tr').disabled = split;
+    $('t-help').textContent = state.case !== 'caps'
+      ? 'Switch to All caps to adjust the capital T in MAT.'
+      : split ? 'Adjust the T in MAT. T–R spacing is inactive when those letters are on separate lines.'
+      : 'Adjust only the T in MATRYOSHKA. Spacing is in design units; negative values tighten the pair.';
     $('gap-row-2').hidden=state.layout!=='four';
     $('gap-label-1').textContent=state.layout==='three'?'MAT → RYOSHKA':'MAT → RYO';
     if (svgURL) URL.revokeObjectURL(svgURL);
@@ -70,6 +76,10 @@ function sync() {
     const [word, tag] = key.split(':');
     range.value = state[word][tag];
     output.value = state[word][tag];
+  }
+  for (const [key, control] of Object.entries(tControls)) {
+    $('t-'+key).value = state.tuning[key];
+    $('t-'+key+'-value').value = state.tuning[key]+control.unit;
   }
   $('case').value = state.case;
   $('layout').value = state.layout;
@@ -109,6 +119,23 @@ try {
     }
     $(word+'-reset').onclick = () => { state[word] = defaults(font); sync(); };
   }
+  for (const [key, control] of Object.entries(tControls)) {
+    const row = node('div', '', 'axis');
+    const id = 't-'+key;
+    const label = node('label', control.label); label.htmlFor = id;
+    const output = node('output'); output.id=id+'-value'; output.htmlFor=id;
+    const range = node('input'); range.type='range'; range.id=id;
+    range.min=control.min; range.max=control.max; range.step=1;
+    const help = node('small',control.help); help.id=id+'-help';
+    range.setAttribute('aria-describedby',help.id);
+    range.oninput=()=>{state.tuning[key]=Number(range.value);output.value=range.value+control.unit;schedule();};
+    row.append(label,output,range,help);
+    $('t-axes').append(row);
+  }
+  $('t-reset').onclick=()=>{
+    state.tuning=Object.fromEntries(Object.entries(tControls).map(([key,control])=>[key,control.initial]));
+    sync();
+  };
   state.gaps.forEach((_,index) => {
     $('gap-'+index).oninput=()=>{
       state.gaps[index]=Number($('gap-'+index).value);

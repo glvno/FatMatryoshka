@@ -166,3 +166,59 @@ test('justification adds equal letter spacing, keeping the R and its numeral tog
   state.alignment='right';
   assert.equal(renderWordmark(font,state).svg,oneLine);
 });
+
+const current = () => normalizeState(font,presets.at(-1),presets[1]);
+const outlineData = svg => [...svg.matchAll(/<path[^>]* d="([^"]+)"/g)].map(m=>m[1]);
+const letterPositions = svg => [...svg.matchAll(/<path[^>]*translate\(([-\d.]+) 0\)/g)].map(m=>Number(m[1]));
+
+test('T pair spacing moves only that pair and subsequent letters, without changing outlines', () => {
+  for (const [key,first] of [['at',2],['tr',3]]) {
+    const state=current(), before=renderWordmark(font,state);
+    state.tuning[key]=-25;
+    const after=renderWordmark(font,state);
+    assert.equal(after.width,before.width-25);
+    assert.deepEqual(outlineData(after.svg),outlineData(before.svg));
+    const a=letterPositions(before.svg),b=letterPositions(after.svg);
+    a.forEach((x,i)=>assert.ok(Math.abs(b[i]-x-(i>=first?-25:0))<.002));
+  }
+});
+
+test('T arm edits preserve stem and horizontal thickness across axis extremes', () => {
+  const coords=d=>d.match(/-?\d+(?:\.\d+)?/g).map(Number);
+  for (const [tag,axis] of Object.entries(font.variationAxes)) {
+    for (const value of [axis.min,axis.max]) {
+      const state=current();state.mat[tag]=value;
+      const before=renderWordmark(font,state), paths=outlineData(before.svg), original=coords(paths[2]);
+      for (const key of ['leftArm','rightArm']) {
+        state.tuning[key]=30;
+        const after=renderWordmark(font,state), edited=outlineData(after.svg), shortened=coords(edited[2]);
+        assert.ok(!/NaN|Infinity/.test(after.svg),`${tag} ${key}`);
+        assert.ok(after.width<before.width,`${tag} ${key}`);
+        // Only the T outline changes. All y coordinates and stem vertices stay intact.
+        assert.deepEqual(edited.filter((_,i)=>i!==2),paths.filter((_,i)=>i!==2));
+        assert.deepEqual(shortened.filter((_,i)=>i%2),original.filter((_,i)=>i%2));
+        assert.deepEqual(shortened.slice(2,10),original.slice(2,10));
+        state.tuning[key]=100;
+      }
+    }
+  }
+});
+
+test('T adjustments round-trip, clamp invalid values and do not affect legacy FAT or mixed case', () => {
+  const state=current();state.tuning={at:-20,tr:10,leftArm:85,rightArm:65};
+  assert.deepEqual(normalizeState(font,JSON.parse(JSON.stringify(state)),presets[1]),state);
+  assert.deepEqual(normalizeState(font,{tuning:{at:-999,tr:'bad',leftArm:-1,rightArm:999}},presets[1]).tuning,
+    {at:-80,tr:0,leftArm:0,rightArm:100});
+  assert.deepEqual(current().tuning,{at:0,tr:0,leftArm:100,rightArm:100});
+  for (const layout of ['matryoshka','line','stack','three','four']) {
+    const base=current();base.layout=layout; const before=renderWordmark(font,base);
+    base.tuning=state.tuning;const after=renderWordmark(font,base);
+    assert.ok(!/NaN|Infinity/.test(after.svg));
+    if (layout!=='matryoshka') assert.deepEqual(outlineData(before.svg).slice(0,3),outlineData(after.svg).slice(0,3));
+    if (['three','four'].includes(layout)) {
+      const split=after.svg;base.tuning.tr=80;assert.equal(renderWordmark(font,base).svg,split);
+    }
+    base.case='mixed'; const mixed=renderWordmark(font,base).svg;
+    base.tuning=current().tuning;assert.equal(renderWordmark(font,base).svg,mixed);
+  }
+});

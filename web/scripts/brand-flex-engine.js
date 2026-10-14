@@ -4,6 +4,12 @@ export const loadFont = bytes => create(bytes);
 const n = value => Number(value.toFixed(3));
 export const defaults = font => Object.fromEntries(Object.entries(font.variationAxes).map(([tag, axis]) => [tag, axis.default]));
 export const lineKeys = ['fat', 'mat', 'ryo', 'shka'];
+export const tControls = {
+  at: { label: 'A–T spacing', min: -80, max: 80, initial: 0, unit: '', help: 'Negative values bring A and T closer.' },
+  tr: { label: 'T–R / 1 spacing', min: -80, max: 80, initial: 0, unit: '', help: 'Negative values bring T closer to the R and its numeral serif.' },
+  leftArm: { label: 'T left arm', min: 0, max: 100, initial: 100, unit: '%', help: '100% keeps the original arm; 0% trims it back to the stem.' },
+  rightArm: { label: 'T right arm', min: 0, max: 100, initial: 100, unit: '%', help: 'Shorten the arm next to the R / 1 without thinning the stem or crossbar.' },
+};
 
 export function normalizeState(font, input, fallback) {
   const result = {};
@@ -23,13 +29,31 @@ export function normalizeState(font, input, fallback) {
     const value = Number(input?.gaps?.[index] ?? fallback.gaps?.[index] ?? 45);
     return Number.isFinite(value) ? Math.max(0,Math.min(240,value)) : 45;
   });
+  result.tuning = Object.fromEntries(Object.entries(tControls).map(([key, control]) => {
+    const value = Number(input?.tuning?.[key] ?? fallback.tuning?.[key] ?? control.initial);
+    return [key, Number.isFinite(value) ? Math.max(control.min, Math.min(control.max, value)) : control.initial];
+  }));
   result.case = ['caps', 'mixed', 'contrast'].includes(input?.case) ? input.case : fallback.case;
   const ratio = Number(input?.ratio ?? fallback.ratio);
   result.ratio = Number.isFinite(ratio) ? Math.max(.5, Math.min(3, ratio)) : fallback.ratio;
   return result;
 }
 
-function word(font, text, axes, size, signature = true) {
+/** Compress only the T's overhangs, in coordinates aligned with its slanted stem. */
+function trimT(glyph, tuning) {
+  if (!tuning || (tuning.leftArm === 100 && tuning.rightArm === 100)) return glyph.path;
+  const points = glyph.path.commands.filter(c => c.args.length >= 2).map(c => c.args.slice(-2));
+  const baseline = points.filter(p => p[1] === glyph.bbox.minY).sort((a,b) => a[0]-b[0]);
+  const [left, right] = baseline;
+  const shoulder = points[points.indexOf(left)-1];
+  const shear = (shoulder[0]-left[0])/(shoulder[1]-left[1]);
+  return glyph.path.mapPoints((x,y) => {
+    const l = left[0] + shear*(y-left[1]), r = right[0] + shear*(y-right[1]);
+    return [x < l ? l+(x-l)*tuning.leftArm/100 : x > r ? r+(x-r)*tuning.rightArm/100 : x, y];
+  });
+}
+
+function word(font, text, axes, size, signature = true, tuning) {
   const face = font.getVariation(axes);
   const scale = size / font.capHeight;
   let x = 0, above = 0, below = 0;
@@ -39,12 +63,15 @@ function word(font, text, axes, size, signature = true) {
   for (const [index, character] of [...text].entries()) {
     const start = parts.length;
     const glyph = face.glyphForCodePoint(character.codePointAt(0));
-    const { minX, maxX, minY, maxY } = glyph.bbox;
+    const path = character === 'T' ? trimT(glyph, tuning) : glyph.path;
+    const { minX, maxX, minY, maxY } = path.bbox;
+    const pair = text.slice(index-1,index+1);
+    if (tuning && (pair === 'AT' || pair === 'TR')) x += tuning[pair === 'AT' ? 'at' : 'tr'] * size/300;
     const hook = signature && character === 'R' ? font.capHeight * .10 : 0;
     x += hook * scale;
     const transform = `translate(${n(x-minX*scale)} 0) scale(${n(scale)} ${n(-scale)})`;
     const color = signature && index === 0 && ['F','M'].includes(character) ? 'accent' : 'ink';
-    parts.push(`<path class="${color}" transform="${transform}" d="${glyph.path.toSVG()}"/>`);
+    parts.push(`<path class="${color}" transform="${transform}" d="${path.toSVG()}"/>`);
     if (hook) {
       const endpoints = glyph.path.commands.filter(c => c.args.length >= 2).map(c => c.args.slice(-2));
       const baseline = [...new Set(endpoints.filter(p => p[1] === 0).map(p => p[0]))].sort((a,b) => a-b);
@@ -92,7 +119,7 @@ export function renderWordmark(font, state, theme = 'dark') {
   const fatText = state.case === 'mixed' ? 'Fat' : 'FAT';
   const matText = state.case === 'caps' ? 'MATRYOSHKA' : 'MatRyoshka';
   const fat = word(font, fatText, state.fat, 300*state.ratio);
-  const mat = word(font, matText, state.mat, 300);
+  const mat = word(font, matText, state.mat, 300, true, state.tuning);
   let width, height, content, lineWidths, lineNames;
   if (state.layout === 'matryoshka') {
     width = mat.width;
@@ -100,7 +127,7 @@ export function renderWordmark(font, state, theme = 'dark') {
     content = alignedRow(mat,width,mat.above,'mat','left');
   } else if (['three','four'].includes(state.layout)) {
     const three = state.layout === 'three';
-    const rows = [fat, word(font,matText.slice(0,3),state.mat,300),
+    const rows = [fat, word(font,matText.slice(0,3),state.mat,300,true,state.tuning),
       word(font,three?matText.slice(3):matText.slice(3,6),state.ryo,300)];
     if (!three) rows.push(word(font,matText.slice(6),state.shka,300));
     lineNames = three ? ['FAT','MAT','RYOSHKA'] : ['FAT','MAT','RYO','SHKA'];

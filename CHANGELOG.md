@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Add independent A–T and T–R spacing and left/right T-arm sliders to the wordmark lab, with shared-link and SVG export support.
+
 - Restore scope traces to 100% opacity.
 
 - Make the scope window resizable with mouse, touch and keyboard. Limit assembly resizing to expanded frames; collapsed cards fit their contents.
