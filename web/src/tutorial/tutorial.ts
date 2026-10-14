@@ -39,6 +39,8 @@ interface Progress {
 const STORE = 'matryoshka.tutorial';
 const SEEN = 'fatmatryoshka.tour-seen';
 const POLL_MS = 400;
+/** a done step shows its check mark this long, then the tutorial moves on by itself */
+const ADVANCE_MS = 900;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> & { class?: string } = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -65,6 +67,9 @@ export class Tutorial {
   private beside: Element | null = null;
   private besideRect = '';
   private pinned = false;
+  /** the pending auto-advance, and whether it is held off (after Back, the step is re-read until Next is pressed) */
+  private advanceTimer = 0;
+  private hold = false;
 
   constructor(private host: TutorialHost) {
     this.panel.setAttribute('role', 'region');
@@ -217,6 +222,8 @@ export class Tutorial {
     }
     this.progress.chapter = ch.id;
     this.progress.step = 0;
+    this.hold = false;
+    clearTimeout(this.advanceTimer); this.advanceTimer = 0;
     this.saveProgress();
     this.page = 'intro';
     this.enterStep();
@@ -312,7 +319,7 @@ export class Tutorial {
       parts.push(el('p', { textContent: ch.intro }));
       parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.page = 'steps'; this.enterStep(); this.render(true); }, true), this.button('Chapters', () => this.open())));
     } else if (this.page === 'steps' && st) {
-      parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? ' · ✓ done' : ''}` }));
+      parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? (this.hold ? ' · ✓ done' : ' · ✓ done, moving on') : ''}` }));
       parts.push(el('p', { textContent: st.text }));
       if (st.why) parts.push(el('details', { class: 'tutorial-why' }, el('summary', { textContent: 'Why' }), el('p', { textContent: st.why })));
       const todo = ok ? [] : st.todo?.(s) ?? [];
@@ -323,11 +330,12 @@ export class Tutorial {
         parts.push(el('p', { class: 'tutorial-warn' }, `Step ${k + 1} (${ch.steps[k].title}) no longer holds. `, el('button', { class: 'sm', textContent: 'Restore', onclick: () => { for (let j = k; j < this.progress.step; j++) this.doStep(j); this.render(true); } })));
       }
       const actions = el('div', { class: 'tour-actions' });
-      if (this.progress.step > 0) actions.append(this.button('← Back', () => { this.progress.step--; this.saveProgress(); this.enterStep(); this.render(true); }));
-      const next = this.button(this.progress.step < ch.steps.length - 1 ? 'Next →' : 'Finish', () => this.advance(), true);
-      next.disabled = !ok;
-      actions.append(this.button('Do it for me', () => { this.doStep(this.progress.step); this.advance(); }), next);
+      if (this.progress.step > 0) actions.append(this.button('← Back', () => { this.progress.step--; this.hold = true; this.saveProgress(); this.enterStep(); this.render(true); }));
+      actions.append(this.button('Do it for me', () => { this.doStep(this.progress.step); this.advance(); }));
+      if (ok && this.hold) actions.append(this.button(this.progress.step < ch.steps.length - 1 ? 'Next →' : 'Finish', () => this.advance(), true));
       parts.push(actions);
+      if (ok && !this.hold && !this.advanceTimer) this.advanceTimer = window.setTimeout(() => { this.advanceTimer = 0; if (this.step === st && st.check(this.state())) this.advance(); }, ADVANCE_MS);
+      if (!ok && this.advanceTimer) { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
     } else {
       const last = i === CHAPTERS.length - 1;
       parts.push(el('p', { textContent: last ? 'You have built eleven patches and five assemblies, and used every sound source Matryoshka has. The Library tab holds what you saved; the Examples menu has every chapter’s result under Tutorial.' : `The patch stays open; chapter ${i + 2} ${CHAPTERS[i + 1].start() ? 'starts a new one' : 'continues it'}.` }));
@@ -345,6 +353,8 @@ export class Tutorial {
     const ch = this.chapter;
     if (!ch) return;
     this.release();
+    clearTimeout(this.advanceTimer); this.advanceTimer = 0;
+    this.hold = false;
     if (this.progress.step < ch.steps.length - 1) {
       this.progress.step++;
       this.enterStep();

@@ -8,7 +8,7 @@ modules. It replaces the five-step tour (`web/src/tour.ts`).
 - **Hybrid do-it-yourself.** Every step tells the user one action; the tutorial watches the patch and editor state and shows a
   check mark when the step's **strict structural check** passes (this cable exists, this module exists, this parameter is in
   this range, the assembly is expanded, the scope watches this jack, a note-on arrived, undo restored the previous state).
-  Next unlocks on the check; it never auto-advances. **Do it for me** applies the step and advances. If a later edit breaks an
+  A done step shows its check mark for a moment and the tutorial moves on by itself (decided 2026-10-14, replacing the earlier "Next unlocks" rule); after Back the previous step is held until Next is pressed. **Do it for me** applies the step and advances. If a later edit breaks an
   earlier step the panel says so and Do it for me restores it. Back re-reads the previous step without undoing anything.
   No skip-chapter button: the chapter menu jumps anywhere.
 - **Chapters have canned start and end patches.** Starting chapter N: if the open patch passes chapter N−1's final check it
