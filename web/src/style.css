@@ -233,13 +233,16 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .credits h2 { color: var(--accent); }
 
 /* Native range interaction, with a visible jack following its thumb. */
-.slider-jack { --jack-size: 18px; grid-column: 1 / -1; position: relative; height: 22px; z-index: 2; }
-.param .jack-range { appearance: none; -webkit-appearance: none; width: 100%; height: 22px; margin: 0; padding: 0; border: 0; background: transparent; cursor: ew-resize; touch-action: none; }
-.jack-range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--line); }
-.jack-range::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
+.slider-jack { --jack-size: 18px; grid-column: 1 / -1; position: relative; height: 22px; }
+/* Paint the track below cables, independently of the native input above them.
+   Neither the wrapper nor the card body may create a stacking context. */
+.slider-jack::before { content: ''; position: absolute; inset: calc(50% - 2px) 0 auto; height: 4px; border-radius: 2px; background: var(--line); z-index: 0; pointer-events: none; }
+.param .jack-range { position: relative; z-index: 2; appearance: none; -webkit-appearance: none; width: 100%; height: 22px; margin: 0; padding: 0; border: 0; background: transparent; cursor: ew-resize; touch-action: none; }
+.jack-range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: transparent; }
+.jack-range::-moz-range-track { height: 4px; border-radius: 2px; background: transparent; }
 .jack-range::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: var(--jack-size); height: var(--jack-size); margin-top: calc((4px - var(--jack-size)) / 2); border: 0; background: transparent; }
 .jack-range::-moz-range-thumb { width: var(--jack-size); height: var(--jack-size); border: 0; background: transparent; }
-.slider-port { position: absolute; box-sizing: border-box; width: var(--jack-size); height: var(--jack-size); top: 50%; left: calc(var(--position) * (100% - var(--jack-size))); transform: translateY(-50%); pointer-events: none; border-width: 3px; box-shadow: inset 0 0 0 2px var(--panel); }
+.slider-port { position: absolute; z-index: 2; box-sizing: border-box; width: var(--jack-size); height: var(--jack-size); top: 50%; left: calc(var(--position) * (100% - var(--jack-size))); transform: translateY(-50%); pointer-events: none; border-width: 3px; box-shadow: inset 0 0 0 2px var(--panel); }
 .patching .slider-port { pointer-events: auto; }
 .dot.connected { background: currentColor; box-shadow: inset 0 0 0 3px var(--panel); }
 .dot.armed { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 40%, transparent); }
@@ -249,7 +252,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .internal-cables { z-index: 1; }
 .module .port > span:not(.dot), .module .param > input { position: relative; z-index: 2; }
 .module:has(.parameter-routing[open]) { z-index: 3; }
-.module .mhead, .module .param > span, .module .param > output, .module .parameter-routing, .module .prb, .module .tog, .module .voices-row, .module .morph-row { position: relative; z-index: 2; }
+.module .mhead, .module .param > span:not(.slider-jack), .module .param > output, .module .parameter-routing, .module .prb, .module .tog, .module .voices-row, .module .morph-row { position: relative; z-index: 2; }
 .cable.alias { stroke-width: 3; stroke-dasharray: 3 4; opacity: .6; pointer-events: stroke; }
 .cable.alias:hover, .cable.alias:focus { stroke-width: 6; opacity: 1; }
 .parameter-routing { position: relative; z-index: 2; justify-self: end; font-size: 11px; }
@@ -302,7 +305,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 
 /* Every card is one layer; internal routes never escape onto another card. */
 .internal-cables { overflow: hidden; border-radius: inherit; }
-.module .mbody { position: relative; z-index: 2; pointer-events: none; }
+.module .mbody { position: relative; pointer-events: none; }
 .module .mbody :is(input, select, button, summary, label, .dot:not(.slider-port), .rename, .param > span:not(.slider-jack), output) { pointer-events: auto; }
 /* Only solid controls mask routes. Labels, values and ranges span grid cells;
    keep their backgrounds transparent so they cannot cut gaps in the cables. */
