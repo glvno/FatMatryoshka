@@ -42,6 +42,19 @@ function save(list: Entry[]): void {
 
 const patchOf = (e: Entry): Patch => (e.patch ? e.patch : PRESETS[e.name]());
 
+/** put a patch into the bank under its name (replacing one of that name); a factory patch of that name is left alone */
+export function addToBank(p: Patch): string {
+  const list = load();
+  const i = list.findIndex((e) => e.name === p.name);
+  if (i >= 0 && !list[i].patch) return `"${p.name}" is a factory patch: rename it to keep a copy`;
+  const copy = { name: p.name, patch: validatePatch(JSON.parse(JSON.stringify(p)), DEFS) };
+  if (i >= 0) list[i] = copy;
+  else if (list.length >= SLOTS) return `the bank is full (${SLOTS} slots): "${p.name}" was not kept`;
+  else list.push(copy);
+  save(list);
+  return `"${p.name}" ${i >= 0 ? 'updated in' : 'kept in'} the bank`;
+}
+
 /** the patches the Patches page holds (the editor's own copies; factory patches are rebuilt), for the morph picker */
 export const bankPatches = (): { name: string; patch: Patch }[] => load().map((e) => ({ name: e.name, patch: patchOf(e) }));
 

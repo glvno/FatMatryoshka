@@ -109,6 +109,8 @@ export interface EditorEvents {
   onError(msg: string): void;
   /** "save" on an assembly: put this definition into the library */
   onSaveAssembly(def: AssemblyDef): void;
+  /** undo or redo happened (the tutorial counts them) */
+  onHistory?(kind: 'undo' | 'redo'): void;
   /** the patches the morph picker on the Main card offers as the B side (those of the same structure are listed) */
   morphCandidates?(): { name: string; patch: Patch }[];
 }
@@ -252,6 +254,7 @@ export class Editor {
     if (s === undefined) return this.ev.onError('nothing to undo');
     this.future.push(JSON.stringify(this.patch));
     this.restore(s);
+    this.ev.onHistory?.('undo');
   }
 
   redo(): void {
@@ -259,6 +262,19 @@ export class Editor {
     if (s === undefined) return this.ev.onError('nothing to redo');
     this.history.push(JSON.stringify(this.patch));
     this.restore(s);
+    this.ev.onHistory?.('redo');
+  }
+
+  /** a structural change from outside (the tutorial's "do it for me"): undoable like the editor's own */
+  transact(fn: () => unknown): boolean {
+    return this.change(fn);
+  }
+
+  /** select exactly these modules */
+  selectOnly(ids: number[]): void {
+    this.selected.clear();
+    for (const id of ids) this.selected.add(id);
+    this.rebuild();
   }
 
   private restore(s: string): void {

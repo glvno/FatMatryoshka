@@ -357,14 +357,33 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 #tour-btn { color: var(--secondary); border-color: transparent; text-align: left; padding-inline: 0; background: transparent; }
 .example-picker { display: grid; gap: 5px; font-size: 11px; color: var(--muted); margin-top: 12px; }
 .example-picker select { width: 100%; }
-.patch-tour { position: fixed; z-index: 11000; right: 24px; bottom: 24px; width: min(440px, calc(100vw - 40px)); padding: 22px; background: var(--panel); border: 1px solid var(--secondary); border-radius: 12px; box-shadow: 0 8px 32px var(--shadow); }
-.patch-tour[hidden] { display: none; }
-.tour-count { font-size: 10px; letter-spacing: .12em; color: var(--secondary); font-weight: 700; }
-.patch-tour h2 { font-family: 'Alegreya SC', Georgia, serif; font-size: 25px; margin: 8px 0; line-height: 1.1; }
-.patch-tour p { color: var(--muted); line-height: 1.6; }
-.patch-tour button { margin-right: 6px; }
-.tour-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.tutorial { position: fixed; z-index: 11000; right: 24px; bottom: 24px; width: min(440px, calc(100vw - 40px)); max-height: calc(100dvh - 48px); overflow: auto; padding: 18px 22px 22px; background: var(--panel); border: 1px solid var(--secondary); border-radius: 12px; box-shadow: 0 8px 32px var(--shadow); }
+.tutorial[hidden] { display: none; }
+.tutorial-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.tutorial-head h2 { font-family: 'Alegreya SC', Georgia, serif; font-size: 23px; margin: 0; line-height: 1.1; flex: 1; }
+.tutorial-head .x { min-height: 0; padding: 2px 8px; }
+.tutorial-handle { cursor: grab; touch-action: none; min-height: 0; padding: 2px 6px; color: var(--muted); background: transparent; border-color: transparent; letter-spacing: -2px; }
+.tutorial-handle:active { cursor: grabbing; }
+.tour-count { font-size: 10px; letter-spacing: .12em; color: var(--secondary); font-weight: 700; text-transform: uppercase; }
+.tour-step { display: block; margin-top: 8px; font-size: 11px; color: var(--muted); }
+.tutorial p { color: var(--muted); line-height: 1.6; margin: 8px 0; }
+.tutorial-hint { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--ink); }
+.tutorial-warn { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--ink); }
+.tutorial-why { font-size: 13px; margin: 6px 0; }
+.tutorial-why summary { cursor: pointer; color: var(--secondary); font-weight: 600; }
+.tutorial button { margin-right: 6px; }
+.tour-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .tour-note { touch-action: none; user-select: none; width: 100%; background: var(--surface-tint); }
 .tour-note:active { background: var(--secondary); color: var(--panel); }
-.tour-focus { outline: 2px solid var(--secondary); outline-offset: 4px; }
-@media (max-width: 650px) { .patch-tour { right: 12px; bottom: 12px; padding: 16px; } .patch-tour p { font-size: 12px; } }
+.tutorial-menu { width: 520px; max-width: calc(100% - 24px); }
+.tutorial-rows { display: grid; gap: 2px; margin: 12px 0; }
+.tutorial-row { display: flex; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 6px; }
+.tutorial-row.current { background: var(--surface-tint); }
+.tutorial-row .n { width: 22px; text-align: center; color: var(--muted); font-family: ui-monospace, monospace; font-size: 12px; }
+.tutorial-row.done .n { color: var(--secondary); font-weight: 700; }
+.tutorial-row .grow { flex: 1; }
+.tutorial-row button { min-height: 28px; padding: 2px 10px; font-size: 12px; }
+@keyframes tour-pulse { 0%, 100% { outline-color: var(--secondary); } 50% { outline-color: transparent; } }
+.tour-focus { outline: 2px solid var(--secondary); outline-offset: 4px; animation: tour-pulse 1.6s ease-in-out infinite; border-radius: 6px; }
+.dot.tour-focus { outline-offset: 3px; border-radius: 50%; }
+@media (max-width: 650px) { .tutorial { right: 0; bottom: 0; left: 0; width: auto; max-height: 55dvh; border-radius: 12px 12px 0 0; padding: 12px 16px 16px; } .tutorial p { font-size: 12px; } }

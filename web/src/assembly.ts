@@ -105,6 +105,8 @@ export interface AssemblyDef extends AssemblyLayout {
   name: string;
   /** a factory assembly's shelf in the browser (CATEGORIES in assemblies.ts); the user's own have none */
   category?: string;
+  /** saved by the tutorial under this tag ("my-voice"); later chapters find it by the tag whatever its name */
+  tutorial?: string;
   /** every module inside, the nested ones included */
   modules: ModuleInst[];
   cables: Cable[];
@@ -771,6 +773,7 @@ export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef
   stripPatchIO(d); // a patch's own modules never belong to a building block
   if (d.modules.length > MAX_MODULES || !d.modules.length) throw new Error('an assembly holds 1 to 32 modules');
   if (d.category !== undefined && typeof d.category !== 'string') delete d.category;
+  if (d.tutorial !== undefined && typeof d.tutorial !== 'string') delete d.tutorial;
   const seen = new Set<number>();
   for (const m of d.modules) {
     const def = defs[m.type];

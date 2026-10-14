@@ -1,4 +1,4 @@
-# Tutorial design (decided with the owner, 2026-10-14)
+# Tutorial design (decided with the owner, 2026-10-14; implemented in web/src/tutorial/)
 
 The editor's tutorial is a **course of 11 chapters** that teaches the editor and, at the same time, how to build synths from
 modules. It replaces the five-step tour (`web/src/tour.ts`).

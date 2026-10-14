@@ -3,8 +3,8 @@ import { setupPopoverPositioning } from './popover';
 import { AudioHost } from './audio';
 import type { HostMsg } from './worklet';
 import { DeviceLink } from './device';
-import { Editor } from './editor';
-import { bankPatches, buildBankTab } from './bank';
+import { Editor, probeKey } from './editor';
+import { addToBank, bankPatches, buildBankTab } from './bank';
 import { buildAssembliesTab, storeAssembly } from './assemblies';
 import { AssemblyBrowser } from './browser';
 import { searchCommands, type Command } from './commands';
@@ -19,7 +19,8 @@ import { FACTORY, loadLibrary, categoryOf, USER_SHELF, summary } from './assembl
 import type { AssemblyDef } from './assembly';
 import { decodeShare, encodeShare, shareCodeOf, shareLink } from './share';
 import { starterPatch } from './starter';
-import { PatchTour } from './tour';
+import { Tutorial } from './tutorial/tutorial';
+import { CHAPTERS, chapterEnd } from './tutorial/chapters';
 import { PRESETS } from './presets';
 import { deviceBudget, DEVICE } from './patchbin';
 
@@ -51,9 +52,8 @@ let currentTab = 'patch';
 let saveTimer = 0;
 /** set while a patch from a link is loaded: it must not replace the remembered patch until the user acts */
 let suppressSave = false;
-let touring = false;
 const queueSave = (p: Patch): void => {
-  if (suppressSave || touring) return;
+  if (suppressSave) return;
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => save(p), 300);
 };
@@ -96,6 +96,7 @@ const queueUpload = (): void => {
 const sink = {
   send(msg: HostMsg): void {
     host.send(msg);
+    if (msg.t === 'on') tutorial.noteOn();
     if (live()) device.note(msg as { t: string; note?: number; vel?: number });
   },
 };
@@ -137,6 +138,7 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   },
   onBypass(id, on) {
     host.send({ t: 'bypass', id, on });
+    tutorial.bypassed();
     queueSave(editor.patch);
     if (live() && !uploading) device.bypass(editor.patch, id, on);
     else if (live()) dirty = true;
@@ -176,10 +178,38 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
     const r = storeAssembly(def);
     status.textContent = r === 'cancelled' ? 'not saved' : `"${def.name}" ${r === 'replaced' ? 'replaced in' : 'saved to'} the assembly library`;
     refreshAssemblies();
+    tutorial.refresh();
+  },
+  onHistory(kind) {
+    if (kind === 'undo') tutorial.undone();
+    else tutorial.redone();
   },
   morphCandidates: patchCandidates,
 });
 host.setPatch(editor.patch);
+const tutorial = new Tutorial({
+  editor,
+  audioOn: () => host.running,
+  startAudio: () => void startAudio(),
+  load: (p) => { sink.send({ t: 'panic' }); loadNamed(p); },
+  note: (on) => sink.send(on ? { t: 'on', note: 60, vel: 0.8 } : { t: 'off', note: 60 }),
+  library: loadLibrary,
+  saveAssembly: (def) => {
+    storeAssembly(def, () => true);
+    refreshAssemblies();
+    status.textContent = `"${def.name}" saved to the assembly library`;
+  },
+  snapshot: (side) => takeSnapshot(side),
+  flipAB: () => flipAB(),
+  share: () => void sharePatch(),
+  arpPlay: (on) => { editor.arpPlay = on; host.send({ t: 'arpplay', on }); if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, on); editor.rebuild(); },
+  probe: (id, port) => { const key = probeKey(id, port); if (editor.probes.has(key)) return; editor.probes.add(key); const def = DEFS[editor.patch.modules.find((m) => m.id === id)?.type ?? '']; const kind = def?.outputs.find((o) => o.name === port)?.kind ?? 'audio'; scope.add(key, kind); host.send({ t: 'probe', key, id, port }); editor.rebuild(); },
+  bypass: (id, on) => { const m = editor.patch.modules.find((m) => m.id === id); if (!m) return; if (on) m.bypass = true; else delete m.bypass; host.send({ t: 'bypass', id, on }); tutorial.bypassed(); editor.rebuild(); queueSave(editor.patch); },
+  bankSave: addToBank,
+  rename: (name) => { editor.patch.name = name; nameInput.value = name; queueSave(editor.patch); },
+  status: (msg) => { status.textContent = msg; },
+});
+editor.onZoom = () => tutorial.zoomed();
 host.onValues = (values) => {
   editor.showParameterValues(values);
   if (!host.running) scope.clearSamples();
@@ -189,9 +219,16 @@ host.onValues = (values) => {
 setupPopoverPositioning();
 const presetSel = $<HTMLSelectElement>('preset');
 presetSel.append(new Option('Choose an example…', ''), ...Object.keys(PRESETS).map((n) => new Option(n, n)));
+{
+  const group = document.createElement('optgroup');
+  group.label = 'Tutorial';
+  group.append(...CHAPTERS.map((c, i) => new Option(`${i + 1}. ${c.title}`, `tutorial:${i}`)));
+  presetSel.append(group);
+}
 presetSel.onchange = () => {
   const v = presetSel.value;
-  if (v) { editor.setPatch(PRESETS[v]()); closeSidebar(); }
+  if (v.startsWith('tutorial:')) { editor.setPatch(chapterEnd(Number(v.slice(9)))); closeSidebar(); }
+  else if (v) { editor.setPatch(PRESETS[v]()); closeSidebar(); }
   setBaseline();
   presetSel.value = '';
   $<HTMLInputElement>('patch-name').value = editor.patch.name;
@@ -242,6 +279,7 @@ const takeSnapshot = (side: 'A' | 'B'): void => {
 };
 const flipAB = (): void => {
   if (editor.toggleAB()) {
+    tutorial.flipped();
     status.textContent = `${editor.side}${diffCount(diffPatches(JSON.parse(editor.snapshots[editor.side === 'A' ? 'B' : 'A']!) as Patch, editor.patch, DEFS)) ? '' : ' (same as the other side)'}`;
     queueSave(editor.patch);
   } else status.textContent = 'set A and B first';
@@ -261,7 +299,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Save patch as .json', keywords: 'export download file', run: savePatch },
     { kind: 'command', label: 'Load patch from .json', keywords: 'import open file', run: () => $('load-file').click() },
     { kind: 'command', label: 'Share patch link', keywords: 'copy url clipboard', run: () => void sharePatch() },
-    { kind: 'command', label: 'Tour: how a patch works', keywords: 'learn help starter tutorial', run: () => { switchTab('patch'); tour.start(); } },
+    { kind: 'command', label: 'Tutorial', keywords: 'learn help starter tour chapters course', run: () => { switchTab('patch'); tutorial.open(); } },
     { kind: 'command', label: 'New patch', run: () => loadNamed(newPatch(DEFS)) },
     { kind: 'command', label: 'Undo', detail: 'Ctrl/Cmd+Z', run: inPatch(() => editor.undo()) },
     { kind: 'command', label: 'Redo', detail: 'Shift+Ctrl/Cmd+Z', run: inPatch(() => editor.redo()) },
@@ -368,7 +406,7 @@ $('palette-btn').onclick = () => openPalette();
 $('new-patch-btn').onclick = () => { loadNamed(newPatch(DEFS)); closeSidebar(); };
 $('add-btn').onclick = () => openPalette('module');
 $('add-assembly-btn').onclick = () => openPalette('assembly');
-$('tour-btn').onclick = () => { switchTab('patch'); tour.start(); };
+$('tour-btn').onclick = () => { switchTab('patch'); tutorial.open(); };
 $('mobile-commands').onclick = () => openPalette();
 $('palette-close').onclick = () => palette.close();
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-query]')) button.onclick = () => {
@@ -454,6 +492,7 @@ const sharePatch = async (): Promise<void> => {
     const link = shareLink(code);
     await navigator.clipboard.writeText(link);
     status.textContent = `link copied (${link.length} characters${full ? '' : '; too long with the layout: the cards open on a grid'})`;
+    tutorial.shared();
   } catch (e) {
     status.textContent = `share failed: ${(e as Error).message}`;
   }
@@ -596,14 +635,7 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) {
 }
 
 
-const tour = new PatchTour({
-  getPatch: () => editor.patch,
-  load: p => { sink.send({ t: 'panic' }); loadNamed(p); },
-  active: on => { if (on && !suppressSave) save(editor.patch); touring = on; clearTimeout(saveTimer); },
-  fit: () => { if ($('canvas').clientWidth < 700) editor.setZoom(1); else requestAnimationFrame(() => editor.zoomToFit()); },
-  note: on => sink.send(on ? { t: 'on', note: 60, vel: .8 } : { t: 'off', note: 60 }),
-});
-if (currentTab === 'patch' && !shareCodeOf(location.href)) tour.welcome();
+if (currentTab === 'patch' && !shareCodeOf(location.href)) tutorial.welcome();
 // Audio is enabled by default. A fresh browser may require a trusted gesture to resume it.
 const unlockAudio = (): void => { if (!host.running) void startAudio(); };
 window.addEventListener('pointerdown', unlockAudio, { capture: true });
