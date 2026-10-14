@@ -2,6 +2,8 @@
 
 ## FatMatryoshka workspace and identity
 
+- Keep slider backgrounds transparent so internal routes remain visible all the way to their thumbs. Add a separate New patch sidebar button and keep the Examples dropdown for examples.
+- Explain the tutorial in plain language. Draw the wordmark as sans-serif small caps in SVG, with teal F, M, and a footless 1 for the K stem; keep its diagonals in the regular text color.
 - Rename the project to **FatMatryoshka**. A self-hosted small-caps wordmark integrates “1” into the K ascender. Pages deploys only `main` at `/FatMatryoshka/`; the old URL has a small forwarding page.
 - Confine internal cables to their own module layer; keep cross-card wires behind cards. Clicking a partially obscured card or assembly raises it.
 - Resize both collapsed assemblies and expanded frames, with pointer or arrow keys. Sizes survive patch export and library round-trips; expanded frames retain enough space for their contents.

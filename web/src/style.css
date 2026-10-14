@@ -303,7 +303,8 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .internal-cables { overflow: hidden; border-radius: inherit; }
 .module .mbody { position: relative; z-index: 2; pointer-events: none; }
 .module .mbody :is(input, select, button, summary, label, .dot:not(.slider-port), .rename, .param > span:not(.slider-jack), output) { pointer-events: auto; }
-.module .mbody :is(input, select, button, summary, .param > span:not(.slider-jack), output, .port > span:not(.dot)) { background-color: var(--panel); }
+/* Range inputs cover the whole row. Keep them transparent so routes reach the thumb. */
+.module .mbody :is(input:not(.jack-range), select, button, summary, .param > span:not(.slider-jack), output, .port > span:not(.dot)) { background-color: var(--panel); }
 .module:has(.parameter-routing[open]) { isolation: isolate; }
 .patch-preview { z-index: 10000; }
 .rubber { z-index: 10001; }
@@ -311,9 +312,10 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .resize-handle { position: absolute; right: 0; bottom: 0; width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--secondary); cursor: nwse-resize; touch-action: none; pointer-events: auto; z-index: 4; }
 
 @font-face { font-family: 'Alegreya SC'; src: url('/fonts/AlegreyaSC-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
-.brand .wordmark { font-family: 'Alegreya SC', Georgia, serif; font-size: 23px; font-weight: 700; letter-spacing: -.035em; white-space: nowrap; }
-.one-k { width: .62em; height: 1.05em; vertical-align: -.08em; fill: currentColor; margin: 0 -.025em; overflow: visible; }
-.one-k .one-stem { fill: var(--secondary); }
+.brand .wordmark { width: 100%; margin: 0; line-height: 1; }
+.brand-mark { display: block; width: 100%; height: auto; overflow: visible; }
+.brand-mark .brand-ink { fill: var(--ink); }
+.brand-mark .brand-accent { fill: var(--secondary); }
 #add-assembly-btn { background: var(--secondary); border-color: var(--secondary); color: var(--panel); }
 #tour-btn { color: var(--secondary); border-color: transparent; text-align: left; padding-inline: 0; background: transparent; }
 .example-picker { display: grid; gap: 5px; font-size: 11px; color: var(--muted); margin-top: 12px; }

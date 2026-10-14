@@ -189,10 +189,10 @@ host.onValues = (values) => editor.showParameterValues(values);
 // Sidebar
 setupPopoverPositioning();
 const presetSel = $<HTMLSelectElement>('preset');
-presetSel.append(new Option('Choose an example…', ''), new Option('New patch', '__new'), ...Object.keys(PRESETS).map((n) => new Option(n, n)));
+presetSel.append(new Option('Choose an example…', ''), ...Object.keys(PRESETS).map((n) => new Option(n, n)));
 presetSel.onchange = () => {
   const v = presetSel.value;
-  if (v) { editor.setPatch(v === '__new' ? newPatch(DEFS) : PRESETS[v]()); closeSidebar(); }
+  if (v) { editor.setPatch(PRESETS[v]()); closeSidebar(); }
   setBaseline();
   presetSel.value = '';
   $<HTMLInputElement>('patch-name').value = editor.patch.name;
@@ -363,6 +363,7 @@ palInput.onkeydown = (e) => {
   e.stopPropagation();
 };
 $('palette-btn').onclick = () => openPalette();
+$('new-patch-btn').onclick = () => { loadNamed(newPatch(DEFS)); closeSidebar(); };
 $('add-btn').onclick = () => openPalette('module');
 $('add-assembly-btn').onclick = () => openPalette('assembly');
 $('tour-btn').onclick = () => { switchTab('patch'); tour.start(); };

@@ -12,11 +12,11 @@ interface TourEvents {
 }
 const SEEN = 'fatmatryoshka.tour-seen';
 const steps = [
-  ['A sound you can see', 'Hold A on your keyboard, or hold the button below. Main turns a key press into pitch and gate. Follow the cables through Oscillator → VCA → Output.'],
-  ['Every cable has a job', 'Teal carries pitch and control; gold carries the key’s gate; coral carries audio. The VCA opens while a key is held. Release it and the signal stops. Click ◎ beside an output to watch its signal on the scope.'],
-  ['Shape it at the source', 'Hold a note and change the Oscillator’s wave or fine tuning. The controls belong to the sound source itself. Drag a slider to adjust it; Alt-drag its thumb to patch a control signal into it.'],
-  ['Turn a voice into a building block', 'The oscillator and VCA are now one assembly. Its pitch and gate inputs still connect to Main. The wave and gain controls expose the exact same internal parameters. Nothing in the sound engine has changed.'],
-  ['Open it. Understand it. Reuse it.', 'Click Expand on Simple voice to see the original modules and cables. Assemblies can contain other assemblies. Resize the container from its corner; save it to your library to reuse the structure in another instrument.'],
+  ['Play a note', 'Hold A on your keyboard, or hold the button below. Main sends the note’s pitch to the Oscillator. The Oscillator makes the sound, which passes through the VCA to Output.'],
+  ['Follow the cables', 'Teal cables carry control values, gold cables carry gates, and coral cables carry audio. Main’s gate is on while you hold a key. It opens the VCA so the sound can pass. Click ◎ beside an output to see its signal on the scope.'],
+  ['Change the sound', 'Hold a note and change the Oscillator’s wave or fine tuning. Drag a slider to set its value. A slider thumb is also an input jack: Alt-drag it to an output, or drag an output cable onto it, to control that parameter with a signal.'],
+  ['Make an assembly', 'The tour has grouped the Oscillator and VCA into an assembly called Simple voice. The pitch cable still reaches the Oscillator, and the gate cable reaches the VCA through the cv input. The wave and gain sliders control those same parameters inside. To group modules yourself, select them and press G.'],
+  ['Open an assembly', 'Click Expand on Simple voice to edit its modules and cables. An assembly can contain other assemblies. Drag the bottom-right corner to resize it. Click Save in its header to add it to your library. Keep this patch below, or return to the patch you had open.'],
 ] as const;
 
 /** A reversible tour: the original patch stays in storage until “Keep this patch”. */
@@ -38,8 +38,8 @@ export class PatchTour {
   welcome(): void {
     try { if (localStorage.getItem(SEEN)) return; } catch { /* storage optional */ }
     this.panel.hidden = false;
-    const title = document.createElement('h2'); title.textContent = 'See inside a sound';
-    const p = document.createElement('p'); p.textContent = 'Five short steps: play a simple voice, trace its signals, then open it as an assembly. Your current patch will be kept.';
+    const title = document.createElement('h2'); title.textContent = 'Patch editor tutorial';
+    const p = document.createElement('p'); p.textContent = 'This tutorial opens a patch with four modules, explains its connections, and groups two modules into an assembly. You can return to your current patch afterward.';
     this.panel.replaceChildren(title, p, this.button('Take the tour', () => this.start(), true), this.button('Later', () => { this.seen(); this.panel.hidden = true; }));
   }
   start(): void {
@@ -57,10 +57,10 @@ export class PatchTour {
   }
   private render(): void {
     this.release();
-    const count = document.createElement('span'); count.className = 'tour-count'; count.textContent = `INSIDE THE PATCH · ${this.step + 1} / ${steps.length}`;
+    const count = document.createElement('span'); count.className = 'tour-count'; count.textContent = `Step ${this.step + 1} of ${steps.length}`;
     const title = document.createElement('h2'); title.textContent = steps[this.step][0]; title.tabIndex = -1;
     const p = document.createElement('p'); p.textContent = steps[this.step][1];
-    const hold = this.button('Hold to hear C', () => {}); hold.className = 'tour-note';
+    const hold = this.button('Hold to play C', () => {}); hold.className = 'tour-note';
     const press = (): void => { if (!this.sounding) { this.sounding = true; this.ev.note(true); } };
     hold.onpointerdown = e => { e.preventDefault(); hold.setPointerCapture(e.pointerId); press(); };
     hold.onpointerup = hold.onlostpointercapture = () => this.release();
