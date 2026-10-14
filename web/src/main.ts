@@ -10,6 +10,7 @@ import { AssemblyBrowser } from './browser';
 import { searchCommands, type Command } from './commands';
 import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi, isTextEntry } from './input';
+import { releaseFocusAfterPointer } from './focus';
 import { DEFS } from './modules';
 import { newPatch, validatePatch, voicesOf, type Patch } from './patch';
 import { ARP_DEFAULT } from './arp';
@@ -417,6 +418,8 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-query]'
 };
 const help = $<HTMLDialogElement>('help');
 
+// A pointer interaction gives focus back to the page, so Space / arrows / Delete reach the shortcuts below, not the control.
+releaseFocusAfterPointer();
 // ---- keyboard shortcuts (off while typing in a field; the note keyboard in input.ts gets what is left)
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && sidebar.classList.contains('open') && !document.querySelector('dialog[open]')) {
