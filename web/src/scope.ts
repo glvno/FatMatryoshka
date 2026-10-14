@@ -212,7 +212,7 @@ export class Scope {
     g.lineWidth = 1.5;
     g.lineCap = 'butt';
     g.lineJoin = 'miter';
-    g.globalAlpha = .25;
+    g.globalAlpha = 1;
     const traceHeight = Math.max(1, H - 16), traceBottom = H / 2 + traceHeight / 2;
     for (const p of this.probes) {
       const d = p.data;

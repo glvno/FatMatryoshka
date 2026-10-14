@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Restore scope traces to 100% opacity.
+
 - Make the scope window resizable with mouse, touch and keyboard. Limit assembly resizing to expanded frames; collapsed cards fit their contents.
 
 - Restore the scope as an enabled-by-default compact window at the bottom right. Add mouse/touch dragging, keyboard movement, viewport bounds and header controls; retain automatic stereo output probes and the zooming dot grid.
