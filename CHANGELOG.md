@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Return scope traces to their original 1.5 px thickness and use 50% opacity to soften overlapping waveforms.
+
 - Match scope traces to their cable signal colors. Center traces in one-third of the canvas height and show roughly 64 ms of audio across the full width for a steadier view with more cycles.
 
 - Restore full-strength scope palette colors and use thicker, rounded traces. Draw waveforms through the original sample positions to eliminate pixel-stepped lines without filtering the signal.

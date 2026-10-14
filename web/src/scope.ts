@@ -123,10 +123,10 @@ export class Scope {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
     const style = getComputedStyle(this.cv);
-    g.lineWidth = 3;
+    g.lineWidth = 1.5;
     g.lineCap = 'round';
     g.lineJoin = 'round';
-    g.globalAlpha = 1;
+    g.globalAlpha = .5;
     const traceHeight = H / 3, traceBottom = H / 2 + traceHeight / 2;
     for (const p of this.probes) {
       const d = p.data;
