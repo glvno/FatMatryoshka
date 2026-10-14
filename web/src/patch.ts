@@ -22,6 +22,8 @@ export interface ParamDef {
   name: string;
   /** Dedicated signal input controlling this value; also exposed on the editor's slider thumb. */
   input?: string;
+  /** with `input`: the value the module settles on with a steady signal `cv` on that input (the editor's knob ticks) */
+  rest?: (params: Record<string, number>, cv: number) => number;
   min: number;
   max: number;
   default: number;

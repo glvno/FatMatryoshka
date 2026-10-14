@@ -5,6 +5,7 @@ import { DEFS } from './modules';
 import { parameterInputs, connectParameter, setInputRoute } from './parameter-routing';
 import { parameterMenu } from './parameter-menu';
 import { sliderJack } from './slider-jack';
+import { isKnob, knobRests } from './knob-rest';
 import type { ParameterValues } from './engine';
 import { deviceBudget, DEVICE } from './patchbin';
 import {
@@ -136,7 +137,7 @@ export class Editor {
   /** the collapsed assembly cards on the canvas */
   private containers = new Map<number, HTMLElement>();
   private drag: { path: SVGPathElement; cancel: () => void } | null = null;
-  private sliderPorts: { m: ModuleInst; pd: ParamDef; jack: HTMLElement }[] = [];
+  private sliderPorts: { m: ModuleInst; pd: ParamDef; jack: HTMLElement; ticks: (t: { knob: string; unit: number }[]) => void }[] = [];
   private cablePaths: { path: SVGPathElement; from: HTMLElement; to: HTMLElement; origin: HTMLElement }[] = [];
   private stack: string[] = [];
   private routingOpen = new Set<string>();
@@ -430,7 +431,7 @@ export class Editor {
     body.className = 'mbody';
     const ins = document.createElement('div');
     ins.className = 'ports in';
-    for (const p of def.inputs) if (!p.pin) ins.append(this.port(m, p, 'in', { open }));
+    for (const p of def.inputs) ins.append(this.port(m, p, 'in', { open }));
     const outs = document.createElement('div');
     outs.className = 'ports out';
     for (const p of def.outputs) outs.append(this.port(m, p, 'out', { open }));
@@ -442,7 +443,6 @@ export class Editor {
     params.className = 'params';
     for (const pd of def.params) params.append(this.paramRow(m, def, pd, { open }));
     body.append(io);
-    if (def.paramInputs) body.append(this.pins(m, def, open));
     if (def.type === 'fm1') params.append(this.voicesRow(), this.morphRow(), this.arpPanel());
     body.append(params);
     el.append(head, body);
@@ -473,6 +473,11 @@ export class Editor {
   private paramRow(m: ModuleInst, def: ModuleDef, pd: ParamDef, o: { open?: AssemblyInst; label?: string; rename?: () => void } = {}): HTMLElement {
     const row = document.createElement('div');
     row.className = 'param';
+    const knob = def.type === 'fm1' && isKnob(pd.name) ? pd.name : null;
+    if (knob) {
+      row.classList.add('knob');
+      row.style.setProperty('--knob', `var(--${knob})`);
+    }
     const name = document.createElement('span');
     name.textContent = o.label ?? pd.name;
     if (o.open) {
@@ -513,23 +518,34 @@ export class Editor {
       input.value = String(m.params[pd.name]);
     }
     input.setAttribute('aria-label', `${def.label} ${o.label ?? pd.name}`);
-    // Pointer capture also releases the edit lock when a drag ends outside the card.
+    // The thumb shows the live (modulated) value; a tick on the track marks the base. A drag moves the base by the
+    // thumb's travel, so the live value stays under the pointer: `offset` = thumb - base at the start of the edit, in
+    // slider units. Pointer capture also releases the edit lock when a drag ends outside the card.
     let editing = false;
+    let offset = 0;
+    const posOf = (v: number): number => (pd.log ? Math.round(toUnit(pd, v) * 1000) : v);
+    const begin = (): void => {
+      if (!editing) offset = Number(input.value) - posOf(m.params[pd.name]);
+      editing = true;
+    };
     input.onpointerdown = (e) => {
       if (e.altKey && (pd.input || def.paramInputs) && !pd.toggle) return;
-      editing = true;
+      begin();
       input.setPointerCapture(e.pointerId);
     };
     input.onpointerup = input.onpointercancel = input.onlostpointercapture = () => { editing = false; };
     input.onkeydown = (e) => {
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown', ' '].includes(e.key)) editing = true;
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown', ' '].includes(e.key)) begin();
     };
     input.onkeyup = input.onblur = () => { editing = false; };
     input.oninput = () => {
-      const v = pd.log ? snapTo(pd, fromUnit(pd, Number(input.value) / 1000)) : Number(input.value);
+      const pos = Math.min(Number(input.max), Math.max(Number(input.min), Number(input.value) - offset));
+      const v = pd.log ? snapTo(pd, fromUnit(pd, pos / 1000)) : Number(pos.toFixed(6));
       m.params[pd.name] = v;
-      val.textContent = fmt(v);
+      if (!offset) val.textContent = fmt(v); // else the live text keeps coming from the engine
+      thumb?.setBase(offset ? toUnit(pd, v) : null);
       this.ev.onParam(m.id, pd.name, v);
+      this.refreshKnobTicks(); // a knob moved, or a base a knob rests on
     };
     if (pd.toggle) {
       input.type = 'checkbox';
@@ -540,6 +556,7 @@ export class Editor {
         val.textContent = fmt(v);
         for (const el of row.parentElement?.children ?? []) this.refreshers.get(el as HTMLElement)?.(); // a toggle can change how its siblings show (altText)
         this.ev.onParam(m.id, pd.name, v);
+        this.refreshKnobTicks();
       };
     }
     const canPatch = def.inputs.length > 0;
@@ -551,24 +568,28 @@ export class Editor {
       thumb.jack.dataset.param = pd.name;
       thumb.jack.dataset.dir = 'in';
       thumb.jack.title = `${def.label} ${pd.name}: ${parameterInputs(m, pd).join(' / ') || 'parameter input'}. ${gesture}`;
-      this.sliderPorts.push({ m, pd, jack: thumb.jack });
+      this.sliderPorts.push({ m, pd, jack: thumb.jack, ticks: thumb.setKnobTicks });
       input.addEventListener('input', () => this.positionCables());
     }
     this.parameterDisplays.push({ id: m.id, update: (values) => {
-      if (editing) return;
       const base = m.params[pd.name];
       const v = values?.[pd.name] ?? base;
       if (!Number.isFinite(v)) return;
-      const position = String(pd.log ? Math.round(toUnit(pd, v) * 1000) : v);
-      if (pd.toggle) input.checked = v >= 0.5;
-      else if (input.value !== position) input.value = position;
-      thumb?.update();
-      const text = fmt(v, values ?? m.params);
-      if (val.textContent !== text) val.textContent = text;
-      input.setAttribute('aria-valuetext', text);
       const automated = Math.abs(v - base) > 1e-6;
+      const text = fmt(v, values ?? m.params);
+      if (!editing) {
+        const position = String(posOf(v));
+        if (pd.toggle) input.checked = v >= 0.5;
+        else if (input.value !== position) input.value = position;
+        thumb?.update();
+        thumb?.setBase(automated ? toUnit(pd, base) : null);
+        input.title = automated ? `Live: ${text}. Base: ${fmt(base)}. ${gesture || 'Drag to edit the base value.'}` : gesture;
+      }
+      if (!editing || automated) {
+        if (val.textContent !== text) val.textContent = text;
+        input.setAttribute('aria-valuetext', text);
+      }
       row.classList.toggle('automated', automated);
-      input.title = automated ? `Live: ${text}. Base: ${fmt(base)}. ${gesture || 'Drag to edit the base value.'}` : gesture;
     } });
     row.append(name, val);
     if (canPatch) {
@@ -973,14 +994,6 @@ export class Editor {
     return box;
   }
 
-  /** Keep physical parameter jacks available; depth and ranges live beside each destination. */
-  private pins(m: ModuleInst, def: ModuleDef, open?: AssemblyInst): HTMLElement {
-    const box = document.createElement('div');
-    box.className = 'pins';
-    for (const p of def.inputs) if (p.pin) box.append(this.port(m, p, 'in', { open }));
-    return box;
-  }
-
   /**
    * A port row. On a member card of an expanded assembly it gets the expose toggle; on an assembly card (`label`) the dot
    * still belongs to the inner module, so cables and drags work the same, and the label renames on click.
@@ -993,6 +1006,7 @@ export class Editor {
     dot.dataset.mod = String(m.id);
     dot.dataset.port = p.name;
     dot.dataset.dir = dir;
+    if (m.type === 'fm1' && dir === 'out' && isKnob(p.name)) dot.dataset.knob = p.name;
     dot.title = o.label ? `${o.label}: ${DEFS[m.type].label} ${p.name} (${p.kind})` : `${p.name} (${p.kind})`;
     const label = document.createElement('span');
     label.textContent = o.label ?? p.name;
@@ -1587,14 +1601,24 @@ export class Editor {
       a?.classList.add('connected'); b?.classList.add('connected');
       for (const { jack } of thumbs) jack.classList.add('connected');
       if (!a) continue;
-      const kind = DEFS[this.patch.modules.find((m) => m.id === c.from.module)!.type].outputs.find((o) => o.name === c.from.port)!.kind;
+      const src = this.patch.modules.find((m) => m.id === c.from.module)!;
+      let kind = DEFS[src.type].outputs.find((o) => o.name === c.from.port)!.kind;
+      if (src.type === 'fm1' && isKnob(c.from.port)) kind += ` knob-${c.from.port}`;
       if (b) {
         const key = `${c.from.module}:${c.from.port}:${b.dataset.mod}:${b.dataset.port}`;
         if (!physicalCables.has(key)) add(a, b, kind, () => this.removeCable(c), 'Disconnect cable');
         physicalCables.add(key);
       } else for (const { jack } of thumbs) add(a, jack, kind, () => this.removeCable(c), 'Disconnect cable');
     }
+    this.refreshKnobTicks();
     this.positionCables();
+  }
+
+  /** the knob ticks under every slider an FM-1 knob reaches: where that knob alone leaves the parameter at rest */
+  private refreshKnobTicks(): void {
+    const rests = knobRests(this.patch);
+    for (const { m, pd, ticks } of this.sliderPorts)
+      ticks((rests.get(`${m.id}:${pd.name}`) ?? []).map((r) => ({ knob: r.knob, unit: toUnit(pd, r.value) })));
   }
 
   /** remove a cable; one drawn to a merged jack whose other inputs are hidden takes their cables (from the same output) with it */

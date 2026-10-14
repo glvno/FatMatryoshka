@@ -51,6 +51,9 @@ const param = (name: string, min: number, max: number, def: number, extra: Parti
   ...extra,
 });
 
+/** where a filter's cutoff rests with a steady cv: cvamt octaves per unit (the editor clamps it to the range) */
+const cutoffRest = (p: Record<string, number>, cv: number): number => (p.cutoff ?? 1000) * Math.pow(2, cv * (p.cvamt ?? 1));
+
 const WAVES = ['sine', 'triangle', 'saw', 'square'];
 const C4 = 261.6255653;
 
@@ -99,7 +102,7 @@ const fm1: ModuleImpl<null> = {
     // sequencer can morph the patch; the engine reads it, not this module (engine.ts morphPosition)
     inputs: [control('morph')],
     outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), gate('clock'), control('spread'), control('bend'), control('mod'), control('at')],
-    params: [...knobNames.map((n) => param(n, 0, 1, 0.5, { step: 0.01 })), param('morph', 0, 1, 0, { step: 0.01, input: 'morph' })],
+    params: [...knobNames.map((n) => param(n, 0, 1, 0.5, { step: 0.01 })), param('morph', 0, 1, 0, { step: 0.01, input: 'morph', rest: (p, cv) => (p.morph ?? 0) + cv })],
   },
   init: () => null,
   process(c) {
@@ -458,7 +461,7 @@ const vca: ModuleImpl<null> = {
     label: 'VCA',
     inputs: [audio('in'), control('cv')],
     outputs: [audio('out')],
-    params: [param('gain', 0, 2, 1, { step: 0.01, input: 'cv' })],
+    params: [param('gain', 0, 2, 1, { step: 0.01, input: 'cv', rest: (p, cv) => cv * (p.gain ?? 1) })],
   },
   init: () => null,
   process(c) {
@@ -480,11 +483,11 @@ const filter: ModuleImpl<{ ic1: number; ic2: number; jc1: number; jc2: number }>
     inputs: [audio('in'), control('cv'), control('morph')],
     outputs: [audio('lp24'), audio('lp12'), audio('bp'), audio('hp'), audio('mix'), audio('notch'), audio('peak'), audio('ap')],
     params: [
-      param('cutoff', 20, 16000, 1200, { unit: 'Hz', step: 1, log: true, bend: true, input: 'cv' }),
+      param('cutoff', 20, 16000, 1200, { unit: 'Hz', step: 1, log: true, bend: true, input: 'cv', rest: cutoffRest }),
       param('res', 0, 1, 0.2, { step: 0.01 }),
       param('cvamt', 0, 4, 1, { unit: 'oct', step: 0.01 }),
       param('track', 0, 1, 0, { step: 1, choices: ['off', 'on'], toggle: true }),
-      param('morph', 0, 1, 0, { step: 0.01, input: 'morph' }),
+      param('morph', 0, 1, 0, { step: 0.01, input: 'morph', rest: (p, cv) => (p.morph ?? 0) + cv }),
     ],
   },
   init: () => ({ ic1: 0, ic2: 0, jc1: 0, jc2: 0 }),
@@ -548,7 +551,7 @@ const ladder: ModuleImpl<{ s: Float64Array }> = {
     inputs: [audio('in'), control('cv')],
     outputs: [audio('lp24'), audio('lp12')],
     params: [
-      param('cutoff', 20, 16000, 1200, { unit: 'Hz', step: 1, log: true, bend: true, input: 'cv' }),
+      param('cutoff', 20, 16000, 1200, { unit: 'Hz', step: 1, log: true, bend: true, input: 'cv', rest: cutoffRest }),
       param('res', 0, 1, 0.2, { step: 0.01 }),
       param('drive', 1, 8, 1, { step: 0.01, log: true }),
       param('cvamt', 0, 4, 1, { unit: 'oct', step: 0.01 }),
@@ -934,7 +937,7 @@ const shift: ModuleImpl<{ a: Float64Array; b: Float64Array; ia: number; phase: n
     inputs: [audio('in'), control('cv')],
     outputs: [audio('up'), audio('down')],
     params: [
-      param('shift', -1000, 1000, 100, { unit: 'Hz', step: 0.5, input: 'cv' }),
+      param('shift', -1000, 1000, 100, { unit: 'Hz', step: 0.5, input: 'cv', rest: (p, cv) => (p.shift ?? 0) + cv * (p.cvamt ?? 0) }),
       param('cvamt', 0, 1000, 100, { unit: 'Hz', step: 1 }),
       param('mix', 0, 1, 1, { step: 0.01 }),
     ],
@@ -1805,7 +1808,7 @@ const pan: ModuleImpl<null> = {
     label: 'Pan',
     inputs: [audio('in'), control('pos')],
     outputs: [audio('l'), audio('r')],
-    params: [param('pan', -1, 1, 0, { step: 0.01, input: 'pos' })],
+    params: [param('pan', -1, 1, 0, { step: 0.01, input: 'pos', rest: (p, cv) => (p.pan ?? 0) + cv })],
   },
   init: () => null,
   process(c) {
@@ -1829,7 +1832,7 @@ const xfade: ModuleImpl<null> = {
     inputs: [audio('a'), audio('b'), control('pos')],
     thru: 'a',
     outputs: [audio('out')],
-    params: [param('mix', 0, 1, 0.5, { step: 0.01, input: 'pos' })],
+    params: [param('mix', 0, 1, 0.5, { step: 0.01, input: 'pos', rest: (p, cv) => (p.mix ?? 0.5) + cv })],
   },
   init: () => null,
   process(c) {
@@ -1865,7 +1868,7 @@ const vowel: ModuleImpl<VowelState> = {
     label: 'Vowel',
     inputs: [audio('in'), control('vowel')],
     outputs: [audio('out')],
-    params: [param('vowel', 0, 4, 0, { step: 0.01, input: 'vowel' }), param('res', 0, 1, 0.5, { step: 0.01 }), param('level', 0, 1, 0.7, { step: 0.01 })],
+    params: [param('vowel', 0, 4, 0, { step: 0.01, input: 'vowel', rest: (p, cv) => (p.vowel ?? 0) + cv }), param('res', 0, 1, 0.5, { step: 0.01 }), param('level', 0, 1, 0.7, { step: 0.01 })],
   },
   init: () => ({ ic1: [0, 0, 0], ic2: [0, 0, 0] }),
   process(c, s) {
