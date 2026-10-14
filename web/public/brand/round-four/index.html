@@ -36,8 +36,14 @@
         <div id="gap-row-1" class="axis"><label id="gap-label-1" for="gap-1">MAT → RYO</label><output id="gap-value-1" for="gap-1"></output><input id="gap-1" type="range" min="0" max="240" step="1"></div>
         <div id="gap-row-2" class="axis"><label for="gap-2">RYO → SHKA</label><output id="gap-value-2" for="gap-2"></output><input id="gap-2" type="range" min="0" max="240" step="1"></div>
       </div>
+      <fieldset id="pair-tuning">
+        <legend>Letter-pair spacing</legend>
+        <p class="caption">Adjust every pair in Matryoshka. Negative values tighten spacing; positive values add space. Pairs across a line break are inactive. Justify adds spacing after these adjustments.</p>
+        <div id="pair-axes" class="axis-columns"></div>
+        <button id="pair-reset" type="button">Reset pair spacing</button>
+      </fieldset>
       <fieldset id="t-tuning">
-        <legend>T shape and spacing</legend>
+        <legend>T arm lengths</legend>
         <p id="t-help" class="caption"></p>
         <div id="t-axes" class="axis-columns"></div>
         <button id="t-reset" type="button">Reset T adjustments</button>

@@ -4,9 +4,12 @@ export const loadFont = bytes => create(bytes);
 const n = value => Number(value.toFixed(3));
 export const defaults = font => Object.fromEntries(Object.entries(font.variationAxes).map(([tag, axis]) => [tag, axis.default]));
 export const lineKeys = ['fat', 'mat', 'ryo', 'shka'];
+export const spacingPairs = ['ma','at','tr','ry','yo','os','sh','hk','ka'];
 export const tControls = {
-  at: { label: 'A–T spacing', min: -80, max: 80, initial: 0, unit: '', help: 'Negative values bring A and T closer.' },
-  tr: { label: 'T–R / 1 spacing', min: -80, max: 80, initial: 0, unit: '', help: 'Negative values bring T closer to the R and its numeral serif.' },
+  ...Object.fromEntries(spacingPairs.map(pair => [pair, {
+    label: pair.toUpperCase().split('').join('–') + (pair === 'tr' ? ' / 1' : '') + ' spacing',
+    min: -80, max: 80, initial: 0, unit: '', help: 'Negative values tighten this pair; positive values add space.',
+  }])),
   leftArm: { label: 'T left arm', min: 0, max: 100, initial: 100, unit: '%', help: '100% keeps the original arm; 0% trims it back to the stem.' },
   rightArm: { label: 'T right arm', min: 0, max: 100, initial: 100, unit: '%', help: 'Shorten the arm next to the R / 1 without thinning the stem or crossbar.' },
 };
@@ -65,8 +68,8 @@ function word(font, text, axes, size, signature = true, tuning) {
     const glyph = face.glyphForCodePoint(character.codePointAt(0));
     const path = character === 'T' ? trimT(glyph, tuning) : glyph.path;
     const { minX, maxX, minY, maxY } = path.bbox;
-    const pair = text.slice(index-1,index+1);
-    if (tuning && (pair === 'AT' || pair === 'TR')) x += tuning[pair === 'AT' ? 'at' : 'tr'] * size/300;
+    const pair = text.slice(index-1,index+1).toLowerCase();
+    if (index > 0 && tuning && spacingPairs.includes(pair)) x += (tuning[pair] ?? 0) * size/300;
     const hook = signature && character === 'R' ? font.capHeight * .10 : 0;
     x += hook * scale;
     const transform = `translate(${n(x-minX*scale)} 0) scale(${n(scale)} ${n(-scale)})`;
@@ -128,8 +131,8 @@ export function renderWordmark(font, state, theme = 'dark') {
   } else if (['three','four'].includes(state.layout)) {
     const three = state.layout === 'three';
     const rows = [fat, word(font,matText.slice(0,3),state.mat,300,true,state.tuning),
-      word(font,three?matText.slice(3):matText.slice(3,6),state.ryo,300)];
-    if (!three) rows.push(word(font,matText.slice(6),state.shka,300));
+      word(font,three?matText.slice(3):matText.slice(3,6),state.ryo,300,true,state.tuning)];
+    if (!three) rows.push(word(font,matText.slice(6),state.shka,300,true,state.tuning));
     lineNames = three ? ['FAT','MAT','RYOSHKA'] : ['FAT','MAT','RYO','SHKA'];
     lineWidths = rows.map(row => row.width);
     width = Math.max(...lineWidths);

@@ -72,8 +72,15 @@
     "YTFI": 732
   },
   "tuning": {
+    "ma": 0,
     "at": 0,
     "tr": 0,
+    "ry": 0,
+    "yo": 0,
+    "os": 0,
+    "sh": 0,
+    "hk": 0,
+    "ka": 0,
     "leftArm": 100,
     "rightArm": 100
   },

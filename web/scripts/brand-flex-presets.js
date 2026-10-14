@@ -46,3 +46,11 @@ export const presets = [
 presets.push({...presets.find(preset => preset.id === 'p09'),
   id:'p10', name:'Matryoshka', layout:'matryoshka',
   description:'Current wordmark: the approved MATRYOSHKA lettering with its teal M and R/1 signature.'});
+
+// Latest shared working version; keep the shipped identity on selectedPresetId.
+presets.push({...presets.find(preset => preset.id === 'p10'),
+  id:'p11', name:'Latest wordmark tweaks',
+  description:'Latest shared version: narrower lettering, finer uprights and a shorter right T arm. Continue adjusting each letter pair from here.',
+  tuning:{at:-23,tr:6,leftArm:89,rightArm:56},
+  mat:{opsz:144,wght:597,GRAD:-139,wdth:64,slnt:0,XOPQ:39,YOPQ:121,XTRA:425,YTUC:650,YTLC:550,YTAS:649,YTDE:-98,YTFI:732},
+});

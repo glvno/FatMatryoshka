@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Add spacing sliders for all nine pairs in MATRYOSHKA, including mixed-case and split-line layouts. Save the latest shared wordmark as lab preset p11.
+
 - Add independent A–T and T–R spacing and left/right T-arm sliders to the wordmark lab, with shared-link and SVG export support.
 
 - Restore scope traces to 100% opacity.

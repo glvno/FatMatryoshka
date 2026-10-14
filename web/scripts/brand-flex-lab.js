@@ -1,4 +1,4 @@
-import { loadFont, defaults, normalizeState, renderWordmark, renderFigures, lineKeys, tControls } from './brand-flex-engine.js';
+import { loadFont, defaults, normalizeState, renderWordmark, renderFigures, lineKeys, tControls, spacingPairs } from './brand-flex-engine.js';
 import { presets, selectedPresetId } from './brand-flex-presets.js';
 
 const $ = id => document.getElementById(id);
@@ -53,11 +53,14 @@ function draw() {
     $('ryo-reset').textContent=state.layout==='three'?'Reset RYOSHKA axes':'Reset RYO axes';
     $('line-gaps').hidden=!split;
     $('t-tuning').disabled = state.case !== 'caps';
-    $('t-tr').disabled = split;
+    const text = state.case === 'caps' ? 'MATRYOSHKA' : 'MatRyoshka';
+    for (const [index,pair] of spacingPairs.entries()) {
+      $('t-'+pair).disabled = (split && pair === 'tr') || (state.layout === 'four' && pair === 'os');
+      $('t-'+pair+'-label').textContent = text[index]+'–'+text[index+1]+(pair === 'tr' ? ' / 1' : '')+' spacing';
+    }
     $('t-help').textContent = state.case !== 'caps'
       ? 'Switch to All caps to adjust the capital T in MAT.'
-      : split ? 'Adjust the T in MAT. T–R spacing is inactive when those letters are on separate lines.'
-      : 'Adjust only the T in MATRYOSHKA. Spacing is in design units; negative values tighten the pair.';
+      : 'Shorten either T arm while keeping the stem and crossbar thickness.';
     $('gap-row-2').hidden=state.layout!=='four';
     $('gap-label-1').textContent=state.layout==='three'?'MAT → RYOSHKA':'MAT → RYO';
     if (svgURL) URL.revokeObjectURL(svgURL);
@@ -122,7 +125,7 @@ try {
   for (const [key, control] of Object.entries(tControls)) {
     const row = node('div', '', 'axis');
     const id = 't-'+key;
-    const label = node('label', control.label); label.htmlFor = id;
+    const label = node('label', control.label); label.htmlFor = id; label.id=id+'-label';
     const output = node('output'); output.id=id+'-value'; output.htmlFor=id;
     const range = node('input'); range.type='range'; range.id=id;
     range.min=control.min; range.max=control.max; range.step=1;
@@ -130,12 +133,13 @@ try {
     range.setAttribute('aria-describedby',help.id);
     range.oninput=()=>{state.tuning[key]=Number(range.value);output.value=range.value+control.unit;schedule();};
     row.append(label,output,range,help);
-    $('t-axes').append(row);
+    $(spacingPairs.includes(key)?'pair-axes':'t-axes').append(row);
   }
   $('t-reset').onclick=()=>{
-    state.tuning=Object.fromEntries(Object.entries(tControls).map(([key,control])=>[key,control.initial]));
+    for (const key of ['leftArm','rightArm']) state.tuning[key]=tControls[key].initial;
     sync();
   };
+  $('pair-reset').onclick=()=>{for(const key of spacingPairs) state.tuning[key]=0;sync();};
   state.gaps.forEach((_,index) => {
     $('gap-'+index).oninput=()=>{
       state.gaps[index]=Number($('gap-'+index).value);

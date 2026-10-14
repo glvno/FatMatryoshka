@@ -1,7 +1,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { loadFont, normalizeState, renderWordmark, renderFigures } from './brand-flex-engine.js';
+import { loadFont, normalizeState, renderWordmark, renderFigures, spacingPairs } from './brand-flex-engine.js';
 import { presets } from './brand-flex-presets.js';
 
 const font = loadFont(new Uint8Array(readFileSync(new URL('../public/brand/round-three/fonts/RobotoFlex.ttf', import.meta.url))));
@@ -167,12 +167,13 @@ test('justification adds equal letter spacing, keeping the R and its numeral tog
   assert.equal(renderWordmark(font,state).svg,oneLine);
 });
 
-const current = () => normalizeState(font,presets.at(-1),presets[1]);
+const current = () => normalizeState(font,presets.find(p=>p.id==='p10'),presets[1]);
 const outlineData = svg => [...svg.matchAll(/<path[^>]* d="([^"]+)"/g)].map(m=>m[1]);
 const letterPositions = svg => [...svg.matchAll(/<path[^>]*translate\(([-\d.]+) 0\)/g)].map(m=>Number(m[1]));
 
-test('T pair spacing moves only that pair and subsequent letters, without changing outlines', () => {
-  for (const [key,first] of [['at',2],['tr',3]]) {
+test('Every pair spacing moves only that pair and subsequent letters, without changing outlines', () => {
+  for (const [index,key] of spacingPairs.entries()) {
+    const first=index+1+(index>=3?1:0);
     const state=current(), before=renderWordmark(font,state);
     state.tuning[key]=-25;
     const after=renderWordmark(font,state);
@@ -205,11 +206,11 @@ test('T arm edits preserve stem and horizontal thickness across axis extremes', 
 });
 
 test('T adjustments round-trip, clamp invalid values and do not affect legacy FAT or mixed case', () => {
-  const state=current();state.tuning={at:-20,tr:10,leftArm:85,rightArm:65};
+  const state=current();state.tuning={...state.tuning,at:-20,tr:10,leftArm:85,rightArm:65};
   assert.deepEqual(normalizeState(font,JSON.parse(JSON.stringify(state)),presets[1]),state);
   assert.deepEqual(normalizeState(font,{tuning:{at:-999,tr:'bad',leftArm:-1,rightArm:999}},presets[1]).tuning,
-    {at:-80,tr:0,leftArm:0,rightArm:100});
-  assert.deepEqual(current().tuning,{at:0,tr:0,leftArm:100,rightArm:100});
+    {...current().tuning,at:-80,tr:0,leftArm:0,rightArm:100});
+  assert.deepEqual(current().tuning,{...Object.fromEntries(spacingPairs.map(pair=>[pair,0])),leftArm:100,rightArm:100});
   for (const layout of ['matryoshka','line','stack','three','four']) {
     const base=current();base.layout=layout; const before=renderWordmark(font,base);
     base.tuning=state.tuning;const after=renderWordmark(font,base);
@@ -219,6 +220,41 @@ test('T adjustments round-trip, clamp invalid values and do not affect legacy FA
       const split=after.svg;base.tuning.tr=80;assert.equal(renderWordmark(font,base).svg,split);
     }
     base.case='mixed'; const mixed=renderWordmark(font,base).svg;
-    base.tuning=current().tuning;assert.equal(renderWordmark(font,base).svg,mixed);
+    base.tuning={...base.tuning,leftArm:100,rightArm:100};assert.equal(renderWordmark(font,base).svg,mixed);
   }
+});
+
+
+test('pair spacing applies in mixed case and to each separate line, ignoring broken pairs', () => {
+  for (const letterCase of ['caps','mixed']) {
+    for (const layout of ['matryoshka','three','four']) {
+      for (const [index,pair] of spacingPairs.entries()) {
+        const state=current();state.case=letterCase;state.layout=layout;
+        const before=renderWordmark(font,state);
+        state.tuning[pair]=20;
+        const after=renderWordmark(font,state);
+        const broken=layout!=='matryoshka' && (pair==='tr'||(layout==='four'&&pair==='os'));
+        if (broken) assert.equal(after.svg,before.svg);
+        else {
+          assert.notEqual(after.svg,before.svg);
+          assert.deepEqual(outlineData(after.svg),outlineData(before.svg));
+          if (layout==='matryoshka') assert.ok(Math.abs(after.width-before.width-20)<.001);
+          else {
+            const row=index<2?1:layout==='three'||index<5?2:3;
+            before.lineWidths.forEach((width,i)=>assert.ok(Math.abs(after.lineWidths[i]-width-(i===row?20:0))<.001));
+          }
+        }
+      }
+    }
+  }
+});
+
+test('older T-only links retain their settings and the latest working preset matches the shared version', () => {
+  const old={...presets.find(p=>p.id==='p10'),tuning:{at:-23,tr:6,leftArm:89,rightArm:56}};
+  const state=normalizeState(font,old,presets[1]);
+  for(const pair of spacingPairs) assert.equal(state.tuning[pair],old.tuning[pair]??0);
+  const latest=normalizeState(font,presets.find(p=>p.id==='p11'),presets[1]);
+  assert.deepEqual(latest.tuning,state.tuning);
+  assert.equal(latest.mat.wght,597);assert.equal(latest.mat.wdth,64);
+  assert.equal(latest.mat.XOPQ,39);assert.equal(latest.mat.YOPQ,121);assert.equal(latest.mat.XTRA,425);
 });

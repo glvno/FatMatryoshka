@@ -73,8 +73,15 @@
       45
     ],
     "tuning": {
+      "ma": 0,
       "at": 0,
       "tr": 0,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
       "leftArm": 100,
       "rightArm": 100
     },
@@ -154,8 +161,15 @@
       45
     ],
     "tuning": {
+      "ma": 0,
       "at": 0,
       "tr": 0,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
       "leftArm": 100,
       "rightArm": 100
     },
@@ -235,8 +249,15 @@
       45
     ],
     "tuning": {
+      "ma": 0,
       "at": 0,
       "tr": 0,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
       "leftArm": 100,
       "rightArm": 100
     },
@@ -316,8 +337,15 @@
       45
     ],
     "tuning": {
+      "ma": 0,
       "at": 0,
       "tr": 0,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
       "leftArm": 100,
       "rightArm": 100
     },
@@ -397,8 +425,15 @@
       45
     ],
     "tuning": {
+      "ma": 0,
       "at": 0,
       "tr": 0,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
       "leftArm": 100,
       "rightArm": 100
     },
@@ -478,8 +513,15 @@
       45
     ],
     "tuning": {
+      "ma": 0,
       "at": 0,
       "tr": 0,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
       "leftArm": 100,
       "rightArm": 100
     },
@@ -559,8 +601,15 @@
     },
     "alignment": "center",
     "tuning": {
+      "ma": 0,
       "at": 0,
       "tr": 0,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
       "leftArm": 100,
       "rightArm": 100
     },
@@ -640,8 +689,15 @@
     },
     "alignment": "center",
     "tuning": {
+      "ma": 0,
       "at": 0,
       "tr": 0,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
       "leftArm": 100,
       "rightArm": 100
     },
@@ -721,8 +777,15 @@
       "YTFI": 732
     },
     "tuning": {
+      "ma": 0,
       "at": 0,
       "tr": 0,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
       "leftArm": 100,
       "rightArm": 100
     },
@@ -802,11 +865,106 @@
       "YTFI": 732
     },
     "tuning": {
+      "ma": 0,
       "at": 0,
       "tr": 0,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
       "leftArm": 100,
       "rightArm": 100
     },
     "widthRatio": 3.8635064910161265
+  },
+  {
+    "id": "p11",
+    "name": "Latest wordmark tweaks",
+    "description": "Latest shared version: narrower lettering, finer uprights and a shorter right T arm. Continue adjusting each letter pair from here.",
+    "case": "caps",
+    "layout": "matryoshka",
+    "alignment": "left",
+    "ratio": 1,
+    "gaps": [
+      45,
+      45,
+      45
+    ],
+    "fat": {
+      "opsz": 69,
+      "wght": 1000,
+      "GRAD": 150,
+      "wdth": 25,
+      "slnt": 0,
+      "XOPQ": 175,
+      "YOPQ": 135,
+      "XTRA": 603,
+      "YTUC": 650,
+      "YTLC": 570,
+      "YTAS": 649,
+      "YTDE": -203,
+      "YTFI": 738
+    },
+    "mat": {
+      "opsz": 144,
+      "wght": 597,
+      "GRAD": -139,
+      "wdth": 64,
+      "slnt": 0,
+      "XOPQ": 39,
+      "YOPQ": 121,
+      "XTRA": 425,
+      "YTUC": 650,
+      "YTLC": 550,
+      "YTAS": 649,
+      "YTDE": -98,
+      "YTFI": 732
+    },
+    "ryo": {
+      "opsz": 72,
+      "wght": 135,
+      "GRAD": -139,
+      "wdth": 34,
+      "slnt": 0,
+      "XOPQ": 126,
+      "YOPQ": 135,
+      "XTRA": 432,
+      "YTUC": 650,
+      "YTLC": 550,
+      "YTAS": 649,
+      "YTDE": -98,
+      "YTFI": 732
+    },
+    "shka": {
+      "opsz": 72,
+      "wght": 135,
+      "GRAD": -139,
+      "wdth": 34,
+      "slnt": 0,
+      "XOPQ": 126,
+      "YOPQ": 135,
+      "XTRA": 432,
+      "YTUC": 650,
+      "YTLC": 550,
+      "YTAS": 649,
+      "YTDE": -98,
+      "YTFI": 732
+    },
+    "tuning": {
+      "ma": 0,
+      "at": -23,
+      "tr": 6,
+      "ry": 0,
+      "yo": 0,
+      "os": 0,
+      "sh": 0,
+      "hk": 0,
+      "ka": 0,
+      "leftArm": 89,
+      "rightArm": 56
+    },
+    "widthRatio": 1.604794275377604
   }
 ]
