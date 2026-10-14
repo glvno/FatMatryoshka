@@ -95,3 +95,27 @@ describe('parameter display transport', () => {
     expect(frames.size).toBe(0);
   });
 });
+
+it('resumes within the gesture, shares initialization and replays the patch before early notes', async () => {
+  let ready!: () => void;
+  const moduleReady = new Promise<void>(resolve => { ready = resolve; });
+  const resume = vi.fn(() => Promise.resolve());
+  let contexts = 0;
+  class Context {
+    state = 'running'; destination = {}; audioWorklet = { addModule: () => moduleReady };
+    resume = resume; constructor() { contexts++; }
+  }
+  const messages: unknown[] = [];
+  class Node { port = { postMessage: (m: unknown) => messages.push(m), onmessage: null }; connect() {} }
+  vi.stubGlobal('AudioContext', Context); vi.stubGlobal('AudioWorkletNode', Node);
+  vi.stubGlobal('requestAnimationFrame', () => 1); vi.stubGlobal('cancelAnimationFrame', () => {});
+  const host = new AudioHost(); const patch = emptyPatch(); host.setPatch(patch);
+  const first = host.start(), second = host.start();
+  expect(contexts).toBe(1); expect(resume).toHaveBeenCalledTimes(2);
+  host.send({ t: 'on', note: 60, vel: .8 }); host.send({ t: 'off', note: 60 });
+  expect(messages).toEqual([]); ready(); await Promise.all([first, second]);
+  expect(messages).toEqual([
+    { t: 'patch', patch, revision: 1 }, expect.objectContaining({ t: 'arp' }),
+    { t: 'on', note: 60, vel: .8 }, { t: 'off', note: 60 },
+  ]);
+});

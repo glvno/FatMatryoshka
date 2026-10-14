@@ -51,6 +51,7 @@ class ModularProcessor extends AudioWorkletProcessor {
       const m = ev.data;
       try {
         if (m.t === 'patch') {
+          this.arp.clear(this.engine);
           this.engine.load(m.patch);
           this.revision = m.revision ?? 0;
           this.failed = false;
@@ -68,17 +69,17 @@ class ModularProcessor extends AudioWorkletProcessor {
           this.arp.ticks = (Date.now() & 0xffffffff) >>> 0;
           if (!m.on) this.engine.clockRun(true);
         }
-        else if (m.t === 'on') this.engine.noteOn(m.note, m.vel);
-        else if (m.t === 'off') this.engine.noteOff(m.note);
+        else if (m.t === 'on') this.arp.keyOn(m.note, m.vel, this.engine);
+        else if (m.t === 'off') this.arp.keyOff(m.note, this.engine);
         else if (m.t === 'clock') {
-          if (!this.arp.play) this.engine.clockTick();
+          if (!this.arp.active) this.engine.clockTick();
         } else if (m.t === 'clockrun') {
-          if (!this.arp.play) this.engine.clockRun(m.on);
+          if (!this.arp.active) this.engine.clockRun(m.on);
         }
         else if (m.t === 'bend') this.engine.bend(m.v);
         else if (m.t === 'cc') this.engine.cc(m.n, m.v);
         else if (m.t === 'at') this.engine.aftertouch(m.v);
-        else if (m.t === 'panic') this.engine.allNotesOff();
+        else if (m.t === 'panic') { this.arp.clear(this.engine); this.engine.allNotesOff(); }
       } catch (e) {
         this.port.postMessage({ error: String(e) });
       }

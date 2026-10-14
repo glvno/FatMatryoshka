@@ -312,7 +312,7 @@ describe('assemblies', () => {
   });
 
   it('rejects bad definitions', () => {
-    expect(() => validateAssemblyDef({ format: 'x' }, DEFS)).toThrow(/not a Modular-1 assembly/);
+    expect(() => validateAssemblyDef({ format: 'x' }, DEFS)).toThrow(/not a FatMatryoshka assembly/);
     const base = FACTORY[0];
     expect(() => validateAssemblyDef({ ...base, modules: [{ id: 1, type: 'fm1', x: 0, y: 0, params: {} }], cables: [] }, DEFS)).toThrow(/1 to 32/) /* the Main panel is stripped, nothing is left */;
     expect(() => validateAssemblyDef({ ...base, inputs: [{ module: 1, port: 'nope' }] }, DEFS)).toThrow(/does not exist/);
@@ -537,5 +537,32 @@ describe('assemblies', () => {
     const missing = JSON.parse(JSON.stringify(raw)) as Patch;
     missing.assemblies!.find((a) => a.id === voice.id)!.children = [99];
     expect(fixAssemblies(validatePatch(missing, DEFS), DEFS).join(' ')).toMatch(/missing/);
+  });
+});
+
+describe('assembly layout metadata', () => {
+  it('round-trips collapsed and expanded sizes through patch and nested library files without changing firmware bytes', () => {
+    const { p, osc, env, vca } = voice();
+    const root = makeAssembly(p, [osc, env, vca], 'Voice');
+    const child = makeAssembly(p, [osc], 'Source');
+    const before = encodePatch(p);
+    root.size = { width: 360, height: 240 }; root.frameSize = { width: 980, height: 720 };
+    child.size = { width: 280, height: 180 }; child.frameSize = { width: 360, height: 640 };
+    const restored = validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
+    fixAssemblies(restored, DEFS);
+    expect(restored.assemblies?.map(a => [a.size, a.frameSize])).toEqual(p.assemblies?.map(a => [a.size, a.frameSize]));
+    expect(encodePatch(p)).toEqual(before);
+    const def = validateAssemblyDef(JSON.parse(JSON.stringify(toDef(p, root))), DEFS);
+    const next = emptyPatch(); const inserted = insertAssembly(next, DEFS, def, 0, 0);
+    expect(inserted.size).toEqual(root.size); expect(inserted.frameSize).toEqual(root.frameSize);
+    expect(next.assemblies?.find(a => a.id !== inserted.id)?.size).toEqual(child.size);
+  });
+  it('drops invalid dimensions and bounds extreme imports', () => {
+    const { p, osc } = voice(); const a = makeAssembly(p, [osc], 'Source');
+    a.size = { width: -1, height: 90 }; a.frameSize = { width: 1e9, height: 1 };
+    const restored = validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
+    fixAssemblies(restored, DEFS);
+    expect(restored.assemblies?.[0].size).toBeUndefined();
+    expect(restored.assemblies?.[0].frameSize).toEqual({ width: 4000, height: 80 });
   });
 });

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FatMatryoshka has moved</title>
+<link rel="canonical" href="https://glvno.github.io/FatMatryoshka/">
+<style>body{max-width:38rem;margin:15vh auto;padding:24px;background:#171f21;color:#fff7e8;font:18px/1.6 system-ui,sans-serif}a{color:#e8b65a}h1{font-size:28px}</style>
+<h1>FatMatryoshka has moved.</h1>
+<p><a id="destination" href="https://glvno.github.io/FatMatryoshka/">Open FatMatryoshka →</a></p>
+<p>The project is now called FatMatryoshka. Please update your bookmark.</p>
+<script>
+const suffix = location.pathname.replace(/^\/FatMatryoshka-1\/?/, '');
+const destination = new URL('https://glvno.github.io/FatMatryoshka/' + suffix);
+destination.search = location.search;
+destination.hash = location.hash;
+document.getElementById('destination').href = destination.href;
+location.replace(destination.href);
+</script>
+</html>

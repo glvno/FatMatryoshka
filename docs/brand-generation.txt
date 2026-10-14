@@ -1,10 +1,10 @@
-FatMatryoshka-1 logo
+FatMatryoshka logo
 Updated with the built-in image generation tool, 2026-10-14.
-Final asset: web/public/brand/fatmatryoshka-1.png (transparent PNG).
+Final asset: web/public/brand/fatmatryoshka.png (transparent PNG).
 
 Final edit prompt:
 Use case: precise-object-edit.
-Edit the provided transparent FatMatryoshka-1 logo. Simplify its cable connectors while preserving the exact friendly doll identity, composition, all three faces, shapes, split hovering tops, nested plain lower bowls, colors, outlines, waveform, cable routes, and genuine transparency.
+Edit the provided transparent FatMatryoshka logo. Simplify its cable connectors while preserving the exact friendly doll identity, composition, all three faces, shapes, split hovering tops, nested plain lower bowls, colors, outlines, waveform, cable routes, and genuine transparency.
 REMOVE ALL cable connector collars, plug barrels, ribbed strain-relief jackets, and chunky sleeves EVERYWHERE EXCEPT the TWO DISCONNECTED external plug ends cradling the bottom coral bowl.
 Specifically:
 1. Remove the four round dark interior mounts/collars on the tan undersides of the coral and teal upper shells. Their internal cables should just disappear into the hollow interior as plain smooth colored wire, no grommets or collars showing.

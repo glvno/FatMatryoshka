@@ -1,5 +1,15 @@
 # Changelog
 
+## FatMatryoshka workspace and identity
+
+- Rename the project to **FatMatryoshka**. A self-hosted small-caps wordmark integrates “1” into the K ascender. Pages deploys only `main` at `/FatMatryoshka/`; the old URL has a small forwarding page.
+- Confine internal cables to their own module layer; keep cross-card wires behind cards. Clicking a partially obscured card or assembly raises it.
+- Resize both collapsed assemblies and expanded frames, with pointer or arrow keys. Sizes survive patch export and library round-trips; expanded frames retain enough space for their contents.
+- Give Add module and Add assembly equal sidebar prominence. Start new visitors with a simple voice and a reversible five-step tour of signals, controls and reusable assemblies.
+- Enable browser audio automatically, resuming on the first interaction when required by autoplay policy; queue notes while the worklet loads.
+- Arpeggiate held keys in both browser and firmware. Enabling with no held notes is silent; releasing keys and Panic stop playback. Legacy scale/root fields remain serialized for compatibility; the hardware melody page now exposes rate and octaves.
+- Provide ten logo concept candidates and a separate, unimplemented UX proposal report.
+
 ## Unreleased (firmware `M1-1.1.0-dev`, app 1.1.0-dev)
 
 The merge of the four-voice firmware (1.0.2) with the polyphony, assembly and module work. Host-tested (vitest, golden vectors, arpeggiator and protocol tests, LCD preview), **not built with the JieLi toolchain and not flashed**.

@@ -298,3 +298,34 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
   .palette-filters { gap: 4px; }
   .palette-filters button { flex: 1; padding: 6px; }
 }
+
+/* Every card is one layer; internal routes never escape onto another card. */
+.internal-cables { overflow: hidden; border-radius: inherit; }
+.module .mbody { position: relative; z-index: 2; pointer-events: none; }
+.module .mbody :is(input, select, button, summary, label, .dot:not(.slider-port), .rename, .param > span:not(.slider-jack), output) { pointer-events: auto; }
+.module .mbody :is(input, select, button, summary, .param > span:not(.slider-jack), output, .port > span:not(.dot)) { background-color: var(--panel); }
+.module:has(.parameter-routing[open]) { isolation: isolate; }
+.patch-preview { z-index: 10000; }
+.rubber { z-index: 10001; }
+.module.assembly { padding-bottom: 20px; }
+.resize-handle { position: absolute; right: 0; bottom: 0; width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--secondary); cursor: nwse-resize; touch-action: none; pointer-events: auto; z-index: 4; }
+
+@font-face { font-family: 'Alegreya SC'; src: url('/fonts/AlegreyaSC-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+.brand .wordmark { font-family: 'Alegreya SC', Georgia, serif; font-size: 23px; font-weight: 700; letter-spacing: -.035em; white-space: nowrap; }
+.one-k { width: .62em; height: 1.05em; vertical-align: -.08em; fill: currentColor; margin: 0 -.025em; overflow: visible; }
+.one-k .one-stem { fill: var(--secondary); }
+#add-assembly-btn { background: var(--secondary); border-color: var(--secondary); color: var(--panel); }
+#tour-btn { color: var(--secondary); border-color: transparent; text-align: left; padding-inline: 0; background: transparent; }
+.example-picker { display: grid; gap: 5px; font-size: 11px; color: var(--muted); margin-top: 12px; }
+.example-picker select { width: 100%; }
+.patch-tour { position: fixed; z-index: 11000; right: 24px; bottom: 24px; width: min(440px, calc(100vw - 40px)); padding: 22px; background: var(--panel); border: 1px solid var(--secondary); border-radius: 12px; box-shadow: 0 8px 32px var(--shadow); }
+.patch-tour[hidden] { display: none; }
+.tour-count { font-size: 10px; letter-spacing: .12em; color: var(--secondary); font-weight: 700; }
+.patch-tour h2 { font-family: 'Alegreya SC', Georgia, serif; font-size: 25px; margin: 8px 0; line-height: 1.1; }
+.patch-tour p { color: var(--muted); line-height: 1.6; }
+.patch-tour button { margin-right: 6px; }
+.tour-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.tour-note { touch-action: none; user-select: none; width: 100%; background: var(--surface-tint); }
+.tour-note:active { background: var(--secondary); color: var(--panel); }
+.tour-focus { outline: 2px solid var(--secondary); outline-offset: 4px; }
+@media (max-width: 650px) { .patch-tour { right: 12px; bottom: 12px; padding: 16px; } .patch-tour p { font-size: 12px; } }

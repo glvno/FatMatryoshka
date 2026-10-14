@@ -1,20 +1,24 @@
 # **WE STAND ON THE SHOULDERS OF GIANTS.**
 
-**FatMatryoshka-1 exists thanks to [Leo Kuroshita (@kurogedelic)](https://github.com/kurogedelic) / [Hügelton Instruments](https://github.com/hugelton), creators of [Felucca](https://github.com/hugelton/Felucca), and [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), creators of [Modular-1](https://github.com/WiggisModular/Modular-1). Thank you for making this possible.**
+**FatMatryoshka exists thanks to [Leo Kuroshita (@kurogedelic)](https://github.com/kurogedelic) / [Hügelton Instruments](https://github.com/hugelton), creators of [Felucca](https://github.com/hugelton/Felucca), and [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), creators of [Modular-1](https://github.com/WiggisModular/Modular-1). Thank you for making this possible.**
 
 <p align="center">
-  <img src="web/public/brand/fatmatryoshka-1.png" width="240" height="240" alt="FatMatryoshka-1: split coral and teal synth dolls wired to a gold doll inside, embraced by loose patch cables" />
+  <img src="web/public/brand/fatmatryoshka.png" width="240" height="240" alt="FatMatryoshka: split coral and teal synth dolls wired to a gold doll inside, embraced by loose patch cables" />
 </p>
 
-# FatMatryoshka-1
+# FatMatryoshka
 
 A modular synthesizer for the **M-VAVE FM-1**, with a browser patch editor and reusable, nested assemblies. Build a sound, wrap it into an instrument, then nest it inside something bigger. The name celebrates that matryoshka structure.
 
-FatMatryoshka-1 is an independent project grown from Modular-1, which builds on Felucca's flashing tools and hardware support.
+FatMatryoshka is an independent project grown from Modular-1, which builds on Felucca's flashing tools and hardware support.
 
 ## Webapp
 
-[Open the FatMatryoshka-1 editor](https://glvno.github.io/FatMatryoshka-1/) to make patches and upload them to the FM-1. The editor currently deploys from branch `dev`; its firmware package has not been installed on a device. The [original Modular-1 editor](https://wiggismodular.github.io/Modular-1/) is also available.
+[Open the FatMatryoshka editor](https://glvno.github.io/FatMatryoshka/) to make patches and upload them to the FM-1. The editor deploys from branch `main`; its firmware package has not been installed on a device. The [original Modular-1 editor](https://wiggismodular.github.io/Modular-1/) is also available.
+
+Start with **How a patch works** in the sidebar: play a four-module voice, trace the signals, and turn the voice into an assembly. Browser audio is enabled automatically; a fresh browser may wait for your first interaction. Enabling the arpeggiator plays only held keys.
+
+Review the [ten logo candidates](https://glvno.github.io/FatMatryoshka/brand/candidates/) and [UX improvement proposals](https://glvno.github.io/FatMatryoshka/review/). The small-caps wordmark incorporates the FM-1’s “1” into the K ascender.
 
 The sidebar holds the logo, patch name, preset picker, **Add to patch**, audio controls, and **Patch / Library** navigation. The canvas gets the full window height. **Commands** (Ctrl/Cmd+K) opens file operations, undo/redo, grouping, A/B snapshots, hardware settings, firmware installation, and help. The palette opens on actions; its Modules, Assemblies and Patches filters let you browse without guessing a name. On narrow screens, **Workspace** opens a sidebar drawer. **Tab** moves through controls; **Alt+B** switches A/B.
 

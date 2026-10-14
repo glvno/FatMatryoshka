@@ -107,10 +107,10 @@ export function buildFlashTab(root: HTMLElement): void {
   };
 
   // ---- Modular-1
-  const installBtn = el('button', { textContent: 'Install FatMatryoshka-1 firmware', class: 'primary' });
+  const installBtn = el('button', { textContent: 'Install FatMatryoshka firmware', class: 'primary' });
   const bundleInfo = el('p', { class: 'muted', textContent: 'Looking for the firmware package…' });
   installBtn.onclick = () =>
-    run('install FatMatryoshka-1', async () => {
+    run('install FatMatryoshka', async () => {
       if (!bundle) throw new Error('no firmware package is bundled with this copy of the app');
       const r = await fetch(`./firmware/modular-1.fwsc?v=${bundle.sha256}`, { cache: 'no-cache' });
       if (!r.ok) throw new Error('the bundled firmware package could not be loaded');
@@ -122,7 +122,7 @@ export function buildFlashTab(root: HTMLElement): void {
   void loadBundle().then((b) => {
     bundle = b;
     bundleInfo.textContent = b
-      ? `FatMatryoshka-1 ${b.version} (${b.product}, ${Math.round(b.size / 1024)} KB) comes with this app. GPL-3.0; three JieLi SDK files inside are Apache-2.0.`
+      ? `FatMatryoshka ${b.version} (${b.product}, ${Math.round(b.size / 1024)} KB) comes with this app. GPL-3.0; three JieLi SDK files inside are Apache-2.0.`
       : 'No firmware package comes with this copy of the app. Build one (tools/build.py), run npm run firmware in web/, and reload; or choose a .fwsc file below.';
     setButtons();
   });
@@ -183,10 +183,10 @@ export function buildFlashTab(root: HTMLElement): void {
       el('label', {}, ack, ' I understand and accept the risk'),
     ),
     card(
-      'Install FatMatryoshka-1',
+      'Install FatMatryoshka',
       bundleInfo,
       el('div', { class: 'row' }, installBtn, findBtn),
-      el('p', { class: 'muted' }, 'Licences: ', el('a', { href: './firmware/LICENSE-GPL-3.0.txt', textContent: 'GPL-3.0' }), ', ', el('a', { href: './firmware/LICENSE-Apache-2.0.txt', textContent: 'Apache-2.0' }), '. Source: ', el('a', { href: 'https://github.com/glvno/FatMatryoshka-1', textContent: 'FatMatryoshka-1 source' }), '.'),
+      el('p', { class: 'muted' }, 'Licences: ', el('a', { href: './firmware/LICENSE-GPL-3.0.txt', textContent: 'GPL-3.0' }), ', ', el('a', { href: './firmware/LICENSE-Apache-2.0.txt', textContent: 'Apache-2.0' }), '. Source: ', el('a', { href: 'https://github.com/glvno/FatMatryoshka', textContent: 'FatMatryoshka source' }), '.'),
     ),
     card('Return to stock', el('p', { class: 'muted', textContent: 'Needs the unmodified official FM-1.fwsc (V15); anything else is refused.' }), el('div', { class: 'row' }, stockOnly, stockBtn)),
     el(

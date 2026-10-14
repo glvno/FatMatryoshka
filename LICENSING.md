@@ -1,13 +1,13 @@
 # Licensing
 
-FatMatryoshka-1 is GPL-3.0-only (`LICENSE`). It is derived from [Modular-1](https://github.com/WiggisModular/Modular-1) by [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), also GPL-3.0-only. Original copyright and licence notices are retained.
+FatMatryoshka is GPL-3.0-only (`LICENSE`). It is derived from [Modular-1](https://github.com/WiggisModular/Modular-1) by [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), also GPL-3.0-only. Original copyright and licence notices are retained.
 
 ## Copied from Felucca
 
 Source: <https://github.com/hugelton/Felucca> at commit `a4d7ca2e5d52a4c35e2468401f00d883cadbda03`.
 Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments. GPL-3.0-only.
 
-Copied files, to be changed only as part of FatMatryoshka-1's own work:
+Copied files, to be changed only as part of FatMatryoshka's own work:
 
 - `firmware/hal/`, `firmware/loader/`, `firmware/crt0.S`, `firmware/app.ld`
 - `tools/build.py`, `tools/fm1_install.py`, `tools/fm1pkg_make.py`, `tools/lz4blk.py`, `tools/get_toolchain.sh`
@@ -18,3 +18,7 @@ Every one of these keeps its original `SPDX-License-Identifier` and copyright he
 ## JieLi SDK files (Apache-2.0)
 
 Packages made by `tools/build.py` embed three files from the JieLi AC79 SDK (`uboot.boot`, `cfg_tool.bin`, `cfg/eq_cfg_hw.bin`), Apache-2.0. They are not in this repository as files, but the prebuilt package that the web app bundles (`web/public/firmware/modular-1.fwsc`, made by `tools/build.py` and `npm run firmware`, published on GitHub Pages) contains them, so the licence texts (`LICENSE-GPL-3.0.txt`, `LICENSE-Apache-2.0.txt`) are published next to it and linked from the Flash tab. Ship `LICENSES/Apache-2.0.txt` with every package. The other texts in `LICENSES/` belong to Felucca's own bundled material (fonts, DSP ports) and apply only to files not copied here; they are kept so any later copy stays correctly attributed.
+
+The self-hosted Alegreya SC Bold wordmark font is by Juan Pablo del Peral / Huerta Tipográfica, distributed under the SIL Open Font License 1.1. Its licence is included at `web/public/fonts/OFL-AlegreyaSC.txt`; source: https://github.com/google/fonts/tree/main/ofl/alegreyasc. The custom 1-shaped K is drawn in the wordmark markup.
+
+The ten logo concept PNGs in `web/public/brand/candidates/` were generated with the built-in image generation tool using the current project logo as reference. Their prompts are recorded in `docs/logo-candidate-prompts.json`. They are review candidates; the app continues to use `web/public/brand/fatmatryoshka.png`.

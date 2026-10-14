@@ -3,7 +3,7 @@
 /* The arpeggiator pages of the LCD (ARP, SEQ and LFO buttons): what K1..K4 change, as big values. Included after ui.c
  * (put, pad, fmt_int, colours) and arp.c (the settings).
  *
- *   MELODY (ARP)   K1 arp mode   K2 scale   K3 root note   K4 speed (BPM)
+ *   MELODY (ARP)   K1 arp mode   K2 rate    K3 octaves   K4 speed (BPM)
  *   RHYTHM (SEQ)   K1 steps      K2 pulses  K3 rotation    K4 rate        + the Euclid pattern as dots
  *   CHAOS  (LFO)   K1 melody chaos   K2 velocity chaos   K3 rhythm chaos   K4 octaves */
 
@@ -16,19 +16,10 @@
 static const char *const AU_TITLE[4] = {"", "MELODY", "RHYTHM", "CHAOS"};
 static const char *const AU_LABEL[4][4] = {
     {"", "", "", ""},
-    {"ARP MODE", "SCALE", "ROOT NOTE", "SPEED"},
+    {"ARP MODE", "RATE", "OCTAVES", "SPEED"},
     {"STEPS", "PULSES", "ROTATION", "RATE"},
     {"MELODY CHAOS", "VELOCITY CHAOS", "RHYTHM CHAOS", "OCTAVES"},
 };
-
-static char *put_note(char *d, uint32_t note)           /* C4, C#4: 60 = C4 */
-{
-    static const char *const N[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-    char num[8];
-    d = put(d, N[note % 12u]);
-    fmt_int(num, (int32_t)(note / 12u) - 1);
-    return put(d, num);
-}
 
 static void au_value(uint32_t page, uint32_t k, char *out)
 {
@@ -36,8 +27,8 @@ static void au_value(uint32_t page, uint32_t k, char *out)
     uint32_t v = 0;
     switch (page * 4u + k) {
     case 4:  p = put(p, ARP_MODE_NAME[arp_c.mode]); break;
-    case 5:  p = put(p, ARP_SCALES[arp_c.scale].name); break;
-    case 6:  p = put_note(p, arp_c.root); break;
+    case 5:  p = put(p, ARP_RATE_NAME[arp_c.rate]); break;
+    case 6:  fmt_int(num, arp_c.octaves); p = put(p, num); break;
     case 7:  fmt_int(num, arp_c.bpm); p = put(p, num); p = put(p, " BPM"); break;
     case 8:  v = arp_c.steps; break;
     case 9:  v = arp_c.pulses; break;
@@ -66,8 +57,8 @@ static uint32_t au_bar(uint32_t page, uint32_t k)
     uint32_t v, max;
     switch (page * 4u + k) {
     case 4:  v = arp_c.mode; max = ARP_NMODES - 1u; break;
-    case 5:  v = arp_c.scale; max = ARP_NSCALES - 1u; break;
-    case 6:  v = arp_c.root; max = 100u; break;
+    case 5:  v = arp_c.rate; max = ARP_NRATES - 1u; break;
+    case 6:  v = arp_c.octaves - 1u; max = 2u; break;
     case 7:  v = arp_c.bpm - 40u; max = 260u; break;
     case 8:  v = arp_c.steps - 1u; max = ARP_MAX_STEPS - 1u; break;
     case 9:  v = arp_c.pulses; max = arp_c.steps; break;

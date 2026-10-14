@@ -32,12 +32,13 @@ function run(cfg: Partial<ArpCfg>, blocks: number, play = true): { arp: Arp; rec
   arp.set({ ...BASE, ...cfg });
   arp.play = play;
   const rec = new Rec();
+  for (const n of ARP_SCALES[arp.cfg.scale].notes) arp.keyOn(arp.cfg.root + n, 100 / 127, rec);
   for (let i = 0; i < blocks; i++) arp.run(128, rec);
   return { arp, rec };
 }
 
 describe('arpeggiator', () => {
-  it('UP walks the scale at the rate, wraps to the root, default velocity 100', () => {
+  it('UP walks held notes at the rate, wraps to the root, default velocity 100', () => {
     const { rec } = run({}, 43 * 10 + 5);
     expect(rec.notes.length === 10 || rec.notes.length === 11).toBe(true);
     for (let i = 0; i < 8; i++) expect(rec.notes[i]).toBe(60 + ARP_SCALES[1].notes[i % 8]);
@@ -66,6 +67,7 @@ describe('arpeggiator', () => {
     arp.set(BASE);
     arp.play = true;
     const rec2 = new Rec();
+    arp.keyOn(60, 1, rec2);
     arp.run(128, rec2);
     expect(rec2.on.size).toBe(1);
     for (let i = 0; i < 26; i++) arp.run(128, rec2);
@@ -80,8 +82,10 @@ describe('arpeggiator', () => {
     arp.set(BASE);
     arp.play = true;
     const rec = new Rec();
+    arp.keyOn(60, 1, rec);
     arp.run(128, rec);
     expect(rec.on.size).toBe(1);
+    arp.keyOff(60, rec);
     arp.play = false;
     arp.run(128, rec);
     expect(rec.on.size).toBe(0);
@@ -111,5 +115,35 @@ describe('arpeggiator', () => {
     expect(validatePatch(JSON.parse(JSON.stringify(p)), DEFS).arp).toEqual({ ...c, steps: 32 });
     delete p.arp;
     expect(validatePatch(JSON.parse(JSON.stringify(p)), DEFS).arp).toBeUndefined();
+  });
+});
+
+
+describe('held-key arpeggiation', () => {
+  it('enabling is silent, releasing the last key stops and repressing restarts', () => {
+    const arp = new Arp(SR), rec = new Rec(); arp.play = true;
+    for (let i = 0; i < 100; i++) arp.run(128, rec);
+    expect(rec.notes).toEqual([]);
+    arp.keyOn(61, .8, rec); arp.keyOn(68, .8, rec);
+    for (let i = 0; i < 90; i++) arp.run(128, rec);
+    expect(rec.notes.slice(0, 3)).toEqual([61, 68, 61]);
+    arp.keyOff(61, rec); arp.keyOff(68, rec);
+    expect(rec.on.size).toBe(0);
+    const count = rec.notes.length;
+    for (let i = 0; i < 100; i++) arp.run(128, rec);
+    expect(rec.notes).toHaveLength(count);
+    arp.keyOn(73, 1, rec); arp.run(128, rec);
+    expect(rec.notes.at(-1)).toBe(73);
+    arp.clear(rec); arp.run(128, rec); expect(rec.on.size).toBe(0);
+  });
+  it('all modes work with one held note; disabling resumes held keys', () => {
+    for (let mode = 0; mode < 7; mode++) {
+      const arp = new Arp(SR), rec = new Rec(); arp.set({ ...BASE, mode }); arp.play = true;
+      arp.keyOn(65, .5, rec);
+      for (let i = 0; i < 100; i++) arp.run(128, rec);
+      expect(new Set(rec.notes)).toEqual(new Set([65]));
+      arp.play = false; arp.run(128, rec); expect(rec.on.has(65)).toBe(true);
+      arp.keyOff(65, rec); expect(rec.on.size).toBe(0);
+    }
   });
 });

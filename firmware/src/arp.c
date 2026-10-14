@@ -136,12 +136,14 @@ typedef struct {
     volatile uint8_t play;              /* panel -> ISR: the transport */
     volatile uint8_t step_ui;           /* ISR -> panel: ring position of the step last played, +1 (0 = not running) */
     volatile uint8_t ui_mark;           /* ISR -> panel: counts steps, so the panel notices a change at any rate */
+    volatile uint8_t held[128];         /* input keys; zero means released */
+    uint8_t enabled;                    /* last transport state applied by ISR */
     arp_run_t run;
 } arp_t;
 
 #define ARP_CFG_DEFAULT {ARP_UP, 5, 60, 1, 0, 0, 0, 16, 16, 0, RATE_1_16, 120}   /* Maj Pentatonic, as the original's default set */
 #define ARP_N ((uint32_t)ENG_VOICES)   /* one per voice (engine.h) */
-#define ARP_INIT(seed) {ARP_CFG_DEFAULT, 1, 0, 0, 0, {.rng = seed}}
+#define ARP_INIT(seed) {.cfg = ARP_CFG_DEFAULT, .dirty = 1, .run = {.rng = seed}}
 static arp_t AV[ARP_N] = ENG_VOICE_INIT(ARP_INIT(0x2545F491u), ARP_INIT(0x6C8E9CF5u), ARP_INIT(0x1B873593u), ARP_INIT(0x3C6EF372u));
 static arp_t *arp_p = AV;
 #define arp_c (arp_p->cfg)
@@ -162,11 +164,18 @@ static void arp_sync_scale(void)
     }
 }
 
+static int arp_has_keys(uint32_t voice)
+{
+    uint32_t key;
+    for (key = 0; key < 128; key++) if (AV[voice].held[key]) return 1;
+    return 0;
+}
+
 static int arp_any_play(void)           /* an arpeggiator runs on some voice (its clock, not MIDI's, drives the clock output) */
 {
     uint32_t v;
     for (v = 0; v < ARP_N; v++)
-        if (AV[v].play)
+        if (AV[v].play && arp_has_keys(v))
             return 1;
     return 0;
 }
@@ -217,13 +226,15 @@ static void arp_cursor_reset(void)
 
 static void arp_pool_build(void)
 {
-    const arp_scale_t *s = &ARP_SCALES[AR.c.scale];
     uint32_t oct, i, n = 0;
+    uint8_t present[128] = {0};
     for (oct = 0; oct < AR.c.octaves; oct++)
-        for (i = 0; i < s->n && n < ARP_MAX_POOL; i++) {
-            uint32_t note = (uint32_t)AR.c.root + s->notes[i] + oct * 12u;
-            AR.pool[n++] = (uint8_t)(note > 127u ? 127u : note);
+        for (i = 0; i < 128; i++) if (arp_p->held[i]) {
+            uint32_t note = i + oct * 12u;
+            present[note > 127u ? 127u : note] = 1;
         }
+    for (i = 0; i < 128 && n < ARP_MAX_POOL; i++)
+        if (present[i]) AR.pool[n++] = (uint8_t)i;
     AR.npool = (uint8_t)n;
     if (AR.idx > (int32_t)n - 1)
         AR.idx = (int32_t)n - 1;
@@ -248,8 +259,8 @@ static void arp_apply(void)             /* the panel's settings, at a block boun
     if (n.rate != AR.c.rate)
         AR.ppq = 0;                     /* a rate change takes effect on the next tick */
     AR.c = n;
-    if (pool_changed || !AR.npool)
-        arp_pool_build();
+    (void)pool_changed;
+    arp_pool_build();
 }
 
 static uint32_t arp_next_index(void)
@@ -257,6 +268,7 @@ static uint32_t arp_next_index(void)
     uint32_t size = AR.npool;
     uint32_t chaos = AR.c.chaos;
     int32_t next;
+    if (size == 1u) return 0;
     switch (AR.c.mode) {
     case ARP_UP:
         AR.idx = AR.idx < 0 ? 0 : (AR.idx + 1) % (int32_t)size;
@@ -350,7 +362,21 @@ static void arp_run_one(uint32_t n)
         arp_dirty = 0;
         arp_apply();
     }
-    if (!arp_play) {
+    if (AR.note_on) {
+        uint32_t i, present = 0;
+        for (i = 0; i < AR.npool; i++) if (AR.pool[i] == AR.note) present = 1;
+        if (!present) arp_note_off();
+    }
+    if (arp_p->enabled != arp_play) {
+        uint32_t key;
+        arp_note_off(); AR.running = 0; arp_step_ui = 0;
+        for (key = 0; key < 128; key++) if (arp_p->held[key]) {
+            if (arp_play) eng_note_off_v(ARP_VOICE, key);
+            else eng_note_on_v(ARP_VOICE, key, (int32_t)(arp_p->held[key] * 65536u / 127u));
+        }
+        arp_p->enabled = arp_play;
+    }
+    if (!arp_play || !AR.npool) {
         if (AR.running) {
             AR.running = 0;
             arp_note_off();
@@ -382,7 +408,7 @@ static void arp_run_one(uint32_t n)
         {                               /* the clock output follows the lowest voice whose arpeggiator runs */
             uint32_t lower = 0, i;
             for (i = 0; i < ARP_VOICE; i++)
-                lower |= AV[i].play;
+                lower |= AV[i].play && arp_has_keys(i);
             if (!lower)
                 eng_clock_tick();
         }
@@ -404,6 +430,28 @@ static void arp_run(uint32_t n)         /* every voice's arpeggiator */
     arp_p = keep;
 }
 
+/* Input notes belong to the held-key pool. Only the ISR emits arpeggiated notes. */
+static void arp_key_on(uint32_t voice, uint32_t note, int32_t velocity)
+{
+    if (voice >= ARP_N || note > 127) return;
+    AV[voice].held[note] = (uint8_t)(velocity < 517 ? 1 : velocity >= 65536 ? 127 : velocity * 127 / 65536);
+    AV[voice].dirty = 1;
+    if (!AV[voice].play) eng_note_on_v(voice, note, velocity);
+}
+static void arp_key_off(uint32_t voice, uint32_t note)
+{
+    if (voice >= ARP_N || note > 127) return;
+    AV[voice].held[note] = 0; AV[voice].dirty = 1;
+    if (!AV[voice].play) eng_note_off_v(voice, note);
+}
+static void arp_clear_keys(uint32_t voice)
+{
+    uint32_t note;
+    if (voice >= ARP_N) return;
+    for (note = 0; note < 128; note++) AV[voice].held[note] = 0;
+    AV[voice].dirty = 1;
+}
+
 /* ---- panel side: knob k (0..3) of page 1 (melody), 2 (rhythm) or 3 (chaos), `clicks` turned; returns 1 if a value changed */
 static int arp_knob(uint32_t page, uint32_t k, int32_t clicks, int fast)
 {
@@ -414,8 +462,8 @@ static int arp_knob(uint32_t page, uint32_t k, int32_t clicks, int fast)
         field = (__typeof__(field))(v_ < (lo) ? (lo) : v_ > (hi) ? (hi) : v_); } while (0)
     if (page == 1u) {
         if (k == 0u) BUMP(arp_c.mode, 0, (int32_t)ARP_NMODES - 1, 1);
-        else if (k == 1u) BUMP(arp_c.scale, 0, (int32_t)ARP_NSCALES - 1, fast ? 3 : 1);
-        else if (k == 2u) BUMP(arp_c.root, 0, 100, fast ? 3 : 1);
+        else if (k == 1u) BUMP(arp_c.rate, 0, (int32_t)ARP_NRATES - 1, 1);
+        else if (k == 2u) BUMP(arp_c.octaves, 1, 3, 1);
         else BUMP(arp_c.bpm, 40, 300, m);
     } else if (page == 2u) {
         if (k == 0u) BUMP(arp_c.steps, 1, (int32_t)ARP_MAX_STEPS, 1);

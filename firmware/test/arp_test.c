@@ -32,9 +32,17 @@ static void run_blocks(int blocks)
         }
     }
 }
+static void hold_scale(void)
+{
+    uint32_t i;
+    arp_clear_keys(ARP_VOICE);
+    for (i = 0; i < ARP_SCALES[arp_c.scale].n; i++)
+        arp_key_on(ARP_VOICE, arp_c.root + ARP_SCALES[arp_c.scale].notes[i], 100 * 65536 / 127);
+}
 static void reset(void)
 {
     int i;
+    arp_clear_keys(ARP_VOICE);
     arp_play = 0;
     arp_run(128);
     memset(on, 0, sizeof on);
@@ -48,9 +56,23 @@ static void reset(void)
 int main(void)
 {
     int i, held;
+    reset(); arp_clear_keys(ARP_VOICE); arp_play = 1;
+    run_blocks(100);
+    CHECK(events == 0, "enabling without keys must be silent");
+    arp_key_on(0, 61, 65536); arp_key_on(0, 68, 65536);
+    run_blocks(90);
+    CHECK(notes[0] == 61 && notes[1] == 68 && notes[2] == 61, "only held keys are played");
+    arp_key_off(0, 61); arp_key_off(0, 68); run_blocks(100);
+    CHECK(!on[61] && !on[68] && events == 3, "release ends notes and stops generation");
+    for (i = 0; i < ARP_NMODES; i++) {
+        reset(); arp_c.mode = (uint8_t)i; arp_play = 1;
+        arp_key_on(0, 65, 65536); run_blocks(100);
+        CHECK(last_note == 65, "single held key mode %d", i);
+    }
     /* 1/16 at 120 bpm = 125 ms = 5512.5 frames = 43 blocks */
     reset();
     arp_play = 1;
+    hold_scale();
     run_blocks(43 * 10 + 5);
     CHECK(nn == 10 || nn == 11, "10 steps in 10 step times, got %d", nn);
     for (i = 0; i < 8 && i < nn; i++)
@@ -63,6 +85,7 @@ int main(void)
     for (i = 0; i < 128; i++)
         held += on[i];
     CHECK(held <= 1, "at most one note sounding, got %d", held);
+    arp_clear_keys(ARP_VOICE);
     arp_play = 0;
     arp_run(128);
     held = 0;
@@ -74,6 +97,7 @@ int main(void)
     reset();
     arp_c.mode = ARP_DOWN;
     arp_play = 1;
+    hold_scale();
     run_blocks(43 * 3 + 5);
     CHECK(notes[0] == 72 && notes[1] == 71 && notes[2] == 69, "DOWN: %d %d %d", notes[0], notes[1], notes[2]);
 
@@ -82,6 +106,7 @@ int main(void)
     arp_c.mode = ARP_INCLUDE;
     arp_c.scale = 40;                   /* major triad 0 4 7 */
     arp_play = 1;
+    hold_scale();
     run_blocks(43 * 10 + 5);
     {
         static const int want[] = {60, 64, 67, 67, 64, 60, 60, 64, 67, 67};
@@ -92,6 +117,7 @@ int main(void)
     arp_c.mode = ARP_EXCLUDE;
     arp_c.scale = 40;
     arp_play = 1;
+    hold_scale();
     run_blocks(43 * 8 + 5);
     {
         CHECK(notes[0] == 60 && notes[1] == 64 && notes[2] == 67 && notes[3] == 64 && notes[4] == 60, "EXCLUDE %d %d %d %d %d",
@@ -103,6 +129,7 @@ int main(void)
     arp_c.scale = 40;
     arp_c.octaves = 3;
     arp_play = 1;
+    hold_scale();
     run_blocks(43 * 9 + 5);
     CHECK(AR.npool == 9 && notes[3] == 72 && notes[8] == 91, "3 octaves: pool %d, %d %d", AR.npool, notes[3], notes[8]);
 
@@ -111,6 +138,7 @@ int main(void)
     arp_c.steps = 8;
     arp_c.pulses = 3;
     arp_play = 1;
+    hold_scale();
     run_blocks(43 * 16 + 5);
     CHECK(nn == 6 || nn == 5 || nn == 7, "3 of 8 over two cycles: %d notes", nn);
     {
@@ -137,6 +165,7 @@ int main(void)
     reset();
     arp_c.rchaos = 100;
     arp_play = 1;
+    hold_scale();
     run_blocks(43 * 8);
     CHECK(nn == 0, "rhythm chaos 100%% on a full pattern: %d notes", nn);
 
@@ -145,6 +174,7 @@ int main(void)
     arp_c.chaos = 100;
     arp_c.vchaos = 100;
     arp_play = 1;
+    hold_scale();
     run_blocks(43 * 40);
     {
         int out = 0, varied = 0;
@@ -170,6 +200,7 @@ int main(void)
             arp_c.octaves = (uint8_t)(1 + sc % 3);
             arp_c.chaos = (uint8_t)(sc * 7 % 101);
             arp_play = 1;
+    hold_scale();
             run_blocks(43 * 40);
             for (j = 0; j < nn; j++) {
                 int inpool = 0, k;
@@ -185,11 +216,13 @@ int main(void)
     reset();
     arp_c.bpm = 240;
     arp_play = 1;
+    hold_scale();
     run_blocks(43 * 10 + 5);
     CHECK(nn >= 19 && nn <= 21, "240 bpm: %d notes in 10 steps of 120 bpm", nn);
     reset();
     arp_c.rate = RATE_1_8;
     arp_play = 1;
+    hold_scale();
     run_blocks(43 * 10 + 5);
     CHECK(nn >= 4 && nn <= 6, "1/8: %d notes", nn);
 

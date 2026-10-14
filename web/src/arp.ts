@@ -182,6 +182,25 @@ export class Arp {
   private c: ArpCfg = { ...ARP_DEFAULT };
   private dirty = true;
   private pool: number[] = [];
+  private held = new Map<number, number>();
+  private enabled = false;
+  get active(): boolean { return this.play && this.held.size > 0; }
+
+  keyOn(note: number, velocity: number, target: ArpTarget): void {
+    this.held.set(note, velocity); this.poolBuild();
+    if (!this.play) target.noteOn(note, velocity);
+  }
+
+  keyOff(note: number, target: ArpTarget): void {
+    this.held.delete(note); this.poolBuild();
+    if (!this.play) target.noteOff(note);
+    if (this.noteOn && !this.pool.includes(this.note)) this.off(target);
+    if (!this.held.size) { this.off(target); this.running = false; this.stepUi = 0; }
+  }
+
+  clear(target: ArpTarget): void {
+    this.off(target); this.held.clear(); this.pool = []; this.running = false; this.stepUi = 0;
+  }
   private running = false;
   private ppq = 0;
   private noteOn = false;
@@ -227,11 +246,15 @@ export class Arp {
   }
 
   private poolBuild(): void {
-    const s = ARP_SCALES[this.c.scale];
     const pool: number[] = [];
-    for (let oct = 0; oct < this.c.octaves; oct++) for (let i = 0; i < s.notes.length && pool.length < ARP_MAX_POOL; i++) pool.push(Math.min(127, this.c.root + s.notes[i] + oct * 12));
-    this.pool = pool;
-    if (this.idx > pool.length - 1) this.idx = pool.length - 1;
+    const keys = [...this.held.keys()].sort((a, b) => a - b);
+    for (let oct = 0; oct < this.c.octaves; oct++) for (const key of keys) {
+      const note = Math.min(127, key + oct * 12);
+      if (!pool.includes(note)) pool.push(note);
+    }
+    pool.sort((a, b) => a - b);
+    this.pool = pool.slice(0, ARP_MAX_POOL);
+    if (this.idx > this.pool.length - 1) this.idx = this.pool.length - 1;
   }
 
   private off(t: ArpTarget): void {
@@ -252,6 +275,7 @@ export class Arp {
 
   private nextIndex(): number {
     const size = this.pool.length;
+    if (size === 1) return 0;
     const chaos = this.c.chaos;
     let next: number;
     switch (this.c.mode) {
@@ -337,7 +361,14 @@ export class Arp {
       this.dirty = false;
       this.apply();
     }
-    if (!this.play) {
+    if (this.play !== this.enabled) {
+      this.off(t); this.running = false; this.stepUi = 0;
+      for (const [note, velocity] of this.held) {
+        if (this.play) t.noteOff(note); else t.noteOn(note, velocity);
+      }
+      this.enabled = this.play;
+    }
+    if (!this.play || !this.pool.length) {
       if (this.running) {
         this.running = false;
         this.off(t);

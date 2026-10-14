@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FatMatryoshka-1</title>
+  <title>FatMatryoshka</title>
   <meta name="description" content="A modular synthesizer for the M-VAVE FM-1. Build patches with reusable, nested assemblies." />
-  <link rel="icon" type="image/png" href="./brand/fatmatryoshka-1.png" />
+  <link rel="icon" type="image/png" href="./brand/fatmatryoshka.png" />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
@@ -14,8 +14,8 @@
   <div class="workspace">
     <aside id="workspace-sidebar" class="sidebar" aria-label="Workspace controls">
       <div class="brand">
-        <img src="./brand/fatmatryoshka-1.png" width="80" height="80" alt="" />
-        <h1>FatMatryoshka-1</h1>
+        <img src="./brand/fatmatryoshka.png" width="80" height="80" alt="" />
+        <h1 aria-label="FatMatryoshka" class="wordmark"><span aria-hidden="true">FatMatryosh<svg class="one-k" viewBox="0 0 28 40"><path class="one-stem" d="M2 10 12 2h4v33h5v3H2v-3h6V12L4 15Z"/><path d="m15 25 8-12h5v3h-3l-7 10 7 9h3v3h-8l-9-12Z"/></svg>a</span></h1>
       </div>
       <nav id="tabs" role="tablist" aria-label="Workspace" aria-orientation="horizontal">
         <button id="nav-patch" role="tab" data-tab="patch" aria-controls="tab-patch" aria-selected="true">Patch</button>
@@ -23,15 +23,17 @@
       </nav>
       <div class="patch-controls">
         <input id="patch-name" aria-label="Patch name" title="Rename patch" />
-        <select id="preset" aria-label="Load a preset"></select>
-        <button id="add-btn" class="primary">+ Add to patch</button>
+        <button id="add-btn" class="primary">+ Add module</button>
+        <button id="add-assembly-btn" class="primary">+ Add assembly</button>
+        <button id="tour-btn">How a patch works ↗</button>
+        <label class="example-picker">Explore examples<select id="preset" aria-label="Load a preset"></select></label>
       </div>
       <div class="sidebar-bottom">
         <div class="audio-controls">
-          <button id="audio-btn" class="primary">Start audio</button>
+          <button id="audio-btn" class="primary">Enable audio</button>
           <button id="panic-btn" title="Stop all playing notes" aria-label="Panic: stop all notes">■</button>
         </div>
-        <span id="audio-status" class="muted" role="status">Audio off</span>
+        <span id="audio-status" class="muted" role="status">Audio ready · play a key</span>
         <button id="palette-btn" title="All commands (Ctrl/Cmd+K)">Commands <kbd>⌘ / Ctrl K</kbd></button>
       </div>
     </aside>
@@ -45,7 +47,7 @@
     </section>
     <section id="tab-library" class="tab" role="tabpanel" aria-labelledby="nav-library" hidden></section>
     <section id="tab-flash" class="tab" aria-label="Flash firmware" hidden></section>
-    <section id="tab-about" class="tab" aria-label="About FatMatryoshka-1" hidden></section>
+    <section id="tab-about" class="tab" aria-label="About FatMatryoshka" hidden></section>
     </main>
   </div>
   <input id="load-file" type="file" accept="application/json,.json" hidden />
@@ -83,7 +85,7 @@
           <tr><td>Arrows (Shift: ×10)</td><td>nudge the selected cards</td></tr>
           <tr><td>Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z</td><td>undo, redo</td></tr>
           <tr><td>Alt+B</td><td>flip between the A and B snapshots</td></tr>
-          <tr><td>Space</td><td>arpeggiator play / stop</td></tr>
+          <tr><td>Space</td><td>arpeggiator enable / disable</td></tr>
           <tr><td>A W S E D F T G Y H U J K, Z / X</td><td>play notes, octave down / up (when nothing is selected: G plays a note, else it groups)</td></tr>
           <tr><td>?</td><td>this list; Esc closes it</td></tr>
         </table>

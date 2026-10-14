@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Patch editor: module cards on a canvas, SVG cables, drag-to-connect, a selection, assemblies and undo.
+import { resizeHandle } from './resize-handle';
 import { DEFS } from './modules';
 import { parameterInputs, connectParameter, setInputRoute } from './parameter-routing';
 import { parameterMenu } from './parameter-menu';
@@ -137,6 +138,7 @@ export class Editor {
   private drag: { path: SVGPathElement; cancel: () => void } | null = null;
   private sliderPorts: { m: ModuleInst; pd: ParamDef; jack: HTMLElement }[] = [];
   private cablePaths: { path: SVGPathElement; from: HTMLElement; to: HTMLElement; origin: HTMLElement }[] = [];
+  private stack: string[] = [];
   private routingOpen = new Set<string>();
   private history: string[] = [];
   private future: string[] = [];
@@ -161,6 +163,14 @@ export class Editor {
     new ResizeObserver(() => { this.sizeCanvas(); this.positionCables(); }).observe(canvas);
     canvas.addEventListener('pointerdown', (e) => this.rubberBand(e));
     this.touchGestures();
+    const raise = (event: Event): void => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const card = target.closest<HTMLElement>('.module, .frame');
+      if (card) this.raiseCard(card);
+    };
+    canvas.addEventListener('pointerdown', raise, true);
+    canvas.addEventListener('focusin', raise);
     window.addEventListener('keydown', (e) => {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
       if (!this.canvas.checkVisibility() || document.querySelector('dialog[open], [popover]:popover-open')) return;
@@ -179,6 +189,7 @@ export class Editor {
     this.history = [];
     this.future = [];
     this.routingOpen.clear();
+    this.stack = [];
     this.selected.clear();
     this.rebuild();
     this.ev.onStructure(p);
@@ -310,12 +321,54 @@ export class Editor {
       this.modulesEl.append(this.card(m, DEFS[m.type], poly.has(m.id), a));
     }
     for (const a of visible) if (!a.open) this.modulesEl.append(this.container(a, perVoice(a), parentOf(this.patch, a.id)));
+    this.applyStack();
     this.sizeCanvas();
     requestAnimationFrame(() => {
       this.layoutFrames();
       this.sizeCanvas();
       this.drawCables();
     });
+  }
+
+  private layerKey(el: HTMLElement): string { return el.dataset.asm ? `a${el.dataset.asm}` : `m${el.dataset.id}`; }
+
+  private applyStack(): void {
+    const elements = [...this.frames.values(), ...this.cards.values(), ...this.containers.values()];
+    const keys = elements.map((el) => this.layerKey(el));
+    this.stack = this.stack.filter((key) => keys.includes(key));
+    this.stack = [...keys.filter((key) => !this.stack.includes(key)), ...this.stack];
+    for (const el of elements) el.style.zIndex = String(2 + this.stack.indexOf(this.layerKey(el)));
+  }
+
+  private raiseCard(el: HTMLElement): void {
+    let raised = [this.layerKey(el)];
+    if (el.classList.contains('frame')) {
+      const a = assembliesOf(this.patch).find((a) => a.id === Number(el.dataset.asm));
+      if (a) raised = [raised[0], ...descendants(this.patch, a).map((child) => `a${child.id}`), ...allModules(this.patch, a).map((id) => `m${id}`)];
+    }
+    this.stack = [...this.stack.filter((key) => !raised.includes(key)), ...raised];
+    this.applyStack();
+  }
+
+  private resizeAssembly(el: HTMLElement, a: AssemblyInst, expanded: boolean): void {
+    const key = expanded ? 'frameSize' : 'size';
+    if (!expanded && a.size) { el.style.width = `${a.size.width}px`; el.style.minHeight = `${a.size.height}px`; }
+    let before = '';
+    el.append(resizeHandle(`Resize ${a.label}`, () => this.zoom, {
+      start: () => { before = JSON.stringify(this.patch); this.raiseCard(el); },
+      size: () => ({ width: el.offsetWidth, height: el.offsetHeight }),
+      resize: (width, height) => {
+        a[key] = { width: Math.min(4000, Math.max(236, width)), height: Math.min(4000, Math.max(80, height)) };
+        if (!expanded) { el.style.width = `${a[key]!.width}px`; el.style.minHeight = `${a[key]!.height}px`; }
+        this.layoutFrames(); this.sizeCanvas(); this.positionCables();
+      },
+      end: () => {
+        if (before !== JSON.stringify(this.patch)) {
+          this.history.push(before); if (this.history.length > HISTORY) this.history.shift(); this.future = [];
+          this.ev.onLayout(this.patch);
+        }
+      },
+    }));
   }
 
   private sizeCanvas(): void {
@@ -892,11 +945,11 @@ export class Editor {
     const play = document.createElement('label');
     play.className = 'param';
     const pname = document.createElement('span');
-    pname.textContent = 'play';
+    pname.textContent = 'enable';
     const pbox = document.createElement('input');
     pbox.type = 'checkbox';
     pbox.checked = this.arpPlay;
-    pbox.setAttribute('aria-label', 'arpeggiator play');
+    pbox.setAttribute('aria-label', 'arpeggiator enable');
     pbox.oninput = () => {
       this.arpPlay = pbox.checked;
       if (this.arpPlay && !this.patch.arp) {
@@ -906,12 +959,10 @@ export class Editor {
       this.ev.onArpPlay(this.arpPlay);
     };
     const pval = document.createElement('output');
-    pval.textContent = 'PLAY on the FM-1';
+    pval.textContent = 'Hold keys to play';
     play.append(pname, pval, pbox);
     box.append(play);
     choice('mode', 'mode', ARP_MODES);
-    choice('scale', 'scale', ARP_SCALES.map((s) => s.name));
-    num('root', 'root', 0, () => 100, noteName);
     num('bpm', 'bpm', 40, () => 300);
     choice('rate', 'rate', ARP_RATES);
     num('steps', 'steps', 1, () => ARP_MAX_STEPS);
@@ -1143,6 +1194,7 @@ export class Editor {
       body.append(hint);
     }
     el.append(head, body);
+    this.resizeAssembly(el, a, false);
     return el;
   }
 
@@ -1165,6 +1217,7 @@ export class Editor {
     el.append(head);
     this.frames.set(a.id, el);
     this.frameDrag(head, a);
+    this.resizeAssembly(el, a, true);
     return el;
   }
 
@@ -1199,7 +1252,7 @@ export class Editor {
       }
     }
     if (x0 === Infinity) return null;
-    return { x: x0 - FRAME_PAD, y: y0 - FRAME_PAD - FRAME_HEAD, w: x1 - x0 + 2 * FRAME_PAD, h: y1 - y0 + 2 * FRAME_PAD + FRAME_HEAD };
+    return { x: x0 - FRAME_PAD, y: y0 - FRAME_PAD - FRAME_HEAD, w: Math.max(x1 - x0 + 2 * FRAME_PAD, a.frameSize?.width ?? 0), h: Math.max(y1 - y0 + 2 * FRAME_PAD + FRAME_HEAD, a.frameSize?.height ?? 0) };
   }
 
   private layoutFrames(exclude?: Set<number>, excludeAsm?: number): void {
@@ -1510,9 +1563,9 @@ export class Editor {
       const hint = document.createElementNS(SVGNS, 'title'); hint.textContent = title; path.append(hint);
       let layer = this.svg;
       let origin = this.world;
-      if (internal || to.classList.contains('slider-port')) {
+      if (internal) {
         const card = to.closest<HTMLElement>('.module');
-        if (card) {
+        if (card && from.closest('.module') === card) {
           origin = card;
           let local = internalLayers.get(card);
           if (!local) {

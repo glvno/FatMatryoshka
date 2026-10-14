@@ -1,0 +1,23 @@
+FatMatryoshka workspace release validation
+
+Automated: web typecheck/production build; 190 Vitest checks; C arpeggiator tests for 1 and 4 voices; golden DSP/protocol vectors.
+Browser: desktop/tablet/phone layouts; module/assembly command search; normal slider drag and Alt-drag patching; side-jack fan-out; independent internal/fixed-route disconnect; Wobble 2 live slider/jack/cable motion; notes after native control interaction; first-gesture audio; actual AudioWorklet silence on arp enable, held-chord audio, release and Panic; tour completion; pointer and keyboard resize; saved dimensions; click-to-front.
+Visual: light/dark workbench; mobile sidebar and tour; nested assembly frame; routing UI; Library; ten-candidate gallery, full image loads and size/theme controls; firmware arp LCD preview.
+
+Hardware has not been flashed. Full target firmware compilation is performed by CI for both supported voice counts. Browser audio is requested automatically; browser autoplay policy can hold it until a trusted interaction. A brief note queue preserves input while the AudioWorklet initializes.
+
+Arp scale/root fields and existing patch, library, SysEx and firmware-package identifiers remain compatible. Scale/root no longer generate notes; the held keys are the pool. Melody page K2/K3 now edit rate/octaves. The arpeggiator is armed by PLAY; no keys means no sequence.
+
+Expanded assembly resize is a minimum frame size: it never clips its contents. Stacking is view state; dimensions are saved in patch/library metadata and do not change firmware bytes.
+
+The current illustration remains in the app. Ten generated concept candidates are in web/public/brand/candidates/ with exact prompts in docs/logo-candidate-prompts.json. Each candidate has a refinement note in the gallery. Additional audit suggestions are proposals only at web/public/review/index.html.
+
+Deployment: .github/workflows/pages.yml accepts main only, including manual dispatch. The old /FatMatryoshka-1 address is served by the minimal companion repository; its source is copied from deploy/legacy-redirect. The forwarding page preserves shared-patch fragments and includes a normal link when scripts are disabled.
+
+References:
+https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository
+GitHub repository renames do not forward project Pages URLs; a separate old-address page is necessary.
+https://developer.chrome.com/blog/web-audio-autoplay
+Browser Web Audio autoplay and user-gesture resume behavior.
+https://github.com/google/fonts/tree/main/ofl/alegreyasc
+Self-hosted wordmark font; local OFL text included.

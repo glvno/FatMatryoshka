@@ -1,12 +1,11 @@
 name: pages
 # Builds the firmware (JieLi toolchain + AC79 SDK files), then publishes the web app (editor, presets, flasher and the freshly built firmware package) to GitHub Pages:
-#   https://glvno.github.io/FatMatryoshka-1/ (repository: glvno/FatMatryoshka-1)
+#   https://glvno.github.io/FatMatryoshka/ (repository: glvno/FatMatryoshka)
 # One-time setup: repository Settings > Pages > Source: GitHub Actions. The github-pages environment
-# only lets main deploy by default; every branch listed below needs a deployment branch policy there
-# (Settings > Environments > github-pages, or POST .../environments/github-pages/deployment-branch-policies).
+# deploys only main; workflow_dispatch on any other branch is skipped.
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +19,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     defaults:
       run:

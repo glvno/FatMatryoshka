@@ -363,7 +363,7 @@ export function processingOrder(p: Patch): { order: number[]; feedback: Set<Cabl
 /** Structural check of a patch loaded from JSON. Version 1 patches (one `<param>_cv` input per parameter) are converted, and a `midi` module becomes the FM-1 panel. Throws with a readable message. */
 export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Patch {
   const p = raw as Omit<Patch, 'version'> & { version: number };
-  if (!p || (p.version !== 1 && p.version !== 2) || !Array.isArray(p.modules) || !Array.isArray(p.cables)) throw new Error('not a Modular-1 patch');
+  if (!p || (p.version !== 1 && p.version !== 2) || !Array.isArray(p.modules) || !Array.isArray(p.cables)) throw new Error('not a FatMatryoshka patch');
   if (p.modules.length > MAX_MODULES) throw new Error(`more than ${MAX_MODULES} modules`);
   const seen = new Set<number>();
   for (const m of p.modules) {

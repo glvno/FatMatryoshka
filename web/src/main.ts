@@ -18,6 +18,8 @@ import { diffCount, diffLines, diffPatches } from './diff';
 import { FACTORY, loadLibrary, categoryOf, USER_SHELF, summary } from './assemblies';
 import type { AssemblyDef } from './assembly';
 import { decodeShare, encodeShare, shareCodeOf, shareLink } from './share';
+import { starterPatch } from './starter';
+import { PatchTour } from './tour';
 import { PRESETS } from './presets';
 import { deviceBudget, DEVICE } from './patchbin';
 
@@ -49,8 +51,9 @@ let currentTab = 'patch';
 let saveTimer = 0;
 /** set while a patch from a link is loaded: it must not replace the remembered patch until the user acts */
 let suppressSave = false;
+let touring = false;
 const queueSave = (p: Patch): void => {
-  if (suppressSave) return;
+  if (suppressSave || touring) return;
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => save(p), 300);
 };
@@ -116,7 +119,7 @@ scope.onRemove = (key) => {
   editor.dropProbe(key);
 };
 host.onProbe = (key, data, sr) => scope.feed(key, data, sr);
-const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw'](), {
+const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   onStructure(p) {
     $<HTMLInputElement>('patch-name').value = p.name;
     host.setPatch(p);
@@ -186,7 +189,7 @@ host.onValues = (values) => editor.showParameterValues(values);
 // Sidebar
 setupPopoverPositioning();
 const presetSel = $<HTMLSelectElement>('preset');
-presetSel.append(new Option('Load patch…', ''), new Option('New patch', '__new'), ...Object.keys(PRESETS).map((n) => new Option(n, n)));
+presetSel.append(new Option('Choose an example…', ''), new Option('New patch', '__new'), ...Object.keys(PRESETS).map((n) => new Option(n, n)));
 presetSel.onchange = () => {
   const v = presetSel.value;
   if (v) { editor.setPatch(v === '__new' ? newPatch(DEFS) : PRESETS[v]()); closeSidebar(); }
@@ -259,6 +262,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Save patch as .json', keywords: 'export download file', run: savePatch },
     { kind: 'command', label: 'Load patch from .json', keywords: 'import open file', run: () => $('load-file').click() },
     { kind: 'command', label: 'Share patch link', keywords: 'copy url clipboard', run: () => void sharePatch() },
+    { kind: 'command', label: 'Tour: how a patch works', keywords: 'learn help starter tutorial', run: () => { switchTab('patch'); tour.start(); } },
     { kind: 'command', label: 'New patch', run: () => loadNamed(newPatch(DEFS)) },
     { kind: 'command', label: 'Undo', detail: 'Ctrl/Cmd+Z', run: inPatch(() => editor.undo()) },
     { kind: 'command', label: 'Redo', detail: 'Shift+Ctrl/Cmd+Z', run: inPatch(() => editor.redo()) },
@@ -275,7 +279,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Panic: stop all notes', keywords: 'silence stuck', run: () => sink.send({ t: 'panic' }) },
     { kind: 'command', label: 'FM-1 & MIDI settings', keywords: 'connect send store sync hardware keyboard release', run: () => $<HTMLDialogElement>('device-bar').showModal() },
     { kind: 'command', label: 'Flash firmware', keywords: 'install update hardware', run: () => switchTab('flash') },
-    { kind: 'command', label: 'About FatMatryoshka-1', keywords: 'credits', run: () => switchTab('about') },
+    { kind: 'command', label: 'About FatMatryoshka', keywords: 'credits', run: () => switchTab('about') },
     { kind: 'command', label: 'Keyboard shortcuts', keywords: 'help', detail: '?', run: () => help.showModal() },
     { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },
     { kind: 'command', label: 'Reset canvas scale', keywords: 'zoom 100%', run: inPatch(() => editor.setZoom(1)) },
@@ -360,6 +364,8 @@ palInput.onkeydown = (e) => {
 };
 $('palette-btn').onclick = () => openPalette();
 $('add-btn').onclick = () => openPalette('module');
+$('add-assembly-btn').onclick = () => openPalette('assembly');
+$('tour-btn').onclick = () => { switchTab('patch'); tour.start(); };
 $('mobile-commands').onclick = () => openPalette();
 $('palette-close').onclick = () => palette.close();
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-query]')) button.onclick = () => {
@@ -399,7 +405,7 @@ window.addEventListener('keydown', (e) => {
     editor.arpPlay = !editor.arpPlay;
     host.send({ t: 'arpplay', on: editor.arpPlay });
     if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, editor.arpPlay);
-    status.textContent = editor.arpPlay ? 'arpeggiator playing' : 'arpeggiator stopped';
+    status.textContent = editor.arpPlay ? 'arpeggiator enabled · hold keys' : 'arpeggiator disabled';
     editor.rebuild();
     done = true;
   } else if (k.startsWith('Arrow')) {
@@ -549,8 +555,8 @@ refreshAssemblies = buildAssembliesTab($('tab-library'), {
 buildFlashTab($('tab-flash'));
 $('tab-about').innerHTML = `
   <div class="card about-brand">
-  <img src="./brand/fatmatryoshka-1.png" width="160" height="160" alt="Split coral and teal synth dolls wired to a gold doll inside, embraced by loose patch cables" />
-  <h2>FatMatryoshka-1</h2>
+  <img src="./brand/fatmatryoshka.png" width="160" height="160" alt="Split coral and teal synth dolls wired to a gold doll inside, embraced by loose patch cables" />
+  <h2>FatMatryoshka</h2>
   <p>A patchable modular synth for the M-VAVE FM-1, with a browser editor. Build sounds from modules, wrap them into assemblies, and nest those assemblies inside bigger instruments. The module engine runs in your browser here and on the FM-1 itself.</p></div>
   <div class="card credits"><h2>We stand on the shoulders of giants.</h2>
   <p><a href="https://github.com/hugelton/Felucca">Felucca</a>, by <a href="https://github.com/kurogedelic">Leo Kuroshita (@kurogedelic)</a> / <a href="https://github.com/hugelton">Hügelton Instruments</a>, provides the foundation for the flasher, loader and hardware support.</p>
@@ -585,3 +591,18 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) {
   const tab = h === 'presets' || h === 'assemblies' ? 'library' : h;
   if (['patch', 'library', 'flash', 'about'].includes(tab)) switchTab(tab);
 }
+
+
+const tour = new PatchTour({
+  getPatch: () => editor.patch,
+  load: p => { sink.send({ t: 'panic' }); loadNamed(p); },
+  active: on => { if (on && !suppressSave) save(editor.patch); touring = on; clearTimeout(saveTimer); },
+  fit: () => { if ($('canvas').clientWidth < 700) editor.setZoom(1); else requestAnimationFrame(() => editor.zoomToFit()); },
+  note: on => sink.send(on ? { t: 'on', note: 60, vel: .8 } : { t: 'off', note: 60 }),
+});
+if (currentTab === 'patch' && !shareCodeOf(location.href)) tour.welcome();
+// Audio is enabled by default. A fresh browser may require a trusted gesture to resume it.
+const unlockAudio = (): void => { if (!host.running) void startAudio(); };
+window.addEventListener('pointerdown', unlockAudio, { capture: true });
+window.addEventListener('keydown', unlockAudio, { capture: true });
+void startAudio();

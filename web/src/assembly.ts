@@ -39,8 +39,25 @@ export interface ParamRef {
   label: string;
 }
 
+export interface AssemblyLayout {
+  /** User-sized collapsed card and expanded frame, in unscaled canvas pixels. */
+  size?: { width: number; height: number };
+  frameSize?: { width: number; height: number };
+}
+
+/** Accept bounded layout metadata; it never changes audio or firmware data. */
+export function assemblyLayout(raw: AssemblyLayout): AssemblyLayout {
+  const result: AssemblyLayout = {};
+  for (const key of ['size', 'frameSize'] as const) {
+    const value = raw[key];
+    if (value && Number.isFinite(value.width) && Number.isFinite(value.height) && value.width > 0 && value.height > 0)
+      result[key] = { width: Math.min(4000, Math.max(236, value.width)), height: Math.min(4000, Math.max(80, value.height)) };
+  }
+  return result;
+}
+
 /** an assembly in a patch: the overlay entry */
-export interface AssemblyInst {
+export interface AssemblyInst extends AssemblyLayout {
   v: 1;
   id: number;
   /** the library name it was made from or saved as */
@@ -66,7 +83,7 @@ export interface AssemblyInst {
 }
 
 /** a nested assembly inside a saved definition: local module ids and local assembly ids, positions relative like the modules */
-export interface NestedDef {
+export interface NestedDef extends AssemblyLayout {
   id: number;
   name: string;
   label: string;
@@ -81,7 +98,7 @@ export interface NestedDef {
 }
 
 /** a saved assembly: the file format, the library entry and the factory set. Module ids are local (1..n), positions relative. */
-export interface AssemblyDef {
+export interface AssemblyDef extends AssemblyLayout {
   format: 'modular-1-assembly';
   version: 1;
   name: string;
@@ -627,6 +644,7 @@ export function toDef(p: Patch, a: AssemblyInst): AssemblyDef {
     format: ASSEMBLY_FORMAT,
     version: 1,
     name: a.name,
+    ...assemblyLayout(a),
     modules: ms,
     cables: p.cables.filter((c) => local.has(c.from.module) && local.has(c.to.module)).map((c) => ({ from: remap(c.from), to: remap(c.to) })),
     inputs: a.inputs.map(port),
@@ -643,6 +661,7 @@ export function toDef(p: Patch, a: AssemblyInst): AssemblyDef {
         x: d.x - x0,
         y: d.y - y0,
         open: d.open,
+        ...assemblyLayout(d),
         modules: d.modules.map((id) => local.get(id)!),
         inputs: d.inputs.map(port),
         outputs: d.outputs.map(port),
@@ -692,6 +711,7 @@ export function insertAssembly(p: Patch, defs: Record<string, ModuleDef>, def: A
       x: Math.max(0, x + d.x),
       y: Math.max(0, y + d.y),
       open: d.open,
+      ...assemblyLayout(d),
       modules: d.modules.map((id) => fresh.get(id)!),
       inputs: d.inputs.map(port),
       outputs: d.outputs.map(port),
@@ -705,6 +725,7 @@ export function insertAssembly(p: Patch, defs: Record<string, ModuleDef>, def: A
     v: 1,
     id: nextId,
     name: def.name,
+    ...assemblyLayout(def),
     label: uniqueLabel(taken, def.name),
     x,
     y,
@@ -742,8 +763,11 @@ export function stripPatchIO(d: AssemblyDef): number {
 }
 
 export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef>): AssemblyDef {
-  if (!isRec(raw) || raw.format !== ASSEMBLY_FORMAT || !Array.isArray(raw.modules) || !Array.isArray(raw.cables)) throw new Error('not a Modular-1 assembly');
+  if (!isRec(raw) || raw.format !== ASSEMBLY_FORMAT || !Array.isArray(raw.modules) || !Array.isArray(raw.cables)) throw new Error('not a FatMatryoshka assembly');
   const d = raw as unknown as AssemblyDef;
+  const layout = assemblyLayout(d);
+  delete d.size; delete d.frameSize;
+  Object.assign(d, layout);
   stripPatchIO(d); // a patch's own modules never belong to a building block
   if (d.modules.length > MAX_MODULES || !d.modules.length) throw new Error('an assembly holds 1 to 32 modules');
   if (d.category !== undefined && typeof d.category !== 'string') delete d.category;
@@ -814,6 +838,7 @@ export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef
         x: Number(e.x) || 0,
         y: Number(e.y) || 0,
         open: !!e.open,
+        ...assemblyLayout(e),
         modules: mods,
         inputs: ports(e.inputs, 'in'),
         outputs: ports(e.outputs, 'out'),
@@ -893,6 +918,7 @@ export function fixAssemblies(p: Patch, defs: Record<string, ModuleDef>): string
       x: Number(e.x) || 0,
       y: Number(e.y) || 0,
       open: !!e.open,
+      ...assemblyLayout(e),
       modules: [...new Set(members)],
       inputs: refs(e.inputs, 'port'),
       outputs: refs(e.outputs, 'port').map((r) => ({ module: r.module, port: r.port, label: r.label })),

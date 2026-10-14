@@ -496,8 +496,10 @@ static void patch_boot(void)                    /* the stored state if there is 
 static void defaults_now(void)
 {
     uint32_t v;
-    for (v = 0; v < ENG_VOICES; v++)
+    for (v = 0; v < ENG_VOICES; v++) {
+        arp_clear_keys(v);
         eng_all_notes_off_v(v);
+    }
     cfg_defaults();
     for (v = 0; v < ENG_VOICES; v++) {
         mix_vol[v] = 100;
@@ -543,10 +545,11 @@ static void midi_drain(void)                    /* USB-MIDI events -> the engine
                 if (cfg.ch[mv] && cfg.ch[mv] != chn)
                     continue;
                 if (st == 0x90u && v) {
-                    eng_note_on_v(mv, n, (int32_t)(v * 65536u / 127u));
+                    arp_key_on(mv, n, (int32_t)(v * 65536u / 127u));
                 } else if (st == 0x80u || st == 0x90u) {
-                    eng_note_off_v(mv, n);
+                    arp_key_off(mv, n);
                 } else if (st == 0xB0u && n == 123u) {
+                    arp_clear_keys(mv);
                     eng_all_notes_off_v(mv);
                 } else if (st == 0xB0u && n == 1u) {        /* mod wheel: the Main module's mod output */
                     eng_ctl_v(mv, ENG_CTL_MOD, (int32_t)(v * 65536u / 127u));
@@ -817,9 +820,9 @@ static void keys_poll(void)                     /* the FM-1's 27 keys (bit 0 = F
         if (now & (1u << n)) {
             int32_t note = 53 + (int32_t)n + 12 * octave;
             key_note[n] = (uint8_t)(note < 0 ? 0 : note > 127 ? 127 : note);
-            eng_note_on(key_note[n], ENG_ONE);
+            arp_key_on(eng_voice(), key_note[n], ENG_ONE);
         } else {
-            eng_note_off(key_note[n]);
+            arp_key_off(eng_voice(), key_note[n]);
         }
     }
 }
@@ -958,6 +961,7 @@ static void voice_switch(void)
     uint32_t v = (eng_voice() + 1u) % ENG_VOICES;
     if (ENG_VOICES == 1)
         return;
+    arp_clear_keys(eng_voice());
     eng_all_notes_off_v(eng_voice());
     eng_voice_select(v);
     arp_p = &AV[v];                                 /* the arpeggiator pages and PLAY act on this voice's */
