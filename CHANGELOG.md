@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Lower scope trace opacity to 25%.
+
 - Shorten the scope’s audio window from 64 ms to 16 ms, showing one-quarter as many samples across the canvas.
 
 - Return scope traces to their original 1.5 px thickness and use 50% opacity to soften overlapping waveforms.

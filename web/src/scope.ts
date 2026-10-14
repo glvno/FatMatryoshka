@@ -126,7 +126,7 @@ export class Scope {
     g.lineWidth = 1.5;
     g.lineCap = 'round';
     g.lineJoin = 'round';
-    g.globalAlpha = .5;
+    g.globalAlpha = .25;
     const traceHeight = H / 3, traceBottom = H / 2 + traceHeight / 2;
     for (const p of this.probes) {
       const d = p.data;
