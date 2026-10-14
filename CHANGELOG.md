@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Disable the scope smoothing changes: restore per-pixel sample selection and the original stroke caps/joins.
+
 - Lower scope trace opacity to 25%.
 
 - Shorten the scope’s audio window from 64 ms to 16 ms, showing one-quarter as many samples across the canvas.

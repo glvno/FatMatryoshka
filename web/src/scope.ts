@@ -124,8 +124,8 @@ export class Scope {
     g.clearRect(0, 0, W, H);
     const style = getComputedStyle(this.cv);
     g.lineWidth = 1.5;
-    g.lineCap = 'round';
-    g.lineJoin = 'round';
+    g.lineCap = 'butt';
+    g.lineJoin = 'miter';
     g.globalAlpha = .25;
     const traceHeight = H / 3, traceBottom = H / 2 + traceHeight / 2;
     for (const p of this.probes) {
@@ -159,12 +159,11 @@ export class Scope {
           }
         }
         const scale = p.kind === 'audio' ? amp : Math.max(1, amp);
-        // Join the original samples at fractional pixel positions. Repeating a
-        // rounded sample index at every screen pixel produced visible stairs.
-        for (let i = 0; i < len; i++) {
-          const x = (i / Math.max(1, len - 1)) * (W - 1);
-          const y = H / 2 - (d[start + i] / scale) * traceHeight / 2;
-          if (i === 0) g.moveTo(x, y);
+        // Original display: pick the nearest preceding sample for each pixel.
+        for (let x = 0; x < W; x++) {
+          const i = start + Math.floor((x / W) * len);
+          const y = H / 2 - (d[i] / scale) * traceHeight / 2;
+          if (x === 0) g.moveTo(x, y);
           else g.lineTo(x, y);
         }
       }
