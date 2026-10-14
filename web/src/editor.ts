@@ -890,13 +890,6 @@ export class Editor {
   /** the outputs with a scope probe (probeKey) */
   readonly probes = new Set<string>();
 
-  /** the scope dropped a probe: forget it (the cards redraw their buttons) */
-  dropProbe(key: string): void {
-    this.probes.delete(key);
-    for (const dot of this.ports.values()) if (dot.dataset.dir === 'out' && probeKey(Number(dot.dataset.mod), dot.dataset.port!) === key) dot.classList.remove('probed');
-    this.modulesEl.querySelectorAll<HTMLButtonElement>(`button.prb[data-key="${CSS.escape(key)}"]`).forEach((b) => b.classList.remove('on'));
-  }
-
   /** the arpeggiator on the Main card: the rows of the FM-1's MELODY / RHYTHM / CHAOS pages, saved with the patch (Patch.arp) */
   private arpPanel(): HTMLElement {
     const box = document.createElement('details');
@@ -1470,7 +1463,7 @@ export class Editor {
   /** a drag on empty canvas selects the cards it touches; a click on empty canvas clears the selection */
   private rubberBand(e: PointerEvent): void {
     const t = e.target as HTMLElement;
-    if (e.button !== 0 || t.closest('.module, .fhead, .dot, button, input, select, .scope, .ctx')) return;
+    if (e.button !== 0 || t.closest('.module, .fhead, .dot, button, input, select, .ctx')) return;
     e.preventDefault();
     if (e.pointerType === 'touch') {
       // one finger on the empty canvas pans it (a rubber band needs a mouse or shift)

@@ -73,8 +73,7 @@ main { min-width: 0; min-height: 0; overflow: auto; }
 .tab[hidden] { display: none; }
 #tab-presets, #tab-assemblies, #tab-flash, #tab-about { width: min(100%, 640px); margin: 0 auto; }
 .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-.canvas { position: relative; overflow: auto; border: 0; border-radius: 0; background: var(--surface-tint);
-  background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 20px 20px; }
+.canvas { position: relative; overflow: auto; border: 0; border-radius: 0; background: transparent; }
 .cables { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .cable { fill: none; stroke-width: 3; opacity: .85; pointer-events: stroke; cursor: pointer; }
 .cable.audio { stroke: var(--audio); } .cable.control { stroke: var(--control); } .cable.gate { stroke: var(--gate); }
@@ -141,16 +140,8 @@ dialog.help::backdrop { background: var(--backdrop); }
 dialog.help h2 { margin-top: 0; font-size: 15px; }
 dialog.help td { padding: 2px 10px 2px 0; vertical-align: top; }
 dialog.help td:first-child { white-space: nowrap; color: var(--accent); font-family: ui-monospace, monospace; font-size: 12px; }
-.scope { position: fixed; left: 16px; bottom: 16px; z-index: 20; width: 496px; max-width: calc(100% - 32px); margin: 0; background: var(--panel); border: 1px solid var(--muted); border-radius: 8px; box-shadow: 0 2px 8px var(--shadow); padding: 6px 8px; font-size: 12px; }
-.scope-head { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
-.scope-head span { font-weight: 600; margin-right: auto; }
-.scope-head button { padding: 1px 6px; font-size: 11px; }
-.scope-head button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.scope canvas { display: block; width: 100%; height: 160px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
-.scope-list { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; }
-.scope-probe { display: inline-flex; gap: 6px; align-items: center; }
-.scope-probe output { color: var(--muted); font-variant-numeric: tabular-nums; }
-.scope-probe button { padding: 0 4px; font-size: 11px; }
+.scope-background { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.scope-background[hidden] { display: none; }
 button.prb { padding: 0 2px; line-height: 1; border: none; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
 button.prb.on { color: var(--accent); }
 .dot.probed { box-shadow: 0 0 0 2px var(--accent); }
@@ -182,7 +173,6 @@ progress { width: 100%; }
   .x, button.tog, button.prb, button.pw { min-width: 28px; min-height: 28px; }
 }
 @media (max-width: 640px) {
-  .scope { width: calc(100% - 24px); left: 12px; bottom: 80px; }
   .panel { width: calc(100% - 24px); right: 12px; bottom: 80px; }
   dialog.browser { width: 100%; max-width: 100%; height: 100%; max-height: 100%; border-radius: 0; margin: 0; }
   dialog.browser .panes { flex-direction: column; }
@@ -280,10 +270,11 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .device-controls p { margin: 4px 0 10px; font-size: 12px; }
 .device-controls form { margin-top: 20px; text-align: right; }
 #dev-status { display: block; font-size: 12px; overflow-wrap: anywhere; }
-#tab-patch { height: 100%; }
-.canvas { width: 100%; min-width: 0; min-height: 0; height: 100%; isolation: isolate; }
+#tab-patch { position: relative; height: 100%; isolation: isolate; background: var(--surface-tint); }
+.canvas { width: 100%; min-width: 0; min-height: 0; height: 100%; isolation: isolate; z-index: 1; }
 #canvas-space { position: relative; min-width: 100%; min-height: 100%; }
-#patch-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#patch-world { position: absolute; left: 0; top: 0; transform-origin: 0 0;
+  background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 20px 20px; }
 #tab-library { max-width: 1200px; margin: 0 auto; }
 @media (max-height: 660px) and (min-width: 701px) {
   .sidebar { gap: 12px; padding-top: 12px; }
@@ -320,7 +311,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 @font-face { font-family: 'Barlow'; src: url('/fonts/Barlow-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
 @font-face { font-family: 'Barlow Semi Condensed'; src: url('/fonts/BarlowSemiCondensed-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
 /* Names, values, and actions have separate type roles inside the patch field. */
-.module, .fhead, .scope { font-family: 'Barlow', system-ui, sans-serif; font-weight: 500; }
+.module, .fhead { font-family: 'Barlow', system-ui, sans-serif; font-weight: 500; }
 .mhead { min-height: 40px; gap: 8px; padding: 7px 10px; }
 .mhead > span:first-child, .fhead > span:first-child { font: 700 20px/1.1 'Barlow Semi Condensed', system-ui, sans-serif; }
 .mhead > span:first-child { min-width: 0; overflow-wrap: anywhere; }

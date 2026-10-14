@@ -19,7 +19,7 @@ class FakeContext {
   async resume() { this.state = 'running'; }
 }
 class FakeNode {
-  port = { postMessage: vi.fn(), onmessage: (_event: { data: { values: ParameterValues; revision: number } }) => {} };
+  port = { postMessage: vi.fn(), onmessage: (_event: { data: { values?: ParameterValues; revision: number; probe?: string; data?: Float32Array; sr?: number } }) => {} };
   constructor() { node = this; }
   connect() {}
 }
@@ -118,4 +118,17 @@ it('resumes within the gesture, shares initialization and replays the patch befo
     { t: 'patch', patch, revision: 1 }, expect.objectContaining({ t: 'arp' }),
     { t: 'on', note: 60, vel: .8 }, { t: 'off', note: 60 },
   ]);
+});
+
+it('discards stale scope messages after a preset switch', async () => {
+  const host = new AudioHost();
+  host.setPatch(emptyPatch());
+  await host.start();
+  const paint = vi.fn(); host.onProbe = paint;
+  host.setPatch(emptyPatch());
+  const data = new Float32Array([.1, -.1]);
+  node.port.onmessage({ data: { probe: 'output:left', data, sr: 48000, revision: 1 } });
+  expect(paint).not.toHaveBeenCalled();
+  node.port.onmessage({ data: { probe: 'output:left', data, sr: 48000, revision: 2 } });
+  expect(paint).toHaveBeenCalledWith('output:left', data, 48000);
 });

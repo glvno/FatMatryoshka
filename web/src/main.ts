@@ -112,16 +112,12 @@ const patchCandidates = (): { name: string; patch: Patch }[] => {
     }
   return out;
 };
-const scope = new Scope($('scope'));
-scope.onRemove = (key) => {
-  scope.remove(key);
-  host.send({ t: 'unprobe', key });
-  editor.dropProbe(key);
-};
+const scope = new Scope($<HTMLCanvasElement>('scope'));
 host.onProbe = (key, data, sr) => scope.feed(key, data, sr);
 const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   onStructure(p) {
     $<HTMLInputElement>('patch-name').value = p.name;
+    scope.clearSamples();
     host.setPatch(p);
     queueSave(p);
     if (live()) queueUpload();
@@ -161,9 +157,9 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
     host.send({ t: 'arpplay', on });
     if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, on);
   },
-  onProbe(key, id, port, kind, label, on) {
+  onProbe(key, id, port, kind, _label, on) {
     if (on) {
-      scope.add(key, label, kind);
+      scope.add(key, kind);
       host.send({ t: 'probe', key, id, port });
     } else {
       scope.remove(key);
@@ -184,7 +180,10 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   morphCandidates: patchCandidates,
 });
 host.setPatch(editor.patch);
-host.onValues = (values) => editor.showParameterValues(values);
+host.onValues = (values) => {
+  editor.showParameterValues(values);
+  if (!host.running) scope.clearSamples();
+};
 
 // Sidebar
 setupPopoverPositioning();
@@ -281,6 +280,9 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Flash firmware', keywords: 'install update hardware', run: () => switchTab('flash') },
     { kind: 'command', label: 'About Matryoshka', keywords: 'credits', run: () => switchTab('about') },
     { kind: 'command', label: 'Keyboard shortcuts', keywords: 'help', detail: '?', run: () => help.showModal() },
+    { kind: 'command', label: scope.visible ? 'Hide oscilloscope' : 'Show oscilloscope', keywords: 'scope background waveform', run: inPatch(() => scope.setVisible(!scope.visible)) },
+    { kind: 'command', label: 'Scope: waveform', keywords: 'oscilloscope time', run: inPatch(() => scope.setMode('time')) },
+    { kind: 'command', label: 'Scope: spectrum', keywords: 'oscilloscope frequency fft', run: inPatch(() => scope.setMode('spectrum')) },
     { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },
     { kind: 'command', label: 'Reset canvas scale', keywords: 'zoom 100%', run: inPatch(() => editor.setZoom(1)) },
     ...Object.values(DEFS).map((d) => ({ kind: 'add module', tags: ['module'], label: d.label, run: () => editor.add(d.type) })),

@@ -160,7 +160,9 @@ During browser playback, sliders and their readouts follow dedicated CV inputs (
 
 ## Scope
 
-- Every output jack has a small **◎**: click it and the signal appears in the scope panel at the bottom of the canvas, several at once in their own colours (the jack gets a ring). The **time** view auto-scales; audio signals are triggered on a rising zero crossing so the wave stands still, control and gate signals show the whole last 85 ms with a min / max / mean readout. The **spectrum** view is a 2048-point FFT (log frequency, 0 dB = a full-scale sine) with the peak's frequency in the readout, so an oscillator can be tuned by eye. Probes cost nothing on the FM-1: they live in the browser's engine.
+The oscilloscope fills the patch canvas background and is on by default for every preset. It watches both channels of the rendered output, including all voices, incoming cables and Output level. The waveform stays fixed to the visible canvas while modules, cables and the dot grid zoom and pan together.
+
+Every output jack’s **◎** adds or removes an extra trace. **Commands** offers **Hide oscilloscope**, **Scope: waveform**, and **Scope: spectrum**. Audio waveforms auto-scale and trigger on a rising zero crossing; control and gate probes show their full sample window. The spectrum uses a 2048-point Hann-windowed FFT. Probes run in the browser and add no work on the FM-1.
 
 ## Arpeggiator in the editor
 

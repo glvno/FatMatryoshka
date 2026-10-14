@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Replace the floating oscilloscope window with a transparent, canvas-wide background. Scope the rendered stereo output by default for every preset; keep waveforms fixed while the dot grid zooms and pans with the patch. Retain extra jack probes and move scope mode/visibility controls to Commands.
+
 - Rename the project and active app branding to Matryoshka; remove FAT from the approved wordmark while preserving its MATRYOSHKA outlines and doll artwork. Make the shortened wordmark the type lab’s default.
 - Move the app and source repository to lowercase `matryoshka`. Point the existing `/FatMatryoshka-1` redirect directly to `/matryoshka`, preserving paths, queries and shared-patch fragments.
 

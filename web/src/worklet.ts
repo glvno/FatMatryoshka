@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // AudioWorklet wrapper around Engine.
 import { Engine } from './engine';
+import { OUTPUT_PROBES } from './scope';
 import { Arp, type ArpCfg } from './arp';
 import type { Patch } from './patch';
 
@@ -43,7 +44,9 @@ class ModularProcessor extends AudioWorkletProcessor {
   private revision = 0;
   private valuesRequested = false;
   /** scope probes: the last PROBE_LEN samples of an output, sent to the host about 30 times a second */
-  private probes = new Map<string, { id: number; port: string; ring: Float32Array; w: number }>();
+  private probes = new Map<string, { id: number | null; port: string; ring: Float32Array; w: number }>(
+    OUTPUT_PROBES.map((key, channel) => [key, { id: null, port: String(channel), ring: new Float32Array(PROBE_LEN), w: 0 }]),
+  );
   private probeBlocks = 0;
   constructor() {
     super();
@@ -53,6 +56,8 @@ class ModularProcessor extends AudioWorkletProcessor {
         if (m.t === 'patch') {
           this.arp.clear(this.engine);
           this.engine.load(m.patch);
+          for (const p of this.probes.values()) { p.ring.fill(0); p.w = 0; }
+          this.probeBlocks = 0;
           this.revision = m.revision ?? 0;
           this.failed = false;
         }
@@ -85,12 +90,11 @@ class ModularProcessor extends AudioWorkletProcessor {
       }
     };
   }
-  private feedProbes(n: number): void {
+  private feedProbes(n: number, outputs: Float32Array[]): void {
     for (const p of this.probes.values()) {
-      const src = this.engine.probe(p.id, p.port);
-      if (!src) continue;
+      const src = p.id === null ? outputs[Number(p.port)] ?? outputs[0] : this.engine.probe(p.id, p.port);
       for (let i = 0; i < n; i++) {
-        p.ring[p.w] = src[i];
+        p.ring[p.w] = src?.[i] ?? 0;
         if (++p.w === PROBE_LEN) p.w = 0;
       }
     }
@@ -100,7 +104,7 @@ class ModularProcessor extends AudioWorkletProcessor {
       const data = new Float32Array(PROBE_LEN); // oldest first
       data.set(p.ring.subarray(p.w));
       data.set(p.ring.subarray(0, p.w), PROBE_LEN - p.w);
-      this.port.postMessage({ probe: key, data, sr: sampleRate }, [data.buffer]);
+      this.port.postMessage({ probe: key, data, sr: sampleRate, revision: this.revision }, [data.buffer]);
     }
   }
 
@@ -109,7 +113,7 @@ class ModularProcessor extends AudioWorkletProcessor {
     try {
       this.arp.run(out[0].length, this.engine);
       this.engine.render(out[0], out[1] ?? out[0]);
-      if (this.probes.size) this.feedProbes(out[0].length);
+      if (this.probes.size) this.feedProbes(out[0].length, out);
       if (this.valuesRequested) {
         this.valuesRequested = false;
         this.port.postMessage({ values: this.engine.parameterValues(), revision: this.revision });

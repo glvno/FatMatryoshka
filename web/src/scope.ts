@@ -1,20 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The scope: a floating panel that draws the probed outputs (worklet probes, 4096 samples each, about 30 times a
-// second) as a time view (auto-scaled; audio signals triggered on a rising zero crossing so the wave stands still) or as
-// a spectrum (a radix-2 FFT in TypeScript, Hann window, log magnitude over a log frequency axis). Control signals get a
-// min / max / mean readout. Several probes at once, each in its own colour.
-
-export interface Probe {
+// Transparent viewport-sized scope behind the patch. Drawing follows samples, not patch zoom.
+export const OUTPUT_PROBES = ['output:left', 'output:right'] as const;
+type ProbeKind = 'audio' | 'control' | 'gate';
+interface Probe {
   key: string;
-  label: string;
-  kind: 'audio' | 'control' | 'gate';
+  kind: ProbeKind;
   color: string;
   data: Float32Array | null;
   sr: number;
 }
-
-// Keep CSS token references on labels; resolve them for the canvas on each frame.
-const COLORS = ['var(--scope-1)', 'var(--scope-2)', 'var(--scope-3)', 'var(--scope-4)', 'var(--scope-5)', 'var(--scope-6)'];
+const COLORS = ['--scope-1', '--scope-2', '--scope-3', '--scope-4', '--scope-5', '--scope-6'];
 const FFT_N = 2048;
 
 /** in-place radix-2 FFT of re / im (length a power of two) */
@@ -62,69 +57,43 @@ export function spectrum(data: Float32Array): Float32Array {
 
 export class Scope {
   private probes: Probe[] = [];
-  private el: HTMLElement;
-  private cv: HTMLCanvasElement;
-  private list: HTMLElement;
   private mode: 'time' | 'spectrum' = 'time';
   private raf = 0;
-  onRemove: (key: string) => void = () => {};
 
-  constructor(root: HTMLElement) {
-    this.el = root;
-    root.innerHTML = '';
-    const head = document.createElement('div');
-    head.className = 'scope-head';
-    const title = document.createElement('span');
-    title.textContent = 'Scope';
-    const time = document.createElement('button');
-    time.textContent = 'time';
-    const spec = document.createElement('button');
-    spec.textContent = 'spectrum';
-    const pick = (m: 'time' | 'spectrum'): void => {
-      this.mode = m;
-      time.classList.toggle('on', m === 'time');
-      spec.classList.toggle('on', m === 'spectrum');
-    };
-    time.onclick = () => pick('time');
-    spec.onclick = () => pick('spectrum');
-    pick('time');
-    const close = document.createElement('button');
-    close.textContent = '×';
-    close.title = 'remove every probe';
-    close.onclick = () => {
-      for (const p of [...this.probes]) this.onRemove(p.key);
-    };
-    head.append(title, time, spec, close);
-    this.cv = document.createElement('canvas');
-    this.cv.width = 480;
-    this.cv.height = 160;
-    this.list = document.createElement('div');
-    this.list.className = 'scope-list';
-    root.append(head, this.cv, this.list);
-    root.hidden = true;
+  constructor(private cv: HTMLCanvasElement) {
+    for (const key of OUTPUT_PROBES) this.add(key, 'audio');
+    new ResizeObserver(() => this.schedule()).observe(cv);
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.schedule());
+    document.addEventListener('visibilitychange', () => this.schedule());
   }
 
-  get keys(): string[] {
-    return this.probes.map((p) => p.key);
+  get visible(): boolean { return !this.cv.hidden; }
+
+  setVisible(visible: boolean): void {
+    this.cv.hidden = !visible;
+    this.schedule();
   }
 
-  add(key: string, label: string, kind: Probe['kind']): void {
+  setMode(mode: 'time' | 'spectrum'): void {
+    this.mode = mode;
+    this.setVisible(true);
+  }
+
+  add(key: string, kind: ProbeKind): void {
     if (this.probes.some((p) => p.key === key)) return;
-    const used = new Set(this.probes.map((p) => p.color));
-    this.probes.push({ key, label, kind, color: COLORS.find((c) => !used.has(c)) ?? COLORS[this.probes.length % COLORS.length], data: null, sr: 48000 });
-    this.renderList();
-    this.el.hidden = false;
-    if (!this.raf) this.raf = requestAnimationFrame(() => this.draw());
+    const color = COLORS[this.probes.length % COLORS.length];
+    this.probes.push({ key, kind, color, data: null, sr: 48000 });
+    this.schedule();
   }
 
   remove(key: string): void {
     this.probes = this.probes.filter((p) => p.key !== key);
-    this.renderList();
-    if (!this.probes.length) {
-      this.el.hidden = true;
-      cancelAnimationFrame(this.raf);
-      this.raf = 0;
-    }
+    this.schedule();
+  }
+
+  clearSamples(): void {
+    for (const p of this.probes) p.data = null;
+    this.schedule();
   }
 
   feed(key: string, data: Float32Array, sr: number): void {
@@ -132,57 +101,42 @@ export class Scope {
     if (p) {
       p.data = data;
       p.sr = sr;
+      this.schedule();
     }
   }
 
-  colorOf(key: string): string | undefined {
-    return this.probes.find((p) => p.key === key)?.color;
-  }
-
-  private renderList(): void {
-    this.list.replaceChildren(
-      ...this.probes.map((p) => {
-        const row = document.createElement('span');
-        row.className = 'scope-probe';
-        row.style.color = p.color;
-        const name = document.createElement('b');
-        name.textContent = p.label;
-        const stat = document.createElement('output');
-        stat.dataset.key = p.key;
-        const x = document.createElement('button');
-        x.textContent = '×';
-        x.title = `remove the probe on ${p.label}`;
-        x.onclick = () => this.onRemove(p.key);
-        row.append(name, stat, x);
-        return row;
-      }),
-    );
+  private schedule(): void {
+    if (!this.raf) this.raf = requestAnimationFrame(() => {
+      this.raf = 0;
+      if (!document.hidden && this.cv.checkVisibility()) this.draw();
+    });
   }
 
   private draw(): void {
-    this.raf = this.probes.length ? requestAnimationFrame(() => this.draw()) : 0;
     const g = this.cv.getContext('2d');
     if (!g) return;
-    const W = this.cv.width, H = this.cv.height;
+    const W = this.cv.clientWidth, H = this.cv.clientHeight;
+    if (!W || !H) return;
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.round(W * dpr), height = Math.round(H * dpr);
+    if (this.cv.width !== width || this.cv.height !== height) {
+      this.cv.width = width;
+      this.cv.height = height;
+    }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
     const style = getComputedStyle(this.cv);
-    g.fillStyle = style.getPropertyValue('--panel').trim();
-    g.fillRect(0, 0, W, H);
-    g.strokeStyle = style.getPropertyValue('--line').trim();
-    g.lineWidth = 1;
-    g.beginPath();
-    g.moveTo(0, H / 2);
-    g.lineTo(W, H / 2);
-    g.stroke();
+    g.lineWidth = 1.5;
+    g.globalAlpha = .55;
     for (const p of this.probes) {
-      const stat = this.list.querySelector<HTMLOutputElement>(`output[data-key="${CSS.escape(p.key)}"]`);
-      if (!p.data) continue;
       const d = p.data;
+      if (!d?.length) continue;
+      g.strokeStyle = style.getPropertyValue(p.color).trim();
+      g.beginPath();
       if (this.mode === 'spectrum') {
         const s = spectrum(d);
         const n = s.length;
         const fmin = 20, fmax = p.sr / 2;
-        g.strokeStyle = style.getPropertyValue(p.color.slice(4, -1)).trim();
-        g.beginPath();
         for (let x = 0; x < W; x++) {
           const f = fmin * Math.pow(fmax / fmin, x / W);
           const bin = Math.min(n - 1, Math.round((f / (p.sr / 2)) * (n - 1)));
@@ -190,43 +144,26 @@ export class Scope {
           if (x === 0) g.moveTo(x, y);
           else g.lineTo(x, y);
         }
-        g.stroke();
-        if (stat) {
-          let best = 1;
-          for (let i = 2; i < n; i++) if (s[i] > s[best]) best = i;
-          stat.textContent = `peak ${Math.round((best / (n - 1)) * (p.sr / 2))} Hz, ${s[best].toFixed(0)} dB`;
+      } else {
+        let amp = 1e-3;
+        for (const sample of d) amp = Math.max(amp, Math.abs(sample));
+        let start = 0, len = d.length;
+        if (p.kind === 'audio') {
+          len = Math.min(1024, d.length);
+          start = Math.max(0, d.length - len);
+          for (let i = Math.max(1, Math.floor(d.length / 2)); i < d.length - len; i++) {
+            if (d[i - 1] < 0 && d[i] >= 0) { start = i; break; }
+          }
         }
-        continue;
-      }
-      let lo = Infinity, hi = -Infinity, sum = 0;
-      for (let i = 0; i < d.length; i++) {
-        if (d[i] < lo) lo = d[i];
-        if (d[i] > hi) hi = d[i];
-        sum += d[i];
-      }
-      const mean = sum / d.length;
-      // audio: a window of 1024 samples from a rising zero crossing; control / gate: the whole buffer
-      let start = 0, len = d.length;
-      if (p.kind === 'audio') {
-        len = 1024;
-        for (let i = Math.floor(d.length / 2); i < d.length - len; i++) if (d[i - 1] < 0 && d[i] >= 0) {
-          start = i;
-          break;
+        const scale = p.kind === 'audio' ? amp : Math.max(1, amp);
+        for (let x = 0; x < W; x++) {
+          const i = start + Math.floor((x / W) * len);
+          const y = H / 2 - (d[Math.min(d.length - 1, i)] / scale) * H * .4;
+          if (x === 0) g.moveTo(x, y);
+          else g.lineTo(x, y);
         }
-      }
-      const amp = Math.max(1e-3, Math.abs(lo), Math.abs(hi));
-      const scale = p.kind === 'audio' ? amp : Math.max(1, amp);
-      g.strokeStyle = style.getPropertyValue(p.color.slice(4, -1)).trim();
-      g.lineWidth = 1.5;
-      g.beginPath();
-      for (let x = 0; x < W; x++) {
-        const i = start + Math.floor((x / W) * len);
-        const y = H / 2 - (d[Math.min(d.length - 1, i)] / scale) * (H / 2 - 4);
-        if (x === 0) g.moveTo(x, y);
-        else g.lineTo(x, y);
       }
       g.stroke();
-      if (stat) stat.textContent = p.kind === 'audio' ? `peak ${amp.toFixed(3)}` : `${lo.toFixed(3)} … ${hi.toFixed(3)}, mean ${mean.toFixed(3)}`;
     }
   }
 }
