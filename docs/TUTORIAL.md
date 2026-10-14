@@ -45,10 +45,12 @@ parameter with a fixed input cables the source to that input.
 
 ## Chapters
 
-1. **Hello sound** - enable audio, New patch (Main + Output), add an Oscillator, cable pitch and audio, play a note, scope ◎,
-   a wrong cable and Ctrl+Z. Teaches: add module, cable colours, keys, scope, undo.
-2. **Shaping a note** - VCA and ADSR: gate opens the envelope, the envelope drives gain (VCA's built-in cv → gain link).
-   Teaches: sliders, thumb = jack, Alt-drag, undo / redo.
+1. **Hello sound** - enable audio, New patch (Main + Output), an Oscillator with its pitch, a VCA fed by it, the gate into
+   the VCA's cv, and only then VCA → Output: the sound is under the key's control before it ever reaches the speaker (the
+   Output's default level is 0.15 for the same reason). Play, scope ◎, change the wave. Teaches: add module, cable colours,
+   the VCA's built-in cv → gain link, keys, scope.
+2. **Shaping a note** - ADSR replaces the bare gate; attack / release, then a percussive sustain / decay; thumb = jack,
+   Alt-drag; undo / redo.
 3. **Subtractive voice** - Filter: cutoff, resonance, morph, track; LFO into the filter's cv (fixed link, depth = cvamt);
    K1 into p1 with the matrix sending it to cutoff and resonance (attenuverter). Teaches: pins, att, matrix, knob colours,
    rest ticks, live thumb vs base tick.

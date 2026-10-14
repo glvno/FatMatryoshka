@@ -852,8 +852,8 @@ kit('crush-color', (add, wire) => {
 // Every dedicated input link at once (they are built in: a cable into cv always moves cutoff, and so on).
 kit('fixed-links', (add, wire) => {
   const main = add('fm1', 0, 0, { morph: 0 });
-  const osc = add('osc', 0, 0, { wave: 0, level: .3 });
-  const cv = add('const', 0, 0, { value: .8 });
+  const osc = add('osc', 0, 0, { wave: 2, level: 1 });
+  const cv = add('const', 0, 0, { value: .3 });
   const filter = add('filter', 0, 0, { cutoff: 1200, morph: .2 });
   const ladder = add('ladder', 0, 0, { cutoff: 1600, res: .1 });
   const pan = add('pan', 0, 0, { pan: -.2 });
@@ -861,7 +861,7 @@ kit('fixed-links', (add, wire) => {
   const shift = add('shift', 0, 0, { shift: 50, cvamt: 100 });
   const vowel = add('vowel', 0, 0, { vowel: 1 });
   const amp = add('vca', 0, 0, { gain: .8 });
-  const out = add('output', 0, 0);
+  const out = add('output', 0, 0, { level: 1 }); // the chain is quiet: keep the reference above the Q16 floor
   wire(main, 'pitch', osc, 'pitch');
   wire(osc, 'out', filter, 'in'); wire(filter, 'mix', ladder, 'in');
   wire(ladder, 'lp12', pan, 'in'); wire(pan, 'l', xfade, 'a'); wire(pan, 'r', xfade, 'b');

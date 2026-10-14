@@ -1202,7 +1202,7 @@ const output: ModuleImpl<null> = {
     label: 'Output',
     inputs: [{ ...audio('l'), label: 'l (mono)' }, audio('r')],
     outputs: [],
-    params: [param('level', 0, 1, 0.7, { step: 0.01 })],
+    params: [param('level', 0, 1, 0.15, { step: 0.01 })], // low by default: a new patch's first, unshaped note should not be loud
   },
   init: () => null,
   process() {

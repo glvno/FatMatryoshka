@@ -196,7 +196,7 @@ describe('engine', () => {
       modules: [
         { id: 1, type: 'const', x: 0, y: 0, params: { value: 0.5 } },
         { id: 2, type: 'osc', x: 0, y: 0, params: { level: 0 } },
-        { id: 3, type: 'output', x: 0, y: 0, params: {} },
+        { id: 3, type: 'output', x: 0, y: 0, params: { level: 0.7 } },
       ],
       cables: [
         { from: { module: 1, port: 'out' }, to: { module: 2, port: 'level_cv' } },
@@ -663,6 +663,7 @@ describe('unison', () => {
     addModule(p, DEFS.fm1, 0, 0);
     const o = addModule(p, DEFS.osc, 0, 0);
     const out = addModule(p, DEFS.output, 0, 0);
+    out.params.level = 0.7;
     Object.assign(o.params, { wave: 2, level: 1, ...params });
     connect(p, DEFS, { module: o.id, port: 'out' }, { module: out.id, port: 'l' });
     e.load(p);
@@ -1298,6 +1299,7 @@ describe('FM oscillator', () => {
     const o = addModule(p, DEFS.osc, 0, 0);
     Object.assign(o.params, { wave: 0, level: 1 }, car);
     const out = addModule(p, DEFS.output, 0, 0);
+    out.params.level = 0.7;
     connect(p, DEFS, { module: kb.id, port: 'pitch' }, { module: o.id, port: 'pitch' });
     connect(p, DEFS, { module: o.id, port: 'out' }, { module: out.id, port: 'l' });
     if (mod) {
@@ -2074,6 +2076,7 @@ describe('delay sync and ping-pong', () => {
     const dly = addModule(p, DEFS.delay, 0, 0);
     Object.assign(dly.params, { fb: 0, mix: 1, ...params });
     const out = addModule(p, DEFS.output, 0, 0);
+    out.params.level = 0.7;
     connect(p, DEFS, { module: c1.id, port: 'out' }, { module: dly.id, port: 'in' });
     if (clockEvery) connect(p, DEFS, { module: kb.id, port: 'clock' }, { module: dly.id, port: 'clk' });
     connect(p, DEFS, { module: dly.id, port: 'out' }, { module: out.id, port: 'l' });

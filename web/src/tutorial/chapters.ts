@@ -40,7 +40,7 @@ const ch1: Chapter = {
   id: 'hello-sound',
   title: 'Hello sound',
   patchName: 'Tutorial voice',
-  intro: 'A patch is a few modules and the cables between them. Main is the keyboard (and, on the FM-1, its panel), Output is the speaker. Between them you put a sound source and whatever shapes it. This chapter makes the simplest possible synth: one oscillator.',
+  intro: 'A patch is a few modules and the cables between them. Main is the keyboard (and, on the FM-1, its panel), Output is the speaker. Between them you put a sound source and whatever shapes it. The first thing to learn is how a note starts and stops: the oscillator never stops on its own, so a VCA (voltage controlled amplifier) opens and closes for it.',
   start: () => PRESETS['Subtractive saw'](),
   keep: true,
   steps: [
@@ -58,7 +58,7 @@ const ch1: Chapter = {
     {
       id: 'osc', title: 'Add an Oscillator',
       text: 'Click + Add module (or press /) and pick Oscillator. A new card appears on the canvas; drag it by its header to move it.',
-      why: 'The oscillator is the sound source: it repeats one waveform at the pitch it is told. Everything else in a synth shapes what comes out of it.',
+      why: 'The oscillator is the sound source: it repeats one waveform at the pitch it is told, all the time. Everything else in a synth shapes what comes out of it.',
       check: (s) => has(s.patch, 'osc'), apply: (a) => a.edit((p) => place(p, 'osc')), target: () => T.ui('add-btn'),
     },
     {
@@ -69,16 +69,31 @@ const ch1: Chapter = {
       target: (s) => [...T.port(mod(s.patch, 'fm1'), 'pitch', 'out'), ...T.port(mod(s.patch, 'osc'), 'pitch', 'in')],
     },
     {
-      id: 'audio-out', title: 'Send the sound to the Output',
-      text: 'Drag the Oscillator’s out jack to Output’s l jack. Coral cables carry audio. The Oscillator now sounds all the time.',
-      check: (s) => cabled(s.patch, mod(s.patch, 'osc'), 'out', mod(s.patch, 'output'), 'l'),
-      apply: (a) => a.edit((p) => wire(p, mod(p, 'osc'), 'out', mod(p, 'output'), 'l')),
-      target: (s) => [...T.port(mod(s.patch, 'osc'), 'out', 'out'), ...T.port(mod(s.patch, 'output'), 'l', 'in')],
+      id: 'vca', title: 'Add a VCA and feed it',
+      text: 'Add a VCA and drag the Oscillator’s out jack to the VCA’s in jack. Coral cables carry audio. Nothing reaches the Output yet, so nothing sounds.',
+      why: 'A VCA multiplies its input by the signal at its cv input: cv 1 lets everything through, cv 0 is silence. The grey route inside the card shows that cv is wired to gain by design; that link cannot be removed.',
+      check: (s) => cabled(s.patch, mod(s.patch, 'osc'), 'out', mod(s.patch, 'vca'), 'in'),
+      apply: (a) => a.edit((p) => { const v = mod(p, 'vca') ?? place(p, 'vca'); wire(p, mod(p, 'osc'), 'out', v, 'in'); }),
+      target: (s) => has(s.patch, 'vca') ? [...T.port(mod(s.patch, 'osc'), 'out', 'out'), ...T.port(mod(s.patch, 'vca'), 'in', 'in')] : T.ui('add-btn'),
+    },
+    {
+      id: 'gate', title: 'Let the key open it',
+      text: 'Drag Main’s gate jack to the VCA’s cv jack. Gold cables carry gates: on while a key is held, off otherwise. Now the VCA only passes sound while you hold a key.',
+      check: (s) => cabled(s.patch, mod(s.patch, 'fm1'), 'gate', mod(s.patch, 'vca'), 'cv'),
+      apply: (a) => a.edit((p) => wire(p, mod(p, 'fm1'), 'gate', mod(p, 'vca'), 'cv')),
+      target: (s) => [...T.port(mod(s.patch, 'fm1'), 'gate', 'out'), ...T.port(mod(s.patch, 'vca'), 'cv', 'in')],
+    },
+    {
+      id: 'out', title: 'Send it to the Output',
+      text: 'Drag the VCA’s out jack to Output’s l jack. Press A on your keyboard: the note starts when you press and stops when you let go. The keys A W S E D F T G Y H U J K play notes, Z and X move the octave.',
+      check: (s) => cabled(s.patch, mod(s.patch, 'vca'), 'out', mod(s.patch, 'output'), 'l'),
+      apply: (a) => a.edit((p) => wire(p, mod(p, 'vca'), 'out', mod(p, 'output'), 'l')),
+      target: (s) => [...T.port(mod(s.patch, 'vca'), 'out', 'out'), ...T.port(mod(s.patch, 'output'), 'l', 'in')],
     },
     {
       id: 'note', title: 'Play a note', transient: true,
-      text: 'Press A on your keyboard. The keys A W S E D F T G Y H U J K play notes, Z and X move the octave. The pitch changes while the tone keeps going.',
-      check: (s) => s.seen.notes > 0, apply: (a) => a.note(), target: () => T.ui('tutorial-note'),
+      text: 'Hold a key, or the button below. The Output’s level slider is the volume: it starts low on purpose, raise it to taste.',
+      check: (s) => s.seen.notes > 0, apply: (a) => a.note(), target: (s) => T.param(mod(s.patch, 'output'), 'level'),
     },
     {
       id: 'scope', title: 'Look at the wave', transient: true,
@@ -87,13 +102,6 @@ const ch1: Chapter = {
       check: (s) => [...s.probes].some((k) => k === `${mod(s.patch, 'osc')?.id}:out`),
       apply: (a) => { const o = mod(a.patch(), 'osc'); if (o) a.probe(o.id, 'out'); },
       target: (s) => T.port(mod(s.patch, 'osc'), 'out', 'out'),
-    },
-    {
-      id: 'undo', title: 'Break it, then undo', transient: true,
-      text: 'Click × on the Oscillator’s header: the card and its cables are gone. Press Ctrl+Z (Cmd+Z on a Mac), or Commands → Undo, and it is back.',
-      check: (s) => s.seen.undos > 0 && has(s.patch, 'osc') && cabled(s.patch, mod(s.patch, 'osc'), 'out', mod(s.patch, 'output'), 'l'),
-      apply: (a) => { a.edit((p) => { const o = mod(p, 'osc'); if (o) removeModule(p, o.id); }); a.undo(); },
-      target: (s) => T.module(mod(s.patch, 'osc')?.id),
     },
     {
       id: 'wave', title: 'Change the wave',
@@ -111,29 +119,9 @@ const ch2: Chapter = {
   id: 'shaping-a-note',
   title: 'Shaping a note',
   patchName: 'Tutorial voice',
-  intro: 'A note has a shape: it starts, holds and dies away. Two modules draw it. The VCA is a volume control driven by a signal, and the envelope generator (ADSR: attack, decay, sustain, release) makes that signal each time the gate opens.',
+  intro: 'A gate is on or off, so the note it opens is on or off too. Real notes have a shape: they start, hold and die away. The envelope generator (ADSR: attack, decay, sustain, release) draws that shape each time the gate opens, and the VCA follows it instead of the bare gate.',
   start: () => null,
   steps: [
-    {
-      id: 'vca', title: 'Add a VCA',
-      text: 'Add a VCA (voltage controlled amplifier). It has an audio input, an audio output and a cv input that sets its gain.',
-      check: (s) => has(s.patch, 'vca'), apply: (a) => a.edit((p) => place(p, 'vca')), target: () => T.ui('add-btn'),
-    },
-    {
-      id: 'reroute', title: 'Put the VCA in the path',
-      text: 'Cable Oscillator out → VCA in and VCA out → Output l. Click the old cable from the Oscillator to Output to remove it. Silence: the gain is driven by nothing yet.',
-      check: (s) => cabled(s.patch, mod(s.patch, 'osc'), 'out', mod(s.patch, 'vca'), 'in') && cabled(s.patch, mod(s.patch, 'vca'), 'out', mod(s.patch, 'output'), 'l') && !cabled(s.patch, mod(s.patch, 'osc'), 'out', mod(s.patch, 'output'), 'l'),
-      apply: (a) => a.edit((p) => { wire(p, mod(p, 'osc'), 'out', mod(p, 'vca'), 'in'); wire(p, mod(p, 'vca'), 'out', mod(p, 'output'), 'l'); unwire(p, mod(p, 'osc'), 'out', mod(p, 'output'), 'l'); }),
-      target: (s) => [...T.port(mod(s.patch, 'osc'), 'out', 'out'), ...T.port(mod(s.patch, 'vca'), 'in', 'in'), ...T.port(mod(s.patch, 'vca'), 'out', 'out'), ...T.port(mod(s.patch, 'output'), 'l', 'in')],
-    },
-    {
-      id: 'gate', title: 'Open it with the gate', superseded: true,
-      text: 'Drag Main’s gate to the VCA’s cv. Gold cables carry gates: on while a key is held, off otherwise. The grey route inside the card shows that cv is wired to gain by design.',
-      why: 'The VCA multiplies its input by the cv: gate on means gain 1, gate off means silence. That grey route cannot be removed: a VCA whose cv did not set its gain would not be a VCA.',
-      check: (s) => cabled(s.patch, mod(s.patch, 'fm1'), 'gate', mod(s.patch, 'vca'), 'cv'),
-      apply: (a) => a.edit((p) => wire(p, mod(p, 'fm1'), 'gate', mod(p, 'vca'), 'cv')),
-      target: (s) => [...T.port(mod(s.patch, 'fm1'), 'gate', 'out'), ...T.port(mod(s.patch, 'vca'), 'cv', 'in')],
-    },
     {
       id: 'adsr', title: 'Add an ADSR',
       text: 'Add an ADSR. Its env output rises when the gate opens, falls to the sustain level, and dies away after the gate closes.',
@@ -144,15 +132,22 @@ const ch2: Chapter = {
       text: 'Cable Main gate → ADSR gate and ADSR env → VCA cv, then click the cable from Main’s gate to the VCA to remove it. The note now has a shape.',
       check: (s) => cabled(s.patch, mod(s.patch, 'fm1'), 'gate', mod(s.patch, 'adsr'), 'gate') && cabled(s.patch, mod(s.patch, 'adsr'), 'env', mod(s.patch, 'vca'), 'cv') && !cabled(s.patch, mod(s.patch, 'fm1'), 'gate', mod(s.patch, 'vca'), 'cv'),
       apply: (a) => a.edit((p) => { wire(p, mod(p, 'fm1'), 'gate', mod(p, 'adsr'), 'gate'); wire(p, mod(p, 'adsr'), 'env', mod(p, 'vca'), 'cv'); unwire(p, mod(p, 'fm1'), 'gate', mod(p, 'vca'), 'cv'); }),
-      target: (s) => [...T.port(mod(s.patch, 'adsr'), 'gate', 'in'), ...T.port(mod(s.patch, 'adsr'), 'env', 'out'), ...T.port(mod(s.patch, 'vca'), 'cv', 'in')],
+      target: (s) => [...T.port(mod(s.patch, 'fm1'), 'gate', 'out'), ...T.port(mod(s.patch, 'adsr'), 'gate', 'in'), ...T.port(mod(s.patch, 'adsr'), 'env', 'out'), ...T.port(mod(s.patch, 'vca'), 'cv', 'in')],
     },
     {
       id: 'shape', title: 'Draw the shape',
       text: 'Drag the ADSR’s a (attack) to about 0.3 s and r (release) to about 1 s. Hold a note: it swells in and fades out after you let go.',
-      why: 'Attack and release are times, sustain is a level. Plucked and struck sounds have a short attack and no sustain; pads have long attacks and releases.',
+      why: 'Attack and release are times, sustain is a level. Pads have long attacks and releases; the next step makes the opposite.',
       check: (s) => pct(s.patch, 'adsr', 'a') >= 0.1 && pct(s.patch, 'adsr', 'r') >= 0.5,
       apply: (a) => a.edit((p) => { const e = mod(p, 'adsr')!; e.params.a = 0.3; e.params.r = 1; }),
       target: (s) => [...T.param(mod(s.patch, 'adsr'), 'a'), ...T.param(mod(s.patch, 'adsr'), 'r')],
+    },
+    {
+      id: 'pluck', title: 'Make it percussive',
+      text: 'Set s (sustain) to 0.1 and d (decay) to about 0.2 s. Hold a note: it rings out and dies although the key is still down. Plucked and struck sounds have no sustain.',
+      check: (s) => pct(s.patch, 'adsr', 's') <= 0.3 && pct(s.patch, 'adsr', 'd') <= 0.4,
+      apply: (a) => a.edit((p) => { const e = mod(p, 'adsr')!; e.params.s = 0.1; e.params.d = 0.2; }),
+      target: (s) => [...T.param(mod(s.patch, 'adsr'), 's'), ...T.param(mod(s.patch, 'adsr'), 'd')],
     },
     {
       id: 'thumb', title: 'A slider thumb is a jack',
@@ -164,9 +159,10 @@ const ch2: Chapter = {
     },
     {
       id: 'redo', title: 'Undo and redo', transient: true,
-      text: 'Press Ctrl+Z: the route is gone. Press Shift+Ctrl+Z (Commands → Redo) and it is back. Forty steps of history are kept.',
+      text: 'Press Ctrl+Z (Cmd+Z on a Mac), or Commands → Undo: the route is gone. Press Shift+Ctrl+Z (Commands → Redo) and it is back. Forty steps of history are kept, cables and modules included.',
       check: (s) => s.seen.undos > 0 && s.seen.redos > 0 && (['p1', 'p2'] as const).some((pin) => cabled(s.patch, mod(s.patch, 'adsr'), 'env', mod(s.patch, 'osc'), pin)),
       apply: (a) => { a.undo(); a.redo(); },
+      target: () => T.ui('palette-btn'),
     },
   ],
 };

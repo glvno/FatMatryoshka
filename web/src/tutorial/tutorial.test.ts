@@ -9,10 +9,10 @@ import { completes, HeadlessSession, headlessState, noSeen, runCourse } from './
 
 const SR = 48000;
 /** peak of a second of audio with a C held */
-function peak(p: Patch): number {
+function peak(p: Patch, key = true): number {
   const e = new Engine(SR);
   e.load(validatePatch(JSON.parse(JSON.stringify(p)), DEFS));
-  e.noteOn(60, 0.8);
+  if (key) e.noteOn(60, 0.8);
   e.clockRun(true);
   const l = new Float32Array(128);
   const r = new Float32Array(128);
@@ -68,6 +68,17 @@ describe('tutorial course', () => {
       expect(completes(CHAPTERS[i - 1], chapterStart(i), run.library)).toBe(true);
     }
     for (let i = 0; i < CHAPTERS.length; i++) expect(chapterEnd(i).modules.length).toBeGreaterThan(2);
+  });
+
+  it('chapter 1 never lets an uncontrolled note through: silent without a key after every step', () => {
+    const s = new HeadlessSession(chapterStart(0), []);
+    for (const st of CHAPTERS[0].steps) {
+      s.state.entry = JSON.parse(JSON.stringify(s.state.patch)) as Patch;
+      s.state.seen = noSeen();
+      if (!st.check(s.state)) st.apply(s, s.state);
+      expect(peak(s.state.patch, false), `${st.id}: sound without a key`).toBeLessThan(1e-4);
+    }
+    expect(peak(s.state.patch)).toBeGreaterThan(0.01);
   });
 
   it.each(CHAPTERS.map((c, i) => [i + 1, c.title] as const))('chapter %i (%s): the result makes sound', (n) => {
