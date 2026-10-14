@@ -1,0 +1,13 @@
+.word-art{height:180px;justify-content:center}
+.word-art svg{max-height:170px;width:100%}
+.small-word{height:110px;align-items:center}
+.small-word svg{max-height:110px}
+.type-settings{font-size:13px;color:var(--muted);margin-bottom:16px}
+.type-settings span{display:block}
+.doll-study{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:center;margin:24px 0 48px}
+.doll-study>img{width:100%;max-height:460px;object-fit:contain}
+.icon-sizes{display:flex;gap:24px;align-items:end;margin-top:24px}
+figure{margin:0}figure img{object-fit:contain}figcaption{font-size:12px;color:var(--muted)}
+.reference-art{max-width:650px;margin-top:28px}.reference-art svg{width:100%;height:auto}
+#reference{--wordmark-accent:var(--teal);margin-bottom:48px}
+@media(max-width:650px){.doll-study{grid-template-columns:1fr}.doll-study>img{max-height:350px}.preview-panel{display:block}.sidebar-preview{margin:20px auto 8px}.preview-controls{max-width:320px}.word-art{height:160px}.small-word{height:100px}}

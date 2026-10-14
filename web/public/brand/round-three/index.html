@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FatMatryoshka — Roboto Flex studies</title>
+  <link rel="stylesheet" href="../round-two/studies.css">
+  <link rel="stylesheet" href="studies.css">
+</head>
+<body>
+<header>
+  <a href="../round-two/index.html?wordmark=w06&amp;icon=15-flat-cut-paper&amp;theme=dark">Round two: the starting point</a>
+  <h1>More FAT. Less length.</h1>
+  <p><a href="../round-four/index.html">New: full-axis type lab with mixed-case lettering and independent sliders</a></p>
+  <p>Four Roboto Flex wordmarks. A full-height teal 1 forms the R’s stem in MATRYOSHKA, so the accented letters read FM1. The R’s bowl and diagonal leg stay in the regular text color. Independent width and weight give the two words different proportions.</p>
+  <nav aria-label="Studies"><a href="#wordmarks">Compare wordmarks</a><a href="#dolls">Connected siblings</a><a href="#reference">Original W06</a></nav>
+</header>
+<div class="layout">
+<main>
+  <section id="wordmarks">
+    <h2>One line or a compact block?</h2>
+    <p>Start with the full-width stack: MATRYOSHKA sets the width, FAT fills the space above it. Compare each study at 175 pixels below.</p>
+    <div id="wordmark-list" class="grid wordmarks"></div>
+  </section>
+  <section id="dolls">
+    <h2>Two siblings, one connection</h2>
+    <div class="doll-study">
+      <img src="24-brand-siblings.png" alt="Open coral and yellow nesting dolls with two small teal dolls in the inner bowl. Outer sibling jacks connect to the yellow parent; inner jacks connect directly to one another.">
+      <div>
+        <p>Two teal dolls sit inside the yellow parent. The outer jacks connect upward to that parent; the two inward-facing jacks share one short cable.</p>
+        <p>Detail reduces with size: hair and a smile on the outer doll, a simpler middle face, and just two eye marks on each small teal body. No ivory face discs on the smallest dolls.</p>
+        <a href="24-brand-siblings.png" download>Download transparent PNG</a>
+        <div class="icon-sizes"><figure><img src="24-brand-siblings.png" width="96" height="96" alt="Doll icon at 96 pixels"><figcaption>96 px</figcaption></figure><figure><img src="24-brand-siblings.png" width="48" height="48" alt="Doll icon at 48 pixels"><figcaption>48 px</figcaption></figure></div>
+      </div>
+    </div>
+  </section>
+  <section id="reference">
+    <h2>The starting point</h2>
+    <div class="reference-art" id="original-wordmark"></div>
+    <p>W06 · Archivo Black · the original numeral inside K.</p>
+  </section>
+  <section class="method">
+    <h2>Study files</h2>
+    <p>The four new wordmarks are SVG outlines with no font dependency at display time. Each uses different Roboto Flex width, weight, and optical-size settings for FAT and MATRYOSHKA.</p>
+    <p><a href="wordmarks.json">Exact type settings</a> · <a href="brand-color-edit.json">Image-generation prompt and brand colors</a> · <a href="https://github.com/google/fonts/tree/main/ofl/robotoflex">Roboto Flex source</a> · <a href="fonts/OFL-RobotoFlex.txt">Font licence</a></p>
+  </section>
+  <noscript><p>JavaScript enables selection and theme controls. Open a wordmark directly: <a href="r01.svg">Wide / narrow</a>, <a href="r02.svg">Big / small</a>, <a href="r03.svg">Full-width stack</a>, <a href="r04.svg">Compact stack</a>.</p></noscript>
+</main>
+<aside id="pair" class="preview-panel" aria-label="Selected logo preview">
+  <div class="preview-controls"><h2>Try a wordmark</h2><label>Background <select id="theme"><option value="dark">Dark</option><option value="light">Light</option></select></label></div>
+  <div class="sidebar-preview">
+    <img src="24-brand-siblings.png" alt="Two teal sibling dolls nested inside the yellow parent">
+    <div id="selected-wordmark"></div>
+    <div class="preview-tab">Patch</div><div class="preview-button">New patch</div><strong>My first voice</strong><div class="preview-button add">+ Add module</div><div class="preview-button assembly">+ Add assembly</div>
+  </div>
+  <p class="caption">208 px sidebar · 175 px artwork</p>
+  <p id="selection" role="status"></p>
+  <button id="copy" type="button">Copy link to this study</button>
+  <p id="copy-status" role="status"></p>
+  <p class="caption">Brand studies for comparison.</p>
+</aside>
+</div>
+<a id="view-pair" href="#pair">View selected pair</a>
+<script type="module" src="studies.js"></script>
+</body>
+</html>

@@ -2,6 +2,14 @@
 
 ## FatMatryoshka workspace and identity
 
+- Ship the selected Roboto Flex R/1 wordmark and four-doll artwork in the sidebar, About screen, favicon and README. Generate the active assets from the saved selection and support light/dark wordmark colors; retain the full-axis lab and earlier studies.
+- Hide the yellow cable-arm terminations behind the coral parent’s rim, removing the exposed interior collars while retaining the side-aligned routing.
+- Match cable jackets to the doll whose arms they represent: coral outer arms, yellow middle arms and teal sibling arms, including the shared sibling connection.
+- Add an all-coral cable-jacket variant to the brand lab, preserving the port alignment, sibling connection and black-and-gold external plug hardware.
+- Give both smallest teal dolls white faces with black eyes and no mouths. Align the coral outer shell’s internal cable origins beneath its external ports to clarify the through-shell connections.
+- Save the selected one-line wordmark as the type lab’s default and current-wordmark preset. Repair the yellow center doll’s right cable to connect upward to the coral parent and add a simple smile, preserving the two teal siblings and their connections.
+- Add a full-axis Roboto Flex type lab with independent word or line controls, mixed-case studies, live width comparison, theme-aware SVG exports and shareable settings. Include FAT / MAT / RYO / SHKA and FAT / MAT / RYOSHKA arrangements with separate gap sliders. Preserve the teal R/1 signature across variable stroke weight, capital height and slant; match its serif to the selected thin stroke.
+- Add round-three brand studies: four Roboto Flex wordmarks with separate FAT/MATRYOSHKA proportions and a teal R-stem numeral 1, plus two teal sibling dolls inside the yellow middle doll, with a direct inner-jack connection and simpler faces. Reuse the existing brand palette. Include light/dark sidebar previews and downloadable artwork.
 - Paint slider tracks below internal cables, with draggable controls and jack thumbs above them.
 - Remove opaque backgrounds from parameter labels, values and port text so their grid cells no longer hide internal cable segments.
 - Use Barlow for patch controls and Barlow Semi Condensed for module and assembly names. Enlarge labels, align tabular values, and wrap assembly actions when needed. Reposition cables when fonts finish loading.

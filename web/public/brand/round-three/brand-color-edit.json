@@ -1,0 +1,18 @@
+{
+  "mode": "Built-in image_gen",
+  "reference": "../round-two/15-flat-cut-paper.png",
+  "output": "24-brand-siblings.png",
+  "palette": {
+    "outer": "#e7775d",
+    "middle": "#e8b65a",
+    "innermost": "#287d80",
+    "ivory": "#fff7e8",
+    "ink": "#171f21",
+    "wordmarkLight": "#226669",
+    "wordmarkDark": "#79c7c1"
+  },
+  "prompt": "Use case: precise-object-edit. Image 1 is the EDIT TARGET (four dolls, two blue siblings). Image 2 is ONLY the ORIGINAL BRAND COLOR REFERENCE (three dolls, one yellow core); do NOT copy its number of dolls or wiring. Make ONLY these color changes to image 1: (1) Recolor the entire MIDDLE doll's teal upper shell AND its matching teal lower bowl to the original yellow/gold #e8b65a of image 2's smallest core doll. (2) Recolor BOTH innermost small cobalt-blue dolls to the original middle doll's teal #287d80 from image 2. Eliminate all cobalt blue. Preserve the coral outer upper shell and coral outer lower bowl, ivory rims and interiors, dark cables, gold metal plug ends. Preserve EXACTLY image 1's positions, sizes, silhouettes, four-doll composition, open shells, faces, jack rings and every cable route. In particular both small teal dolls must have ONLY TWO SMALL IVORY DOT EYES ON THEIR TEAL BODIES, NO IVORY FACE DISCS, no mouths, no hair. The yellow middle doll retains its ivory face disc and two dark eyes. The outer coral doll retains hair and smiling face. Inner-facing jacks of the small dolls remain linked directly to each other by the single short U cable; each outer-facing small-doll jack connects up to the INSIDE of the now-YELLOW middle upper shell. No bowl connections. Preserve flat cut-paper styling, crisp edges and the transparent background. No new colors, no new features, no text.",
+  "editTarget": "23-blue-siblings.png",
+  "followup": null,
+  "notes": "Brand palette restored: yellow middle shell and matching bowl; teal innermost siblings with two ivory eyes and no face discs. Cable routing and geometry preserved."
+}

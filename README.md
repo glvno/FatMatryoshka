@@ -3,7 +3,10 @@
 **FatMatryoshka is a fork of a fork of bootleg firmware. Big ups to [Leo Kuroshita (@kurogedelic)](https://github.com/kurogedelic) / [Hügelton Instruments](https://github.com/hugelton), creators of [Felucca](https://github.com/hugelton/Felucca), and [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), creators of [Modular-1](https://github.com/WiggisModular/Modular-1).**
 
 <p align="center">
-  <img src="web/public/brand/fatmatryoshka.png" width="240" height="240" alt="FatMatryoshka: split coral and teal synth dolls wired to a gold doll inside, embraced by loose patch cables" />
+  <img src="web/public/brand/fatmatryoshka.png" width="240" height="240" alt="Coral and yellow parent dolls with two teal siblings, connected by matching cable arms" />
+</p>
+<p align="center">
+  <img src="web/public/brand/wordmark.svg" width="480" alt="FatMatryoshka" />
 </p>
 
 # FatMatryoshka
@@ -25,7 +28,7 @@ A handful of patch presets are provided. Use them to learn, then replace them wi
 
 Start with **How a patch works** in the sidebar: play a four-module voice, trace the signals, and turn the voice into an assembly. Browser audio is enabled automatically; a fresh browser may wait for your first interaction. Enabling the arpeggiator plays only held keys.
 
-Compare [12 wordmarks and 12 new pictorial logos](https://glvno.github.io/FatMatryoshka/brand/round-two/), the [earlier ten candidates](https://glvno.github.io/FatMatryoshka/brand/candidates/), and the [UX improvement proposals](https://glvno.github.io/FatMatryoshka/review/). The wordmark uses equal-height sans-serif small caps, with teal F, M, and a footless “1” forming the K’s stem.
+The wordmark uses independently styled Roboto Flex capitals, with teal F, M, and a full-height “1” forming the R’s stem. The logo pairs coral and yellow parent dolls with two teal siblings and matching cable arms. The selected wordmark and editable settings are in the [type lab](https://glvno.github.io/FatMatryoshka/brand/round-four/index.html?preset=p09). Earlier [wordmark and pictorial studies](https://glvno.github.io/FatMatryoshka/brand/round-two/index.html), [ten candidates](https://glvno.github.io/FatMatryoshka/brand/candidates/index.html), and [UX proposals](https://glvno.github.io/FatMatryoshka/review/index.html) remain available.
 
 The sidebar holds the logo, **New patch**, patch name, example picker, **Add module**, **Add assembly**, audio controls, and **Patch / Library** navigation. **Commands** (Ctrl/Cmd+K) opens file operations, undo/redo, grouping, A/B snapshots, hardware settings, firmware installation, and help. The palette opens on actions; its Modules, Assemblies and Patches filters let you browse without guessing a name. On narrow screens, **Workspace** opens a sidebar drawer. **Tab** moves through controls; **Alt+B** switches A/B.
 

@@ -1,0 +1,78 @@
+[
+  {
+    "id": "r01",
+    "name": "Wide FAT / narrow MATRYOSHKA",
+    "fat": [
+      1000,
+      140,
+      72
+    ],
+    "mat": [
+      720,
+      45,
+      72
+    ],
+    "layout": "line",
+    "ratio": 1,
+    "description": "Same cap height. Width and weight give FAT its own voice while pulling the long name inward.",
+    "file": "r01.svg",
+    "aspect": 10.37
+  },
+  {
+    "id": "r02",
+    "name": "Big FAT / small MATRYOSHKA",
+    "fat": [
+      1000,
+      125,
+      96
+    ],
+    "mat": [
+      800,
+      25,
+      96
+    ],
+    "layout": "line",
+    "ratio": 1.35,
+    "description": "A taller FAT and the narrowest MATRYOSHKA. A compact horizontal signature with a shared baseline.",
+    "file": "r02.svg",
+    "aspect": 8.03
+  },
+  {
+    "id": "r03",
+    "name": "Full-width stack",
+    "fat": [
+      1000,
+      151,
+      72
+    ],
+    "mat": [
+      800,
+      35,
+      72
+    ],
+    "layout": "stack",
+    "ratio": 1,
+    "description": "Both words fill the same width. The oversized FAT turns the name into a solid graphic block.",
+    "file": "r03.svg",
+    "aspect": 2.24
+  },
+  {
+    "id": "r04",
+    "name": "Compact stack",
+    "fat": [
+      950,
+      140,
+      48
+    ],
+    "mat": [
+      700,
+      50,
+      48
+    ],
+    "layout": "stack",
+    "ratio": 0.72,
+    "description": "A centered FAT at 72% of the lower line\u2019s width. More breathing room, less dominance.",
+    "file": "r04.svg",
+    "aspect": 2.61
+  }
+]

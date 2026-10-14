@@ -6,7 +6,8 @@
   "license": "GPL-3.0-only",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run brand:flex && tsc --noEmit && vite build",
+    "brand:flex": "node scripts/build-brand-flex.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "golden": "vite-node scripts/golden.ts",
@@ -14,6 +15,8 @@
     "export-defs": "vite-node scripts/export-defs.ts"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
+    "fontkit": "^2.0.4",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vite-node": "^6.0.0",

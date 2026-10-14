@@ -228,7 +228,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 
 .about-brand { text-align: center; margin-top: 12px; border-top: 3px solid var(--accent); }
 .about-brand > img { display: block; margin: 0 auto 12px; }
-.about-brand h2 { font-size: 28px; letter-spacing: -.04em; margin-bottom: 12px; }
+.about-brand h2 { max-width: 360px; margin: 0 auto 12px; }
 .credits { border-top: 3px solid var(--secondary); }
 .credits h2 { color: var(--accent); }
 
@@ -340,8 +340,6 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .module .x { font-size: 20px; }
 .brand .wordmark { width: 100%; margin: 0; line-height: 1; }
 .brand-mark { display: block; width: 100%; height: auto; overflow: visible; }
-.brand-mark .brand-ink { fill: var(--ink); }
-.brand-mark .brand-accent { fill: var(--secondary); }
 #add-assembly-btn { background: var(--secondary); border-color: var(--secondary); color: var(--panel); }
 #tour-btn { color: var(--secondary); border-color: transparent; text-align: left; padding-inline: 0; background: transparent; }
 .example-picker { display: grid; gap: 5px; font-size: 11px; color: var(--muted); margin-top: 12px; }

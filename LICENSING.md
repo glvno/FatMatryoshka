@@ -21,8 +21,24 @@ Packages made by `tools/build.py` embed three files from the JieLi AC79 SDK (`ub
 
 The self-hosted Alegreya SC Bold heading font is by Juan Pablo del Peral / Huerta Tipográfica, distributed under the SIL Open Font License 1.1. Its licence is included at `web/public/fonts/OFL-AlegreyaSC.txt`; source: https://github.com/google/fonts/tree/main/ofl/alegreyasc.
 
-The SVG wordmark and patch editor use Barlow Semi Condensed Bold and Barlow Medium by Jeremy Tribby, distributed under the SIL Open Font License 1.1. Their licences are included at `web/public/fonts/OFL-BarlowSemiCondensed.txt` and `web/public/fonts/OFL-Barlow.txt`; sources: https://github.com/google/fonts/tree/main/ofl/barlowsemicondensed and https://github.com/google/fonts/tree/main/ofl/barlow. `web/scripts/wordmark.py` generates equal-height small caps and replaces the K stem with a footless numeral 1.
+The patch editor and earlier wordmark use Barlow Semi Condensed Bold and Barlow Medium by Jeremy Tribby, distributed under the SIL Open Font License 1.1. Their licences are included at `web/public/fonts/OFL-BarlowSemiCondensed.txt` and `web/public/fonts/OFL-Barlow.txt`; sources: https://github.com/google/fonts/tree/main/ofl/barlowsemicondensed and https://github.com/google/fonts/tree/main/ofl/barlow. `web/scripts/wordmark.py` regenerates the legacy K-stem wordmark as a study without replacing the current branding.
+
+The active SVG wordmark uses Roboto Flex under SIL OFL 1.1, with the selected axes and preset recorded in `web/public/brand/wordmark-settings.json`. `npm run brand:flex` generates its outlines from preset `p09` and promotes `round-three/29-hidden-arm-ends.png` to the app’s `brand/fatmatryoshka.png`. The app displays the outlined SVG without loading a font renderer or the variable font at runtime.
 
 The ten logo concept PNGs in `web/public/brand/candidates/` were generated with the built-in image generation tool using the current project logo as reference. Their prompts are recorded in `docs/logo-candidate-prompts.json`. They are review candidates; the app continues to use `web/public/brand/fatmatryoshka.png`.
 
 The twelve further pictorial concepts in `web/public/brand/round-two/` were generated with the built-in image tool; their exact prompts are in `docs/logo-round-two-prompts.json`. The comparison uses Nick Dawson's [design-partner skill](https://github.com/nickpdawson/claude-studio-design-partner-skill/blob/main/SKILL.md). The twelve SVG wordmark studies use Barlow, Barlow Condensed, Barlow Semi Condensed, Space Grotesk, Rajdhani, Archivo Black, and one custom line drawing. The additional font sources and OFL licence texts are included in `web/public/brand/round-two/fonts/`.
+
+The third-round wordmarks use Roboto Flex from https://github.com/google/fonts/tree/main/ofl/robotoflex under the SIL Open Font License 1.1. The unmodified variable font and licence are included in `web/public/brand/round-three/fonts/`. `web/scripts/wordmark-flex.py` generates the SVG outlines and replaces the R stem in MATRYOSHKA with a custom footless numeral 1, so the accented letters read FM1. The two-sibling pictorial study was edited with the built-in image generator; its initial prompts are recorded in `web/public/brand/round-three/prompts.json` and its brand-color correction in `web/public/brand/round-three/brand-color-edit.json`.
+
+The fourth-round type lab uses the same Roboto Flex font and existing brand artwork. `npm run brand:flex` in `web/` builds its SVG starting points and browser renderer. The browser bundle includes Fontkit (MIT, Devon Govett) and dependencies; their notices are included in `web/public/brand/round-four/third-party-notices.txt` and the generated bundle’s linked licence comments.
+
+The lab’s revised doll artwork, `web/public/brand/round-three/25-routed-smile.png`, was edited with the built-in image generator. Its exact cable-routing and smile prompt is recorded in `web/public/brand/round-three/routing-smile-edit.json`.
+
+The subsequent revision, `web/public/brand/round-three/26-port-aligned-faces.png`, gives the smallest dolls white faces with black eyes and aligns the outer shell’s internal cable origins with its external ports. It was edited with the built-in image generator; the exact prompt is in `web/public/brand/round-three/port-aligned-faces-edit.json`.
+
+The all-coral cable variant, `web/public/brand/round-three/27-coral-cables.png`, was edited with the built-in image generator. Its prompt is in `web/public/brand/round-three/coral-cables-edit.json`.
+
+The doll-colored cable-arm variant, `web/public/brand/round-three/28-doll-colored-arms.png`, was edited with the built-in image generator. Its prompt is in `web/public/brand/round-three/doll-colored-arms-edit.json`.
+
+The hidden cable-end revision, `web/public/brand/round-three/29-hidden-arm-ends.png`, was edited with the built-in image generator. Its prompt is in `web/public/brand/round-three/hidden-arm-ends-edit.json`.

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FatMatryoshka — full-axis type lab</title>
+  <link rel="stylesheet" href="../round-two/studies.css"><link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<header>
+  <a href="../round-three/index.html">Previous wordmarks</a>
+  <h1>Let the letters change.</h1>
+  <p>Make Fat broader. Make MatRyoshka shorter—or break it into three or four lines. Change each line’s letter shapes independently and adjust the space between lines. The capital R keeps the approved FM1 detail.</p>
+  <nav><a href="#workbench">Type lab</a><a href="#starting-points">Starting points</a></nav>
+</header>
+<main class="lab-main">
+  <section id="workbench">
+    <div class="live-preview">
+      <div id="large-preview"><img src="p09.svg" alt="Current FatMatryoshka wordmark"></div>
+      <div class="small-lockup"><a href="../round-three/29-hidden-arm-ends.png"><img src="../round-three/29-hidden-arm-ends.png" alt="Nested dolls with matching cable arms that disappear behind their parent rims: coral outer doll, yellow middle doll and two teal siblings" width="96" height="96"></a><div id="small-preview"></div><span>175 px wordmark</span></div>
+      <p id="width-ratio"></p>
+    </div>
+    <p id="status" role="status">Loading Roboto Flex…</p>
+    <fieldset id="controls" disabled>
+      <legend class="sr-only">Wordmark controls</legend>
+      <div class="composition">
+        <label>Letter case<select id="case"><option value="mixed">Fat / MatRyoshka</option><option value="contrast">FAT / MatRyoshka</option><option value="caps">FAT / MATRYOSHKA</option></select></label>
+        <label>Arrangement<select id="layout"><option value="line">One line</option><option value="stack">Two lines</option><option value="three">FAT / MAT / RYOSHKA</option><option value="four">FAT / MAT / RYO / SHKA</option></select></label>
+        <label>Alignment<select id="alignment" aria-describedby="alignment-help"><option value="left">Left</option><option value="right">Right</option><option value="center" selected>Center</option><option value="justify">Justify</option></select></label>
+        <label>Background<select id="theme"><option value="dark">Dark</option><option value="light">Light</option></select></label>
+        <label>Fat’s relative size <output id="ratio-value" for="ratio"></output><input id="ratio" type="range" min=".5" max="3" step=".05"></label>
+      </div>
+      <p id="alignment-help" class="caption">Alignment applies to stacked lines. Justify spaces the letters to give every line the same width.</p>
+      <div id="line-gaps" class="gap-controls" hidden>
+        <p class="caption">Space between the visible edges of each line, in design units.</p>
+        <div id="gap-row-0" class="axis"><label for="gap-0">FAT → MAT</label><output id="gap-value-0" for="gap-0"></output><input id="gap-0" type="range" min="0" max="240" step="1"></div>
+        <div id="gap-row-1" class="axis"><label id="gap-label-1" for="gap-1">MAT → RYO</label><output id="gap-value-1" for="gap-1"></output><input id="gap-1" type="range" min="0" max="240" step="1"></div>
+        <div id="gap-row-2" class="axis"><label for="gap-2">RYO → SHKA</label><output id="gap-value-2" for="gap-2"></output><input id="gap-2" type="range" min="0" max="240" step="1"></div>
+      </div>
+      <div class="axis-columns">
+        <section><div class="axis-heading"><h2>Fat</h2><button id="fat-reset" type="button">Reset Fat axes</button></div><div id="fat-axes"></div><div class="figures" id="fat-figures"></div><p class="caption">Figure-height sample</p></section>
+        <section><div class="axis-heading"><h2 id="mat-title">MatRyoshka</h2><button id="mat-reset" type="button">Reset MatRyoshka axes</button></div><div id="mat-axes"></div><div class="figures" id="mat-figures"></div><p class="caption">Figure-height sample</p></section>
+        <section id="ryo-panel" hidden><div class="axis-heading"><h2 id="ryo-title">RYO</h2><button id="ryo-reset" type="button">Reset RYO axes</button></div><div id="ryo-axes"></div><div class="figures" id="ryo-figures"></div><p class="caption">Figure-height sample</p></section>
+        <section id="shka-panel" hidden><div class="axis-heading"><h2>SHKA</h2><button id="shka-reset" type="button">Reset SHKA axes</button></div><div id="shka-axes"></div><div class="figures" id="shka-figures"></div><p class="caption">Figure-height sample</p></section>
+      </div>
+    </fieldset>
+    <div class="save-actions"><a id="download" href="p09.svg" download="fatmatryoshka-wordmark.svg">Download outlined SVG</a><button id="copy" type="button" disabled>Copy link with settings</button><p id="copy-status" role="status"></p></div>
+    <p class="caption">Lowercase controls affect the mixed-case options. Figure height affects the numeral samples; the custom R/1 follows the capital height. Extreme combinations can close counters—check the 175 px preview.</p>
+  </section>
+  <section id="starting-points"><h2>Starting points</h2><p>Each is a different combination of actual font axes. Load one, then adjust each word or line.</p><div id="presets" class="grid"></div></section>
+  <p class="caption"><a href="presets.json">Preset settings</a> · <a href="https://v-fonts.com/fonts/roboto-flex">Axis reference</a> · <a href="../round-three/fonts/OFL-RobotoFlex.txt">Font licence</a> · <a href="third-party-notices.txt">Renderer notices</a></p>
+  <noscript><p>Live controls require JavaScript. SVG starting points: <a href="p01.svg">Broad / tight</a>, <a href="p02.svg">Soft / compact</a>, <a href="p03.svg">Stroke contrast</a>, <a href="p04.svg">Low / square</a>, <a href="p05.svg">Forward</a>, <a href="p06.svg">Caps</a>.</p></noscript>
+</main>
+<script type="module" src="lab.js"></script>
+</body></html>

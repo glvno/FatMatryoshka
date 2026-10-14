@@ -2,7 +2,9 @@
 # requires-python = ">=3.11"
 # dependencies = ["fonttools"]
 # ///
-"""Generate outlined branding: uv run web/scripts/wordmark.py.
+"""Regenerate the legacy Barlow study: uv run web/scripts/wordmark.py.
+
+For the active Roboto Flex wordmark, run npm run brand:flex in web/.
 
 Barlow Semi Condensed Bold is distributed under SIL OFL 1.1. See
 public/fonts/OFL-BarlowSemiCondensed.txt. The outlined SVG requires no font download.
@@ -42,9 +44,4 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg" class="brand-mark" viewBox="0 
   <style>.brand-ink{{fill:#202a2c}}.brand-accent{{fill:#226669}}@media(prefers-color-scheme:dark){{.brand-ink{{fill:#fff7e8}}.brand-accent{{fill:#79c7c1}}}}</style>
 {chr(10).join(paths)}
 </svg>'''
-(web / "public/brand/wordmark.svg").write_text(svg + "\n")
-index = web / "index.html"
-html = index.read_text()
-start = html.index('        <h1 class="wordmark">')
-end = html.index('</h1>', start) + len('</h1>')
-index.write_text(html[:start] + '        <h1 class="wordmark">' + svg + '</h1>' + html[end:])
+(web / "public/brand/round-two/legacy-wordmark.svg").write_text(svg + "\n")

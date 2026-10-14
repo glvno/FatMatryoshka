@@ -1,3 +1,28 @@
+FatMatryoshka active branding — approved 2026-10-14.
+
+Logo: web/public/brand/fatmatryoshka.png, copied unchanged from
+web/public/brand/round-three/29-hidden-arm-ends.png.
+Built-in image generation edit history and exact prompts are preserved in
+web/public/brand/round-three/*-edit.json and prompts.json.
+The final edit is hidden-arm-ends-edit.json.
+
+Coral outer doll; smiling yellow middle doll; two teal siblings with ivory
+faces, black eyes and no mouths. Cable arms match their dolls. The siblings’
+inner ports connect to one another; their outer ports connect to the yellow
+parent. Yellow arms connect upward at the coral parent’s side ports, with
+upper cable terminations hidden behind its rim.
+
+Wordmark: web/public/brand/wordmark.svg. Outlined Roboto Flex, selected preset
+p09 in web/scripts/brand-flex-presets.js. Exact axes are also published in
+web/public/brand/wordmark-settings.json. One line, all capitals, independent
+FAT and MATRYOSHKA settings. The full-height teal numeral 1 forms R’s stem;
+its serif matches the font’s thin strokes. Automatic light/dark colors.
+
+Rebuild active assets and the type lab: cd web && npm run brand:flex.
+The browser app uses static assets; Fontkit and Roboto Flex load only in the lab.
+
+Earlier logo provenance (superseded):
+-----------------------------------
 FatMatryoshka logo
 Updated with the built-in image generation tool, 2026-10-14.
 Final asset: web/public/brand/fatmatryoshka.png (transparent PNG).
