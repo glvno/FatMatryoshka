@@ -8,7 +8,7 @@
 
 # FatMatryoshka-1
 
-A modular synthesizer for the **M-VAVE FM-1**, with a browser patch editor and reusable, nested assemblies. Build a sound, wrap it into an instrument, then nest it inside something bigger. The name celebrates that matryoshka structure.
+A modular synthesizer for the **M-VAVE FM-1**, with a browser patch editor and reusable, nested assemblies. Build a sound, wrap it into an instrument, then nest it inside something bigger. 
 
 FatMatryoshka-1 is an independent project grown from Modular-1, which builds on Felucca's flashing tools and hardware support.
 
