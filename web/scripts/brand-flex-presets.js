@@ -1,4 +1,4 @@
-export const selectedPresetId = 'p12';
+export const selectedPresetId = 'p13';
 export const presets = [
   { id:'p01', name:'Broad FAT / tight lowercase', description:'Open, heavy FAT against condensed lowercase. Short ascenders and descenders keep the long word compact.',
     case:'contrast', layout:'line', ratio:1.25,
@@ -57,8 +57,15 @@ presets.push({...presets.find(preset => preset.id === 'p10'),
 
 // Approved full settings from the shared lab URL, 2026-10-14.
 presets.push({...presets.find(preset => preset.id === 'p11'),
-  id:'p12', name:'Matryoshka — selected wordmark',
-  description:'Current wordmark: narrow capitals, both T arms at 55%, A–T spacing −23, T–R spacing +6 and the teal R/1 signature.',
+  id:'p12', name:'Narrow wordmark without foot',
+  description:'Narrow capitals, both T arms at 55%, A–T spacing −23, T–R spacing +6 and the teal R/1 signature.',
   tuning:{ma:0,at:-23,tr:6,ry:0,yo:0,os:0,sh:0,hk:0,ka:0,leftArm:55,rightArm:55},
   mat:{opsz:144,wght:597,GRAD:-139,wdth:64,slnt:0,XOPQ:39,YOPQ:135,XTRA:425,YTUC:650,YTLC:550,YTAS:649,YTDE:-98,YTFI:732},
+});
+
+// Add the requested small numeral foot to the otherwise unchanged approved wordmark.
+presets.push({...presets.find(preset => preset.id === 'p12'),
+  id:'p13', name:'Matryoshka — selected wordmark',
+  description:'Current wordmark: the approved narrow capitals and shortened T arms, with a small teal foot completing the R/1.',
+  tuning:{...presets.find(preset => preset.id === 'p12').tuning,foot:50},
 });

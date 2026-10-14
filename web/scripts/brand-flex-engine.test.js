@@ -210,7 +210,7 @@ test('T adjustments round-trip, clamp invalid values and do not affect legacy FA
   assert.deepEqual(normalizeState(font,JSON.parse(JSON.stringify(state)),presets[1]),state);
   assert.deepEqual(normalizeState(font,{tuning:{at:-999,tr:'bad',leftArm:-1,rightArm:999}},presets[1]).tuning,
     {...current().tuning,at:-80,tr:0,leftArm:0,rightArm:100});
-  assert.deepEqual(current().tuning,{...Object.fromEntries(spacingPairs.map(pair=>[pair,0])),leftArm:100,rightArm:100});
+  assert.deepEqual(current().tuning,{...Object.fromEntries(spacingPairs.map(pair=>[pair,0])),leftArm:100,rightArm:100,foot:0});
   for (const layout of ['matryoshka','line','stack','three','four']) {
     const base=current();base.layout=layout; const before=renderWordmark(font,base);
     base.tuning=state.tuning;const after=renderWordmark(font,base);
@@ -257,4 +257,24 @@ test('older T-only links retain their settings and the latest working preset mat
   assert.deepEqual(latest.tuning,state.tuning);
   assert.equal(latest.mat.wght,597);assert.equal(latest.mat.wdth,64);
   assert.equal(latest.mat.XOPQ,39);assert.equal(latest.mat.YOPQ,121);assert.equal(latest.mat.XTRA,425);
+});
+
+
+test('the numeral foot changes only the teal base and preserves the selected lettering and spacing', () => {
+  for (const slnt of [0,-10]) {
+    const state=normalizeState(font,presets.find(p=>p.id==='p12'),presets[1]);state.mat.slnt=slnt;
+    const before=renderWordmark(font,state),original=outlineData(before.svg);
+    state.tuning.foot=50;
+    const after=renderWordmark(font,state),paths=outlineData(after.svg);
+    assert.equal(after.width,before.width);assert.equal(after.height,before.height);
+    assert.deepEqual(letterPositions(after.svg),letterPositions(before.svg));
+    assert.deepEqual(paths.filter((_,i)=>i!==4),original.filter((_,i)=>i!==4));
+    const points=d=>d.slice(1,-1).split('L').map(p=>p.split(' ').map(Number));
+    const old=points(original[4]),next=points(paths[4]);
+    assert.deepEqual(next.slice(0,3),old.slice(0,3)); // serif and top of stem
+    assert.deepEqual(next.slice(-2),old.slice(-2));
+    const base=next.filter(p=>p[1]===0).map(p=>p[0]);
+    assert.ok(Math.min(...base)<old[4][0]);assert.ok(Math.max(...base)>old[3][0]);
+    state.tuning.foot=0;assert.equal(renderWordmark(font,state).svg,before.svg);
+  }
 });

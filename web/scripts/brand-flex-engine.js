@@ -10,6 +10,7 @@ export const tControls = {
     label: pair.toUpperCase().split('').join('–') + (pair === 'tr' ? ' / 1' : '') + ' spacing',
     min: -80, max: 80, initial: 0, unit: '', help: 'Negative values tighten this pair; positive values add space.',
   }])),
+  foot: { label: '1 foot extension', min: 0, max: 100, initial: 0, unit: '%', help: 'Add a short foot on both sides of the R’s teal stem. Zero removes it.' },
   leftArm: { label: 'T left arm', min: 0, max: 100, initial: 100, unit: '%', help: '100% keeps the original arm; 0% trims it back to the stem.' },
   rightArm: { label: 'T right arm', min: 0, max: 100, initial: 100, unit: '%', help: 'Shorten the arm next to the R / 1 without thinning the stem or crossbar.' },
 };
@@ -96,8 +97,17 @@ function word(font, text, axes, size, signature = true, tuning) {
       const drop = thinStroke*Math.hypot(1,slope);
       const intercept = maxY-slope*topLeft;
       const joinY = (slope*left+intercept-drop)/(1-slope*shear);
-      const points = [tip,[topLeft,maxY],[topLeft+right-left,maxY],
-        [right,0],[left,0],[stemAt(joinY),joinY],[tip[0],tip[1]-drop]];
+      const stemWidth = right-left;
+      const foot = Math.min(hook,stemWidth)*(tuning?.foot ?? 0)/100;
+      const footHeight = Math.min(thinStroke,stemWidth,maxY*.1);
+      const base = foot ? [
+        [stemAt(footHeight)+stemWidth,footHeight],
+        [stemAt(footHeight)+stemWidth+foot,footHeight],
+        [right+foot,0],[left-foot,0],
+        [stemAt(footHeight)-foot,footHeight],[stemAt(footHeight),footHeight],
+      ] : [[right,0],[left,0]];
+      const points = [tip,[topLeft,maxY],[topLeft+stemWidth,maxY],
+        ...base,[stemAt(joinY),joinY],[tip[0],tip[1]-drop]];
       parts.push(`<path class="accent numeral" transform="${transform}" d="M${points.map(p=>p.map(n).join(' ')).join('L')}Z"/>`);
     }
     letters.push(parts.slice(start).join(''));

@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Add a small teal foot to the R/1 in the selected wordmark (p13), with a foot-extension slider in the lab.
+
 - Adopt the approved narrow wordmark (p12), with symmetric 55% T arms, A–T spacing −23, T–R spacing +6 and thin-stroke axis 135.
 
 - Add spacing sliders for all nine pairs in MATRYOSHKA, including mixed-case and split-line layouts. Save the latest shared wordmark as lab preset p11.

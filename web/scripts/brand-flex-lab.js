@@ -52,15 +52,15 @@ function draw() {
     $('ryo-title').textContent=state.layout==='three'?'RYOSHKA':'RYO';
     $('ryo-reset').textContent=state.layout==='three'?'Reset RYOSHKA axes':'Reset RYO axes';
     $('line-gaps').hidden=!split;
-    $('t-tuning').disabled = state.case !== 'caps';
+    for (const key of ['leftArm','rightArm']) $('t-'+key).disabled = state.case !== 'caps';
     const text = state.case === 'caps' ? 'MATRYOSHKA' : 'MatRyoshka';
     for (const [index,pair] of spacingPairs.entries()) {
       $('t-'+pair).disabled = (split && pair === 'tr') || (state.layout === 'four' && pair === 'os');
       $('t-'+pair+'-label').textContent = text[index]+'–'+text[index+1]+(pair === 'tr' ? ' / 1' : '')+' spacing';
     }
     $('t-help').textContent = state.case !== 'caps'
-      ? 'Switch to All caps to adjust the capital T in MAT.'
-      : 'Shorten either T arm while keeping the stem and crossbar thickness.';
+      ? 'Switch to All caps to adjust the T arms. The numeral foot works in either case.'
+      : 'Shorten either T arm or add a small foot to the numeral 1 in the R.';
     $('gap-row-2').hidden=state.layout!=='four';
     $('gap-label-1').textContent=state.layout==='three'?'MAT → RYOSHKA':'MAT → RYO';
     if (svgURL) URL.revokeObjectURL(svgURL);
@@ -136,7 +136,7 @@ try {
     $(spacingPairs.includes(key)?'pair-axes':'t-axes').append(row);
   }
   $('t-reset').onclick=()=>{
-    for (const key of ['leftArm','rightArm']) state.tuning[key]=tControls[key].initial;
+    for (const key of ['leftArm','rightArm','foot']) state.tuning[key]=tControls[key].initial;
     sync();
   };
   $('pair-reset').onclick=()=>{for(const key of spacingPairs) state.tuning[key]=0;sync();};
