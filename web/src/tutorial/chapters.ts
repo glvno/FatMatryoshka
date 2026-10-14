@@ -308,9 +308,9 @@ const ch4: Chapter = {
     },
     {
       id: 'group', title: 'Group them',
-      text: 'Press G, or Commands → Make assembly, and name it My voice. The five cards fold into one that shows the ports which had cables from outside: pitch, gate and out.',
+      text: 'Press Ctrl+G (Cmd+G on a Mac), or Commands → Make assembly, and name it My voice. The five cards fold into one that shows the ports which had cables from outside: pitch, gate and out.',
       why: 'Grouping changes nothing in the sound. Ports with outside cables are exposed automatically; the rest is hidden until you expose it.',
-      ...need(['Group the Oscillator, Filter, ADSR, VCA and LFO (press G)', (s) => !!myVoice(s.patch), (s) => VOICE_TYPES.flatMap((t) => T.module(mod(s.patch, t)?.id))]),
+      ...need(['Group the Oscillator, Filter, ADSR, VCA and LFO (Ctrl+G)', (s) => !!myVoice(s.patch), (s) => VOICE_TYPES.flatMap((t) => T.module(mod(s.patch, t)?.id))]),
       apply: (a) => a.edit((p) => makeAssembly(p, VOICE_TYPES.map((t) => mod(p, t)!.id), 'My voice')),
     },
     {
@@ -407,8 +407,8 @@ const ch5: Chapter = {
     },
     {
       id: 'group', title: 'Group the three',
-      text: 'Select the Delay, Reverb and Chorus and press G. Name the assembly My space. Its card shows in, l and r.',
-      ...need(['Group the Delay, Reverb and Chorus (press G)', (s) => !!mySpace(s.patch), (s) => SPACE_TYPES.flatMap((t) => T.module(mod(s.patch, t)?.id))]),
+      text: 'Select the Delay, Reverb and Chorus and press Ctrl+G (Cmd+G). Name the assembly My space. Its card shows in, l and r.',
+      ...need(['Group the Delay, Reverb and Chorus (Ctrl+G)', (s) => !!mySpace(s.patch), (s) => SPACE_TYPES.flatMap((t) => T.module(mod(s.patch, t)?.id))]),
       apply: (a) => a.edit((p) => makeAssembly(p, SPACE_TYPES.map((t) => mod(p, t)!.id), 'My space')),
     },
     {
@@ -498,8 +498,8 @@ const ch6: Chapter = {
     },
     {
       id: 'group', title: 'Group it as FM keys',
-      text: 'Select both Oscillators, the Env and the VCA and press G. Name it FM keys. It exposes pitch (twice, one per oscillator), gate and out.',
-      ...need(['Group both Oscillators, the Env and the VCA (press G)', (s) => !!fmKeys(s.patch), (s) => [...mods(s.patch, 'osc'), ...mods(s.patch, 'env'), ...mods(s.patch, 'vca')].flatMap((m) => T.module(m.id))]),
+      text: 'Select both Oscillators, the Env and the VCA and press Ctrl+G (Cmd+G). Name it FM keys. It exposes pitch (twice, one per oscillator), gate and out.',
+      ...need(['Group both Oscillators, the Env and the VCA (Ctrl+G)', (s) => !!fmKeys(s.patch), (s) => [...mods(s.patch, 'osc'), ...mods(s.patch, 'env'), ...mods(s.patch, 'vca')].flatMap((m) => T.module(m.id))]),
       apply: (a) => a.edit((p) => makeAssembly(p, [...mods(p, 'osc'), mod(p, 'env')!, mod(p, 'vca')!].map((m) => m.id), 'FM keys')),
     },
     {
@@ -619,9 +619,9 @@ const ch7: Chapter = {
     },
     {
       id: 'group', title: 'Group the pluck',
-      text: 'Select the String and the Modal and press G. Name it Pluck. Expand it, click ○ on the String’s decay and the Modal’s struct, and collapse it again.',
+      text: 'Select the String and the Modal and press Ctrl+G (Cmd+G). Name it Pluck. Expand it, click ○ on the String’s decay and the Modal’s struct, and collapse it again.',
       ...need(
-        ['Group the String and the Modal (press G)', (s) => !!pluck(s.patch), (s) => PLUCK_TYPES.flatMap((t) => T.module(mod(s.patch, t)?.id))],
+        ['Group the String and the Modal (Ctrl+G)', (s) => !!pluck(s.patch), (s) => PLUCK_TYPES.flatMap((t) => T.module(mod(s.patch, t)?.id))],
         promoted('the String’s decay', pluck, 'string', 'decay'),
         promoted('the Modal’s struct', pluck, 'modal', 'struct'),
         ['Collapse the assembly', (s) => !!pluck(s.patch) && !pluck(s.patch)!.open, pluckAsm],
@@ -928,8 +928,8 @@ const ch11: Chapter = {
     },
     {
       id: 'group', title: 'Group it as Hat and save it', transient: true,
-      text: 'Select the Noise, Filter, Env and VCA, press G and name it Hat. Click save on its card.',
-      ...need(['Group the Noise, Filter, Env and VCA (press G)', (s) => !!hat(s.patch), (s) => HAT_TYPES.flatMap((t) => T.module(mod(s.patch, t)?.id))], ['Save it as "Hat" (save on the card)', (s) => !!findDef(s.library, 'hat', 'Hat'), hatAsm]),
+      text: 'Select the Noise, Filter, Env and VCA, press Ctrl+G (Cmd+G) and name it Hat. Click save on its card.',
+      ...need(['Group the Noise, Filter, Env and VCA (Ctrl+G)', (s) => !!hat(s.patch), (s) => HAT_TYPES.flatMap((t) => T.module(mod(s.patch, t)?.id))], ['Save it as "Hat" (save on the card)', (s) => !!findDef(s.library, 'hat', 'Hat'), hatAsm]),
       apply: (a) => { a.edit((p) => { if (!hat(p)) makeAssembly(p, HAT_TYPES.map((t) => mod(p, t)!.id), 'Hat'); }); const p = a.patch(); const h = hat(p)!; h.name = 'Hat'; a.saveAssembly(toDef(p, h), 'hat'); },
     },
     {

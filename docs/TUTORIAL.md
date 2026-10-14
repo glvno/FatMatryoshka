@@ -22,7 +22,7 @@ modules. It replaces the five-step tour (`web/src/tour.ts`).
 - **Browser only.** K1..K4 are explained as the FM-1's knobs; the device bar and diff are not in the course. Morph A/B is
   taught in chapter 9, the share link closes chapter 11.
 - **Text.** Each chapter opens with a short intro that carries the synthesis concept; steps are one action in two or three
-  sentences, key first and button in the same sentence ("press G, or click Make assembly"); a step with a real idea in it has a
+  sentences, key first and button in the same sentence ("press Ctrl+G, or click Make assembly"); a step with a real idea in it has a
   collapsible "Why" paragraph, closed by default. UI words: "Tutorial", "Chapter 3 of 11".
 - **Targeting.** The step's target element(s) (card, jack, slider, button) get a pulsing outline and are scrolled into view.
   No ghost cables.

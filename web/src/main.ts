@@ -303,7 +303,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'New patch', run: () => loadNamed(newPatch(DEFS)) },
     { kind: 'command', label: 'Undo', detail: 'Ctrl/Cmd+Z', run: inPatch(() => editor.undo()) },
     { kind: 'command', label: 'Redo', detail: 'Shift+Ctrl/Cmd+Z', run: inPatch(() => editor.redo()) },
-    { kind: 'command', label: 'Make assembly from the selection', detail: 'G', run: inPatch(() => editor.makeAssembly()) },
+    { kind: 'command', label: 'Make assembly from the selection', detail: 'Ctrl/Cmd+G', run: inPatch(() => editor.makeAssembly()) },
     { kind: 'command', label: 'Browse assembly library', run: () => browser.open() },
     { kind: 'command', label: 'Duplicate selection', detail: 'Ctrl/Cmd+D', run: inPatch(() => editor.duplicateSelected()) },
     { kind: 'command', label: 'Delete selection', detail: 'Delete', run: inPatch(() => editor.removeSelected()) },
@@ -441,7 +441,7 @@ window.addEventListener('keydown', (e) => {
   else if (mod && k.toLowerCase() === 'd') done = editor.duplicateSelected();
   else if (e.altKey && k.toLowerCase() === 'b') (flipAB(), (done = true));
   else if (!mod && k.toLowerCase() === 'b') done = editor.bypassSelected();
-  else if (!mod && k.toLowerCase() === 'g' && editor.selected.size) (editor.makeAssembly(), (done = true));
+  else if (mod && k.toLowerCase() === 'g') (editor.makeAssembly(), (done = true)); // plain G is a note key
   else if (k === ' ') {
     editor.arpPlay = !editor.arpPlay;
     host.send({ t: 'arpplay', on: editor.arpPlay });
