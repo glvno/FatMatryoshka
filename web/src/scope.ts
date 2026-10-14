@@ -150,8 +150,8 @@ export class Scope {
         for (const sample of d) amp = Math.max(amp, Math.abs(sample));
         let start = 0, len = d.length;
         if (p.kind === 'audio') {
-          // About 64 ms: three times the previous window, with room to trigger.
-          len = Math.min(Math.round(p.sr * .064), d.length);
+          // A 16 ms window gives individual samples more horizontal space.
+          len = Math.min(Math.round(p.sr * .016), d.length);
           start = Math.max(0, d.length - len);
           // Use the most recent rising crossing that leaves a complete window.
           for (let i = start; i >= 1; i--) {
