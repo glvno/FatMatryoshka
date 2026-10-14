@@ -1,6 +1,6 @@
-# **WE STAND ON THE SHOULDERS OF GIANTS.**
+# **WE STAND ON THE SHOULDERS OF GIANTS!!**
 
-**FatMatryoshka exists thanks to [Leo Kuroshita (@kurogedelic)](https://github.com/kurogedelic) / [Hügelton Instruments](https://github.com/hugelton), creators of [Felucca](https://github.com/hugelton/Felucca), and [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), creators of [Modular-1](https://github.com/WiggisModular/Modular-1). Thank you for making this possible.**
+**FatMatryoshka is a fork of a fork of bootleg firmware. Big ups to [Leo Kuroshita (@kurogedelic)](https://github.com/kurogedelic) / [Hügelton Instruments](https://github.com/hugelton), creators of [Felucca](https://github.com/hugelton/Felucca), and [@morgulbrut](https://github.com/morgulbrut) / [WiggisModular](https://github.com/WiggisModular), creators of [Modular-1](https://github.com/WiggisModular/Modular-1).**
 
 <p align="center">
   <img src="web/public/brand/fatmatryoshka.png" width="240" height="240" alt="FatMatryoshka: split coral and teal synth dolls wired to a gold doll inside, embraced by loose patch cables" />
@@ -8,9 +8,16 @@
 
 # FatMatryoshka
 
-A modular synthesizer for the **M-VAVE FM-1**, with a browser patch editor and reusable, nested assemblies. Build a sound, wrap it into an instrument, then nest it inside something bigger. The name celebrates that matryoshka structure.
+A modular synthesizer for the **M-VAVE FM-1**, with a browser patch editor and reusable, nested assemblies.
 
-FatMatryoshka is an independent project grown from Modular-1, which builds on Felucca's flashing tools and hardware support.
+**Modules** are the building blocks -- a single oscillator, a VCA, a filter, a delay, whatever.
+
+**Assemblies** are groups of modules. The provided "operator" assembly, for example, is a single oscillator, an eight-step envelope, and a VCA. Like presets, they can be saved and reused. Did you build a really perverted granular synth that sounds like the voice of the metatron? Select its modules, save it as an assembly, and now that's an instrument you can use in your presets whenever you want.
+
+Assembly inputs, outputs, and sliders are just whatever inputs, outputs, and sliders from its contained modules you want to promote to being part of the assembly's user interface.
+
+A handful of patch presets are provided. Use them to learn, then replace them with something you made.
+
 
 ## Webapp
 
@@ -20,11 +27,11 @@ Start with **How a patch works** in the sidebar: play a four-module voice, trace
 
 Review the [ten logo candidates](https://glvno.github.io/FatMatryoshka/brand/candidates/) and [UX improvement proposals](https://glvno.github.io/FatMatryoshka/review/). The small-caps wordmark incorporates the FM-1’s “1” into the K ascender.
 
-The sidebar holds the logo, patch name, preset picker, **Add to patch**, audio controls, and **Patch / Library** navigation. The canvas gets the full window height. **Commands** (Ctrl/Cmd+K) opens file operations, undo/redo, grouping, A/B snapshots, hardware settings, firmware installation, and help. The palette opens on actions; its Modules, Assemblies and Patches filters let you browse without guessing a name. On narrow screens, **Workspace** opens a sidebar drawer. **Tab** moves through controls; **Alt+B** switches A/B.
+The sidebar holds the logo, patch name, example picker, **Add module**, **Add assembly**, audio controls, and **Patch / Library** navigation. **Commands** (Ctrl/Cmd+K) opens file operations, undo/redo, grouping, A/B snapshots, hardware settings, firmware installation, and help. The palette opens on actions; its Modules, Assemblies and Patches filters let you browse without guessing a name. On narrow screens, **Workspace** opens a sidebar drawer. **Tab** moves through controls; **Alt+B** switches A/B.
 
 Slider thumbs are input jacks: **drag normally to adjust, Alt-drag to patch**, or drop an output cable onto a thumb. External cables plug into side jacks, which route to the moving thumbs through internal cables. **Click an internal cable to disconnect that parameter**, leaving the incoming cable and other destinations intact. **Drag the same side input to several thumbs to add multiple destinations** (or Alt-drag from the thumb to the side input). Thumb positions pause while patching so the targets stay still.
 
-Open the **⋯** menu beside a parameter for p1/p2 routing, modulation depth, macro ranges and K1–K4 hardware assignments. The matrix grid is gone. Existing patches retain their routing; fixed input links such as `cv → cutoff` can also be switched off independently, saved and restored. Any side input can also feed additional parameters; these extra routes add the signal’s block average across the parameter range. P1/P2 retain their shared depth controls and per-parameter macro ranges. Extra routes and disabled fixed links on an FM-1 require the updated bundled firmware. Dedicated controls use their own input (for example, Filter cutoff uses `cv`). Other thumbs reuse a suitable p1/p2 route or allocate an unused input; the editor reports when both are occupied. Depth is shared by every parameter assigned to that input. K1–K4 assignments apply while that module is selected on the FM-1.
+Open the **⋯** menu beside a parameter for p1/p2 routing, modulation depth, macro ranges and K1–K4 hardware assignments. Any side input can also feed additional parameters; these extra routes add the signal’s block average across the parameter range. Dedicated controls use their own input (for example, Filter cutoff uses `cv`). Other thumbs reuse a suitable p1/p2 route or allocate an unused input; the editor reports when both are occupied. Depth is shared by every parameter assigned to that input. K1–K4 assignments apply while that module is selected on the FM-1.
 
 ### Voices
 
@@ -34,14 +41,14 @@ The firmware plays one patch at a time (the default build). The four-patch firmw
 
 ## FM-1
 
-In addition to the modular synth engine, there's also some complex arpeggiator. 
+In addition to the modular synth engine, there's also a deep arpeggiator.
 
 Knobs and stuff.
 
-* **PRESETS** scrolls trough the patches 
+* **PRESETS** scrolls trough the patches
 * **SELECT** scrolls trough the modules in the patch
 * **KNOB1 - 4** do what's described
-* **ARP** opens the arpeggiator's melody page (mode, scale, root note, speed)
+* **ARP** opens the arpeggiator's melody page (mode, rate, octaves, speed)
 * **SEQ** opens the arpeggiator's rhythm page (euclid steps, pulses, rotation, rate)
 * **LFO** opens arpeggiator's chaos page, adds some randomness and lets select how many octaves the arpeggio spans.
 * **HOME** opens the main page of the patch
