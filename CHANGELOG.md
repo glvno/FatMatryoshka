@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Make the numeral foot thickness follow Roboto Flex’s Thin strokes (YOPQ) setting, matching the top serif.
+
 - Add a small teal foot to the R/1 in the selected wordmark (p13), with a foot-extension slider in the lab.
 
 - Adopt the approved narrow wordmark (p12), with symmetric 55% T arms, A–T spacing −23, T–R spacing +6 and thin-stroke axis 135.

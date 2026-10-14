@@ -278,3 +278,24 @@ test('the numeral foot changes only the teal base and preserves the selected let
     state.tuning.foot=0;assert.equal(renderWordmark(font,state).svg,before.svg);
   }
 });
+
+
+test('the numeral foot follows Thin strokes without a stem-width or cap-height limit', () => {
+  for (const slnt of [0,-10]) {
+    const heights=[];
+    for (const YOPQ of [25,79,135]) {
+      const state=normalizeState(font,presets.find(p=>p.id==='p13'),presets[1]);
+      Object.assign(state.mat,{slnt,YOPQ});
+      const svg=renderWordmark(font,state).svg;
+      const d=svg.match(/class="accent numeral"[^>]* d="([^"]+)"/)[1];
+      const points=d.slice(1,-1).split('L').map(p=>p.split(' ').map(Number));
+      const h=font.getVariation(state.mat).glyphForCodePoint(72);
+      const ys=h.path.commands.filter(c=>c.args.length).map(c=>c.args.at(-1)).filter(y=>y>h.bbox.minY&&y<h.bbox.maxY);
+      const thickness=Math.max(...ys)-Math.min(...ys);
+      for(const index of [3,4,7,8]) assert.ok(Math.abs(points[index][1]-thickness)<.001);
+      assert.equal(points[5][1],0);assert.equal(points[6][1],0);
+      heights.push(points[3][1]);
+    }
+    assert.ok(heights[0]<heights[1]&&heights[1]<heights[2]);
+  }
+});
