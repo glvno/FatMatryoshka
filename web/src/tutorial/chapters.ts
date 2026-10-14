@@ -22,7 +22,8 @@ type Part = [what: string, ok: (s: S) => boolean, target?: (s: S) => Target[]];
 const need = (...parts: Part[]): Pick<Step, 'check' | 'todo' | 'focus'> => ({
   check: (s) => parts.every(([, ok]) => ok(s)),
   todo: (s) => parts.filter(([, ok]) => !ok(s)).map(([what]) => what),
-  focus: (s) => { const p = parts.find(([, ok]) => !ok(s)); return p?.[2]?.(s) ?? []; },
+  // a done step keeps pointing at its last part, so the panel stays anchored while it says "moving on"
+  focus: (s) => { const p = parts.find(([, ok]) => !ok(s)) ?? parts[parts.length - 1]; return p?.[2]?.(s) ?? []; },
 });
 const pins = ['p1', 'p2'] as const;
 /** a signal routed through a pin to a parameter (what dropping a cable on the thumb makes) */
@@ -301,7 +302,7 @@ const ch4: Chapter = {
     {
       id: 'select', title: 'Select the modules', transient: true,
       text: 'Shift-click the Oscillator, Filter, ADSR, VCA and LFO, or drag a box around them on the empty canvas. Selected cards get a highlight. Main and Output stay outside.',
-      ...need(['the Oscillator, Filter, ADSR, VCA and LFO all selected', (s) => VOICE_TYPES.every((t) => mods(s.patch, t).some((m) => s.selected.has(m.id))), (s) => VOICE_TYPES.filter((t) => !mods(s.patch, t).some((m) => s.selected.has(m.id))).flatMap((t) => T.module(mod(s.patch, t)?.id))]),
+      ...need(['the Oscillator, Filter, ADSR, VCA and LFO all selected', (s) => VOICE_TYPES.every((t) => mods(s.patch, t).some((m) => s.selected.has(m.id))), (s) => { const left = VOICE_TYPES.filter((t) => !mods(s.patch, t).some((m) => s.selected.has(m.id))); return (left.length ? left : VOICE_TYPES).flatMap((t) => T.module(mod(s.patch, t)?.id)); }]),
       apply: (a) => a.select(VOICE_TYPES.map((t) => mod(a.patch(), t)!.id)),
     },
     {
@@ -457,7 +458,7 @@ const ch6: Chapter = {
     {
       id: 'dup', title: 'Duplicate it',
       text: 'Click the Oscillator to select it and press Ctrl+D (Cmd+D), or Commands → Duplicate selection. The copy keeps its settings and its pitch cable.',
-      ...need(['two Oscillators', (s) => has(s.patch, 'osc', 2), (s) => T.module(one('osc')(s)?.id)], ['both cabled from Main’s pitch', (s) => mods(s.patch, 'osc').every((o) => cabled(s.patch, main(s), 'pitch', o, 'pitch')), (s) => mods(s.patch, 'osc').filter((o) => !cabled(s.patch, main(s), 'pitch', o, 'pitch')).flatMap((o) => T.port(o, 'pitch', 'in'))]),
+      ...need(['two Oscillators', (s) => has(s.patch, 'osc', 2), (s) => T.module(one('osc')(s)?.id)], ['both cabled from Main’s pitch', (s) => mods(s.patch, 'osc').every((o) => cabled(s.patch, main(s), 'pitch', o, 'pitch')), (s) => { const left = mods(s.patch, 'osc').filter((o) => !cabled(s.patch, main(s), 'pitch', o, 'pitch')); return (left.length ? left : mods(s.patch, 'osc')).flatMap((o) => T.port(o, 'pitch', 'in')); }]),
       apply: (a) => a.edit((p) => { const o = place(p, 'osc'); wire(p, mod(p, 'fm1'), 'pitch', o, 'pitch'); }),
     },
     {

@@ -55,6 +55,7 @@ describe('tutorial course', () => {
       st.apply(s, s.state);
       expect(st.check(s.state), `${ch.id}/${st.id} fails after apply`).toBe(true);
       expect(st.todo!(s.state)).toEqual([]);
+      expect(st.focus!(s.state).length, `${ch.id}/${st.id} loses its anchor once done`).toBeGreaterThan(0);
     }
     // applying again changes nothing
     const after = JSON.stringify(s.state.patch);
