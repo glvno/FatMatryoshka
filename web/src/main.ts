@@ -9,7 +9,7 @@ import { buildAssembliesTab, storeAssembly } from './assemblies';
 import { AssemblyBrowser } from './browser';
 import { searchCommands, type Command } from './commands';
 import { buildFlashTab } from './flasher';
-import { attachKeyboard, attachMidi } from './input';
+import { attachKeyboard, attachMidi, isTextEntry } from './input';
 import { DEFS } from './modules';
 import { newPatch, validatePatch, voicesOf, type Patch } from './patch';
 import { ARP_DEFAULT } from './arp';
@@ -380,7 +380,7 @@ window.addEventListener('keydown', (e) => {
   }
   if (currentTab !== 'patch') return;
   const t = e.target as HTMLElement | null;
-  const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') && (t as HTMLInputElement).type !== 'range' && (t as HTMLInputElement).type !== 'checkbox';
+  const typing = isTextEntry(t) || t?.tagName === 'SELECT';
   if (document.querySelector('dialog[open], [popover]:popover-open') || typing) return;
   const control = t?.closest('button, summary, [role=tab], input, select');
   if (control && [' ', 'Enter', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;

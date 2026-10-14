@@ -141,6 +141,7 @@ During browser playback, sliders and their readouts follow dedicated CV inputs (
 ## Keyboard
 
 - `/` or Ctrl/Cmd+K opens a **command palette**: type part of a name to add a module, insert an assembly (library or factory), load a patch or start a new one; Enter runs the first match, arrows choose. `?` lists every shortcut.
+- Note keys keep playing after using a dropdown, checkbox, slider or button. A closed dropdown keeps focus but does not use note keys to select another option. Open dropdowns, text fields and dialogs keep their normal keyboard behavior; arrows and Tab still navigate controls. Z / X change octave.
 - Click a jack, then a jack of the other kind, to connect them (Esc cancels; dragging works as before). With cards selected (shift-click or a box): Delete removes them, B bypasses them, G groups them into an assembly, Ctrl/Cmd+D duplicates them with their settings and the cables among them, the arrows nudge them (Shift: ×10). Space starts and stops the arpeggiator, Alt+B flips A/B, Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z undo and redo. The shortcuts are off while a text field has focus; the note keys (A W S E D F T G Y H U J K) still play when they are not taken.
 
 ## Scope

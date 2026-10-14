@@ -3,17 +3,30 @@
 import type { AudioHost } from './audio';
 
 const KEYS = 'awsedftgyhujkolp';
+const NON_TYPING_INPUTS = new Set(['range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'color']);
+
+/** Text editing owns letter keys; merely focusing a synth control does not. */
+export function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || target.tagName === 'TEXTAREA' ||
+    (target.tagName === 'INPUT' && !NON_TYPING_INPUTS.has((target as HTMLInputElement).type));
+}
 
 export function attachKeyboard(host: Pick<AudioHost, 'send'>, isActive: () => boolean): void {
   let octave = 0;
   const down = new Map<string, number>();
-  const editable = (t: EventTarget | null): boolean => t instanceof HTMLElement && (t.tagName === 'SELECT' || (t.tagName === 'INPUT' && (t as HTMLInputElement).type !== 'range') || t.isContentEditable);
   window.addEventListener('keydown', (e) => {
-    if (!isActive() || e.repeat || e.ctrlKey || e.metaKey || e.altKey || editable(e.target)) return;
+    if (!isActive() || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isTextEntry(e.target)) return;
+    // An expanded native dropdown still owns its keyboard navigation/typeahead.
+    if (e.target instanceof HTMLElement && e.target.tagName === 'SELECT' && e.target.matches(':open')) return;
     const k = e.key.toLowerCase();
+    const i = KEYS.indexOf(k);
+    if (i < 0 && k !== 'z' && k !== 'x') return;
+    // Also consume repeats: otherwise holding F starts native select typeahead.
+    e.preventDefault();
+    if (e.repeat) return;
     if (k === 'z') octave = Math.max(-3, octave - 1);
     else if (k === 'x') octave = Math.min(3, octave + 1);
-    const i = KEYS.indexOf(k);
     if (i >= 0 && !down.has(k)) {
       const note = 60 + octave * 12 + i;
       down.set(k, note);
