@@ -16,7 +16,7 @@ FatMatryoshka-1 is an independent project grown from Modular-1, which builds on 
 
 [Open the FatMatryoshka-1 editor](https://glvno.github.io/FatMatryoshka-1/) to make patches and upload them to the FM-1. The editor currently deploys from branch `dev`; its firmware package has not been installed on a device. The [original Modular-1 editor](https://wiggismodular.github.io/Modular-1/) is also available.
 
-The sidebar switches between **Patch**, **Library**, **Flash** and **About**. The larger header holds audio controls and command search. **File** contains save/load/share actions, **Edit** contains grouping, changes and A/B snapshots, and **FM-1 & MIDI** holds hardware connections. The patch canvas scrolls independently; zoom and Fit keep cards and their cables together. **Tab** moves through controls; **Alt+B** switches A/B.
+The sidebar holds the logo, patch name, preset picker, **Add to patch**, audio controls, and **Patch / Library** navigation. The canvas gets the full window height. **Commands** (Ctrl/Cmd+K) opens file operations, undo/redo, grouping, A/B snapshots, hardware settings, firmware installation, and help. The palette opens on actions; its Modules, Assemblies and Patches filters let you browse without guessing a name. On narrow screens, **Workspace** opens a sidebar drawer. **Tab** moves through controls; **Alt+B** switches A/B.
 
 Slider thumbs are input jacks: **drag normally to adjust, Alt-drag to patch**, or drop an output cable onto a thumb. External cables plug into side jacks, which route to the moving thumbs through internal cables. **Click an internal cable to disconnect that parameter**, leaving the incoming cable and other destinations intact. **Drag the same side input to several thumbs to add multiple destinations** (or Alt-drag from the thumb to the side input). Thumb positions pause while patching so the targets stay still.
 
@@ -127,11 +127,11 @@ During browser playback, sliders and their readouts follow dedicated CV inputs (
 
 ## On a phone or tablet
 
-- The canvas zooms: pinch, Ctrl/Cmd + wheel, or the − / + buttons (the percentage button fits the whole patch, then back to 100 %). One finger on empty canvas pans; cards drag by their header as before. On touch screens the jacks are bigger, the controls taller, and a long press on a card header opens its actions (bypass, duplicate, select, remove); a round **+** at the bottom right opens the palette to add a module, insert an assembly or load a patch. Below 640 px the toolbars wrap and the panels go full width. Web MIDI over USB works on Android Chrome in principle; the FM-1 link from a phone has not been tried.
+- One finger on empty canvas pans; cards drag by their header. Pinch and Ctrl/Cmd+wheel still scale the canvas, with Fit and Reset available through Commands. On touch screens the jacks and controls are larger, and a long press on a card header opens its actions. Below 700 px, the sidebar becomes a dismissible Workspace drawer, leaving the full width for the patch. Web MIDI over USB works on Android Chrome in principle; the FM-1 link from a phone has not been tried.
 
 ## Share a patch as a link
 
-- **File → Share link** copies a link that opens this patch: the JSON, layout and assemblies included, deflated into the URL fragment (`#p=…`, about 800 characters for a factory patch). Opening the link loads the patch into the editor without replacing the patch the browser remembers until you change something; the Patches page has an "Import link" field that puts a linked patch into the bank list. A patch too big for a link (over 8000 characters) travels without its card positions and assembly overlay, and opens on a grid.
+- **Commands → Share patch link** copies a link that opens this patch: the JSON, layout and assemblies included, deflated into the URL fragment (`#p=…`, about 800 characters for a factory patch). Opening the link loads the patch into the editor without replacing the patch the browser remembers until you change something; the Patches page has an "Import link" field that puts a linked patch into the bank list. A patch too big for a link (over 8000 characters) travels without its card positions and assembly overlay, and opens on a grid.
 
 ## Diff and A/B
 

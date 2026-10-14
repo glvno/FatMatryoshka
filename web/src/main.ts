@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import { setupWorkspaceMenus } from './popover';
+import { setupPopoverPositioning } from './popover';
 import { AudioHost } from './audio';
 import type { HostMsg } from './worklet';
 import { DeviceLink } from './device';
@@ -118,6 +118,7 @@ scope.onRemove = (key) => {
 host.onProbe = (key, data, sr) => scope.feed(key, data, sr);
 const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw'](), {
   onStructure(p) {
+    $<HTMLInputElement>('patch-name').value = p.name;
     host.setPatch(p);
     queueSave(p);
     if (live()) queueUpload();
@@ -182,13 +183,13 @@ const editor = new Editor($('canvas'), loadSaved() ?? PRESETS['Subtractive saw']
 host.setPatch(editor.patch);
 host.onValues = (values) => editor.showParameterValues(values);
 
-// toolbar
-setupWorkspaceMenus();
+// Sidebar
+setupPopoverPositioning();
 const presetSel = $<HTMLSelectElement>('preset');
 presetSel.append(new Option('Load patch…', ''), new Option('New patch', '__new'), ...Object.keys(PRESETS).map((n) => new Option(n, n)));
 presetSel.onchange = () => {
   const v = presetSel.value;
-  if (v) editor.setPatch(v === '__new' ? newPatch(DEFS) : PRESETS[v]());
+  if (v) { editor.setPatch(v === '__new' ? newPatch(DEFS) : PRESETS[v]()); closeSidebar(); }
   setBaseline();
   presetSel.value = '';
   $<HTMLInputElement>('patch-name').value = editor.patch.name;
@@ -204,37 +205,7 @@ const showVoices = (): void => {
   const b = deviceBudget(editor.patch);
   if (!b.fits) status.textContent = `too big for the FM-1: ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} instances (fewer voices or modules)`;
 };
-/** the module select, by kind; picking one inserts it (the building blocks; assemblies have their own browser) */
-const MODULE_GROUPS: [string, string[]][] = [
-  ['Sources', ['osc', 'wavetable', 'noise', 'string', 'modal', 'comb', 'grain']],
-  ['Filters', ['filter', 'ladder', 'vowel']],
-  ['Modulators', ['lfo', 'adsr', 'env', 'seq', 'sh', 'clkdiv', 'pulse', 'glide', 'quant']],
-  ['Effects', ['delay', 'reverb', 'chorus', 'phaser', 'shape', 'crush', 'shift', 'dyn']],
-  ['Utilities', ['vca', 'mixer', 'scale', 'const', 'math', 'logic', 'pan', 'xfade']],
-  ['I/O', ['fm1', 'output']],
-];
-const typeSel = $<HTMLSelectElement>('add-type');
-{
-  const placed = new Set<string>();
-  typeSel.append(new Option('Add module…', ''));
-  for (const [g, types] of MODULE_GROUPS) {
-    const og = document.createElement('optgroup');
-    og.label = g;
-    for (const t of types) if (DEFS[t]) (og.append(new Option(DEFS[t].label, t)), placed.add(t));
-    typeSel.append(og);
-  }
-  const rest = Object.values(DEFS).filter((d) => !placed.has(d.type)); // a module nobody filed yet lands at the end
-  if (rest.length) typeSel.append(...rest.map((d) => new Option(d.label, d.type)));
-}
-typeSel.onchange = () => {
-  if (typeSel.value) editor.add(typeSel.value);
-  typeSel.value = '';
-};
-const browser = new AssemblyBrowser((d) => editor.insert(d));
-$('asm-insert').onclick = () => browser.open();
-$('asm-btn').onclick = () => editor.makeAssembly();
-$('undo-btn').onclick = () => editor.undo();
-$('redo-btn').onclick = () => editor.redo();
+const browser = new AssemblyBrowser((d) => { switchTab('patch'); editor.insert(d); });
 
 // ---- diff against the baseline (the patch as last loaded, uploaded or stored) and A / B
 let baseline = JSON.stringify(editor.patch);
@@ -263,54 +234,59 @@ const showDiff = (): void => {
   diffPanel.append(h, ul);
   diffPanel.hidden = false;
 };
-$('diff-btn').onclick = () => (diffPanel.hidden ? showDiff() : (diffPanel.hidden = true));
-const abToggle = $<HTMLButtonElement>('ab-toggle');
-const showAB = (): void => {
-  abToggle.textContent = editor.side;
-  abToggle.classList.toggle('b', editor.side === 'B');
-  abToggle.disabled = !(editor.snapshots.A && editor.snapshots.B);
-  abToggle.title = abToggle.disabled ? 'set A and B first' : `flip to ${editor.side === 'A' ? 'B' : 'A'} (Alt+B)`;
-};
-$('ab-a').onclick = () => {
-  editor.takeSnapshot('A');
-  status.textContent = 'A = this patch';
-  showAB();
-};
-$('ab-b').onclick = () => {
-  editor.takeSnapshot('B');
-  status.textContent = 'B = this patch';
-  showAB();
+const takeSnapshot = (side: 'A' | 'B'): void => {
+  editor.takeSnapshot(side);
+  status.textContent = `${side} = this patch`;
 };
 const flipAB = (): void => {
   if (editor.toggleAB()) {
     status.textContent = `${editor.side}${diffCount(diffPatches(JSON.parse(editor.snapshots[editor.side === 'A' ? 'B' : 'A']!) as Patch, editor.patch, DEFS)) ? '' : ' (same as the other side)'}`;
     queueSave(editor.patch);
   } else status.textContent = 'set A and B first';
-  showAB();
 };
-abToggle.onclick = flipAB;
 
 // ---- the command palette: modules, assemblies, patches
 const palette = $<HTMLDialogElement>('palette');
 const palInput = $<HTMLInputElement>('palette-input');
 const palList = $('palette-list');
+const inPatch = (run: () => void): (() => void) => () => { switchTab('patch'); run(); };
 const commands = (): Command[] => {
   const assembly = (d: AssemblyDef, shelf: string): Command => ({
     kind: 'assembly', tags: ['assembly', shelf], label: d.name, detail: shelf, keywords: `insert ${summary(d)}`,
     run: () => editor.insert(d),
   });
   return [
+    { kind: 'command', label: 'Save patch as .json', keywords: 'export download file', run: savePatch },
+    { kind: 'command', label: 'Load patch from .json', keywords: 'import open file', run: () => $('load-file').click() },
+    { kind: 'command', label: 'Share patch link', keywords: 'copy url clipboard', run: () => void sharePatch() },
+    { kind: 'command', label: 'New patch', run: () => loadNamed(newPatch(DEFS)) },
+    { kind: 'command', label: 'Undo', detail: 'Ctrl/Cmd+Z', run: inPatch(() => editor.undo()) },
+    { kind: 'command', label: 'Redo', detail: 'Shift+Ctrl/Cmd+Z', run: inPatch(() => editor.redo()) },
+    { kind: 'command', label: 'Make assembly from the selection', detail: 'G', run: inPatch(() => editor.makeAssembly()) },
+    { kind: 'command', label: 'Browse assembly library', run: () => browser.open() },
+    { kind: 'command', label: 'Duplicate selection', detail: 'Ctrl/Cmd+D', run: inPatch(() => editor.duplicateSelected()) },
+    { kind: 'command', label: 'Delete selection', detail: 'Delete', run: inPatch(() => editor.removeSelected()) },
+    { kind: 'command', label: 'Bypass selection', detail: 'B', run: inPatch(() => editor.bypassSelected()) },
+    { kind: 'command', label: 'Show changes since last load / upload', keywords: 'diff', run: inPatch(showDiff) },
+    { kind: 'command', label: 'Set snapshot A', keywords: 'compare ab', run: () => takeSnapshot('A') },
+    { kind: 'command', label: 'Set snapshot B', keywords: 'compare ab', run: () => takeSnapshot('B') },
+    { kind: 'command', label: 'Switch A / B snapshots', detail: 'Alt+B', run: inPatch(flipAB) },
+    { kind: 'command', label: 'Start audio', keywords: 'sound browser', run: () => void startAudio() },
+    { kind: 'command', label: 'Panic: stop all notes', keywords: 'silence stuck', run: () => sink.send({ t: 'panic' }) },
+    { kind: 'command', label: 'FM-1 & MIDI settings', keywords: 'connect send store sync hardware keyboard release', run: () => $<HTMLDialogElement>('device-bar').showModal() },
+    { kind: 'command', label: 'Flash firmware', keywords: 'install update hardware', run: () => switchTab('flash') },
+    { kind: 'command', label: 'About FatMatryoshka-1', keywords: 'credits', run: () => switchTab('about') },
+    { kind: 'command', label: 'Keyboard shortcuts', keywords: 'help', detail: '?', run: () => help.showModal() },
+    { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },
+    { kind: 'command', label: 'Reset canvas scale', keywords: 'zoom 100%', run: inPatch(() => editor.setZoom(1)) },
     ...Object.values(DEFS).map((d) => ({ kind: 'add module', tags: ['module'], label: d.label, run: () => editor.add(d.type) })),
     ...loadLibrary().map((d) => assembly(d, USER_SHELF)),
     ...FACTORY.map((d) => assembly(d, categoryOf(d))),
     ...patchCandidates().map((c) => ({ kind: 'load patch', label: c.name, run: () => loadNamed(c.patch) })),
-    { kind: 'command', label: 'New patch', run: () => loadNamed(newPatch(DEFS)) },
-    { kind: 'command', label: 'Insert assembly… (browser)', run: () => browser.open() },
-    { kind: 'command', label: 'Diff since the last load / upload', run: showDiff },
-    { kind: 'command', label: 'Make assembly from the selection', run: () => editor.makeAssembly() },
   ];
 };
 const loadNamed = (p: Patch): void => {
+  switchTab('patch');
   editor.setPatch(p);
   setBaseline();
   nameInput.value = editor.patch.name;
@@ -319,16 +295,21 @@ let palSel = 0;
 let palItems: Command[] = [];
 const palRender = (): void => {
   const q = palInput.value.trim().toLowerCase();
-  palItems = searchCommands(commands(), q);
+  palItems = q ? searchCommands(commands(), q) : commands().filter((c) => c.kind === 'command');
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-query]')) button.setAttribute('aria-pressed', String(button.dataset.query === q));
   palSel = Math.min(palSel, Math.max(0, palItems.length - 1));
   palList.replaceChildren(
     ...palItems.map((c, i) => {
       const li = document.createElement('li');
       li.className = i === palSel ? 'sel' : '';
+      li.id = `command-${i}`;
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', String(i === palSel));
       const k = document.createElement('span');
       k.className = 'k';
       k.textContent = c.kind;
-      li.append(k, c.label);
+      if (c.kind !== 'command') li.append(k);
+      li.append(c.label);
       if (c.detail) {
         const detail = document.createElement('span');
         detail.className = 'detail';
@@ -342,20 +323,23 @@ const palRender = (): void => {
   if (!palItems.length) {
     const empty = document.createElement('li');
     empty.className = 'muted';
-    empty.textContent = 'No matching modules, assemblies or patches.';
+    empty.textContent = 'No matches. Try a module name or an action like “save”.';
     palList.append(empty);
   }
+  if (palItems.length) palInput.setAttribute('aria-activedescendant', `command-${palSel}`);
+  else palInput.removeAttribute('aria-activedescendant');
   palList.querySelector('.sel')?.scrollIntoView({ block: 'nearest' });
 };
 const palRun = (c: Command): void => {
   palette.close();
+  if (c.kind !== 'command') switchTab('patch');
   c.run();
 };
-const openPalette = (): void => {
-  if (currentTab !== 'patch') document.querySelector<HTMLButtonElement>('#tabs button[data-tab="patch"]')?.click();
-  palInput.value = '';
+const openPalette = (query = ''): void => {
+  palInput.value = query;
   palSel = 0;
   palRender();
+  closeSidebar();
   palette.showModal();
   palInput.focus();
 };
@@ -374,18 +358,23 @@ palInput.onkeydown = (e) => {
   }
   e.stopPropagation();
 };
-$('palette-btn').onclick = openPalette;
-$('fab').onclick = openPalette;
-const zoomLabel = $('zoom-fit');
-editor.onZoom = (z) => (zoomLabel.textContent = `${Math.round(z * 100)}%`);
-$('zoom-in').onclick = () => editor.setZoom(editor.zoom * 1.2);
-$('zoom-out').onclick = () => editor.setZoom(editor.zoom / 1.2);
-zoomLabel.onclick = () => (editor.zoom === 1 ? editor.zoomToFit() : editor.setZoom(1));
+$('palette-btn').onclick = () => openPalette();
+$('add-btn').onclick = () => openPalette('module');
+$('mobile-commands').onclick = () => openPalette();
+$('palette-close').onclick = () => palette.close();
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-query]')) button.onclick = () => {
+  palInput.value = button.dataset.query!;
+  palSel = 0;
+  palRender();
+  palInput.focus();
+};
 const help = $<HTMLDialogElement>('help');
-$('help-btn').onclick = () => help.showModal();
 
 // ---- keyboard shortcuts (off while typing in a field; the note keyboard in input.ts gets what is left)
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && sidebar.classList.contains('open') && !document.querySelector('dialog[open]')) {
+    closeSidebar(); e.preventDefault(); e.stopImmediatePropagation(); return;
+  }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) {
     e.preventDefault(); e.stopImmediatePropagation(); openPalette(); return;
   }
@@ -450,7 +439,7 @@ $('dev-store').onclick = async () => {
   }
 };
 
-$('share-btn').onclick = async () => {
+const sharePatch = async (): Promise<void> => {
   try {
     const { code, full } = await encodeShare(editor.patch);
     const link = shareLink(code);
@@ -479,8 +468,7 @@ const loadFromHash = (): void => {
 loadFromHash();
 window.addEventListener('hashchange', loadFromHash);
 
-$('load-btn').onclick = () => $<HTMLInputElement>('load-file').click();
-$('save-btn').onclick = () => {
+const savePatch = (): void => {
   const blob = new Blob([JSON.stringify(editor.patch, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -494,16 +482,14 @@ $<HTMLInputElement>('load-file').onchange = async (e) => {
   input.value = '';
   if (!f) return;
   try {
-    editor.setPatch(validatePatch(JSON.parse(await f.text()), DEFS));
-    setBaseline();
-    nameInput.value = editor.patch.name;
+    loadNamed(validatePatch(JSON.parse(await f.text()), DEFS));
   } catch (err) {
     status.textContent = `load failed: ${(err as Error).message}`;
   }
 };
 
 // audio + input
-$('audio-btn').onclick = async () => {
+const startAudio = async (): Promise<void> => {
   try {
     await host.start();
     status.textContent = 'audio running';
@@ -512,6 +498,7 @@ $('audio-btn').onclick = async () => {
     status.textContent = `audio failed: ${e}`;
   }
 };
+$('audio-btn').onclick = startAudio;
 attachKeyboard(sink, () => currentTab === 'patch' && !document.querySelector('dialog[open], [popover]:popover-open'));
 // Web MIDI is only asked for on request: while a page holds MIDI access, Chromium's ALSA backend tracks every MIDI port on the
 // system and aborts the whole browser (SIGILL in midi::MidiManager::SetInputPortState) when the ports change, for example when
@@ -526,6 +513,24 @@ $('dev-release').onclick = () => {
   save(editor.patch); // the patch is remembered; reloading the page is what drops the MIDI access
   location.reload();
 };
+
+// The compact workspace drawer leaves the whole patch usable on small screens.
+const sidebar = $('workspace-sidebar');
+const sidebarToggle = $('sidebar-toggle');
+const sidebarDismiss = document.querySelector<HTMLButtonElement>('.sidebar-dismiss')!;
+const workspaceMain = document.querySelector<HTMLElement>('main')!;
+const compactWorkspace = window.matchMedia('(max-width: 700px)');
+const setSidebarOpen = (open: boolean): void => {
+  if (!open && sidebar.contains(document.activeElement) && compactWorkspace.matches) sidebarToggle.focus();
+  sidebar.classList.toggle('open', open);
+  sidebarToggle.setAttribute('aria-expanded', String(open));
+  sidebarDismiss.hidden = !open;
+  workspaceMain.inert = open && compactWorkspace.matches;
+};
+const closeSidebar = (): void => setSidebarOpen(false);
+sidebarToggle.onclick = () => setSidebarOpen(!sidebar.classList.contains('open'));
+sidebarDismiss.onclick = closeSidebar;
+compactWorkspace.addEventListener('change', closeSidebar);
 
 // tabs
 buildBankTab($('tab-library'), device, () => editor.patch, (msg) => {
@@ -551,27 +556,32 @@ $('tab-about').innerHTML = `
   <p><a href="https://github.com/hugelton/Felucca">Felucca</a>, by <a href="https://github.com/kurogedelic">Leo Kuroshita (@kurogedelic)</a> / <a href="https://github.com/hugelton">Hügelton Instruments</a>, provides the foundation for the flasher, loader and hardware support.</p>
   <p><a href="https://github.com/WiggisModular/Modular-1">Modular-1</a>, by <a href="https://github.com/morgulbrut">@morgulbrut</a> / <a href="https://github.com/WiggisModular">WiggisModular</a>, is the modular synthesizer this project grew from.</p>
   <p class="muted">GPL-3.0-only. Not affiliated with M-VAVE or Clavia.</p></div>`;
+const switchTab = (name: string): void => {
+  currentTab = name;
+  closeSidebar();
+  for (const button of document.querySelectorAll<HTMLButtonElement>('#tabs button')) {
+    const active = button.dataset.tab === name;
+    button.setAttribute('aria-selected', String(active));
+    button.tabIndex = active || (name !== 'patch' && name !== 'library' && button.dataset.tab === 'patch') ? 0 : -1;
+  }
+  for (const tab of document.querySelectorAll<HTMLElement>('.tab')) tab.hidden = tab.id !== `tab-${name}`;
+  document.querySelector<HTMLElement>('.patch-controls')!.hidden = name !== 'patch';
+  if (name === 'patch') requestAnimationFrame(() => editor.drawCables());
+};
 for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) {
   b.onkeydown = (e) => {
-    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key)) return;
     e.preventDefault();
     const tabs = [...document.querySelectorAll<HTMLButtonElement>('#tabs button')];
-    const index = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (tabs.indexOf(b) + (e.key === 'ArrowDown' ? 1 : tabs.length - 1)) % tabs.length;
+    const index = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (tabs.indexOf(b) + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
     tabs[index].click(); tabs[index].focus();
   };
-  b.onclick = () => {
-    currentTab = b.dataset.tab!;
-    for (const x of document.querySelectorAll<HTMLButtonElement>('#tabs button')) {
-      x.setAttribute('aria-selected', String(x === b));
-      x.tabIndex = x === b ? 0 : -1;
-    }
-    for (const t of document.querySelectorAll<HTMLElement>('.tab')) t.hidden = t.id !== `tab-${currentTab}`;
-    if (currentTab === 'patch') requestAnimationFrame(() => editor.drawCables());
-  };
+  b.onclick = () => switchTab(b.dataset.tab!);
 }
 
 // open the tab named in the address (#library, #flash, #about; the old #presets and #assemblies open the Library)
 {
   const h = location.hash.slice(1);
-  document.querySelector<HTMLButtonElement>(`#tabs button[data-tab="${h === 'presets' || h === 'assemblies' ? 'library' : h}"]`)?.click();
+  const tab = h === 'presets' || h === 'assemblies' ? 'library' : h;
+  if (['patch', 'library', 'flash', 'about'].includes(tab)) switchTab(tab);
 }

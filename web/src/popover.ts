@@ -15,18 +15,8 @@ export function positionPopover(panel: HTMLElement, anchor: HTMLElement): void {
   panel.style.top = `${top}px`;
 }
 
-/** Native popovers provide outside-click dismissal, Escape and focus restoration. */
-export function setupWorkspaceMenus(): void {
-  for (const panel of document.querySelectorAll<HTMLElement>('.app-popover[popover]')) {
-    const anchor = document.querySelector<HTMLElement>(`[popovertarget="${panel.id}"]`)!;
-    panel.addEventListener('toggle', () => {
-      if (panel.matches(':popover-open')) positionPopover(panel, anchor);
-    });
-    if (panel.classList.contains('menu-list')) panel.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('button') && !target.closest('[data-keep-open]')) panel.hidePopover();
-    });
-  }
+/** Reposition open parameter menus after viewport changes. */
+export function setupPopoverPositioning(): void {
   const reposition = (): void => {
     for (const panel of document.querySelectorAll<HTMLElement>('[popover]:popover-open')) {
       const anchor = anchors.get(panel);

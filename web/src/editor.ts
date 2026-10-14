@@ -163,6 +163,7 @@ export class Editor {
     this.touchGestures();
     window.addEventListener('keydown', (e) => {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
+      if (!this.canvas.checkVisibility() || document.querySelector('dialog[open], [popover]:popover-open')) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') && (t as HTMLInputElement).type !== 'range') return;
       e.preventDefault();

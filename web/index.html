@@ -9,72 +9,55 @@
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-  <header class="top">
-    <div class="brand">
-      <img src="./brand/fatmatryoshka-1.png" width="116" height="116" alt="" />
-      <div><span class="eyebrow">Modular synthesizer · FM-1</span><h1>FatMatryoshka<span>-1</span></h1></div>
-    </div>
-    <button id="palette-btn" class="command-search" title="Search modules, assemblies and patches (Ctrl/Cmd+K)"><span aria-hidden="true">⌕</span> Search &amp; add… <kbd>⌘ / Ctrl K</kbd></button>
-    <div class="audio-controls">
-      <span id="audio-status" class="muted" role="status">audio off</span>
-      <div><button id="audio-btn" class="primary">Start audio</button><button id="panic-btn" title="Stop all playing notes">Panic</button></div>
-    </div>
-  </header>
+  <div class="mobile-bar"><button id="sidebar-toggle" aria-expanded="false" aria-controls="workspace-sidebar">☰ Workspace</button><button id="mobile-commands">Commands</button></div>
+  <button class="sidebar-dismiss" aria-label="Close workspace" hidden></button>
   <div class="workspace">
-    <aside class="sidebar">
-      <span class="eyebrow nav-caption">Workspace</span>
-      <nav id="tabs" role="tablist" aria-label="Workspace" aria-orientation="vertical">
-        <button id="nav-patch" role="tab" data-tab="patch" aria-controls="tab-patch" aria-selected="true"><span class="nav-icon" aria-hidden="true">◈</span><span>Patch</span></button>
-        <button id="nav-library" role="tab" data-tab="library" aria-controls="tab-library" aria-selected="false" tabindex="-1"><span class="nav-icon" aria-hidden="true">▤</span><span>Library</span></button>
-        <button id="nav-flash" role="tab" data-tab="flash" aria-controls="tab-flash" aria-selected="false" tabindex="-1"><span class="nav-icon" aria-hidden="true">↯</span><span>Flash</span></button>
-        <button id="nav-about" role="tab" data-tab="about" aria-controls="tab-about" aria-selected="false" tabindex="-1"><span class="nav-icon" aria-hidden="true">ⓘ</span><span>About</span></button>
+    <aside id="workspace-sidebar" class="sidebar" aria-label="Workspace controls">
+      <div class="brand">
+        <img src="./brand/fatmatryoshka-1.png" width="80" height="80" alt="" />
+        <h1>FatMatryoshka-1</h1>
+      </div>
+      <nav id="tabs" role="tablist" aria-label="Workspace" aria-orientation="horizontal">
+        <button id="nav-patch" role="tab" data-tab="patch" aria-controls="tab-patch" aria-selected="true">Patch</button>
+        <button id="nav-library" role="tab" data-tab="library" aria-controls="tab-library" aria-selected="false" tabindex="-1">Library</button>
       </nav>
-      <button id="help-btn" class="sidebar-help" title="Keyboard shortcuts (?)"><span class="nav-icon" aria-hidden="true">?</span><span>Shortcuts</span></button>
+      <div class="patch-controls">
+        <input id="patch-name" aria-label="Patch name" title="Rename patch" />
+        <select id="preset" aria-label="Load a preset"></select>
+        <button id="add-btn" class="primary">+ Add to patch</button>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="audio-controls">
+          <button id="audio-btn" class="primary">Start audio</button>
+          <button id="panic-btn" title="Stop all playing notes" aria-label="Panic: stop all notes">■</button>
+        </div>
+        <span id="audio-status" class="muted" role="status">Audio off</span>
+        <button id="palette-btn" title="All commands (Ctrl/Cmd+K)">Commands <kbd>⌘ / Ctrl K</kbd></button>
+      </div>
     </aside>
     <main>
     <section id="tab-patch" class="tab" role="tabpanel" aria-labelledby="nav-patch">
-      <div class="patch-heading">
-        <label class="patch-title"><span class="eyebrow">Current patch</span><input id="patch-name" aria-label="Patch name" /></label>
-        <div class="patch-files">
-          <select id="preset" aria-label="Load a preset"></select>
-          <button popovertarget="patch-files" aria-label="Patch file actions">File <span aria-hidden="true">⌄</span></button>
-          <div id="patch-files" class="app-popover menu-list" popover>
-            <span class="menu-heading">Patch file</span>
-            <button id="save-btn">Save .json</button>
-            <button id="load-btn">Load .json</button><input id="load-file" type="file" accept="application/json,.json" hidden />
-            <button id="share-btn" title="Copy a link that opens this patch">Share link</button>
-          </div>
-        </div>
+      <div id="canvas" class="canvas" aria-label="Patch canvas">
+        <div id="canvas-space"><div id="patch-world"><svg id="cables" class="cables"></svg><div id="modules"></div><svg id="patch-preview" class="cables patch-preview"></svg></div></div>
+        <div id="scope" class="scope" hidden></div>
       </div>
-      <div class="patch-tools" aria-label="Patch controls">
-        <div class="tool-group">
-          <select id="add-type" aria-label="Add module" title="Add a module to the patch"></select>
-          <button id="asm-insert" title="Browse and insert an assembly">Insert assembly</button>
-        </div>
-        <div class="tool-group history-tools">
-          <button id="undo-btn" title="Undo (Ctrl/Cmd+Z)">↶ <span>Undo</span></button>
-          <button id="redo-btn" title="Redo (Shift+Ctrl/Cmd+Z)">↷ <span>Redo</span></button>
-          <button popovertarget="patch-edit">Edit <span aria-hidden="true">⌄</span></button>
-          <div id="patch-edit" class="app-popover menu-list" popover>
-            <span class="menu-heading">Selection &amp; changes</span>
-            <button id="asm-btn" title="Group selected modules into an assembly (G)">Make assembly</button>
-            <button id="diff-btn" title="Changes since the last load, upload or store">Show changes</button>
-            <span class="menu-heading">Compare snapshots</span>
-            <span class="ab" data-keep-open>
-              <button id="ab-a" title="Keep the current patch as A">Set A</button>
-              <button id="ab-b" title="Keep the current patch as B">Set B</button>
-              <button id="ab-toggle" title="Switch A / B (Alt+B)" disabled>A</button>
-            </span>
-          </div>
-        </div>
-        <div class="tool-group view-tools">
-          <span class="zoom" title="Zoom the canvas (pinch or Ctrl/Cmd + wheel)">
-            <button id="zoom-out" aria-label="zoom out">−</button><button id="zoom-fit" title="Fit the patch / reset zoom">100%</button><button id="zoom-in" aria-label="zoom in">+</button>
-          </span>
-          <button popovertarget="device-bar" id="device-menu-btn">FM-1 &amp; MIDI <span aria-hidden="true">⌄</span></button>
-        </div>
-      </div>
-      <div id="device-bar" class="app-popover device-controls" popover>
+      <div id="diff" class="panel" hidden></div>
+    </section>
+    <section id="tab-library" class="tab" role="tabpanel" aria-labelledby="nav-library" hidden></section>
+    <section id="tab-flash" class="tab" aria-label="Flash firmware" hidden></section>
+    <section id="tab-about" class="tab" aria-label="About FatMatryoshka-1" hidden></section>
+    </main>
+  </div>
+  <input id="load-file" type="file" accept="application/json,.json" hidden />
+  <dialog id="palette" class="palette" aria-label="Command palette">
+    <div class="palette-search"><input id="palette-input" type="text" role="combobox" aria-label="Search commands" aria-controls="palette-list" aria-expanded="true" aria-autocomplete="list" placeholder="Find a command, module, assembly or patch…" autocomplete="off" /><button id="palette-close" aria-label="Close commands">×</button></div>
+    <div class="palette-filters" aria-label="Filter commands">
+      <button data-query="" aria-pressed="true">Actions</button><button data-query="module" aria-pressed="false">Modules</button><button data-query="assembly" aria-pressed="false">Assemblies</button><button data-query="load patch" aria-pressed="false">Patches</button>
+    </div>
+    <ul id="palette-list" role="listbox" aria-label="Commands"></ul>
+    <div class="palette-hint">↑ ↓ to browse <span>Enter to run · Esc to close</span></div>
+  </dialog>
+      <dialog id="device-bar" class="device-controls" aria-label="FM-1 and MIDI"><h2>FM-1 &amp; MIDI</h2>
         <span class="menu-heading">FM-1 connection</span>
         <button id="dev-btn">Connect FM-1</button>
         <label><input id="dev-live" type="checkbox" disabled /> Live sync</label>
@@ -84,25 +67,8 @@
         <span class="menu-heading">MIDI keyboard</span>
         <button id="midi-btn">Enable MIDI keyboard</button>
         <button id="dev-release" title="Release MIDI ports by reloading the page. Use before unplugging or flashing the FM-1.">Release MIDI</button>
-      </div>
-      <div id="canvas" class="canvas" aria-label="Patch canvas">
-        <div id="canvas-space"><div id="patch-world"><svg id="cables" class="cables"></svg><div id="modules"></div><svg id="patch-preview" class="cables patch-preview"></svg></div></div>
-        <div id="scope" class="scope" hidden></div>
-      </div>
-      <div id="diff" class="panel" hidden></div>
-      <button id="fab" class="fab" title="add a module, insert an assembly, load a patch" aria-label="command palette">+</button>
-      <dialog id="palette" class="palette">
-        <input id="palette-input" type="text" aria-label="Search commands" placeholder="Search modules, assemblies, patches…" autocomplete="off" />
-        <ul id="palette-list"></ul>
+        <form method="dialog"><button>Close</button></form>
       </dialog>
-
-      <p class="canvas-hint"><span>Drag to adjust · Alt-drag to patch · Click a cable to disconnect</span><span><kbd>⇧</kbd> click to select · <kbd>G</kbd> group</span></p>
-    </section>
-    <section id="tab-library" class="tab" role="tabpanel" aria-labelledby="nav-library" hidden></section>
-    <section id="tab-flash" class="tab" role="tabpanel" aria-labelledby="nav-flash" hidden></section>
-    <section id="tab-about" class="tab" role="tabpanel" aria-labelledby="nav-about" hidden></section>
-    </main>
-  </div>
       <dialog id="help" class="help">
         <h2>Keyboard</h2>
         <table>
