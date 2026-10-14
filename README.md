@@ -160,7 +160,7 @@ During browser playback, sliders and their readouts follow dedicated CV inputs (
 
 ## Scope
 
-The oscilloscope opens by default in a compact window at the bottom right of the patch viewport. Drag its **Scope** handle to move it; with the handle focused, arrow keys move it and Home restores its starting position. It watches both channels of the rendered output, including all voices, incoming cables and Output level. Traces use their cable signal colors, 25% opacity and a 16 ms audio window. The scope stays fixed while modules, cables and the dot grid zoom and pan together.
+The oscilloscope opens by default in a compact window at the bottom right of the patch viewport. Drag its **Scope** handle to move it, and its bottom-right corner to resize it; with the handle focused, arrow keys move it and Home restores its starting position. It watches both channels of the rendered output, including all voices, incoming cables and Output level. Traces use their cable signal colors, 25% opacity and a 16 ms audio window. The scope stays fixed while modules, cables and the dot grid zoom and pan together. Its resize handle also accepts arrow keys (Shift for larger steps). Assemblies can only be resized while expanded; collapsed cards fit their contents.
 
 Every output jack’s **◎** adds or removes an extra trace. **Commands** offers **Hide oscilloscope**, **Scope: waveform**, and **Scope: spectrum**. Audio waveforms auto-scale and trigger on a rising zero crossing; control and gate probes show their full sample window. The spectrum uses a 2048-point Hann-windowed FFT. Probes run in the browser and add no work on the FM-1.
 

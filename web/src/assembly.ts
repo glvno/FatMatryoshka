@@ -40,8 +40,9 @@ export interface ParamRef {
 }
 
 export interface AssemblyLayout {
-  /** User-sized collapsed card and expanded frame, in unscaled canvas pixels. */
+  /** Legacy collapsed-card size, retained for file compatibility but ignored by the editor. */
   size?: { width: number; height: number };
+  /** User-sized expanded frame, in unscaled canvas pixels. */
   frameSize?: { width: number; height: number };
 }
 

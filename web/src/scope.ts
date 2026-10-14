@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Draggable scope window, anchored to the patch viewport independently of patch zoom.
+import { resizeHandle } from './resize-handle';
+
+// Draggable, resizable scope window, anchored to the patch viewport independently of patch zoom.
 export const OUTPUT_PROBES = ['output:left', 'output:right'] as const;
 type ProbeKind = 'audio' | 'control' | 'gate';
 interface Probe {
@@ -68,6 +70,17 @@ export class Scope {
     }
     root.querySelector<HTMLButtonElement>('.scope-close')!.onclick = () => this.setVisible(false);
     this.setupDragging();
+    root.append(resizeHandle('Resize oscilloscope', () => 1, {
+      start: () => { this.position = this.currentPosition(); },
+      size: () => ({ width: root.offsetWidth, height: root.offsetHeight }),
+      resize: (width, height) => {
+        const parent = root.parentElement!;
+        root.style.width = `${Math.min(parent.clientWidth - 24, Math.max(280, width))}px`;
+        root.style.height = `${Math.min(parent.clientHeight - 24, Math.max(120, height))}px`;
+        this.clampPosition();
+      },
+      end: () => {},
+    }));
     new ResizeObserver(() => { this.clampPosition(); this.schedule(); }).observe(root.parentElement!);
     new ResizeObserver(() => this.schedule()).observe(this.cv);
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.schedule());

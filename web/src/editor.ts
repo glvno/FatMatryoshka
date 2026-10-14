@@ -353,16 +353,13 @@ export class Editor {
     this.applyStack();
   }
 
-  private resizeAssembly(el: HTMLElement, a: AssemblyInst, expanded: boolean): void {
-    const key = expanded ? 'frameSize' : 'size';
-    if (!expanded && a.size) { el.style.width = `${a.size.width}px`; el.style.minHeight = `${a.size.height}px`; }
+  private resizeAssembly(el: HTMLElement, a: AssemblyInst): void {
     let before = '';
     el.append(resizeHandle(`Resize ${a.label}`, () => this.zoom, {
       start: () => { before = JSON.stringify(this.patch); this.raiseCard(el); },
       size: () => ({ width: el.offsetWidth, height: el.offsetHeight }),
       resize: (width, height) => {
-        a[key] = { width: Math.min(4000, Math.max(236, width)), height: Math.min(4000, Math.max(80, height)) };
-        if (!expanded) { el.style.width = `${a[key]!.width}px`; el.style.minHeight = `${a[key]!.height}px`; }
+        a.frameSize = { width: Math.min(4000, Math.max(236, width)), height: Math.min(4000, Math.max(80, height)) };
         this.layoutFrames(); this.sizeCanvas(); this.positionCables();
       },
       end: () => {
@@ -1190,7 +1187,6 @@ export class Editor {
       body.append(hint);
     }
     el.append(head, body);
-    this.resizeAssembly(el, a, false);
     return el;
   }
 
@@ -1213,7 +1209,7 @@ export class Editor {
     el.append(head);
     this.frames.set(a.id, el);
     this.frameDrag(head, a);
-    this.resizeAssembly(el, a, true);
+    this.resizeAssembly(el, a);
     return el;
   }
 
