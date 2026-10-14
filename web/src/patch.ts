@@ -115,8 +115,6 @@ export interface ModuleInst {
   map?: Record<Source, string[]>;
   /** bypassed: the module does not run; its outputs carry its through input (thruInput) or silence. Not on the panel or the output. */
   bypass?: boolean;
-  /** Dedicated input-to-parameter links switched off; incoming cables remain plugged in. */
-  disabledInputs?: string[];
   /** Additional additive routes from side inputs to parameters; p1/p2 keep their existing map/depth/ranges. */
   inputMap?: Record<string, string[]>;
   /** the B side of a morph: the same parameters as `params`, taken from another patch of the same structure (setMorphTarget); the
@@ -251,12 +249,10 @@ export function defaultMap(def: ModuleDef): Record<Source, string[]> {
   return { p1: at(0), p2: at(1), k1: at(0), k2: at(1), k3: at(2), k4: at(3) };
 }
 
-/** Validate native link switches and additional side-input destinations; old patches retain their original routing. */
+/** Validate additional side-input destinations. A dedicated input (ParamDef.input) is always linked to its parameter: the
+ * `disabledInputs` list of older patches (format 17) is dropped, so such a patch gets its built-in routing back. */
 export function fixInputRoutes(m: ModuleInst, def: ModuleDef): void {
-  const valid = new Set(def.params.flatMap((pd) => pd.input ? [pd.input] : []));
-  const disabled = Array.isArray(m.disabledInputs) ? [...new Set(m.disabledInputs.filter((name) => valid.has(name)))] : [];
-  if (disabled.length) m.disabledInputs = disabled;
-  else delete m.disabledInputs;
+  delete (m as { disabledInputs?: unknown }).disabledInputs;
   const routes: Record<string, string[]> = {};
   for (const port of def.inputs) {
     if (port.name === 'p1' || port.name === 'p2') continue;

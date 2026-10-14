@@ -684,7 +684,6 @@ export function insertAssembly(p: Patch, defs: Record<string, ModuleDef>, def: A
     m.params = { ...m.params, ...clone(src.params) };
     if (src.att) m.att = [...src.att];
     if (src.map) m.map = clone(src.map);
-    if (src.disabledInputs) m.disabledInputs = [...src.disabledInputs];
     if (src.inputMap) m.inputMap = structuredClone(src.inputMap);
     fixInputRoutes(m, defs[src.type]);
     fixMatrix(m, defs[src.type]);

@@ -849,8 +849,8 @@ kit('crush-color', (add, wire) => {
   wire(cr, 'out', out, 'l');
 });
 
-// A switched-off fixed link keeps its physical cable but renders exactly as an unplugged input.
-kit('fixed-links-disabled', (add, wire) => {
+// Every dedicated input link at once (they are built in: a cable into cv always moves cutoff, and so on).
+kit('fixed-links', (add, wire) => {
   const main = add('fm1', 0, 0, { morph: 0 });
   const osc = add('osc', 0, 0, { wave: 0, level: .3 });
   const cv = add('const', 0, 0, { value: .8 });
@@ -870,20 +870,16 @@ kit('fixed-links-disabled', (add, wire) => {
     wire(cv, 'out', id, port);
 });
 {
-  const p = tests['fixed-links-disabled'];
-  for (const m of p.modules) {
-    const fixed = DEFS[m.type].params.flatMap((pd) => pd.input ? [pd.input] : []);
-    if (fixed.length) m.disabledInputs = fixed;
-  }
+  const p = tests['fixed-links'];
   const filter = p.modules.find((m) => m.type === 'filter')!;
   filter.paramsB = { ...filter.params, cutoff: 4000 };
   filter.range = { p1: { cutoff: [.2, .8] } }; // exercises all optional sections together
 }
 
-// A physical input fans out independently of the native CV switch, alongside morph and macro ranges.
-for (const disabled of [false, true]) {
-  const p = structuredClone(tests['fixed-links-disabled']);
-  tests[`side-input-fanout-${disabled ? 'off' : 'on'}`] = p;
+// A physical input fans out on top of its built-in link, alongside morph and macro ranges.
+{
+  const p = structuredClone(tests['fixed-links']);
+  tests['side-input-fanout'] = p;
   const source = p.modules.find((m) => m.type === 'const')!; source.params.value = .015625;
   const amp = p.modules.find((m) => m.type === 'vca')!;
   const second = { ...structuredClone(source), id: Math.max(...p.modules.map((m) => m.id)) + 1 };
@@ -891,7 +887,6 @@ for (const disabled of [false, true]) {
   p.cables.push({ from: { module: second.id, port: 'out' }, to: { module: p.modules.find((m) => m.type === 'filter')!.id, port: 'cv' } });
   p.cables = p.cables.filter((c) => !(c.to.module === amp.id && c.to.port === 'cv')); // keep the reference audible through the chain
   for (const m of p.modules) {
-    if (!disabled) delete m.disabledInputs;
     if (m.type === 'filter') m.inputMap = { cv: ['res', 'cvamt'], in: ['track'] };
     if (m.type === 'ladder') m.inputMap = { cv: ['res', 'drive'] };
     if (m.type === 'vca') m.inputMap = { in: ['gain'] };

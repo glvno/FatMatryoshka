@@ -266,6 +266,8 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .module .mhead, .module .param > span:not(.slider-jack), .module .param > output, .module .parameter-routing, .module .prb, .module .tog, .module .voices-row, .module .morph-row { position: relative; z-index: 2; }
 .cable.alias { stroke-width: 3; stroke-dasharray: 3 4; opacity: .6; pointer-events: stroke; }
 .cable.alias:hover, .cable.alias:focus { stroke-width: 6; opacity: 1; }
+/* a dedicated input's built-in link: part of the module, shown greyed out, not editable */
+.cable.alias.fixed, .cable.alias.fixed:hover { stroke: var(--muted); opacity: .45; stroke-width: 3; pointer-events: none; }
 .parameter-routing { position: relative; z-index: 2; justify-self: end; font-size: 11px; }
 .parameter-routing[open] { z-index: 5; }
 .parameter-routing summary { list-style: none; cursor: pointer; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; color: var(--muted); }

@@ -23,7 +23,7 @@ interface Inst {
   /** Overrides captured by DSP for dedicated CV inputs, after the parameter matrix. */
   display: Record<string, number>;
   inp: Record<string, Float32Array>;
-  /** Native DSP inputs: aliases of raw buffers, except disabled fixed links receive silence. */
+  /** Native DSP inputs: aliases of the raw buffers (kept apart from `inp` for the per-block parameter routes). */
   dspInp: Record<string, Float32Array>;
   out: Record<string, Float32Array>;
 }
@@ -155,17 +155,16 @@ export class Engine {
       node.paramsB = m.paramsB && m.type !== 'fm1' ? { ...m.paramsB } : null;
       node.range = [{ ...(m.range?.p1 ?? {}) }, { ...(m.range?.p2 ?? {}) }];
       node.inputRoutes = Object.entries(m.inputMap ?? {}).map(([port, params]) => ({ port, params: [...params], mean: 0 }));
-      for (const inst of node.inst) inst.dspInp = Object.fromEntries(Object.entries(inst.inp).map(([port, buf]) => [port, m.disabledInputs?.includes(port) ? new Float32Array(BLOCK) : buf]));
+      for (const inst of node.inst) inst.dspInp = { ...inst.inp };
       node.sources = [];
       node.connected = {};
       next.set(m.id, node);
     }
-    const disabled = new Map(patch.modules.map((m) => [m.id, new Set(m.disabledInputs)]));
     for (const c of patch.cables) {
       const to = next.get(c.to.module)!;
       const from = next.get(c.from.module)!;
       to.sources.push({ port: c.to.port, from, fromPort: c.from.port });
-      if (!disabled.get(c.to.module)?.has(c.to.port)) to.connected[c.to.port] = true;
+      to.connected[c.to.port] = true;
     }
     this.nodes = next;
     const { order } = processingOrder(patch);

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { makeAssembly, toDef, validateAssemblyDef, insertAssembly } from './assembly';
 import { DEFS } from './modules';
 import { addModule, connect, emptyPatch, validatePatch } from './patch';
-import { connectParameter, parameterInputs, setParameterInput, setFixedInput, setInputRoute } from './parameter-routing';
+import { connectParameter, parameterInputs, setParameterInput, setInputRoute } from './parameter-routing';
 
 function setup() {
   const p = emptyPatch();
@@ -43,9 +43,10 @@ describe('slider jack routing', () => {
       setInputRoute(target, DEFS.filter, port, 'res', false);
       expect(parameterInputs(target, DEFS.filter.params.find((pd) => pd.name === 'cvamt')!)).toContain(port);
     }
-    setInputRoute(target, DEFS.filter, 'cv', 'cutoff', false);
+    expect(() => setInputRoute(target, DEFS.filter, 'cv', 'cutoff', false)).toThrow(/built in/);
+    setInputRoute(target, DEFS.filter, 'cv', 'cutoff', true); // a no-op: the link is always there
     expect(target.inputMap).toEqual({ cv: ['cvamt'], in: ['cvamt'] });
-    expect(target.disabledInputs).toEqual(['cv']);
+    expect(parameterInputs(target, DEFS.filter.params[0])).toContain('cv');
     expect(p.cables).toHaveLength(1);
     connectParameter(p, DEFS, from, target.id, 'cvamt');
     expect(p.cables).toHaveLength(1); // dropping on an already routed thumb reuses that side input
@@ -63,30 +64,27 @@ describe('slider jack routing', () => {
     expect(validatePatch(p, DEFS).modules.find((m) => m.id === target.id)!.inputMap).toEqual({ cv: ['res'] });
   });
 
-  it('round-trips disabled fixed links through patches and reusable assemblies', () => {
+  it('keeps the fixed link through patches and reusable assemblies', () => {
     const { p, target, from } = setup();
     const pd = DEFS.filter.params.find((pd) => pd.name === 'cutoff')!;
     connectParameter(p, DEFS, from, target.id, pd.name);
-    setFixedInput(target, pd, false);
     const saved = validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
-    expect(saved.modules.find((m) => m.id === target.id)!.disabledInputs).toEqual(['cv']);
     expect(saved.cables).toEqual(p.cables);
     const a = makeAssembly(p, [target.id], 'Filter');
     const prefab = validateAssemblyDef(toDef(p, a), DEFS);
     const copy = emptyPatch();
     insertAssembly(copy, DEFS, prefab, 0, 0);
-    expect(copy.modules[0].disabledInputs).toEqual(['cv']);
+    expect(parameterInputs(copy.modules[0], pd)).toContain('cv');
     connectParameter(p, DEFS, from, target.id, pd.name);
-    expect(target.disabledInputs).toBeUndefined();
     expect(p.cables).toHaveLength(1);
   });
 
-  it('ignores invalid disabled inputs while loading and leaves old patches fully connected', () => {
+  it('drops the disabledInputs list of an older patch, so its built-in links come back', () => {
     const { p, target } = setup();
-    target.disabledInputs = ['cv', 'cv', 'in', 'p1', 'missing'];
-    expect(validatePatch(p, DEFS).modules.find((m) => m.id === target.id)!.disabledInputs).toEqual(['cv']);
-    delete target.disabledInputs;
-    expect(parameterInputs(target, DEFS.filter.params[0])).toContain('cv');
+    (target as { disabledInputs?: string[] }).disabledInputs = ['cv', 'in', 'missing'];
+    const loaded = validatePatch(JSON.parse(JSON.stringify(p)), DEFS).modules.find((m) => m.id === target.id)!;
+    expect('disabledInputs' in loaded).toBe(false);
+    expect(parameterInputs(loaded, DEFS.filter.params[0])).toContain('cv');
   });
 
   it('aliases dedicated CV jacks and makes duplicate drops a no-op', () => {

@@ -2196,16 +2196,6 @@ describe('dedicated CV parameter displays', () => {
     render(e, 128);
     expect(e.parameterValues().find((m) => m.id === target.id)!.params[param]).toBeCloseTo(expected);
     expect(target.params[param]).toBe(base);
-    const cables = structuredClone(p.cables);
-    target.disabledInputs = [port];
-    e.load(p);
-    render(e, 128);
-    expect(e.parameterValues().find((m) => m.id === target.id)!.params[param]).toBeCloseTo(base);
-    expect(p.cables).toEqual(cables);
-    delete target.disabledInputs;
-    e.load(p);
-    render(e, 128);
-    expect(e.parameterValues().find((m) => m.id === target.id)!.params[param]).toBeCloseTo(expected);
     e.setParam(source.id, 'value', 0);
     render(e, 128);
     expect(e.parameterValues().find((m) => m.id === target.id)!.params[param]).toBeCloseTo(type === 'vca' ? 0 : base);
@@ -2233,7 +2223,7 @@ it('animates the Wobble 2 factory filter and VCA displays through their dedicate
   expect(JSON.stringify(p)).toBe(original);
 });
 
-it('switches the Main morph input independently of its physical cable', () => {
+it('adds the Main morph input to the morph parameter', () => {
   const p = emptyPatch();
   const main = addModule(p, DEFS.fm1, 0, 0); main.params.morph = .1;
   const source = addModule(p, DEFS.const, 0, 0); source.params.value = .5;
@@ -2241,32 +2231,24 @@ it('switches the Main morph input independently of its physical cable', () => {
   connect(p, DEFS, { module: source.id, port: 'out' }, { module: main.id, port: 'morph' });
   const engine = new Engine(SR);
   engine.load(p); render(engine, 512); expect(engine.morph).toBeCloseTo(.6);
-  main.disabledInputs = ['morph'];
-  engine.load(p); render(engine, 512); expect(engine.morph).toBeCloseTo(.1);
-  delete main.disabledInputs;
-  engine.load(p); render(engine, 512); expect(engine.morph).toBeCloseTo(.6);
   expect(p.cables).toHaveLength(1);
 });
 
-it('fans a CV jack into several parameters even with its original fixed link disabled', () => {
+it('fans a CV jack into several parameters on top of its built-in link', () => {
   const p = emptyPatch();
   const source = addModule(p, DEFS.const, 0, 0); source.params.value = .125;
   const target = addModule(p, DEFS.filter, 0, 0);
   target.params = { ...target.params, cutoff: 1000, res: .1, cvamt: 2 };
   target.inputMap = { cv: ['res', 'cvamt'], in: ['track'] };
-  target.disabledInputs = ['cv'];
   for (const port of ['cv', 'in']) connect(p, DEFS, { module: source.id, port: 'out' }, { module: target.id, port });
   const e = new Engine(SR);
   const value = (name: string) => e.parameterValues().find((m) => m.id === target.id)!.params[name];
   e.load(p); render(e, 128);
-  expect(value('cutoff')).toBeCloseTo(1000);
+  expect(value('cutoff')).toBeGreaterThan(1000);
   for (const name of ['res', 'cvamt', 'track']) expect(value(name)).toBeCloseTo(modulate(DEFS.filter.params.find((pd) => pd.name === name)!, target.params[name], .125));
   target.inputMap.cv = ['cvamt'];
   e.load(p); render(e, 128);
   expect(value('res')).toBeCloseTo(.1);
   expect(value('cvamt')).toBeGreaterThan(2);
-  delete target.disabledInputs;
-  e.load(p); render(e, 128);
-  expect(value('cutoff')).toBeGreaterThan(1000);
   expect(p.cables).toHaveLength(2);
 });

@@ -5,7 +5,7 @@ const PINS = ['p1', 'p2'] as const;
 
 /** Physical inputs whose signals affect this parameter. The thumb is an alias, never a new patch port. */
 export function parameterInputs(m: ModuleInst, pd: ParamDef): string[] {
-  return [...(pd.input && !m.disabledInputs?.includes(pd.input) ? [pd.input] : []), ...PINS.filter((pin) => m.map?.[pin].includes(pd.name)), ...Object.keys(m.inputMap ?? {}).filter((port) => m.inputMap![port].includes(pd.name))];
+  return [...(pd.input ? [pd.input] : []), ...PINS.filter((pin) => m.map?.[pin].includes(pd.name)), ...Object.keys(m.inputMap ?? {}).filter((port) => m.inputMap![port].includes(pd.name))];
 }
 
 /** The editable p1/p2 branch; removing it also removes that destination's macro range. */
@@ -18,21 +18,15 @@ export function setParameterInput(m: ModuleInst, pin: 'p1' | 'p2', param: string
   m.map[pin] = names;
 }
 
-/** Switch a dedicated input link independently of any cables plugged into that jack. */
-export function setFixedInput(m: ModuleInst, pd: ParamDef, on: boolean): void {
-  if (!pd.input) throw new Error('This parameter has no fixed input.');
-  const disabled = (m.disabledInputs ?? []).filter((name) => name !== pd.input);
-  if (!on) disabled.push(pd.input);
-  if (disabled.length) m.disabledInputs = disabled;
-  else delete m.disabledInputs;
-}
-
 /** Add or remove one branch without replacing any other destinations or the physical cable. */
 export function setInputRoute(m: ModuleInst, def: ModuleDef, port: string, param: string, on: boolean): void {
   const pd = def.params.find((pd) => pd.name === param);
   if (!pd || !def.inputs.some((p) => p.name === port)) throw new Error('This input or parameter is no longer available.');
   if (port === 'p1' || port === 'p2') return setParameterInput(m, port, param, on);
-  if (port === pd.input) return setFixedInput(m, pd, on);
+  if (port === pd.input) {
+    if (on) return; // built in: a dedicated input always feeds its parameter
+    throw new Error(`${port} → ${param} is built into this module and cannot be disconnected.`);
+  }
   const names = (m.inputMap?.[port] ?? []).filter((name) => name !== param);
   if (on) names.push(param);
   if (names.length) (m.inputMap ??= {})[port] = names;
@@ -65,7 +59,6 @@ export function connectParameter(p: Patch, defs: Record<string, ModuleDef>, from
     }
   }
   if (!port) throw new Error('This control has no modulation input.');
-  if (port === pd.input) setFixedInput(m, pd, true);
   const to = { module, port };
   if (!p.cables.some((c) => sameEnd(c.from, from) && sameEnd(c.to, to)) && !connect(p, defs, from, to))
     throw new Error('Cannot connect these ports.');

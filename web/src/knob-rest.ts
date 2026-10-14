@@ -59,7 +59,7 @@ export function knobRests(patch: Patch): Map<string, KnobRest[]> {
       if (pd) put(m, name, knob, modulate(pd, m.params[name] ?? pd.default, k));
     }
     for (const pd of def.params)
-      if (pd.input === port && pd.rest && !m.disabledInputs?.includes(port)) put(m, pd.name, knob, pd.rest(m.params, k));
+      if (pd.input === port && pd.rest) put(m, pd.name, knob, pd.rest(m.params, k));
   }
   return out;
 }

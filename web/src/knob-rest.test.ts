@@ -60,14 +60,12 @@ describe('knob rests', () => {
     expect(knobRests(patch).get(`${vca}:gain`)).toEqual([{ knob: 'k3', value: 0.25 }]);
   });
 
-  it('ignores a bypassed module and a disabled input', () => {
+  it('ignores a bypassed module', () => {
     const { patch, kb, filter } = rig();
     const f = patch.modules.find((m) => m.id === filter)!;
     patch.modules.find((m) => m.id === kb)!.params.k1 = 1;
     wire(patch, kb, 'k1', filter, 'cv');
-    f.disabledInputs = ['cv'];
-    expect(knobRests(patch).size).toBe(0);
-    delete f.disabledInputs;
+    expect(knobRests(patch).size).toBe(1);
     f.bypass = true;
     expect(knobRests(patch).size).toBe(0);
   });

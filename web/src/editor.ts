@@ -829,7 +829,6 @@ export class Editor {
         if (m.map) copy.map = JSON.parse(JSON.stringify(m.map));
         if (m.range) copy.range = JSON.parse(JSON.stringify(m.range));
         if (m.bypass) copy.bypass = true;
-        if (m.disabledInputs) copy.disabledInputs = [...m.disabledInputs];
         if (m.inputMap) copy.inputMap = structuredClone(m.inputMap);
         map.set(id, copy.id);
       }
@@ -1555,17 +1554,19 @@ export class Editor {
     for (const svg of this.modulesEl.querySelectorAll('.internal-cables')) svg.remove();
     const internalLayers = new Map<HTMLElement, SVGSVGElement>();
     for (const dot of [...this.ports.values(), ...this.sliderPorts.map((p) => p.jack)]) dot.classList.remove('connected');
-    const add = (from: HTMLElement, to: HTMLElement, kind: string, remove: () => void, title: string, internal = false): void => {
+    const add = (from: HTMLElement, to: HTMLElement, kind: string, remove: (() => void) | null, title: string, internal = false): void => {
       const path = document.createElementNS(SVGNS, 'path');
-      path.setAttribute('class', `cable ${kind}${internal ? ' alias' : ''}`);
-      path.setAttribute('role', 'button');
-      path.setAttribute('tabindex', '0');
+      path.setAttribute('class', `cable ${kind}${internal ? ' alias' : ''}${remove ? '' : ' fixed'}`);
       path.setAttribute('aria-label', title);
-      path.addEventListener('pointerdown', (e) => e.stopPropagation());
-      path.addEventListener('click', (e) => { e.stopPropagation(); remove(); });
-      path.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); remove(); }
-      });
+      if (remove) {
+        path.setAttribute('role', 'button');
+        path.setAttribute('tabindex', '0');
+        path.addEventListener('pointerdown', (e) => e.stopPropagation());
+        path.addEventListener('click', (e) => { e.stopPropagation(); remove(); });
+        path.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); remove(); }
+        });
+      }
       const hint = document.createElementNS(SVGNS, 'title'); hint.textContent = title; path.append(hint);
       let layer = this.svg;
       let origin = this.world;
@@ -1585,11 +1586,13 @@ export class Editor {
       layer.prepend(path);
       this.cablePaths.push({ path, from, to, origin });
     };
-    // Show the assignment even without an upstream cable, so it can be edited before patching a source.
+    // Show the assignment even without an upstream cable, so it can be edited before patching a source. A dedicated
+    // input's link (ParamDef.input) is built into the module: drawn grey, not editable.
     for (const { m, pd, jack } of this.sliderPorts) for (const port of parameterInputs(m, pd)) {
       const side = this.inputJack({ module: m.id, port });
       if (!side) continue;
-      add(side, jack, 'control', () => this.change(() => {
+      if (port === pd.input) add(side, jack, 'control', null, `Built in: ${port} sets ${pd.name}`, true);
+      else add(side, jack, 'control', () => this.change(() => {
         setInputRoute(m, DEFS[m.type], port, pd.name, false);
       }), `Disconnect ${DEFS[m.type].label} ${port} → ${pd.name}`, true);
     }
