@@ -36,8 +36,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 syste
 /* The synth is the workspace: a control rail beside an uninterrupted patch field. */
 .workspace { display: grid; grid-template-columns: 208px minmax(0, 1fr); height: 100dvh; }
 .sidebar { display: flex; flex-direction: column; gap: 24px; padding: 20px 16px 16px; min-height: 0; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); }
-.brand { display: grid; justify-items: center; gap: 6px; }
-.brand img { object-fit: contain; }
+.brand { display: grid; justify-items: center; gap: 6px; min-width: 0; }
+.brand img { width: 100%; height: auto; min-width: 0; object-fit: contain; }
 .brand h1 { margin: 0; font-size: 17px; font-weight: 750; letter-spacing: -.045em; }
 #tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
 #tabs button { flex: 1; border: 0; border-radius: 0; padding: 10px 4px; background: transparent; color: var(--muted); }
@@ -283,8 +283,6 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 #tab-library { max-width: 1200px; margin: 0 auto; }
 @media (max-height: 660px) and (min-width: 701px) {
   .sidebar { gap: 12px; padding-top: 12px; }
-  .brand { grid-template-columns: 40px 1fr; gap: 6px; }
-  .brand img { width: 40px; height: 40px; }
   .brand h1 { font-size: 14px; }
 }
 @media (max-width: 700px) {
