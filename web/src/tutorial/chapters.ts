@@ -124,7 +124,7 @@ const ch2: Chapter = {
       text: 'Cable Oscillator out → VCA in and VCA out → Output l. Click the old cable from the Oscillator to Output to remove it. Silence: the gain is driven by nothing yet.',
       check: (s) => cabled(s.patch, mod(s.patch, 'osc'), 'out', mod(s.patch, 'vca'), 'in') && cabled(s.patch, mod(s.patch, 'vca'), 'out', mod(s.patch, 'output'), 'l') && !cabled(s.patch, mod(s.patch, 'osc'), 'out', mod(s.patch, 'output'), 'l'),
       apply: (a) => a.edit((p) => { wire(p, mod(p, 'osc'), 'out', mod(p, 'vca'), 'in'); wire(p, mod(p, 'vca'), 'out', mod(p, 'output'), 'l'); unwire(p, mod(p, 'osc'), 'out', mod(p, 'output'), 'l'); }),
-      target: (s) => [...T.port(mod(s.patch, 'vca'), 'in', 'in'), ...T.port(mod(s.patch, 'vca'), 'out', 'out'), ...T.port(mod(s.patch, 'output'), 'l', 'in')],
+      target: (s) => [...T.port(mod(s.patch, 'osc'), 'out', 'out'), ...T.port(mod(s.patch, 'vca'), 'in', 'in'), ...T.port(mod(s.patch, 'vca'), 'out', 'out'), ...T.port(mod(s.patch, 'output'), 'l', 'in')],
     },
     {
       id: 'gate', title: 'Open it with the gate', superseded: true,

@@ -61,6 +61,10 @@ export class Tutorial {
   private page: 'intro' | 'steps' | 'done' = 'intro';
   private lastRender = '';
   private actions: Actions;
+  /** the element the panel sits beside and where it was; a drag pins the panel until the target changes */
+  private beside: Element | null = null;
+  private besideRect = '';
+  private pinned = false;
 
   constructor(private host: TutorialHost) {
     this.panel.setAttribute('role', 'region');
@@ -70,6 +74,7 @@ export class Tutorial {
     window.addEventListener('blur', () => this.release());
     this.progress = this.loadProgress();
     this.actions = this.makeActions();
+    window.addEventListener('resize', () => { if (this.active && !this.pinned) this.place(this.beside, true); });
   }
 
   // ---- progress
@@ -227,7 +232,7 @@ export class Tutorial {
 
   private schedule(): void {
     clearInterval(this.timer);
-    this.timer = window.setInterval(() => { if (this.active) this.render(); else clearInterval(this.timer); }, POLL_MS);
+    this.timer = window.setInterval(() => { if (this.active) { this.render(); this.refocus(); } else clearInterval(this.timer); }, POLL_MS);
   }
 
   close(): void {
@@ -261,6 +266,8 @@ export class Tutorial {
       const r = this.panel.getBoundingClientRect();
       const dx = ev.clientX - r.left;
       const dy = ev.clientY - r.top;
+      this.pinned = true;
+      this.panel.classList.add('dragging');
       const move = (m: PointerEvent): void => {
         const x = Math.max(0, Math.min(window.innerWidth - r.width, m.clientX - dx));
         const y = Math.max(0, Math.min(window.innerHeight - 40, m.clientY - dy));
@@ -268,7 +275,7 @@ export class Tutorial {
         this.panel.style.right = 'auto'; this.panel.style.bottom = 'auto';
       };
       handle.onpointermove = move;
-      handle.onpointerup = handle.onlostpointercapture = () => { handle.onpointermove = null; };
+      handle.onpointerup = handle.onlostpointercapture = () => { handle.onpointermove = null; this.panel.classList.remove('dragging'); };
     };
   }
 
@@ -372,12 +379,66 @@ export class Tutorial {
     }
   }
 
+  /** the editor rebuilds its cards on every change: re-apply the highlight and follow the target each tick */
+  private refocus(): void {
+    const st = this.step;
+    this.focus(this.page === 'steps' && st?.target ? st.target(this.state()) : []);
+  }
+
   private focus(targets: Target[]): void {
     this.clearFocus();
     const els = targets.map((t) => this.resolve(t)).filter((x): x is Element => !!x);
     for (const x of els) x.classList.add('tour-focus');
-    const first = els[0];
-    if (first && first.closest('#canvas')) first.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const outside = els.filter((x) => !this.panel.contains(x));
+    const first = outside[0] ?? null;
+    if (first && first !== this.beside && first.closest('#canvas')) first.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (first || !els.length) this.place(first, false, outside);
+  }
+
+  /**
+   * Put the panel beside the element the step points at (right, left, below or above it, whichever fits the viewport without
+   * covering it), so the eye does not travel between the text and the highlight. Repositions when the target or its place
+   * changes, not while the user has dragged the panel; without a target the panel returns to the bottom right corner.
+   */
+  private place(el: Element | null, force = false, avoid: Element[] = []): void {
+    if (window.innerWidth <= 650) return; // docked to the bottom edge there
+    const rect = el?.getBoundingClientRect();
+    const key = rect ? [Math.round(rect.left / 8), Math.round(rect.top / 8), Math.round(rect.width / 8)].join(',') : '';
+    const changed = el !== this.beside;
+    if (!force && !changed && key === this.besideRect) return;
+    if (changed) this.pinned = false;
+    this.beside = el;
+    this.besideRect = key;
+    if (this.pinned) return;
+    const style = this.panel.style;
+    if (!rect || (!rect.width && !rect.height)) {
+      style.left = style.top = ''; style.right = '24px'; style.bottom = '24px';
+      return;
+    }
+    const gap = 16;
+    const margin = 12;
+    const w = this.panel.offsetWidth;
+    const h = this.panel.offsetHeight;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const clampY = (y: number): number => Math.max(margin, Math.min(H - h - margin, y));
+    const clampX = (x: number): number => Math.max(margin, Math.min(W - w - margin, x));
+    const others = avoid.map((x) => x.getBoundingClientRect());
+    const clear = (x: number, y: number): boolean => others.every((o) => x >= o.right + 4 || x + w <= o.left - 4 || y >= o.bottom + 4 || y + h <= o.top - 4);
+    const spots: { x: number; y: number; fits: boolean }[] = [
+      { x: rect.right + gap, y: clampY(rect.top), fits: rect.right + gap + w + margin <= W },
+      { x: rect.left - gap - w, y: clampY(rect.top), fits: rect.left - gap - w >= margin },
+      { x: clampX(rect.left), y: rect.bottom + gap, fits: rect.bottom + gap + h + margin <= H },
+      { x: clampX(rect.left), y: rect.top - gap - h, fits: rect.top - gap - h >= margin },
+      // beside the far edge of everything highlighted, when the near spots cover one of them
+      { x: Math.max(...others.map((o) => o.right)) + gap, y: clampY(rect.top), fits: Math.max(...others.map((o) => o.right)) + gap + w + margin <= W },
+      { x: Math.min(...others.map((o) => o.left)) - gap - w, y: clampY(rect.top), fits: Math.min(...others.map((o) => o.left)) - gap - w >= margin },
+      { x: clampX(rect.left), y: Math.max(...others.map((o) => o.bottom)) + gap, fits: Math.max(...others.map((o) => o.bottom)) + gap + h + margin <= H },
+    ];
+    const spot = spots.find((s) => s.fits && clear(s.x, s.y)) ?? spots.find((s) => s.fits) ?? spots[0];
+    style.right = style.bottom = 'auto';
+    style.left = `${clampX(spot.x)}px`;
+    style.top = `${clampY(spot.y)}px`;
   }
 }
 
