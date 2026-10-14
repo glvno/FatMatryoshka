@@ -2,6 +2,8 @@
 
 ## Matryoshka
 
+- Adopt the approved narrow wordmark (p12), with symmetric 55% T arms, A–T spacing −23, T–R spacing +6 and thin-stroke axis 135.
+
 - Add spacing sliders for all nine pairs in MATRYOSHKA, including mixed-case and split-line layouts. Save the latest shared wordmark as lab preset p11.
 
 - Add independent A–T and T–R spacing and left/right T-arm sliders to the wordmark lab, with shared-link and SVG export support.

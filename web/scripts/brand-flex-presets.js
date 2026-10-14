@@ -1,4 +1,4 @@
-export const selectedPresetId = 'p10';
+export const selectedPresetId = 'p12';
 export const presets = [
   { id:'p01', name:'Broad FAT / tight lowercase', description:'Open, heavy FAT against condensed lowercase. Short ascenders and descenders keep the long word compact.',
     case:'contrast', layout:'line', ratio:1.25,
@@ -44,13 +44,21 @@ export const presets = [
 
 // Keep the approved MATRYOSHKA outlines and settings; remove only FAT.
 presets.push({...presets.find(preset => preset.id === 'p09'),
-  id:'p10', name:'Matryoshka', layout:'matryoshka',
-  description:'Current wordmark: the approved MATRYOSHKA lettering with its teal M and R/1 signature.'});
+  id:'p10', name:'Previous Matryoshka wordmark', layout:'matryoshka',
+  description:'Previous wordmark: the original MATRYOSHKA lettering with its teal M and R/1 signature.'});
 
-// Latest shared working version; keep the shipped identity on selectedPresetId.
+// Preserve the intermediate shared study.
 presets.push({...presets.find(preset => preset.id === 'p10'),
-  id:'p11', name:'Latest wordmark tweaks',
-  description:'Latest shared version: narrower lettering, finer uprights and a shorter right T arm. Continue adjusting each letter pair from here.',
+  id:'p11', name:'Narrow wordmark study',
+  description:'Intermediate version: narrower lettering, finer uprights and a shorter right T arm. Continue adjusting each letter pair from here.',
   tuning:{at:-23,tr:6,leftArm:89,rightArm:56},
   mat:{opsz:144,wght:597,GRAD:-139,wdth:64,slnt:0,XOPQ:39,YOPQ:121,XTRA:425,YTUC:650,YTLC:550,YTAS:649,YTDE:-98,YTFI:732},
+});
+
+// Approved full settings from the shared lab URL, 2026-10-14.
+presets.push({...presets.find(preset => preset.id === 'p11'),
+  id:'p12', name:'Matryoshka — selected wordmark',
+  description:'Current wordmark: narrow capitals, both T arms at 55%, A–T spacing −23, T–R spacing +6 and the teal R/1 signature.',
+  tuning:{ma:0,at:-23,tr:6,ry:0,yo:0,os:0,sh:0,hk:0,ka:0,leftArm:55,rightArm:55},
+  mat:{opsz:144,wght:597,GRAD:-139,wdth:64,slnt:0,XOPQ:39,YOPQ:135,XTRA:425,YTUC:650,YTLC:550,YTAS:649,YTDE:-98,YTFI:732},
 });

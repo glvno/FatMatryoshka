@@ -1,7 +1,7 @@
 {
-  "id": "p10",
-  "name": "Matryoshka",
-  "description": "Current wordmark: the approved MATRYOSHKA lettering with its teal M and R/1 signature.",
+  "id": "p12",
+  "name": "Matryoshka — selected wordmark",
+  "description": "Current wordmark: narrow capitals, both T arms at 55%, A–T spacing −23, T–R spacing +6 and the teal R/1 signature.",
   "case": "caps",
   "layout": "matryoshka",
   "alignment": "left",
@@ -28,13 +28,13 @@
   },
   "mat": {
     "opsz": 144,
-    "wght": 517,
+    "wght": 597,
     "GRAD": -139,
-    "wdth": 151,
+    "wdth": 64,
     "slnt": 0,
-    "XOPQ": 126,
+    "XOPQ": 39,
     "YOPQ": 135,
-    "XTRA": 424,
+    "XTRA": 425,
     "YTUC": 650,
     "YTLC": 550,
     "YTAS": 649,
@@ -73,16 +73,16 @@
   },
   "tuning": {
     "ma": 0,
-    "at": 0,
-    "tr": 0,
+    "at": -23,
+    "tr": 6,
     "ry": 0,
     "yo": 0,
     "os": 0,
     "sh": 0,
     "hk": 0,
     "ka": 0,
-    "leftArm": 100,
-    "rightArm": 100
+    "leftArm": 55,
+    "rightArm": 55
   },
-  "widthRatio": 3.8635064910161265
+  "widthRatio": 1.5866515497261056
 }
