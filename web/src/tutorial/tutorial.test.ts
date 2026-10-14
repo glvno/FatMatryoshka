@@ -50,8 +50,11 @@ describe('tutorial course', () => {
       s.state.entry = JSON.parse(JSON.stringify(s.state.patch)) as Patch;
       s.state.seen = noSeen();
       expect(st.check(s.state), `${ch.id}/${st.id} already passes`).toBe(false);
+      expect(st.todo!(s.state).length, `${ch.id}/${st.id} says nothing about what is missing`).toBeGreaterThan(0);
+      expect(st.focus!(s.state).length, `${ch.id}/${st.id} points at nothing`).toBeGreaterThan(0);
       st.apply(s, s.state);
       expect(st.check(s.state), `${ch.id}/${st.id} fails after apply`).toBe(true);
+      expect(st.todo!(s.state)).toEqual([]);
     }
     // applying again changes nothing
     const after = JSON.stringify(s.state.patch);

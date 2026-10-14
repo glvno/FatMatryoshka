@@ -167,6 +167,7 @@ export class Tutorial {
         this.button('Start chapter 1', () => this.start(0), true),
         this.button('Later', () => { this.markSeen(); this.panel.hidden = true; })),
     );
+    this.place(null, true);
   }
 
   /** the chapter menu */
@@ -301,7 +302,7 @@ export class Tutorial {
     const st = this.step;
     const ok = this.page === 'steps' && !!st && st.check(s);
     const broken = this.page === 'steps' ? ch.steps.slice(0, this.progress.step).map((x, k) => (!x.transient && !x.superseded && !x.check(s) ? k : -1)).filter((k) => k >= 0) : [];
-    const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, s.audio]);
+    const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, s.audio, ok ? [] : st?.todo?.(s) ?? []]);
     if (!force && key === this.lastRender) return;
     this.lastRender = key;
     const count = el('span', { class: 'tour-count', textContent: `Chapter ${i + 1} of ${CHAPTERS.length} · ${ch.title}` });
@@ -314,6 +315,8 @@ export class Tutorial {
       parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? ' · ✓ done' : ''}` }));
       parts.push(el('p', { textContent: st.text }));
       if (st.why) parts.push(el('details', { class: 'tutorial-why' }, el('summary', { textContent: 'Why' }), el('p', { textContent: st.why })));
+      const todo = ok ? [] : st.todo?.(s) ?? [];
+      if (todo.length) parts.push(el('div', { class: 'tutorial-todo' }, el('span', { textContent: 'Still to do' }), el('ul', {}, ...todo.map((t) => el('li', { textContent: t })))));
       if (st.id === 'note' || st.id === 'wave' || st.id === 'shape') parts.push(this.noteButton());
       if (broken.length) {
         const k = broken[0];
@@ -335,7 +338,7 @@ export class Tutorial {
         this.button('Close', () => this.close())));
     }
     this.panel.replaceChildren(...parts);
-    this.focus(this.page === 'steps' && st?.target ? st.target(s) : []);
+    this.focus(this.targetsOf(st, s));
   }
 
   private advance(): void {
@@ -381,8 +384,14 @@ export class Tutorial {
 
   /** the editor rebuilds its cards on every change: re-apply the highlight and follow the target each tick */
   private refocus(): void {
-    const st = this.step;
-    this.focus(this.page === 'steps' && st?.target ? st.target(this.state()) : []);
+    this.focus(this.targetsOf(this.step, this.state()));
+  }
+
+  /** what the current step points at: the first unmet part's elements, else the step's fallback target */
+  private targetsOf(st: Step | null, s: TutorialState): Target[] {
+    if (this.page !== 'steps' || !st) return [];
+    const f = st.focus?.(s) ?? [];
+    return f.length ? f : st.target?.(s) ?? [];
   }
 
   private focus(targets: Target[]): void {
@@ -403,7 +412,7 @@ export class Tutorial {
   private place(el: Element | null, force = false, avoid: Element[] = []): void {
     if (window.innerWidth <= 650) return; // docked to the bottom edge there
     const rect = el?.getBoundingClientRect();
-    const key = rect ? [Math.round(rect.left / 8), Math.round(rect.top / 8), Math.round(rect.width / 8)].join(',') : '';
+    const key = rect ? [Math.round(rect.left / 8), Math.round(rect.top / 8), Math.round(rect.width / 8)].join(',') : `none:${this.page}:${this.progress.chapter}:${this.progress.step}`;
     const changed = el !== this.beside;
     if (!force && !changed && key === this.besideRect) return;
     if (changed) this.pinned = false;
@@ -412,7 +421,10 @@ export class Tutorial {
     if (this.pinned) return;
     const style = this.panel.style;
     if (!rect || (!rect.width && !rect.height)) {
-      style.left = style.top = ''; style.right = '24px'; style.bottom = '24px';
+      // nothing to sit beside: the middle of the screen
+      style.right = style.bottom = 'auto';
+      style.left = `${Math.max(12, Math.round((window.innerWidth - this.panel.offsetWidth) / 2))}px`;
+      style.top = `${Math.max(12, Math.round((window.innerHeight - this.panel.offsetHeight) / 2))}px`;
       return;
     }
     const gap = 16;

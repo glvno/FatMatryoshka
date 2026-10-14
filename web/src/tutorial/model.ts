@@ -80,7 +80,12 @@ export interface Step {
   /** a later step of the same chapter undoes this one's state (a cable replaced): not re-checked afterwards */
   superseded?: boolean;
   check(s: TutorialState): boolean;
+  /** the unmet parts of the check, as the panel lists them ("a cable Main gate → VCA cv") */
+  todo?(s: TutorialState): string[];
+  /** the elements of the first unmet part: what the highlight points at next */
+  focus?(s: TutorialState): Target[];
   apply(a: Actions, s: TutorialState): void;
+  /** fallback highlight when `focus` gives nothing */
   target?(s: TutorialState): Target[];
 }
 

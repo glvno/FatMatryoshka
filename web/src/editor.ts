@@ -1601,6 +1601,17 @@ export class Editor {
       }
       layer.prepend(path);
       this.cablePaths.push({ path, from, to, origin });
+      if (internal && remove) {
+        // a thin route is hard to hit: an invisible path 1.5x as wide takes the clicks, above the card's controls
+        const hit = document.createElementNS(SVGNS, 'path');
+        hit.setAttribute('class', 'cable-hit');
+        hit.addEventListener('pointerdown', (e) => e.stopPropagation());
+        hit.addEventListener('click', (e) => { e.stopPropagation(); remove(); });
+        hit.addEventListener('pointerenter', () => path.classList.add('hover'));
+        hit.addEventListener('pointerleave', () => path.classList.remove('hover'));
+        layer.append(hit);
+        this.cablePaths.push({ path: hit, from, to, origin });
+      }
     };
     // Show the assignment even without an upstream cable, so it can be edited before patching a source. A dedicated
     // input's link (ParamDef.input) is built into the module: drawn grey, not editable.
