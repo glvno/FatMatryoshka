@@ -105,6 +105,8 @@ export type StartRule =
 export interface ChapterData {
   id: string;
   title: string;
+  /** hidden from learners in the built site (the dev server still lists it, marked); absent = published */
+  unpublished?: boolean;
   intro: string;
   payoff: string;
   challenge: string;
@@ -176,6 +178,7 @@ export function validateShape(value: unknown, allowEmpty = false): asserts value
     if (chapterIds.has(ch.id as string)) fail(`${path}.id`, `"${ch.id}" is used twice`);
     chapterIds.add(ch.id as string);
     text(ch.title, `${path}.title`, true);
+    if (ch.unpublished !== undefined && typeof ch.unpublished !== 'boolean') fail(`${path}.unpublished`, 'expected true or false');
     text(ch.intro, `${path}.intro`, true);
     text(ch.payoff, `${path}.payoff`, true);
     text(ch.challenge, `${path}.challenge`, true);

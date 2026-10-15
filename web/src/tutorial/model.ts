@@ -83,6 +83,8 @@ export interface Chapter {
   intro: string;
   /** the name the chapter's patch gets */
   patchName: string;
+  /** learners see it; the dev server lists unpublished chapters too */
+  published: boolean;
   steps: Step[];
   payoff?: string;
   challenge?: string;

@@ -415,6 +415,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .tutorial-row { display: flex; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 6px; }
 .tutorial-row.current { background: var(--surface-tint); }
 .tutorial-row .n { width: 22px; text-align: center; color: var(--muted); font-family: ui-monospace, monospace; font-size: 12px; }
+.tutorial-unpublished { margin-left: 6px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--warning); }
 .tutorial-row.done .n { color: var(--secondary); font-weight: 700; }
 .tutorial-row .grow { flex: 1; }
 .tutorial-row button { min-height: 28px; padding: 2px 10px; font-size: 12px; }

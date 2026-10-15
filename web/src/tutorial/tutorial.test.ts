@@ -4,7 +4,7 @@ import { Engine } from '../engine';
 import { DEFS } from '../modules';
 import { validatePatch, type Patch } from '../patch';
 import { validateAssemblyDef } from '../assembly';
-import { COURSE, CHAPTERS, bundledLibrary, chapterEnd, chapterStart, referenceOf, stepStart, tutorialDef } from './chapters';
+import { COURSE, CHAPTERS, bundledLibrary, listedChapters, chapterEnd, chapterStart, referenceOf, stepStart, tutorialDef } from './chapters';
 import { completes, headlessState, stepDone } from './model';
 import { validateCourse } from './validate';
 import { formatCourse, slugId, validateShape } from './course-schema';
@@ -157,5 +157,20 @@ describe('course data', () => {
     const broken = structuredClone(COURSE);
     broken.chapters[0].steps.find((s) => s.id === 'pitch')!.parts = [{ kind: 'cable', from: { type: 'fm1' }, fromPort: 'pitch', to: { type: 'osc' }, toPort: 'nose' }];
     expect(validateCourse(broken).errors[0].message).toMatch(/Oscillator has no input "nose"/);
+  });
+});
+
+describe('publishing', () => {
+  it('offers only published chapters in the built site, and every chapter on the dev server', () => {
+    expect(CHAPTERS.map((c) => c.published)).toEqual(CHAPTERS.map((_, i) => i === 0));
+    expect(listedChapters(CHAPTERS, false)).toEqual([0]);
+    expect(listedChapters(CHAPTERS, true)).toEqual(CHAPTERS.map((_, i) => i));
+  });
+  it('keeps the flag a boolean, after the title, and absent when published', () => {
+    const course = structuredClone(COURSE);
+    expect(Object.keys(course.chapters[1]).slice(0, 3)).toEqual(['id', 'title', 'unpublished']);
+    expect('unpublished' in course.chapters[0]).toBe(false);
+    (course.chapters[1] as unknown as Record<string, unknown>).unpublished = 'yes';
+    expect(() => validateShape(course)).toThrow('unpublished');
   });
 });

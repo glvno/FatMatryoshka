@@ -9,7 +9,7 @@ import type { Patch } from '../patch';
 import type { AssemblyDef } from '../assembly';
 import { assemblyOf, hiddenModules } from '../assembly';
 import type { Editor } from '../editor';
-import { CHAPTERS, chapterStart, chapterEnd, stepStart, tutorialDef } from './chapters';
+import { CHAPTERS, LISTED, chapterStart, chapterEnd, stepStart, tutorialDef } from './chapters';
 import { noSeen, stepDone, type Chapter, type Seen, type Step, type Target, type TutorialState } from './model';
 
 export interface TutorialHost {
@@ -106,7 +106,8 @@ export class Tutorial {
     try {
       const raw = JSON.parse(localStorage.getItem(STORE) ?? 'null') as Partial<Progress> | null;
       if (raw && Array.isArray(raw.done)) {
-        const ch = CHAPTERS.find((c) => c.id === raw.chapter);
+        // progress in a chapter that is no longer offered (unpublished since) starts from the menu
+        const ch = LISTED.map((k) => CHAPTERS[k]).find((c) => c.id === raw.chapter);
         const named = ch?.steps.findIndex((st) => st.id === raw.stepId) ?? -1;
         const step = named >= 0 ? named : Math.max(0, Math.min(ch ? ch.steps.length - 1 : 0, Math.floor(Number(raw.step) || 0)));
         return { done: raw.done.filter((d) => CHAPTERS.some((c) => c.id === d)), chapter: ch?.id ?? null, step, page: raw.page === 'done' || raw.page === 'steps' ? raw.page : 'intro' };
@@ -160,7 +161,7 @@ export class Tutorial {
     this.panel.hidden = false;
     this.panel.replaceChildren(
       this.head('Tutorial'),
-      el('p', { textContent: 'Eleven short chapters build synths from modules, one cable at a time, and show the editor on the way: assemblies, your library, the scope, the arpeggiator. Each chapter starts from a prepared patch, so you can begin anywhere.' }),
+      el('p', { textContent: 'Short chapters build synths from modules, one cable at a time, and show the editor on the way: assemblies, your library, the scope, the arpeggiator. Each chapter starts from a prepared patch, so you can begin anywhere.' }),
       el('div', { class: 'tour-actions' },
         this.button('Start chapter 1', () => this.start(0), true),
         this.button('Later', () => { this.markSeen(); this.panel.hidden = true; })),
@@ -173,12 +174,13 @@ export class Tutorial {
     this.stop();
     this.cancelAdvance();
     this.markSeen();
-    const rows = CHAPTERS.map((c, i) => {
+    const rows = LISTED.map((i, n) => {
+      const c = CHAPTERS[i];
       const done = this.progress.done.includes(c.id);
       const current = this.progress.chapter === c.id;
       const row = el('div', { class: 'tutorial-row' + (done ? ' done' : '') + (current ? ' current' : '') },
-        el('span', { class: 'n', textContent: done ? '✓' : String(i + 1) }),
-        el('span', { class: 'grow', textContent: c.title }),
+        el('span', { class: 'n', textContent: done ? '✓' : String(n + 1) }),
+        el('span', { class: 'grow', textContent: c.title }, ...(c.published ? [] : [el('small', { class: 'tutorial-unpublished', textContent: 'unpublished' })])),
         el('button', { textContent: current ? 'Resume' : done ? 'Again' : 'Start', class: current ? 'primary' : '', onclick: () => { this.menu.close(); if (current) { this.panel.hidden = false; this.render(true); this.schedule(); } else this.start(i); } }));
       return row;
     });
@@ -199,7 +201,7 @@ export class Tutorial {
    * tutorial patch), so no difference from an earlier chapter can carry over */
   start(i: number): void {
     const ch = CHAPTERS[i];
-    if (!ch) return;
+    if (!ch || !LISTED.includes(i)) return;
     this.markSeen();
     this.stop();
     this.cancelAdvance();
@@ -381,7 +383,7 @@ export class Tutorial {
     const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, s.audio, this.error, this.previewing, this.auditionMode, ok ? [] : st?.todo?.(s) ?? []]);
     if (!force && key === this.lastRender) return;
     this.lastRender = key;
-    const count = el('span', { class: 'tour-count', textContent: `Chapter ${i + 1} of ${CHAPTERS.length} · ${ch.title}` });
+    const count = el('span', { class: 'tour-count', textContent: `Chapter ${LISTED.indexOf(i) + 1} of ${LISTED.length}${ch.published ? '' : ' (unpublished)'} · ${ch.title}` });
     const parts: (Node | string)[] = [this.head(this.page === 'steps' && st ? st.title : this.page === 'done' ? 'Chapter done' : ch.title), count];
     if (this.error) parts.push(el('p', { class: 'tutorial-warn', textContent: this.error }));
     if (!s.audio) parts.push(el('p', { class: 'tutorial-hint', textContent: 'Sound is paused. Press a playback button, or the audio button in the sidebar, to listen.' }));
@@ -411,14 +413,15 @@ export class Tutorial {
       if (ok && !broken.length && !st.listen && !this.hold && !this.menu.open && !this.advanceTimer) this.advanceTimer = window.setTimeout(() => { this.advanceTimer = 0; const d = stepDone(ch, this.progress.step, this.state()); if (this.active && !this.menu.open && this.step === st && (d.met || d.moot)) this.advance(); }, ADVANCE_MS);
       if ((!ok || broken.length || this.menu.open) && this.advanceTimer) { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
     } else {
-      const last = i === CHAPTERS.length - 1;
+      const next = LISTED[LISTED.indexOf(i) + 1];
+      const last = next === undefined;
       parts.push(lessonProse(ch.payoff ?? 'Your instrument is ready to play.'));
       parts.push(lessonChallenge(ch.challenge ?? 'Make it your own.'));
       parts.push(this.auditionControls());
       parts.push(this.saveControls());
       parts.push(el('p', { textContent: last ? 'Keep your performance with Save variation. Find your sketches in Tutorial → Your saved variations, or share this patch from Commands.' : 'The next chapter saves a recoverable copy of this patch before loading its prepared start. Find every copy in Tutorial → Your saved variations.' }));
       parts.push(el('div', { class: 'tour-actions' },
-        ...(last ? [] : [this.button(`Chapter ${i + 2}: ${CHAPTERS[i + 1].title}`, () => this.start(i + 1), true)]),
+        ...(last ? [] : [this.button(`Chapter ${LISTED.indexOf(next) + 1}: ${CHAPTERS[next].title}`, () => this.start(next), true)]),
         this.button('Save patch to the bank', () => this.host.status(this.host.bankSave(this.host.editor.patch))),
         this.button('Chapters', () => this.open()),
         this.button('Close', () => this.close())));

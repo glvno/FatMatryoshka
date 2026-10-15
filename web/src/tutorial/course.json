@@ -43,7 +43,7 @@
       "title": "How to make a noise",
       "intro": "By the end of this chapter, you will have built a machine that translates electricity into sound.\n\n",
       "payoff": "You may have noticed a pattern:\n- A pitch is voltage (`2V` for middle C, `+/- 1V` per octave)\n- A control signal (`cv`) is voltage\n- The audio signal sent to the `Output` module is voltage\n\nSo you may be wondering, *What if I mix and match? What happens if I use an oscillator signal as a control voltage? What about as a pitch signal?*\n\nIf so, you're exactly the kind of pervert who is going to really enjoy analog synthesis.",
-      "challenge": "Find out what happens!\n\nHint: add another oscillator module and start plugging its output into stuff.",
+      "challenge": "Find out what happens![^1]\n\n\n[^1]: Hint: add another oscillator module and use it in a dastardly manner.\n\n",
       "patchName": "Tutorial voice",
       "start": { "kind": "new" },
       "steps": [
@@ -245,6 +245,7 @@
     {
       "id": "shaping-a-note",
       "title": "Shaping a note",
+      "unpublished": true,
       "intro": "A gate is on or off, so the note it opens is on or off too. Real notes have a shape: they start, hold and die away. The envelope generator (ADSR: attack, decay, sustain, release) draws that shape each time the gate opens, and the VCA follows it instead of the bare gate.",
       "payoff": "One oscillator now speaks with two different shapes: a swelling pad and a pluck.",
       "challenge": "Make a tiny bell or a very slow sunrise; save both variations.",
@@ -413,6 +414,7 @@
     {
       "id": "subtractive-voice",
       "title": "Subtractive voice",
+      "unpublished": true,
       "intro": "Subtractive synthesis starts with a bright wave and takes harmonics away with a filter. The cutoff says where the filter starts cutting, the resonance adds a peak there. Moving the cutoff with an envelope, an LFO or a knob is where most of the classic synth sounds come from.",
       "payoff": "Your filter can move by itself and follow a performance knob.",
       "challenge": "Find the moment where a gentle wah becomes a rhythm.",
@@ -627,6 +629,7 @@
     {
       "id": "first-assembly",
       "title": "Your first assembly",
+      "unpublished": true,
       "intro": "An assembly packs modules into one card that shows only the ports and knobs you choose. It can be saved to your library, reused in other patches, and put inside other assemblies. The five modules you built are about to become one instrument.",
       "payoff": "Five modules fold into your first reusable instrument.",
       "challenge": "Give the instrument a stage name and keep a personal variation.",
@@ -745,6 +748,7 @@
     {
       "id": "effect-assembly",
       "title": "An effect assembly",
+      "unpublished": true,
       "intro": "An effect is a module with audio in and audio out. Delay repeats, reverb smears the repeats into a room, chorus thickens with detuned copies. Each has a mix slider: dry signal against wet. Chained, they become one effect you can save and reuse.",
       "payoff": "Your instrument carries a room, echoes and stereo movement.",
       "challenge": "Make a small room and an impossible cavern. Compare each with bypass.",
@@ -959,6 +963,7 @@
     {
       "id": "fm",
       "title": "Second instrument: FM",
+      "unpublished": true,
       "intro": "In frequency modulation one oscillator, the modulator, wobbles the phase of another, the carrier, thousands of times a second. The wobble creates new harmonics: the ratio of the two pitches sets which ones, the depth sets how many. An envelope on the depth makes the classic bright-then-mellow electric piano.",
       "payoff": "Two pure tones became a playable FM instrument with its own space.",
       "challenge": "Save a mellow key and a metallic bell from the same two oscillators.",
@@ -1271,6 +1276,7 @@
     {
       "id": "plucked-and-struck",
       "title": "Plucked and struck",
+      "unpublished": true,
       "intro": "Physical models start from how real instruments work: a burst of energy goes into something that resonates. String is a Karplus-Strong string, a short delay line fed back on itself. Modal is a set of tuned resonances like a bar or a bell. Comb is a resonator you can excite with anything, even noise.",
       "payoff": "You built a string, a resonating body and a breathy pipe.",
       "challenge": "Write a three-note call and answer with muted and ringing settings.",
@@ -1559,6 +1565,7 @@
     {
       "id": "wavetables-and-grains",
       "title": "Wavetables and grains",
+      "unpublished": true,
       "intro": "A wavetable oscillator holds a row of waveforms and sweeps through them: the timbre moves without a filter. A granular module chops audio into grains a few milliseconds long and scatters them in time and pitch: a cloud out of a note. This patch starts with four voices so Chord can fill the granular buffer. Both are texture tools; zoom out as the canvas grows.",
       "payoff": "You can turn a vowel into a moving, frozen cloud.",
       "challenge": "Capture a chord and find a texture that sounds nothing like its source.",
@@ -1901,6 +1908,7 @@
     {
       "id": "two-instruments",
       "title": "Two instruments, one keyboard",
+      "unpublished": true,
       "intro": "Layering is two instruments on one keyboard. A mixer sums them, the arpeggiator plays held keys as a pattern, a macro range gives a knob a useful stretch, and the morph slider fades between two settings of the whole patch.",
       "payoff": "Your two instruments play together, and a single slider moves their balance.",
       "challenge": "Find a halfway morph you prefer to either endpoint.",
@@ -2139,6 +2147,7 @@
     {
       "id": "random-melody-machine",
       "title": "A random melody machine",
+      "unpublished": true,
       "intro": "A sequencer is a clock and a value per step. A random one samples noise on every tick; a quantizer snaps the values to a scale so they become notes; a pulse turns each tick into a gate of a chosen length. The instruments you saved will play whatever the machine comes up with.",
       "payoff": "Chance and a written sequence now share one musical clock.",
       "challenge": "Write a four-note answer to the random machine.",
@@ -2444,6 +2453,7 @@
     {
       "id": "drums-from-noise",
       "title": "Drums from noise",
+      "unpublished": true,
       "intro": "Most drum sounds are noise or a short tone with a very fast envelope. A hi-hat is filtered noise that dies in a tenth of a second; a kick is a sine whose pitch drops; a snare is both. You build the hat, borrow the kick and snare from the library, and clock them from a divider.",
       "payoff": "Noise became a hat, a kit, and a small performance with your own instruments.",
       "challenge": "Perform eight bars: establish the beat, bring in the melody, add a fill, return home.",

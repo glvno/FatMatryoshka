@@ -257,6 +257,7 @@ async function mount() {
       const open = button(`${i + 1}. ${ch.title}`, () => select_({ kind: 'chapter', chapter: ch.id }), 'lesson-chapter-title');
       if (changed({ kind: 'chapter', chapter: ch.id }) || ch.steps.some((s) => changed({ kind: 'step', chapter: ch.id, step: s.id }))) open.append(el('span', 'lesson-dirty', ' •'));
       if (issuesOf(ch.id).length) open.append(el('span', 'lesson-bad', ' ✗'));
+      if (ch.unpublished) open.append(el('span', 'lesson-unpublished', 'unpublished'));
       if (page.kind === 'chapter' && page.chapter === ch.id) open.setAttribute('aria-current', 'page');
       open.draggable = true;
       open.ondragstart = (e) => { dragging = { chapter: ch.id }; e.dataTransfer?.setData('text/plain', ch.id); };
@@ -303,10 +304,17 @@ async function mount() {
       if (r) draft.references[refKey(toChapter, s)] = copy(r);
     }
   }
+  /** the flag sits after the title, as in course.json */
+  function setPublished(ch: ChapterData, on: boolean) {
+    const { id, title, unpublished: _, ...rest } = ch;
+    for (const k of Object.keys(ch)) delete (ch as unknown as Record<string, unknown>)[k];
+    Object.assign(ch, { id, title, ...(on ? {} : { unpublished: true }), ...rest });
+  }
   function addChapter() {
     const at = page.kind === 'chapter' || page.kind === 'step' ? chapterIndex(page.chapter) + 1 : draft.chapters.length;
     const id = slugId('New chapter', draft.chapters.map((c) => c.id));
-    const ch: ChapterData = { id, title: 'New chapter', intro: '', payoff: '', challenge: '', patchName: 'Tutorial patch', start: { kind: 'new' }, steps: [] };
+    // a new chapter stays out of the built site until it is published
+    const ch: ChapterData = { id, title: 'New chapter', unpublished: true, intro: '', payoff: '', challenge: '', patchName: 'Tutorial patch', start: { kind: 'new' }, steps: [] };
     draft.chapters.splice(at, 0, ch);
     edited(); select_({ kind: 'chapter', chapter: id });
   }
@@ -553,6 +561,7 @@ async function mount() {
       form.insertBefore(help, fields);
       fields.append(
         textField('Title', ch.title, 1, (v) => { ch.title = v; }, true),
+        check('Published', !ch.unpublished, (v) => { setPublished(ch, v); edited(); }, 'unpublished chapters are left out of the built site; this dev server still lists them, marked'),
         textField('Patch name', ch.patchName, 1, (v) => { ch.patchName = v; }, true),
         startEditor(ch, ci),
         textField('Introduction', ch.intro, 10, (v) => { ch.intro = v; }),

@@ -22,7 +22,7 @@ import { decodeShare, encodeShare, shareCodeOf, shareLink } from './share';
 import { starterPatch } from './starter';
 import { Tutorial } from './tutorial/tutorial';
 import { synthLink } from './tutorial/link';
-import { CHAPTERS, chapterEnd } from './tutorial/chapters';
+import { CHAPTERS, LISTED, chapterEnd } from './tutorial/chapters';
 import { PRESETS } from './presets';
 import { deviceBudget, DEVICE } from './patchbin';
 
@@ -230,7 +230,7 @@ presetSel.append(new Option('Choose an example…', ''), ...Object.keys(PRESETS)
 {
   const group = document.createElement('optgroup');
   group.label = 'Tutorial';
-  group.append(...CHAPTERS.map((c, i) => new Option(`${i + 1}. ${c.title}`, `tutorial:${i}`)));
+  group.append(...LISTED.map((i, n) => new Option(`${n + 1}. ${CHAPTERS[i].title}${CHAPTERS[i].published ? '' : ' (unpublished)'}`, `tutorial:${i}`)));
   presetSel.append(group);
 }
 presetSel.onchange = () => {

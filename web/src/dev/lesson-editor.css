@@ -19,6 +19,7 @@
 .lesson-page { font-size: 13px; padding: 7px 12px 7px 22px; }
 .lesson-page[aria-current] { background: var(--surface-tint); color: var(--secondary); border-left: 3px solid var(--secondary); border-radius: 0 6px 6px 0; }
 .lesson-dirty { color: var(--accent); }
+.lesson-unpublished { margin-left: 6px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--warning); font-weight: 400; }
 .lesson-workspace { padding: 28px; overflow: auto; }
 .lesson-columns { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(270px, 440px); gap: 36px; max-width: 1200px; margin: 0 auto; align-items: start; }
 .lesson-form h2 { font-size: 22px; line-height: 1.25; margin: 0 0 8px; overflow-wrap: anywhere; }
