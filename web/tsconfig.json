@@ -15,10 +15,13 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "types": [
-      "vite/client"
+      "vite/client",
+      "node"
     ]
   },
   "include": [
-    "src"
+    "src",
+    "dev",
+    "vite.config.ts"
   ]
 }

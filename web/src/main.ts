@@ -21,6 +21,7 @@ import type { AssemblyDef } from './assembly';
 import { decodeShare, encodeShare, shareCodeOf, shareLink } from './share';
 import { starterPatch } from './starter';
 import { Tutorial } from './tutorial/tutorial';
+import { synthLink } from './tutorial/link';
 import { CHAPTERS, chapterEnd } from './tutorial/chapters';
 import { PRESETS } from './presets';
 import { deviceBudget, DEVICE } from './patchbin';
@@ -651,3 +652,17 @@ const unlockAudio = (): void => { if (!host.running) void startAudio(); };
 window.addEventListener('pointerdown', unlockAudio, { capture: true });
 window.addEventListener('keydown', unlockAudio, { capture: true });
 void startAudio();
+
+// This link and the editor's server route exist only during local development.
+if (import.meta.env.DEV) {
+  import.meta.hot?.on('lesson-course-saved', () => location.reload());
+  // the lesson editor's live link: it checks steps against this synth and loads patches into it
+  tutorial.observer = synthLink(() => ({
+    patch: editor.patch, probes: [...editor.probes], selected: [...editor.selected], arpPlay: editor.arpPlay, audio: host.running && !host.muted,
+    snapshots: { A: !!editor.snapshots.A, B: !!editor.snapshots.B }, zoom: editor.zoom, library: loadLibrary(),
+  }), (p) => { sink.send({ t: 'panic' }); loadNamed(p); });
+  const link = document.createElement('a');
+  link.href = '/lesson-editor'; link.target = '_blank'; link.rel = 'noopener';
+  link.textContent = 'Edit lessons';
+  document.querySelector('.sidebar-bottom')?.append(link);
+}

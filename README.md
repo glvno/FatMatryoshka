@@ -63,6 +63,7 @@ Knobs and stuff.
 ## Hack it
 
 - Run it yourself: `cd web && npm install && npm run dev`
+- Edit tutorial writing locally: choose **Edit lesson writing** in the dev app sidebar, or open <http://localhost:5173/lesson-editor>. Save writes the lesson source; it does not publish. See [the lesson editor guide](docs/TUTORIAL.md#writing-lessons-locally).
 - Build the firmware: `nix develop`, then `python3 tools/build.py`
 
 ## License

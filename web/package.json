@@ -15,6 +15,7 @@
     "export-defs": "vite-node scripts/export-defs.ts"
   },
   "devDependencies": {
+    "@types/node": "^24.19.2",
     "esbuild": "^0.28.2",
     "fontkit": "^2.0.4",
     "typescript": "^7.0.2",
