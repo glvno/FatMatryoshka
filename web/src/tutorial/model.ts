@@ -3,7 +3,7 @@
 // see, the actions an apply may take, and a headless session that runs the course without a DOM (canned chapter starts
 // and ends, bundled copies of the assemblies the course saves, tests). The design is in docs/TUTORIAL.md.
 import { DEFS } from '../modules';
-import { addModule, connect, disconnect, sameEnd, type ModuleInst, type Patch } from '../patch';
+import { addModule, connect, disconnect, newPatch, sameEnd, type ModuleInst, type Patch } from '../patch';
 import { allModules, assembliesOf, freeSpot, hiddenModules, reconcileAll, type AssemblyDef, type AssemblyInst, type Rect } from '../assembly';
 
 /** events counted since the current step was entered */
@@ -15,8 +15,10 @@ export interface Seen {
   flips: number;
   shares: number;
   bypasses: number;
+  /** New patch presses */
+  news: number;
 }
-export const noSeen = (): Seen => ({ notes: 0, undos: 0, redos: 0, zooms: 0, flips: 0, shares: 0, bypasses: 0 });
+export const noSeen = (): Seen => ({ notes: 0, undos: 0, redos: 0, zooms: 0, flips: 0, shares: 0, bypasses: 0, news: 0 });
 
 /** what a step's check can look at */
 export interface TutorialState {
@@ -42,6 +44,8 @@ export interface Actions {
   edit(fn: (p: Patch) => void): void;
   /** replace the patch */
   load(p: Patch): void;
+  /** what the New patch button does: a bare patch with this name */
+  newPatch(name: string): void;
   setZoom(z: number): void;
   zoomToFit(): void;
   probe(moduleId: number, port: string): void;
@@ -75,7 +79,7 @@ export interface Step {
   text: string;
   /** the idea behind the step, collapsed by default */
   why?: string;
-  /** the check looks at editor state or counters, not the patch: skipped when judging whether a patch continues a chapter */
+  /** the check looks at editor state or counters, not the patch: skipped when judging whether a patch completes a chapter */
   transient?: boolean;
   /** a later step of the same chapter undoes this one's state (a cable replaced): not re-checked afterwards */
   superseded?: boolean;
@@ -96,11 +100,9 @@ export interface Chapter {
   intro: string;
   /** the name the chapter's patch gets */
   patchName: string;
-  /** the canned start: a fresh patch, or null to continue with the previous chapter's end (its canned end when the open
-   * patch does not continue it) */
+  /** the canned start: a fresh patch, or null for the previous chapter's canned end. The runtime always loads it
+   * (`chapterStart`): no chapter continues with whatever the user left open */
   start(): Patch | null;
-  /** true: the runtime loads nothing at the start, the user keeps the open patch (the headless run uses `start()`) */
-  keep?: boolean;
   steps: Step[];
 }
 
@@ -217,6 +219,7 @@ export class HeadlessSession implements Actions {
     if (JSON.stringify(this.state.patch) !== before) { this.history.push(before); this.future = []; }
   }
   load(p: Patch): void { this.state.patch = p; this.state.entry = p; this.state.probes.clear(); this.state.selected.clear(); }
+  newPatch(name: string): void { this.load(newPatch(DEFS, name)); this.state.seen.news++; }
   setZoom(z: number): void { this.state.zoom = z; this.state.seen.zooms++; }
   zoomToFit(): void { this.setZoom(0.8); }
   probe(moduleId: number, port: string): void { this.state.probes.add(`${moduleId}:${port}`); }

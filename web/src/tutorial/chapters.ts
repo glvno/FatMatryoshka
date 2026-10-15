@@ -80,8 +80,7 @@ const ch1: Chapter = {
   title: 'Hello sound',
   patchName: 'Tutorial voice',
   intro: 'A patch is a few modules and the cables between them. Main is the keyboard (and, on the FM-1, its panel), Output is the speaker. Between them you put a sound source and whatever shapes it. The first thing to learn is how a note starts and stops: the oscillator never stops on its own, so a VCA (voltage controlled amplifier) opens and closes for it.',
-  start: () => PRESETS['Subtractive saw'](),
-  keep: true,
+  start: () => newPatch(DEFS, 'Tutorial voice'),
   steps: [
     {
       id: 'audio', title: 'Enable audio', transient: true,
@@ -90,10 +89,10 @@ const ch1: Chapter = {
       apply: (a) => a.startAudio(),
     },
     {
-      id: 'new', title: 'Start a new patch', superseded: true,
-      text: 'Click New patch in the sidebar (or press / and choose New patch). Every patch starts with two cards: Main and Output.',
-      ...need(['Start a new patch (only Main and Output, no cables)', (s) => s.patch.modules.length === 2 && has(s.patch, 'fm1') && has(s.patch, 'output') && !s.patch.cables.length, () => T.ui('new-patch-btn')]),
-      apply: (a) => a.load(newPatch(DEFS, ch1.patchName)),
+      id: 'new', title: 'Start a new patch', transient: true, superseded: true,
+      text: 'Click New patch in the sidebar (or press / and choose New patch). Every patch starts with two cards: Main and Output; this one already does, and the button clears whatever is open.',
+      ...need(['Press New patch', (s) => s.seen.news > 0 && s.patch.modules.length === 2 && has(s.patch, 'fm1') && has(s.patch, 'output') && !s.patch.cables.length, () => T.ui('new-patch-btn')]),
+      apply: (a) => a.newPatch(ch1.patchName),
     },
     {
       id: 'osc', title: 'Add an Oscillator',

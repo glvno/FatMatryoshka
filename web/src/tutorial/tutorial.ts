@@ -2,12 +2,13 @@
 // The tutorial runtime: a draggable step panel, the chapter menu, progress in localStorage, the checks polled against
 // the editor, highlighted targets, and the Actions adapter "do it for me" uses. Chapters are in ./chapters.ts, the
 // model in ./model.ts, the design in docs/TUTORIAL.md.
-import type { Patch } from '../patch';
+import { newPatch, type Patch } from '../patch';
+import { DEFS } from '../modules';
 import type { AssemblyDef } from '../assembly';
 import { assemblyOf, hiddenModules } from '../assembly';
 import type { Editor } from '../editor';
 import { CHAPTERS, chapterStart, tutorialDef } from './chapters';
-import { completes, noSeen, stepDone, type Actions, type Chapter, type Seen, type Step, type Target, type TutorialState } from './model';
+import { noSeen, stepDone, type Actions, type Chapter, type Seen, type Step, type Target, type TutorialState } from './model';
 
 export interface TutorialHost {
   editor: Editor;
@@ -113,6 +114,7 @@ export class Tutorial {
 
   /** the host reports what happened; the step panel re-checks */
   noteOn(): void { this.seen.notes++; this.refresh(); }
+  newPatchPressed(): void { this.seen.news++; this.refresh(); }
   undone(): void { this.seen.undos++; this.refresh(); }
   redone(): void { this.seen.redos++; this.refresh(); }
   zoomed(): void { this.seen.zooms++; this.refresh(); }
@@ -130,6 +132,7 @@ export class Tutorial {
       patch: () => e.patch,
       edit: (fn) => { if (!e.transact(() => fn(e.patch))) e.rebuild(); },
       load: (p) => h.load(p),
+      newPatch: (name) => { h.load(newPatch(DEFS, name)); this.seen.news++; },
       setZoom: (z) => e.setZoom(z),
       zoomToFit: () => e.zoomToFit(),
       probe: (id, port) => h.probe(id, port),
@@ -189,7 +192,7 @@ export class Tutorial {
     });
     this.menu.replaceChildren(
       el('h2', { textContent: 'Tutorial' }),
-      el('p', { class: 'muted', textContent: 'Each chapter builds a patch; later chapters reuse what you saved. Start anywhere: a chapter that does not continue your patch opens its own.' }),
+      el('p', { class: 'muted', textContent: 'Each chapter builds a patch; later chapters reuse what you saved. Start anywhere: every chapter opens its own patch.' }),
       el('div', { class: 'tutorial-rows' }, ...rows),
       el('div', { class: 'tour-actions' },
         el('button', { textContent: 'Reset progress', onclick: () => { this.progress = { done: [], chapter: null, step: 0 }; this.saveProgress(); this.menu.close(); this.panel.hidden = true; this.host.status('tutorial progress reset'); } }),
@@ -198,28 +201,17 @@ export class Tutorial {
     this.menu.showModal();
   }
 
-  /** begin chapter i: continue with the open patch when it finishes chapter i−1, else load the canned start */
+  /** begin chapter i: every chapter loads its own canned start (the open patch goes to the bank first unless it is a
+   * tutorial patch), so no difference from an earlier chapter can carry over */
   start(i: number): void {
     const ch = CHAPTERS[i];
     if (!ch) return;
     this.markSeen();
     this.release();
-    const e = this.host.editor;
-    const open = e.patch;
+    const open = this.host.editor.patch;
     const tutorialPatch = /^Tutorial\b/.test(open.name);
     if (!tutorialPatch && (open.modules.length > 2 || open.cables.length)) this.host.status(this.host.bankSave(open));
-    let note = '';
-    if (ch.keep) {
-      if (open.modules.length <= 2 && !open.cables.length && !tutorialPatch) this.host.rename(ch.patchName);
-    } else {
-      const fresh = ch.start();
-      if (fresh) this.host.load(fresh);
-      else if (i > 0 && completes(CHAPTERS[i - 1], open, this.host.library())) note = 'Continuing with your patch.';
-      else {
-        this.host.load(chapterStart(i));
-        note = i > 0 ? `Your patch does not continue chapter ${i}, so the chapter starts from its own copy.` : '';
-      }
-    }
+    this.host.load(chapterStart(i));
     this.progress.chapter = ch.id;
     this.progress.step = 0;
     this.hold = false;
@@ -229,7 +221,6 @@ export class Tutorial {
     this.enterStep();
     this.panel.hidden = false;
     this.render(true);
-    if (note) this.host.status(note);
     this.schedule();
   }
 
@@ -339,7 +330,7 @@ export class Tutorial {
       if (!ok && this.advanceTimer) { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
     } else {
       const last = i === CHAPTERS.length - 1;
-      parts.push(el('p', { textContent: last ? 'You have built eleven patches and five assemblies, and used every sound source Matryoshka has. The Library tab holds what you saved; the Examples menu has every chapter’s result under Tutorial.' : `The patch stays open; chapter ${i + 2} ${CHAPTERS[i + 1].start() ? 'starts a new one' : 'continues it'}.` }));
+      parts.push(el('p', { textContent: last ? 'You have built eleven patches and five assemblies, and used every sound source Matryoshka has. The Library tab holds what you saved; the Examples menu has every chapter’s result under Tutorial.' : `The patch stays open until chapter ${i + 2} loads its own; Save patch to the bank keeps yours.` }));
       parts.push(el('div', { class: 'tour-actions' },
         ...(last ? [] : [this.button(`Chapter ${i + 2}: ${CHAPTERS[i + 1].title}`, () => this.start(i + 1), true)]),
         this.button('Save patch to the bank', () => this.host.status(this.host.bankSave(this.host.editor.patch))),
@@ -354,6 +345,7 @@ export class Tutorial {
     const ch = this.chapter;
     if (!ch) return;
     this.release();
+    if (this.host.editor.patch.name === 'init') this.host.rename(ch.patchName); // the user's own New patch
     clearTimeout(this.advanceTimer); this.advanceTimer = 0;
     this.hold = false;
     if (this.progress.step < ch.steps.length - 1) {

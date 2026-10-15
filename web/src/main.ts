@@ -301,7 +301,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Load patch from .json', keywords: 'import open file', run: () => $('load-file').click() },
     { kind: 'command', label: 'Share patch link', keywords: 'copy url clipboard', run: () => void sharePatch() },
     { kind: 'command', label: 'Tutorial', keywords: 'learn help starter tour chapters course', run: () => { switchTab('patch'); tutorial.open(); } },
-    { kind: 'command', label: 'New patch', run: () => loadNamed(newPatch(DEFS)) },
+    { kind: 'command', label: 'New patch', run: () => { loadNamed(newPatch(DEFS)); tutorial.newPatchPressed(); } },
     { kind: 'command', label: 'Undo', detail: 'Ctrl/Cmd+Z', run: inPatch(() => editor.undo()) },
     { kind: 'command', label: 'Redo', detail: 'Shift+Ctrl/Cmd+Z', run: inPatch(() => editor.redo()) },
     { kind: 'command', label: 'Make assembly from the selection', detail: 'Ctrl/Cmd+G', run: inPatch(() => editor.makeAssembly()) },
@@ -404,7 +404,7 @@ palInput.onkeydown = (e) => {
   e.stopPropagation();
 };
 $('palette-btn').onclick = () => openPalette();
-$('new-patch-btn').onclick = () => { loadNamed(newPatch(DEFS)); closeSidebar(); };
+$('new-patch-btn').onclick = () => { loadNamed(newPatch(DEFS)); tutorial.newPatchPressed(); closeSidebar(); };
 $('add-btn').onclick = () => openPalette('module');
 $('add-assembly-btn').onclick = () => openPalette('assembly');
 $('tour-btn').onclick = () => { switchTab('patch'); tutorial.open(); };

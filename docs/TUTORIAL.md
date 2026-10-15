@@ -11,11 +11,15 @@ modules. It replaces the five-step tour (`web/src/tour.ts`).
   A done step shows its check mark for a moment and the tutorial moves on by itself (decided 2026-10-14, replacing the earlier "Next unlocks" rule); after Back the previous step is held until Next is pressed. **Do it for me** applies the step and advances. If a later edit breaks an
   earlier step the panel says so and Do it for me restores it. Back re-reads the previous step without undoing anything.
   No skip-chapter button: the chapter menu jumps anywhere.
-- **Chapters have canned start and end patches.** Starting chapter N: if the open patch passes chapter N−1's final check it
-  continues with it, else the canned start is loaded and the panel says so. The canned end patches are listed in the Examples
-  picker under "Tutorial".
-- **Nothing is lost.** Starting the course puts the open patch into the bank under its name if it is not there yet; the
-  chapter patch becomes the working patch. Leaving offers "Save tutorial patch to the bank".
+- **Chapters have canned start and end patches.** Starting chapter N always loads its canned start (chapter N−1's canned
+  end for the Tutorial voice chapters 2..5, a bare patch for the rest, chapter 1 included: its New patch step counts the
+  button press, since a full canned start would make the later steps hold already); it
+  never continues with whatever the user left open (decided 2026-10-14, replacing the earlier "continue with your patch when
+  it passes chapter N−1" rule: differences accumulated between the user's patch and the checks). The canned end patches are
+  listed in the Examples picker under "Tutorial".
+- **Nothing is lost.** Starting a chapter puts the open patch into the bank under its name unless it is a tutorial patch
+  (name starting with "Tutorial"; the user's own New patch is renamed to the chapter's name when its step is done); the
+  chapter patch becomes the working patch. The chapter-done page offers "Save patch to the bank".
 - **Library is real.** Assemblies saved in the course ("My voice" ch 4, "My space" ch 5, "FM keys" ch 6, "Pluck" ch 7) go to
   the real library with a `tutorial` tag on the definition. Later chapters look them up by tag, then name, then fall back to a
   bundled copy and say which they used.
