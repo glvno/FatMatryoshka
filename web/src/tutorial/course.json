@@ -42,8 +42,8 @@
       "id": "hello-sound",
       "title": "How to make a noise",
       "intro": "By the end of this chapter, you will have built a machine that translates electricity into sound.\n\n",
-      "payoff": "To recap:\n- Pitch is represented as voltage (`2V` for middle C, `+/- 1V` per octave)\n- A control signal (`cv`) is voltage\n- The audio signal sent to the `Output` module is voltage\n\nSo you may be wondering, *what if I mix and match*? E.g., *what happens if I use an audio signal as a control voltage?*",
-      "challenge": "Find out what happens",
+      "payoff": "You may have noticed a pattern:\n- A pitch is voltage (`2V` for middle C, `+/- 1V` per octave)\n- A control signal (`cv`) is voltage\n- The audio signal sent to the `Output` module is voltage\n\nSo you may be wondering, *What if I mix and match? What happens if I use an oscillator signal as a control voltage? What about as a pitch signal?*\n\nIf so, you're exactly the kind of pervert who is going to really enjoy analog synthesis.",
+      "challenge": "Find out what happens!\n\nHint: add another oscillator module and start plugging its output into stuff.",
       "patchName": "Tutorial voice",
       "start": { "kind": "new" },
       "steps": [
@@ -203,7 +203,7 @@
         {
           "id": "gate",
           "kind": "task",
-          "title": "Gate signals",
+          "title": "Gates",
           "text": "Whenever you press a key, here's what's happening:\n\n- The sustained electrical voltage coming through `Main`'s  `pitch` jack changes to represent the pressed key's pitch. `2V` means middle C (aka `C4`). Each volt up or down from there represents an octave. [^1]\n- `Main`'s `gate` output voltage, which rests at `0V`, suddenly spikes to `5V`.\n- The output signal of `VCA`, which is using `Main`'s gate signal as its *control voltage* signal multiplier, suddenly spikes from `0V` to the oscillator's signal voltage multiplied by 5.\n\n[^1]: So the note one octave up from `C4` (aka `C5`) is represented as `3V`.  One semitone up from that (aka `C#5`) is represented as `3.083V`. Why `.083`? Because there are 12 notes in an octave, and `1V/12 = 0.083̅V`.\n\n",
           "why": "",
           "parts": [
@@ -215,9 +215,9 @@
         {
           "id": "scope",
           "kind": "task",
-          "title": "Look at the wave",
-          "text": "Click ◎ beside the Oscillator’s out jack. The scope window opens and traces that signal (the Oscillator runs all the time, so it shows even without a key); the Spectrum button shows its harmonics.",
-          "why": "A sine has one harmonic, a saw has all of them, a square only the odd ones. What you see on the spectrum is what a filter will later take away.",
+          "title": "Seeing sound",
+          "text": "To the left of the Oscillator’s `out` jack you'll find a little grey ◎ button.\n\n## Click it.\n\nThe window that just popped up is what's called an *oscilloscope*. \n\nWhat you see there is a live visualization of the oscillator's output voltage over time.  You may recognize this squiggle from high school math class as a *wave*.  \n\nConveniently, sound can also be represented as a wave.\n\n*Analog audio* gets its name from the strategy of using changes in voltage as an *analogy* for changes in air pressure.\n",
+          "why": "",
           "listen": true,
           "parts": [
             {
@@ -233,7 +233,7 @@
           "id": "wave",
           "kind": "task",
           "title": "Change the wave",
-          "text": "Start Riff below. Compare sine, saw and square on the same notes: pure, buzzy, then hollow. Try the level slider and leave your favorite wave selected. Continue when you have heard the difference.",
+          "text": "The shape of a wave determines its timbre. \n\nRight now, our oscillator emits a `sine` wave -- reminscent of a french horn.  But there are a few other types of wave it can emit  -- hold a note and move its `wave` slider around to hear what they sound like.",
           "why": "",
           "listen": true,
           "parts": [

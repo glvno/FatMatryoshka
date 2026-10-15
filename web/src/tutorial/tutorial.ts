@@ -20,7 +20,7 @@ export interface TutorialHost {
   preview(p: Patch | null): void;
   /** replace the open patch (the host's loadNamed) */
   load(p: Patch): void;
-  note(on: boolean, note?: number): void;
+  note(on: boolean, note?: number, vel?: number): void;
   library(): AssemblyDef[];
   saveAssembly(def: AssemblyDef): void;
   snapshot(side: 'A' | 'B'): void;
@@ -93,7 +93,7 @@ export class Tutorial {
     document.body.append(this.panel, this.menu);
     this.menu.addEventListener('close', () => this.render(true));
     window.addEventListener('blur', () => this.stop());
-    this.audition = new Audition((on, note) => this.host.note(on, note), async () => { await this.host.startAudio(); if (!this.host.audioOn()) throw new Error('Audio could not start'); });
+    this.audition = new Audition((on, note, vel) => this.host.note(on, note, vel), async () => { await this.host.startAudio(); if (!this.host.audioOn()) throw new Error('Audio could not start'); });
     this.progress = this.loadProgress();
     this.page = this.progress.page ?? (this.progress.step > 0 ? 'steps' : 'intro');
     this.entry = structuredClone(this.host.editor.patch);
@@ -305,7 +305,7 @@ export class Tutorial {
     this.auditionMode = mode;
     const p = this.host.editor.patch;
     if (this.chapterIndex === 9 && p.cables.some((c) => c.from.port === 'clock' && p.modules.some((m) => m.id === c.from.module && m.type === 'fm1'))) this.host.arpPlay(true);
-    try { await this.audition.play(mode); } catch (err) { this.error = String(err); this.auditionMode = ''; }
+    try { await this.audition.play(mode, this.page === 'steps' ? this.step?.riff : undefined); } catch (err) { this.error = String(err); this.auditionMode = ''; }
     if (this.active) this.render(true);
   }
 
@@ -403,6 +403,7 @@ export class Tutorial {
       }
       const actions = el('div', { class: 'tour-actions' });
       if (this.progress.step > 0) actions.append(this.button('← Back', () => this.back()));
+      actions.append(this.button('↺ Start step over', () => this.restartStep()));
       if (st.optional) actions.append(this.button('Skip optional exercise', () => this.advance(true)));
       if (ok && !broken.length && (this.hold || st.listen)) actions.append(this.button(this.progress.step < ch.steps.length - 1 ? 'Continue →' : 'Finish', () => this.advance(), true));
       parts.push(actions);
@@ -441,6 +442,22 @@ export class Tutorial {
     this.hold = true;
     this.saveProgress();
     this.enterStep();
+    this.render(true);
+  }
+
+  /** put the patch back as it was when this step began (the learner's own, else the canned one); undoable, so the
+   * editor's Undo brings the discarded work back */
+  private restartStep(): void {
+    if (!this.chapter || this.page !== 'steps') return;
+    this.stop();
+    this.cancelAdvance();
+    const start = structuredClone(this.entries.get(this.progress.step) ?? stepStart(this.chapterIndex, this.progress.step));
+    const e = this.host.editor;
+    const target = e.patch as unknown as Record<string, unknown>;
+    e.transact(() => { for (const k of Object.keys(target)) delete target[k]; Object.assign(target, start); });
+    this.hold = false;
+    this.enterStep();
+    this.host.status('Step started over. Undo brings your changes back.');
     this.render(true);
   }
 

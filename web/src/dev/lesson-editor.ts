@@ -12,6 +12,7 @@ import { PRESETS } from '../presets';
 import type { Patch } from '../patch';
 import { formatCourse, refKey, slugId, validateShape, ASSEMBLY_FACTS, EVENT_NAMES, PART_KINDS, SLIDER_OPS, type AssemblyFact, type ChapterData, type CourseData, type EventName, type Part, type PartKind, type Pointer, type Ref, type RoleDef, type SliderOp, type StartRule, type StepData } from '../tutorial/course-schema';
 import { compileStep, stepStart } from '../tutorial/chapters';
+import { parseMidi } from '../tutorial/riff';
 import { momentary, partCheck, partLabel, refType } from '../tutorial/parts';
 import { CUSTOM, ROLES } from '../tutorial/registry';
 import { validateCourse, type Issue, type Report } from '../tutorial/validate';
@@ -584,8 +585,9 @@ async function mount() {
     for (const hint of report.hints.filter((h) => h.chapter === ch.id && h.step === st.id)) fields.append(el('p', 'lesson-hint', hint.message));
     if (st.kind === 'continue') {
       const box = el('section', 'lesson-section'); box.append(el('h3', '', 'Continue step'));
-      box.append(check('Show the playback buttons (Note, Chord, Riff)', !!st.playback, (v) => { st.playback = v || undefined; edited(); }), pointerEditor(st));
+      box.append(check('Show the playback buttons (Note, Chord, Riff)', !!st.playback, (v) => { st.playback = v || undefined; edited({ fields: true }); }), pointerEditor(st));
       fields.append(box);
+      if (st.playback) fields.append(riffEditor(st));
       return;
     }
     const flags = el('section', 'lesson-section'); flags.append(el('h3', '', 'Pace'));
@@ -601,7 +603,28 @@ async function mount() {
     redraw();
     const add = select([['', '+ Add requirement…'], ...PART_KINDS.map((k) => [k, KINDS[k]] as [string, string])], '', (v) => { if (!v) return; (st.parts ??= []).push(defaultPart(v as PartKind, draft)); edited(); redraw(); add.value = ''; }, 'Add requirement');
     reqs.append(partList, add);
-    fields.append(flags, reqs, referenceEditor(ch, ci, st, k));
+    fields.append(flags, reqs, riffEditor(st), referenceEditor(ch, ci, st, k));
+  }
+
+  /** the step's Riff loop: a MIDI file read here and stored in the course as notes */
+  function riffEditor(st: StepData): HTMLElement {
+    const box = el('section', 'lesson-section'); box.append(el('h3', '', 'Riff'));
+    const file = el('input'); file.type = 'file'; file.accept = '.mid,.midi,audio/midi'; file.hidden = true;
+    file.onchange = async () => {
+      const f = file.files?.[0]; file.value = '';
+      if (!f) return;
+      try { st.riff = parseMidi(new Uint8Array(await f.arrayBuffer()), f.name); tell(`Loaded ${f.name}: ${st.riff.notes.length} notes.`); edited({ fields: true }); } catch (err) { tell(`${f.name}: ${(err as Error).message}`, true); }
+    };
+    const r = st.riff;
+    if (!r) box.append(el('p', 'muted', 'The Riff button plays the built-in riff. Load a MIDI file to loop your own on this step.'));
+    else {
+      const bars = r.beats / 4;
+      box.append(el('p', '', `${r.name}: ${r.notes.length} notes, ${r.beats} beats${Number.isInteger(bars) ? ` (${bars} bars of 4/4)` : ''}, looped.`),
+        labelled('tempo (bpm)', numberInput(r.bpm, (v) => { if (v && v >= 20 && v <= 400) { r.bpm = v; edited(); } }, 'bpm', '1')));
+    }
+    box.append(file, button(r ? 'Replace MIDI file…' : 'Load MIDI file…', () => file.click()));
+    if (r) box.append(button('Use the built-in riff', () => { delete st.riff; edited({ fields: true }); }, 'danger'));
+    return box;
   }
 
   function startEditor(ch: ChapterData, ci: number): HTMLElement {

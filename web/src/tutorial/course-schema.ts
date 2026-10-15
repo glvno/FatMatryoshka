@@ -5,6 +5,7 @@
 // need the definitions and the engine are in validate.ts. The design is in docs/TUTORIAL.md.
 import type { Patch } from '../patch.ts';
 import type { AssemblyDef } from '../assembly.ts';
+import { riffProblem, type Riff } from './riff.ts';
 
 export const COURSE_VERSION = 2;
 
@@ -91,6 +92,8 @@ export interface StepData {
   playback?: boolean;
   /** a Continue step's highlight */
   pointer?: Pointer;
+  /** what the Riff button loops on this step (from a MIDI file); absent = the built-in riff */
+  riff?: Riff;
 }
 
 export type StartRule =
@@ -191,6 +194,7 @@ export function validateShape(value: unknown, allowEmpty = false): asserts value
       text(st.text, `${sp}.text`, true);
       text(st.why, `${sp}.why`, false);
       if (st.parts !== undefined && !Array.isArray(st.parts)) fail(`${sp}.parts`, 'expected a list');
+      if (st.riff !== undefined && riffProblem(st.riff)) fail(`${sp}.riff`, riffProblem(st.riff));
       for (const [j, p] of ((st.parts as unknown[]) ?? []).entries()) {
         if (!isObj(p) || !PART_KINDS.includes(p.kind as PartKind)) fail(`${sp}, part ${j + 1}`, 'unknown requirement kind');
         if ((p as Record<string, unknown>).label !== undefined) text((p as Record<string, unknown>).label, `${sp}, part ${j + 1}.label`, false);
@@ -203,7 +207,7 @@ export function validateShape(value: unknown, allowEmpty = false): asserts value
 }
 
 /**
- * The file's text: two-space JSON, except that every reference patch and every stored patch is on one line, so the prose
+ * The file's text: two-space JSON, except that every reference patch, stored patch and riff is on one line, so the prose
  * and the requirements stay readable and a re-recorded step is a one-line diff.
  */
 export function formatCourse(course: CourseData): string {
@@ -212,7 +216,11 @@ export function formatCourse(course: CourseData): string {
   const mark = (v: unknown): string => { const key = `\u0000${n++}\u0000`; compact.set(key, JSON.stringify(v)); return key; };
   const copy: CourseData = {
     ...course,
-    chapters: course.chapters.map((ch) => (ch.start.kind === 'patch' ? { ...ch, start: { kind: 'patch', patch: mark(ch.start.patch) as unknown as Patch } } : ch)),
+    chapters: course.chapters.map((ch) => ({
+      ...ch,
+      start: ch.start.kind === 'patch' ? { kind: 'patch', patch: mark(ch.start.patch) as unknown as Patch } : ch.start,
+      steps: ch.steps.map((st) => (st.riff ? { ...st, riff: mark(st.riff) as unknown as Riff } : st)),
+    })),
     references: Object.fromEntries(Object.entries(course.references).map(([k, r]) => [k, mark(r) as unknown as Reference])),
   };
   const prim = String.raw`(?:"(?:[^"\\\n]|\\.)*"|-?[\d.eE+-]+|true|false|null)`;

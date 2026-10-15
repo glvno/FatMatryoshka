@@ -200,7 +200,7 @@ const tutorial = new Tutorial({
   startAudio: () => startAudio(),
   preview: (p) => host.setPatch(p ?? editor.patch),
   load: (p) => { sink.send({ t: 'panic' }); loadNamed(p); },
-  note: (on, note = 60) => sink.send(on ? { t: 'on', note, vel: 0.8 } : { t: 'off', note }),
+  note: (on, note = 60, vel = 0.8) => sink.send(on ? { t: 'on', note, vel } : { t: 'off', note }),
   library: loadLibrary,
   saveAssembly: (def) => {
     storeTutorialAssembly(def);

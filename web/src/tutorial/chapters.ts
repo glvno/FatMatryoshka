@@ -23,7 +23,7 @@ export function compileStep(st: StepData, roles: Roles): Step {
   return {
     id: st.id, kind: st.kind, title: st.title, text: st.text, why: st.why || undefined,
     listen: st.kind === 'continue' || !!st.listen, optional: !!st.optional, superseded: !!st.superseded,
-    transient: st.kind === 'continue' || parts.some(momentary), playback: st.kind === 'continue' ? !!st.playback : true,
+    transient: st.kind === 'continue' || parts.some(momentary), playback: st.kind === 'continue' ? !!st.playback : true, riff: st.riff,
     check: (s) => ok(s).every(Boolean),
     todo: (s) => { const r = ok(s); return parts.filter((_, i) => !r[i]).map((p) => partLabel(p, roles)); },
     // a done step keeps pointing at its last part, so the panel stays anchored while it says "moving on"
