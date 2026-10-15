@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { parseMidi, riffProblem } from './riff';
-import { Audition } from './audition';
+import { parseMidi, riffProblem, swing } from './riff';
+import { Audition, DEFAULT_RIFF } from './audition';
 import { COURSE } from './chapters';
 import { formatCourse, validateShape } from './course-schema';
 
@@ -62,5 +62,35 @@ describe('riff playback', () => {
     expect(send.mock.calls[n - 1]).toEqual([false, 60]);
     await vi.advanceTimersByTimeAsync(5000);
     expect(send).toHaveBeenCalledTimes(n); expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('legato riffs', () => {
+  afterEach(() => vi.useRealTimers());
+  it('let go 20 ms before the next note, so a one-voice patch starts its envelope again; held notes stay held', async () => {
+    vi.useFakeTimers(); const at: [number, boolean, number][] = []; const t0 = Date.now();
+    const a = new Audition((on, note) => at.push([Date.now() - t0, on, note]), async () => {});
+    // 120 bpm: C runs into E (legato), E overlaps G by 10 ms (still legato), a low C is held under all three
+    await a.play('riff', { name: 'r', bpm: 120, beats: 2, notes: [[0, 2, 48, 100], [0, 0.5, 60, 100], [0.5, 0.52, 64, 100], [1, 1, 67, 100]] });
+    await vi.advanceTimersByTimeAsync(999);
+    a.stop();
+    // a beat is 500 ms: C would end at 250 where E starts, E at 510 just past G at 500
+    expect(at.filter(([, on]) => !on).slice(0, 2)).toEqual([[230, false, 60], [480, false, 64]]);
+    // the low C is held under E and G; it ends where the loop starts again, so it lets go 20 ms before that
+    expect(at.find(([, on, n]) => !on && n === 48)).toEqual([980, false, 48]);
+  });
+});
+
+describe('the built-in riff', () => {
+  it('is read from web/dev/riffs/default_riff.mid and swung: no note starts on a straight off-beat', () => {
+    expect(DEFAULT_RIFF.name).toBe('default_riff.mid');
+    expect(DEFAULT_RIFF.notes.length).toBeGreaterThan(0);
+    expect(DEFAULT_RIFF.notes.some(([t]) => Math.abs(t % 1 - 2 / 3) < 1e-3)).toBe(true);
+    expect(DEFAULT_RIFF.notes.every(([t]) => t % 1 !== 0.5)).toBe(true);
+    expect(riffProblem(DEFAULT_RIFF)).toBe('');
+  });
+  it('swing moves off-beat eighths to the triplet and keeps legato notes touching', () => {
+    const straight = { name: 's', bpm: 120, beats: 2, notes: [[0, 0.5, 60, 100], [0.5, 0.5, 62, 100], [1, 1, 64, 100]] as [number, number, number, number][] };
+    expect(swing(straight).notes).toEqual([[0, 0.667, 60, 100], [0.667, 0.333, 62, 100], [1, 1, 64, 100]]);
   });
 });

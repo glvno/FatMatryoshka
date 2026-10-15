@@ -37,6 +37,19 @@ export function riffProblem(v: unknown): string {
 const round = (x: number) => Math.round(x * 1000) / 1000;
 
 /**
+ * Swings a straight riff: within every beat the first half is stretched to `long` of the beat and the second half squeezed
+ * into the rest, so an off-beat eighth moves from .5 to `long` (2/3 = triplet swing). Note starts and ends move alike, so
+ * a note keeps reaching the next one when it did before.
+ */
+export function swing(riff: Riff, long = 2 / 3): Riff {
+  const at = (t: number): number => {
+    const beat = Math.floor(t), f = t - beat;
+    return beat + (f <= 0.5 ? f * 2 * long : long + (f - 0.5) * 2 * (1 - long));
+  };
+  return { ...riff, notes: riff.notes.map(([t, d, n, v]) => { const s = at(t); return [round(s), round(at(t + d) - s), n, v]; }) };
+}
+
+/**
  * Reads a Standard MIDI File (format 0 or 1, ticks per quarter note): every note of every track and channel, the first
  * tempo (else 120 bpm) and the first time signature (else 4/4), which sets the bar the loop is rounded up to. The loop
  * ends at the later of the last note-off and the end-of-track marker. Throws on what it cannot read.
