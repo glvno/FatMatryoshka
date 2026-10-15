@@ -13,6 +13,9 @@ let node: FakeNode;
 class FakeContext {
   state = 'suspended';
   destination = {};
+  currentTime = 0;
+  gainNode = { gain: { value: 1, setTargetAtTime: vi.fn() }, connect: vi.fn() };
+  createGain() { return this.gainNode; }
   audioWorklet = { addModule: async () => {} };
   onstatechange: (() => void) | null = null;
   constructor() { context = this; }
@@ -102,6 +105,7 @@ it('resumes within the gesture, shares initialization and replays the patch befo
   const resume = vi.fn(() => Promise.resolve());
   let contexts = 0;
   class Context {
+    currentTime = 0; createGain() { return { gain: { value: 1, setTargetAtTime: vi.fn() }, connect() {} }; }
     state = 'running'; destination = {}; audioWorklet = { addModule: () => moduleReady };
     resume = resume; constructor() { contexts++; }
   }
@@ -131,4 +135,20 @@ it('discards stale scope messages after a preset switch', async () => {
   expect(paint).not.toHaveBeenCalled();
   node.port.onmessage({ data: { probe: 'output:left', data, sr: 48000, revision: 2 } });
   expect(paint).toHaveBeenCalledWith('output:left', data, 48000);
+});
+
+
+it('keeps Stop effective when worklet initialization finishes later', async () => {
+  let ready!: () => void;
+  const pending = new Promise<void>((resolve) => { ready = resolve; });
+  class SlowContext extends FakeContext { audioWorklet = { addModule: () => pending }; }
+  vi.stubGlobal('AudioContext', SlowContext);
+  const host = new AudioHost(); const starting = host.start();
+  host.mute(true); ready(); await starting;
+  expect(host.muted).toBe(true);
+  expect(context.gainNode.gain.value).toBe(0);
+  expect(context.gainNode.gain.setTargetAtTime).not.toHaveBeenCalledWith(1, expect.anything(), expect.anything());
+  await host.start();
+  expect(host.muted).toBe(false);
+  expect(context.gainNode.gain.setTargetAtTime).toHaveBeenLastCalledWith(1, 0, 0.01);
 });

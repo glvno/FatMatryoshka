@@ -5,7 +5,7 @@ import type { HostMsg } from './worklet';
 import { DeviceLink } from './device';
 import { Editor, probeKey } from './editor';
 import { addToBank, bankPatches, buildBankTab } from './bank';
-import { buildAssembliesTab, storeAssembly } from './assemblies';
+import { buildAssembliesTab, storeAssembly, storeTutorialAssembly } from './assemblies';
 import { AssemblyBrowser } from './browser';
 import { searchCommands, type Command } from './commands';
 import { buildFlashTab } from './flasher';
@@ -96,6 +96,7 @@ const queueUpload = (): void => {
 /** notes go to the browser engine and, with Live on, to the FM-1 */
 const sink = {
   send(msg: HostMsg): void {
+    if (msg.t === 'on') host.mute(false);
     host.send(msg);
     if (msg.t === 'on') tutorial.noteOn();
     if (live()) device.note(msg as { t: string; note?: number; vel?: number });
@@ -104,10 +105,11 @@ const sink = {
 
 let refreshAssemblies: () => void = () => {};
 /** the factory patches and the Patches page's own copies (the morph picker keeps those of the same structure; the palette loads any) */
+let snapshotCandidates: () => { name: string; patch: Patch }[] = () => [];
 const patchCandidates = (): { name: string; patch: Patch }[] => {
   const seen = new Set<string>();
   const out: { name: string; patch: Patch }[] = [];
-  for (const c of [...bankPatches(), ...Object.entries(PRESETS).map(([name, make]) => ({ name, patch: make() }))])
+  for (const c of [...snapshotCandidates(), ...bankPatches(), ...Object.entries(PRESETS).map(([name, make]) => ({ name, patch: make() }))])
     if (!seen.has(c.name)) {
       seen.add(c.name);
       out.push(c);
@@ -179,6 +181,7 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
     const r = storeAssembly(def);
     status.textContent = r === 'cancelled' ? 'not saved' : `"${def.name}" ${r === 'replaced' ? 'replaced in' : 'saved to'} the assembly library`;
     refreshAssemblies();
+    if (r !== 'cancelled') tutorial.saved(def);
     tutorial.refresh();
   },
   onHistory(kind) {
@@ -187,23 +190,26 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   },
   morphCandidates: patchCandidates,
 });
+snapshotCandidates = () => editor.snapshots.B ? [{ name: 'Snapshot B', patch: { ...JSON.parse(editor.snapshots.B) as Patch, name: 'Snapshot B' } }] : [];
 host.setPatch(editor.patch);
 const tutorial = new Tutorial({
   editor,
-  audioOn: () => host.running,
-  startAudio: () => void startAudio(),
+  audioOn: () => host.running && !host.muted,
+  mute: (on) => host.mute(on),
+  startAudio: () => startAudio(),
+  preview: (p) => host.setPatch(p ?? editor.patch),
   load: (p) => { sink.send({ t: 'panic' }); loadNamed(p); },
-  note: (on) => sink.send(on ? { t: 'on', note: 60, vel: 0.8 } : { t: 'off', note: 60 }),
+  note: (on, note = 60) => sink.send(on ? { t: 'on', note, vel: 0.8 } : { t: 'off', note }),
   library: loadLibrary,
   saveAssembly: (def) => {
-    storeAssembly(def, () => true);
+    storeTutorialAssembly(def);
     refreshAssemblies();
     status.textContent = `"${def.name}" saved to the assembly library`;
   },
   snapshot: (side) => takeSnapshot(side),
   flipAB: () => flipAB(),
-  share: () => void sharePatch(),
-  arpPlay: (on) => { editor.arpPlay = on; host.send({ t: 'arpplay', on }); if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, on); editor.rebuild(); },
+  share: () => sharePatch(),
+  arpPlay: (on) => { if (on) host.mute(false); editor.arpPlay = on; host.send({ t: 'arpplay', on }); if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, on); editor.rebuild(); },
   probe: (id, port) => { const key = probeKey(id, port); if (editor.probes.has(key)) return; editor.probes.add(key); const def = DEFS[editor.patch.modules.find((m) => m.id === id)?.type ?? '']; const kind = def?.outputs.find((o) => o.name === port)?.kind ?? 'audio'; scope.add(key, kind); host.send({ t: 'probe', key, id, port }); editor.rebuild(); },
   bypass: (id, on) => { const m = editor.patch.modules.find((m) => m.id === id); if (!m) return; if (on) m.bypass = true; else delete m.bypass; host.send({ t: 'bypass', id, on }); tutorial.bypassed(); editor.rebuild(); queueSave(editor.patch); },
   bankSave: addToBank,
@@ -276,6 +282,7 @@ const showDiff = (): void => {
 };
 const takeSnapshot = (side: 'A' | 'B'): void => {
   editor.takeSnapshot(side);
+  editor.rebuild();
   status.textContent = `${side} = this patch`;
 };
 const flipAB = (): void => {
@@ -314,7 +321,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Set snapshot B', keywords: 'compare ab', run: () => takeSnapshot('B') },
     { kind: 'command', label: 'Switch A / B snapshots', detail: 'Alt+B', run: inPatch(flipAB) },
     { kind: 'command', label: 'Start audio', keywords: 'sound browser', run: () => void startAudio() },
-    { kind: 'command', label: 'Panic: stop all notes', keywords: 'silence stuck', run: () => sink.send({ t: 'panic' }) },
+    { kind: 'command', label: 'Panic: stop all notes', keywords: 'silence stuck', run: () => { tutorial.stop(); host.mute(true); sink.send({ t: 'panic' }); } },
     { kind: 'command', label: 'FM-1 & MIDI settings', keywords: 'connect send store sync hardware keyboard release', run: () => $<HTMLDialogElement>('device-bar').showModal() },
     { kind: 'command', label: 'Flash firmware', keywords: 'install update hardware', run: () => switchTab('flash') },
     { kind: 'command', label: 'About Matryoshka', keywords: 'credits', run: () => switchTab('about') },
@@ -461,7 +468,7 @@ window.addEventListener('keydown', (e) => {
     e.stopImmediatePropagation();
   }
 }, true);
-$('panic-btn').onclick = () => sink.send({ t: 'panic' });
+$('panic-btn').onclick = () => { tutorial.stop(); host.mute(true); sink.send({ t: 'panic' }); };
 
 // FM-1 link
 $('dev-btn').onclick = async () => {

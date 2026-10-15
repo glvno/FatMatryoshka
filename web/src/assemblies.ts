@@ -56,6 +56,21 @@ export function storeAssembly(def: AssemblyDef, confirm: (msg: string) => boolea
   return 'saved';
 }
 
+/** Tutorial saves preserve earlier user instruments and fail visibly if storage is unavailable. */
+export function storeTutorialAssembly(def: AssemblyDef): void {
+  const list = loadLibrary();
+  const same = (d: AssemblyDef): boolean => d.name === def.name || !!def.tutorial && d.tutorial === def.tutorial;
+  const old = list.filter(same);
+  const kept = list.filter((d) => !same(d));
+  for (const d of old) {
+    if (JSON.stringify({ ...d, tutorial: undefined }) === JSON.stringify({ ...def, tutorial: undefined })) continue;
+    let n = 1;
+    while (kept.some((x) => x.name === `${d.name} (previous ${n})`)) n++;
+    kept.push({ ...d, name: `${d.name} (previous ${n})`, tutorial: undefined });
+  }
+  localStorage.setItem(STORE, JSON.stringify([...kept, def]));
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> & { class?: string } = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   const { class: cls, ...rest } = props as Record<string, unknown>;

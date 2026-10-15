@@ -2,26 +2,30 @@
 // The tutorial runtime: a draggable step panel, the chapter menu, progress in localStorage, the checks polled against
 // the editor, highlighted targets, and the Actions adapter "do it for me" uses. Chapters are in ./chapters.ts, the
 // model in ./model.ts, the design in docs/TUTORIAL.md.
+import { Audition } from './audition';
+import { keepVariation, variations } from './variations';
 import { newPatch, type Patch } from '../patch';
 import { DEFS } from '../modules';
 import type { AssemblyDef } from '../assembly';
 import { assemblyOf, hiddenModules } from '../assembly';
 import type { Editor } from '../editor';
-import { CHAPTERS, chapterStart, tutorialDef } from './chapters';
+import { CHAPTERS, chapterStart, chapterEnd, tutorialDef } from './chapters';
 import { noSeen, stepDone, type Actions, type Chapter, type Seen, type Step, type Target, type TutorialState } from './model';
 
 export interface TutorialHost {
   editor: Editor;
   audioOn(): boolean;
-  startAudio(): void;
+  mute(on: boolean): void;
+  startAudio(): Promise<void>;
+  preview(p: Patch | null): void;
   /** replace the open patch (the host's loadNamed) */
   load(p: Patch): void;
-  note(on: boolean): void;
+  note(on: boolean, note?: number): void;
   library(): AssemblyDef[];
   saveAssembly(def: AssemblyDef): void;
   snapshot(side: 'A' | 'B'): void;
   flipAB(): void;
-  share(): void;
+  share(): Promise<void>;
   arpPlay(on: boolean): void;
   probe(id: number, port: string): void;
   bypass(id: number, on: boolean): void;
@@ -36,6 +40,8 @@ interface Progress {
   done: string[];
   chapter: string | null;
   step: number;
+  page?: 'intro' | 'steps' | 'done';
+  stepId?: string;
 }
 const STORE = 'matryoshka.tutorial';
 const SEEN = 'fatmatryoshka.tour-seen';
@@ -57,9 +63,18 @@ export class Tutorial {
   private menu = el('dialog', { class: 'help tutorial-menu' });
   private progress: Progress = { done: [], chapter: null, step: 0 };
   private seen: Seen = noSeen();
+  private lastSaved?: AssemblyDef;
   private entry: Patch | null = null;
   private timer = 0;
-  private sounding = false;
+  private audition: Audition;
+  private auditionMode = '';
+  private previewing = false;
+  private previewTimer = 0;
+  private previewTransport = false;
+  private previewMuted = false;
+  private busy = false;
+  private error = '';
+  private followTarget = false;
   /** the chapter page: the intro before the steps, the steps, the end */
   private page: 'intro' | 'steps' | 'done' = 'intro';
   private lastRender = '';
@@ -77,10 +92,13 @@ export class Tutorial {
     this.panel.setAttribute('aria-label', 'Tutorial');
     document.body.append(this.panel, this.menu);
     this.menu.addEventListener('close', () => this.render(true));
-    window.addEventListener('blur', () => this.release());
+    window.addEventListener('blur', () => this.stop());
+    this.audition = new Audition((on, note) => this.host.note(on, note), async () => { await this.host.startAudio(); if (!this.host.audioOn()) throw new Error('Audio could not start'); });
     this.progress = this.loadProgress();
+    this.page = this.progress.page ?? (this.progress.step > 0 ? 'steps' : 'intro');
+    this.entry = structuredClone(this.host.editor.patch);
     this.actions = this.makeActions();
-    window.addEventListener('resize', () => { if (this.active && !this.pinned) this.place(this.beside, true); });
+    window.addEventListener('resize', () => { if (this.active) { this.pinned = false; this.place(this.beside, true); }; });
   }
 
   // ---- progress
@@ -88,11 +106,18 @@ export class Tutorial {
   private loadProgress(): Progress {
     try {
       const raw = JSON.parse(localStorage.getItem(STORE) ?? 'null') as Partial<Progress> | null;
-      if (raw && Array.isArray(raw.done)) return { done: raw.done.filter((d) => typeof d === 'string'), chapter: typeof raw.chapter === 'string' ? raw.chapter : null, step: Number(raw.step) || 0 };
+      if (raw && Array.isArray(raw.done)) {
+        const ch = CHAPTERS.find((c) => c.id === raw.chapter);
+        const named = ch?.steps.findIndex((st) => st.id === raw.stepId) ?? -1;
+        const step = named >= 0 ? named : Math.max(0, Math.min(ch ? ch.steps.length - 1 : 0, Math.floor(Number(raw.step) || 0)));
+        return { done: raw.done.filter((d) => CHAPTERS.some((c) => c.id === d)), chapter: ch?.id ?? null, step, page: raw.page === 'done' || raw.page === 'steps' ? raw.page : 'intro' };
+      }
     } catch { /* storage optional */ }
     return { done: [], chapter: null, step: 0 };
   }
   private saveProgress(): void {
+    this.progress.page = this.page;
+    this.progress.stepId = this.step?.id;
     try { localStorage.setItem(STORE, JSON.stringify(this.progress)); } catch { /* storage optional */ }
   }
   private markSeen(): void { try { localStorage.setItem(SEEN, '1'); } catch { /* storage optional */ } }
@@ -108,7 +133,7 @@ export class Tutorial {
     const e = this.host.editor;
     return {
       patch: e.patch, entry: this.entry ?? e.patch, zoom: e.zoom, probes: e.probes, arpPlay: e.arpPlay, audio: this.host.audioOn(),
-      selected: e.selected, library: this.host.library(), snapshots: e.snapshots, seen: this.seen,
+      lastSaved: this.lastSaved, selected: e.selected, library: this.host.library(), snapshots: e.snapshots, seen: this.seen,
     };
   }
 
@@ -119,6 +144,7 @@ export class Tutorial {
   redone(): void { this.seen.redos++; this.refresh(); }
   zoomed(): void { this.seen.zooms++; this.refresh(); }
   flipped(): void { this.seen.flips++; this.refresh(); }
+  saved(def: AssemblyDef): void { this.lastSaved = structuredClone(def); this.seen.saves++; this.refresh(); }
   shared(): void { this.seen.shares++; this.refresh(); }
   bypassed(): void { this.seen.bypasses++; this.refresh(); }
   refresh(): void { if (this.active) this.render(); }
@@ -130,7 +156,7 @@ export class Tutorial {
     const e = h.editor;
     return {
       patch: () => e.patch,
-      edit: (fn) => { if (!e.transact(() => fn(e.patch))) e.rebuild(); },
+      edit: (fn) => { const next = structuredClone(e.patch); fn(next); if (!e.transact(() => { Object.assign(e.patch, next); })) e.rebuild(); },
       load: (p) => h.load(p),
       newPatch: (name) => { h.load(newPatch(DEFS, name)); this.seen.news++; },
       setZoom: (z) => e.setZoom(z),
@@ -140,9 +166,9 @@ export class Tutorial {
       select: (ids) => e.selectOnly(ids),
       undo: () => e.undo(),
       redo: () => e.redo(),
-      note: () => { h.note(true); window.setTimeout(() => h.note(false), 400); },
+      note: () => { void this.play('riff'); },
       startAudio: () => h.startAudio(),
-      saveAssembly: (def, tag) => h.saveAssembly({ ...def, tutorial: tag }),
+      saveAssembly: (def, tag) => { h.saveAssembly({ ...def, tutorial: tag }); this.saved(def); },
       library: () => h.library(),
       snapshot: (side) => h.snapshot(side),
       flipAB: () => h.flipAB(),
@@ -151,14 +177,17 @@ export class Tutorial {
     };
   }
 
-  private doStep(i: number): void {
+  private async doStep(i: number): Promise<boolean> {
     const ch = this.chapter;
-    if (!ch) return;
+    if (!ch) return false;
     const st = ch.steps[i];
     try {
-      if (!st.check(this.state())) st.apply(this.actions, this.state());
+      if (!st.check(this.state())) await st.apply(this.actions, this.state());
+      return st.check(this.state());
     } catch (err) {
-      this.host.status(`tutorial: ${(err as Error).message}`);
+      this.error = `Could not complete this step: ${(err as Error).message}`;
+      this.host.status(this.error);
+      return false;
     }
   }
 
@@ -180,6 +209,8 @@ export class Tutorial {
 
   /** the chapter menu */
   open(): void {
+    this.stop();
+    this.cancelAdvance();
     this.markSeen();
     const rows = CHAPTERS.map((c, i) => {
       const done = this.progress.done.includes(c.id);
@@ -187,15 +218,17 @@ export class Tutorial {
       const row = el('div', { class: 'tutorial-row' + (done ? ' done' : '') + (current ? ' current' : '') },
         el('span', { class: 'n', textContent: done ? '✓' : String(i + 1) }),
         el('span', { class: 'grow', textContent: c.title }),
-        el('button', { textContent: current ? 'Resume' : done ? 'Again' : 'Start', class: current ? 'primary' : '', onclick: () => { this.menu.close(); if (current) { this.panel.hidden = false; this.render(true); } else this.start(i); } }));
+        el('button', { textContent: current ? 'Resume' : done ? 'Again' : 'Start', class: current ? 'primary' : '', onclick: () => { this.menu.close(); if (current) { this.panel.hidden = false; this.render(true); this.schedule(); } else this.start(i); } }));
       return row;
     });
+    const saved = this.variationList();
     this.menu.replaceChildren(
       el('h2', { textContent: 'Tutorial' }),
       el('p', { class: 'muted', textContent: 'Each chapter builds a patch; later chapters reuse what you saved. Start anywhere: every chapter opens its own patch.' }),
       el('div', { class: 'tutorial-rows' }, ...rows),
+      el('details', {}, el('summary', { textContent: 'Your saved variations' }), saved),
       el('div', { class: 'tour-actions' },
-        el('button', { textContent: 'Reset progress', onclick: () => { this.progress = { done: [], chapter: null, step: 0 }; this.saveProgress(); this.menu.close(); this.panel.hidden = true; this.host.status('tutorial progress reset'); } }),
+        el('button', { textContent: 'Reset progress', onclick: () => { this.close(); this.page = 'intro'; this.progress = { done: [], chapter: null, step: 0 }; this.saveProgress(); this.menu.close(); this.panel.hidden = true; this.host.status('tutorial progress reset'); } }),
         el('form', { method: 'dialog' }, el('button', { textContent: 'Close' }))),
     );
     this.menu.showModal();
@@ -207,17 +240,17 @@ export class Tutorial {
     const ch = CHAPTERS[i];
     if (!ch) return;
     this.markSeen();
-    this.release();
-    const open = this.host.editor.patch;
-    const tutorialPatch = /^Tutorial\b/.test(open.name);
-    if (!tutorialPatch && (open.modules.length > 2 || open.cables.length)) this.host.status(this.host.bankSave(open));
+    this.stop();
+    this.cancelAdvance();
+    if (!this.keepCurrent()) return;
+    this.host.arpPlay(false);
     this.host.load(chapterStart(i));
     this.progress.chapter = ch.id;
     this.progress.step = 0;
     this.hold = false;
     clearTimeout(this.advanceTimer); this.advanceTimer = 0;
-    this.saveProgress();
     this.page = 'intro';
+    this.saveProgress();
     this.enterStep();
     this.panel.hidden = false;
     this.render(true);
@@ -227,6 +260,8 @@ export class Tutorial {
   private enterStep(): void {
     this.entry = JSON.parse(JSON.stringify(this.host.editor.patch)) as Patch;
     this.seen = noSeen();
+    this.lastSaved = undefined;
+    this.error = '';
   }
 
   private schedule(): void {
@@ -235,7 +270,8 @@ export class Tutorial {
   }
 
   close(): void {
-    this.release();
+    this.stop();
+    this.cancelAdvance();
     this.panel.hidden = true;
     clearInterval(this.timer);
     this.clearFocus();
@@ -254,7 +290,16 @@ export class Tutorial {
     const handle = el('button', { class: 'tutorial-handle', textContent: '⋮⋮', title: 'Drag to move' });
     handle.setAttribute('aria-label', 'Move the tutorial panel');
     this.drag(handle);
-    const h = el('div', { class: 'tutorial-head' }, handle, el('h2', { textContent: title }), el('button', { class: 'x', textContent: '×', title: 'Hide the tutorial (the chapter menu brings it back)', onclick: () => this.close() }));
+    handle.onkeydown = (ev) => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home'].includes(ev.key)) return;
+      ev.preventDefault(); ev.stopPropagation();
+      if (ev.key === 'Home') { this.pinned = false; this.followTarget = false; this.place(null, true); return; }
+      const r = this.panel.getBoundingClientRect(); this.pinned = true;
+      this.panel.style.left = `${Math.max(0, Math.min(window.innerWidth - r.width, r.left + (ev.key === 'ArrowLeft' ? -20 : ev.key === 'ArrowRight' ? 20 : 0)))}px`;
+      this.panel.style.top = `${Math.max(0, Math.min(window.innerHeight - r.height, r.top + (ev.key === 'ArrowUp' ? -20 : ev.key === 'ArrowDown' ? 20 : 0)))}px`;
+      this.panel.style.right = this.panel.style.bottom = 'auto';
+    };
+    const h = el('div', { class: 'tutorial-head' }, handle, this.button(this.followTarget ? 'Dock' : 'Follow', () => { this.followTarget = !this.followTarget; this.pinned = false; this.place(this.beside, true); this.render(true); }), el('h2', { textContent: title }), el('button', { class: 'x', textContent: '×', title: 'Hide the tutorial (the chapter menu brings it back)', onclick: () => this.close() }));
     return h;
   }
 
@@ -278,17 +323,86 @@ export class Tutorial {
     };
   }
 
-  private release(): void { if (this.sounding) { this.sounding = false; this.host.note(false); } }
+  private cancelAdvance(): void { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
 
-  private noteButton(): HTMLButtonElement {
-    const hold = el('button', { class: 'tour-note', id: 'tutorial-note', textContent: 'Hold to play C' });
-    const press = (): void => { if (!this.sounding) { this.sounding = true; this.host.note(true); } };
-    hold.onpointerdown = (e) => { e.preventDefault(); hold.setPointerCapture(e.pointerId); press(); };
-    hold.onpointerup = hold.onlostpointercapture = () => this.release();
-    hold.onkeydown = (e) => { if ([' ', 'Enter'].includes(e.key)) { e.preventDefault(); e.stopPropagation(); press(); } };
-    hold.onkeyup = (e) => { if ([' ', 'Enter'].includes(e.key)) { e.preventDefault(); e.stopPropagation(); this.release(); } };
-    hold.onblur = () => this.release();
-    return hold;
+  /** Also called by the host's Panic command. */
+  stop(): void {
+    this.audition.stop(); this.auditionMode = '';
+    clearTimeout(this.previewTimer);
+    if (this.previewing) {
+      this.previewing = false;
+      this.host.preview(null);
+      this.host.arpPlay(this.previewTransport);
+    } else if (this.active) this.host.arpPlay(false);
+    if (this.active) this.host.mute(true);
+    if (this.active) this.render(true);
+  }
+
+  private async play(mode: 'note' | 'chord' | 'riff'): Promise<void> {
+    this.auditionMode = mode;
+    const p = this.host.editor.patch;
+    if (this.chapterIndex === 9 && p.cables.some((c) => c.from.port === 'clock' && p.modules.some((m) => m.id === c.from.module && m.type === 'fm1'))) this.host.arpPlay(true);
+    try { await this.audition.play(mode); } catch (err) { this.error = String(err); this.auditionMode = ''; }
+    if (this.active) this.render(true);
+  }
+
+  private auditionControls(): HTMLElement {
+    const controls = el('div', { class: 'tour-actions tutorial-audition' });
+    controls.setAttribute('aria-label', 'Audition');
+    for (const [mode, label] of [['note', 'Note'], ['chord', 'Chord'], ['riff', 'Riff']] as const) {
+      const b = this.button(label, () => { if (this.auditionMode === mode) { this.audition.stop(); this.auditionMode = ''; this.render(true); } else void this.play(mode); });
+      b.setAttribute('aria-pressed', String(this.auditionMode === mode)); controls.append(b);
+    }
+    controls.append(this.button('Release notes', () => { this.audition.stop(); this.auditionMode = ''; this.render(true); }), this.button('Stop', () => this.stop()));
+    return controls;
+  }
+
+  private endPreview(): void {
+    if (!this.previewing) return;
+    this.audition.stop(); this.auditionMode = ''; clearTimeout(this.previewTimer);
+    this.previewing = false; this.host.preview(null);
+    this.host.arpPlay(this.previewTransport); this.host.mute(this.previewMuted); this.render(true);
+  }
+
+  private preview(): void {
+    if (this.previewing) { this.endPreview(); return; }
+    this.previewTransport = this.host.editor.arpPlay;
+    this.previewMuted = !this.host.audioOn();
+    this.previewing = true;
+    this.host.preview(chapterEnd(this.chapterIndex));
+    if (this.chapterIndex >= 9) this.host.arpPlay(true);
+    void this.play('riff');
+    this.previewTimer = window.setTimeout(() => this.endPreview(), 8000);
+    this.render(true);
+  }
+
+  private keepCurrent(name?: string): boolean {
+    try {
+      const p = this.host.editor.patch;
+      const saved = keepVariation({ ...p, name: name?.trim() || p.name }, this.progress.chapter);
+      this.host.status(`Saved “${saved.patch.name}” in Tutorial → Your saved variations`);
+      return true;
+    } catch (err) {
+      this.error = `Could not save your variation: ${String(err)}. Your patch is still open; export it before changing chapters.`;
+      this.host.status(this.error); this.render(true); return false;
+    }
+  }
+
+  private saveControls(): HTMLElement {
+    const name = el('input', { value: this.host.editor.patch.name, placeholder: 'Name your variation' });
+    name.setAttribute('aria-label', 'Variation name');
+    return el('div', { class: 'tour-actions' }, name, this.button('Save variation', () => this.keepCurrent(name.value)));
+  }
+
+  private variationList(): HTMLElement {
+    const list = el('div');
+    try {
+      for (const v of variations().reverse()) list.append(el('div', { class: 'tutorial-row' },
+        el('span', { class: 'grow', textContent: `${v.patch.name} · ${new Date(v.saved).toLocaleString()}` }),
+        this.button('Restore', () => { if (!this.keepCurrent()) return; this.close(); this.menu.close(); this.host.load(JSON.parse(JSON.stringify(v.patch)) as Patch); this.progress.chapter = null; this.saveProgress(); })));
+      if (!list.childElementCount) list.append('Your chapter changes and named variations will appear here.');
+    } catch (err) { list.textContent = `Variations could not be read: ${String(err)}`; }
+    return list;
   }
 
   /** redraw when something the panel shows changed (or `force`) */
@@ -301,36 +415,46 @@ export class Tutorial {
     const done = this.page === 'steps' && st ? stepDone(ch, this.progress.step, s) : { met: false, moot: false };
     const ok = done.met || done.moot;
     const broken = this.page === 'steps' ? ch.steps.slice(0, this.progress.step).map((x, k) => (!x.transient && !x.superseded && !x.check(s) ? k : -1)).filter((k) => k >= 0) : [];
-    const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, s.audio, ok ? [] : st?.todo?.(s) ?? []]);
+    const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, s.audio, this.busy, this.error, this.previewing, this.auditionMode, ok ? [] : st?.todo?.(s) ?? []]);
     if (!force && key === this.lastRender) return;
     this.lastRender = key;
     const count = el('span', { class: 'tour-count', textContent: `Chapter ${i + 1} of ${CHAPTERS.length} · ${ch.title}` });
     const parts: (Node | string)[] = [this.head(this.page === 'steps' && st ? st.title : this.page === 'done' ? 'Chapter done' : ch.title), count];
-    if (!s.audio) parts.push(el('p', { class: 'tutorial-hint', textContent: 'Audio is off: click Enable audio in the sidebar to hear the patch.' }));
+    if (this.error) parts.push(el('p', { class: 'tutorial-warn', textContent: this.error }));
+    if (!s.audio) parts.push(el('p', { class: 'tutorial-hint', textContent: 'Sound is paused. Press a playback button, or the audio button in the sidebar, to listen.' }));
     if (this.page === 'intro') {
       parts.push(el('p', { textContent: ch.intro }));
-      parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.page = 'steps'; this.enterStep(); this.render(true); }, true), this.button('Chapters', () => this.open())));
+      parts.push(el('p', { textContent: 'Your previous patch was saved in Tutorial → Your saved variations. Each chapter starts from a prepared patch; your own sketches remain recoverable.' }));
+      parts.push(this.button(this.previewing ? 'Stop preview' : 'Preview the finished sound', () => this.preview()));
+      parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.stop(); this.page = 'steps'; this.enterStep(); this.saveProgress(); this.render(true); }, true), this.button('Chapters', () => this.open())));
     } else if (this.page === 'steps' && st) {
-      parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? (this.hold ? ' · ✓ done' : done.moot ? ' · ✓ already in the patch, moving on' : ' · ✓ done, moving on') : ''}` }));
+      parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? (this.hold || st.listen ? ' · ✓ ready when you are' : ' · ✓ done, moving on') : ''}` }));
       parts.push(el('p', { textContent: st.text }));
       if (st.why) parts.push(el('details', { class: 'tutorial-why' }, el('summary', { textContent: 'Why' }), el('p', { textContent: st.why })));
       const todo = ok ? [] : st.todo?.(s) ?? [];
       if (todo.length) parts.push(el('div', { class: 'tutorial-todo' }, el('span', { textContent: 'Still to do' }), el('ul', {}, ...todo.map((t) => el('li', { textContent: t })))));
-      if (st.id === 'note' || st.id === 'wave' || st.id === 'shape') parts.push(this.noteButton());
+      parts.push(this.auditionControls());
       if (broken.length) {
         const k = broken[0];
-        parts.push(el('p', { class: 'tutorial-warn' }, `Step ${k + 1} (${ch.steps[k].title}) no longer holds. `, el('button', { class: 'sm', textContent: 'Restore', onclick: () => { for (let j = k; j < this.progress.step; j++) this.doStep(j); this.render(true); } })));
+        parts.push(el('p', { class: 'tutorial-warn' }, `Step ${k + 1} (${ch.steps[k].title}) no longer holds. `, el('button', { class: 'sm', textContent: 'Restore', onclick: async () => { if (this.busy) return; this.busy = true; this.error = ''; this.render(true); for (const j of broken) if (!await this.doStep(j)) break; this.busy = false; this.render(true); } })));
       }
       const actions = el('div', { class: 'tour-actions' });
-      if (this.progress.step > 0) actions.append(this.button('← Back', () => { this.progress.step--; this.hold = true; this.saveProgress(); this.enterStep(); this.render(true); }));
-      actions.append(this.button('Do it for me', () => { this.doStep(this.progress.step); this.advance(); }));
-      if (ok && this.hold) actions.append(this.button(this.progress.step < ch.steps.length - 1 ? 'Next →' : 'Finish', () => this.advance(), true));
+      if (this.progress.step > 0) actions.append(this.button('← Back', () => { this.stop(); this.cancelAdvance(); this.progress.step--; this.hold = true; this.saveProgress(); this.enterStep(); this.render(true); }));
+      const helper = this.button(this.busy ? 'Working…' : 'Do it for me', async () => { if (this.busy) return; this.busy = true; this.error = ''; this.cancelAdvance(); this.render(true); await this.doStep(this.progress.step); this.busy = false; this.render(true); });
+      helper.disabled = this.busy; if (!ok || !st.listen) actions.append(helper);
+      if (st.optional) actions.append(this.button('Skip optional exercise', () => this.advance(true)));
+      if (ok && !broken.length && !this.busy && (this.hold || st.listen)) actions.append(this.button(this.progress.step < ch.steps.length - 1 ? 'Continue →' : 'Finish', () => this.advance(), true));
       parts.push(actions);
-      if (ok && !this.hold && !this.advanceTimer) this.advanceTimer = window.setTimeout(() => { this.advanceTimer = 0; const d = stepDone(ch, this.progress.step, this.state()); if (this.step === st && (d.met || d.moot)) this.advance(); }, ADVANCE_MS);
-      if (!ok && this.advanceTimer) { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
+      parts.push(el('details', {}, el('summary', { textContent: 'Keep a variation' }), this.saveControls()));
+      if (ok && !broken.length && !this.busy && !st.listen && !this.hold && !this.menu.open && !this.advanceTimer) this.advanceTimer = window.setTimeout(() => { this.advanceTimer = 0; const d = stepDone(ch, this.progress.step, this.state()); if (this.active && !this.menu.open && this.step === st && (d.met || d.moot)) this.advance(); }, ADVANCE_MS);
+      if ((!ok || broken.length || this.busy || this.menu.open) && this.advanceTimer) { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
     } else {
       const last = i === CHAPTERS.length - 1;
-      parts.push(el('p', { textContent: last ? 'You have built eleven patches and five assemblies, and used every sound source Matryoshka has. The Library tab holds what you saved; the Examples menu has every chapter’s result under Tutorial.' : `The patch stays open until chapter ${i + 2} loads its own; Save patch to the bank keeps yours.` }));
+      parts.push(el('p', { textContent: ch.payoff ?? 'Your instrument is ready to play.' }));
+      parts.push(el('p', { textContent: `Optional challenge: ${ch.challenge ?? 'Make it your own.'}` }));
+      parts.push(this.auditionControls());
+      parts.push(this.saveControls());
+      parts.push(el('p', { textContent: last ? 'Keep your performance with Save variation. Find your sketches in Tutorial → Your saved variations, or share this patch from Commands.' : 'The next chapter saves a recoverable copy of this patch before loading its prepared start. Find every copy in Tutorial → Your saved variations.' }));
       parts.push(el('div', { class: 'tour-actions' },
         ...(last ? [] : [this.button(`Chapter ${i + 2}: ${CHAPTERS[i + 1].title}`, () => this.start(i + 1), true)]),
         this.button('Save patch to the bank', () => this.host.status(this.host.bankSave(this.host.editor.patch))),
@@ -341,10 +465,13 @@ export class Tutorial {
     this.focus(this.targetsOf(st, s));
   }
 
-  private advance(): void {
+  private advance(optional = false): void {
     const ch = this.chapter;
-    if (!ch) return;
-    this.release();
+    if (!ch || this.busy || this.page !== 'steps') return;
+    const s = this.state();
+    if (!(optional && this.step?.optional) && !this.step?.check(s)) return;
+    if (ch.steps.slice(0, this.progress.step).some((st) => !st.transient && !st.superseded && !st.check(s))) return;
+    this.stop();
     if (this.host.editor.patch.name === 'init') this.host.rename(ch.patchName); // the user's own New patch
     clearTimeout(this.advanceTimer); this.advanceTimer = 0;
     this.hold = false;
@@ -403,7 +530,7 @@ export class Tutorial {
     for (const x of els) x.classList.add('tour-focus');
     const outside = els.filter((x) => !this.panel.contains(x));
     const first = outside[0] ?? null;
-    if (first && first !== this.beside && first.closest('#canvas')) first.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (this.followTarget && first && first !== this.beside && first.closest('#canvas')) first.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     if (first || !els.length) this.place(first, false, outside);
   }
 
@@ -413,7 +540,11 @@ export class Tutorial {
    * changes, not while the user has dragged the panel; without a target the panel returns to the bottom right corner.
    */
   private place(el: Element | null, force = false, avoid: Element[] = []): void {
-    if (window.innerWidth <= 650) return; // docked to the bottom edge there
+    if (window.innerWidth <= 650 || (!this.followTarget && !this.pinned)) {
+      this.panel.style.removeProperty('left'); this.panel.style.removeProperty('top');
+      this.panel.style.removeProperty('right'); this.panel.style.removeProperty('bottom');
+      this.beside = el; return;
+    }
     const rect = el?.getBoundingClientRect();
     const key = rect ? [Math.round(rect.left / 8), Math.round(rect.top / 8), Math.round(rect.width / 8)].join(',') : `none:${this.page}:${this.progress.chapter}:${this.progress.step}`;
     const changed = el !== this.beside;

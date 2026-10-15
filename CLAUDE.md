@@ -281,3 +281,13 @@ All 20 issues of the fork (`glvno/Modular-1`) except #1 (device build and flash)
 - Grouping is Ctrl/Cmd+G (plain G is a note key; it was G when nothing was selected).
 - A VCA with nothing plugged into cv is closed (both engines; `m_vca` reads the zero buffer, modules.ts no longer treats an unconnected cv as 1). No factory patch or assembly had an unplugged VCA cv; tests and golden kits that did now feed a Constant of 1.
 - Lesson: an apply that deletes a module must use `removeModule` (cables too) or the engine throws on a dangling cable.
+
+## Agent skills
+
+- [Issue tracker](docs/agents/issue-tracker.md)
+- [Triage labels](docs/agents/triage-labels.md)
+- [Domain documentation](docs/agents/domain.md)
+
+## Tutorial QA follow-up (2026-10-14)
+
+The current course behavior is specified in [docs/TUTORIAL.md](docs/TUTORIAL.md). Its deliberate listening pauses, immutable variation archive, checked helpers, stable docking and preview/audition lifecycle replace the earlier tutorial progress, bank-save and panel-placement rules above. The work is tracked in glvno/matryoshka #23–#35.

@@ -4,7 +4,7 @@
 // and ends, bundled copies of the assemblies the course saves, tests). The design is in docs/TUTORIAL.md.
 import { DEFS } from '../modules';
 import { addModule, connect, disconnect, newPatch, sameEnd, type ModuleInst, type Patch } from '../patch';
-import { allModules, assembliesOf, freeSpot, hiddenModules, reconcileAll, type AssemblyDef, type AssemblyInst, type Rect } from '../assembly';
+import { allModules, assembliesOf, freeSpot, hiddenModules, reconcileAll, toDef, type AssemblyDef, type AssemblyInst, type Rect } from '../assembly';
 
 /** events counted since the current step was entered */
 export interface Seen {
@@ -17,8 +17,9 @@ export interface Seen {
   bypasses: number;
   /** New patch presses */
   news: number;
+  saves: number;
 }
-export const noSeen = (): Seen => ({ notes: 0, undos: 0, redos: 0, zooms: 0, flips: 0, shares: 0, bypasses: 0, news: 0 });
+export const noSeen = (): Seen => ({ notes: 0, undos: 0, redos: 0, zooms: 0, flips: 0, shares: 0, bypasses: 0, news: 0, saves: 0 });
 
 /** what a step's check can look at */
 export interface TutorialState {
@@ -33,6 +34,7 @@ export interface TutorialState {
   selected: Set<number>;
   /** the user's assembly library */
   library: AssemblyDef[];
+  lastSaved?: AssemblyDef;
   snapshots: { A: string | null; B: string | null };
   seen: Seen;
 }
@@ -75,6 +77,9 @@ export type Target =
 export interface Step {
   id: string;
   title: string;
+  /** Listening and exploration wait for Continue instead of advancing on a timer. */
+  listen?: boolean;
+  optional?: boolean;
   /** one action, two or three sentences; the key first, the button in the same sentence */
   text: string;
   /** the idea behind the step, collapsed by default */
@@ -104,12 +109,16 @@ export interface Chapter {
    * (`chapterStart`): no chapter continues with whatever the user left open */
   start(): Patch | null;
   steps: Step[];
+  payoff?: string;
+  challenge?: string;
 }
 
 // ---- helpers for checks and applies
 
 export const CARD = { w: 250, h: 540 };
 export const mods = (p: Patch, type: string): ModuleInst[] => p.modules.filter((m) => m.type === type);
+/** A module on the canvas, outside every assembly. */
+export const loose = (p: Patch, type: string): ModuleInst | undefined => p.modules.find((m) => m.type === type && !assembliesOf(p).some((a) => allModules(p, a).includes(m.id)));
 export const mod = (p: Patch, type: string, i = 0): ModuleInst | undefined => mods(p, type)[i];
 export const has = (p: Patch, type: string, n = 1): boolean => mods(p, type).length >= n;
 export const byId = (p: Patch, id: number): ModuleInst | undefined => p.modules.find((m) => m.id === id);
@@ -172,6 +181,14 @@ export const asmOf = (p: Patch, m: ModuleInst | undefined): AssemblyInst | undef
 export const findDef = (lib: AssemblyDef[], tag: string, name: string): AssemblyDef | undefined =>
   lib.find((d) => d.tutorial === tag) ?? lib.find((d) => d.name.trim().toLowerCase() === name.toLowerCase());
 
+/** The current instrument itself must have been saved during this step, not an unrelated library item. */
+export function savedAssembly(s: TutorialState, a: AssemblyInst | undefined): boolean {
+  if (!a || !s.lastSaved || !s.seen.saves) return false;
+  const content = (d: AssemblyDef): string => JSON.stringify([d.name, d.modules, d.cables, d.inputs, d.outputs, d.params, d.children, d.assemblies]);
+  const expected = content(toDef(s.patch, a));
+  return content(s.lastSaved) === expected && s.library.some((d) => content(d) === expected);
+}
+
 export const T = {
   module: (id: number | undefined): Target[] => (id === undefined ? [] : [{ kind: 'module', id }]),
   asm: (id: number | undefined): Target[] => (id === undefined ? [] : [{ kind: 'asm', id }]),
@@ -186,15 +203,12 @@ export function completes(ch: Chapter, patch: Patch, library: AssemblyDef[]): bo
   return ch.steps.filter((st) => !st.transient && !st.superseded).every((st) => st.check(s));
 }
 
-/**
- * A step whose work is already in the patch: its own check holds, or it only prepares a later step (transient: select
- * the modules, play a note; superseded: a cable a later step replaces) and a later structural step already holds. So a
- * chapter walked again on a finished patch flows through to its end instead of asking for work that is done.
- */
+/** Only work observed for this step counts. A later default state must never skip a prerequisite. */
 export function stepDone(ch: Chapter, i: number, s: TutorialState): { met: boolean; moot: boolean } {
   const st = ch.steps[i];
   const met = st.check(s);
-  const moot = !met && !!(st.transient || st.superseded) && ch.steps.slice(i + 1).some((x) => !x.transient && !x.superseded && x.check(s));
+  // A later default (for example, a newly grouped assembly is collapsed) is not evidence of work.
+  const moot = false;
   return { met, moot };
 }
 
@@ -214,8 +228,10 @@ export class HeadlessSession implements Actions {
   patch(): Patch { return this.state.patch; }
   edit(fn: (p: Patch) => void): void {
     const before = JSON.stringify(this.state.patch);
-    fn(this.state.patch);
-    reconcileAll(this.state.patch, DEFS);
+    const next = structuredClone(this.state.patch);
+    fn(next);
+    reconcileAll(next, DEFS);
+    this.state.patch = next;
     if (JSON.stringify(this.state.patch) !== before) { this.history.push(before); this.future = []; }
   }
   load(p: Patch): void { this.state.patch = p; this.state.entry = p; this.state.probes.clear(); this.state.selected.clear(); }
@@ -238,6 +254,8 @@ export class HeadlessSession implements Actions {
   note(): void { this.state.seen.notes++; }
   startAudio(): void { this.state.audio = true; }
   saveAssembly(def: AssemblyDef, tag: string): void {
+    this.state.seen.saves++;
+    this.state.lastSaved = def;
     const d = { ...def, tutorial: tag };
     const lib = this.state.library.filter((x) => x.tutorial !== tag && x.name !== def.name);
     this.state.library = [...lib, d];
@@ -258,6 +276,7 @@ export class HeadlessSession implements Actions {
     for (const st of ch.steps) {
       this.state.entry = JSON.parse(JSON.stringify(this.state.patch)) as Patch;
       this.state.seen = noSeen();
+      this.state.lastSaved = undefined;
       if (!st.check(this.state)) st.apply(this, this.state);
     }
   }

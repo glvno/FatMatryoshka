@@ -3,13 +3,14 @@
 // parts, each with the elements it is about (the panel lists the unmet parts and highlights the first one, so a locked
 // Next always says why and points where), and the "do it for me" apply. Checks find modules by type and shape, never
 // by id, since the user adds them in any order.
+import { buildBeat, buildPerformance, hasBeat, hasPerformance } from './performance';
 import { DEFS } from '../modules';
-import { newPatch, type ModuleInst, type Patch } from '../patch';
+import { newPatch, paramUnit, setMorphTarget, type ModuleInst, type Patch } from '../patch';
 import { PRESETS } from '../presets';
 import { addChild, allModules, exposePort, insertAssembly, makeAssembly, mergePorts, promote, toDef, type AssemblyDef } from '../assembly';
 import { FACTORY } from '../assemblies';
 import { connectParameter, setParameterInput } from '../parameter-routing';
-import { asmLike, byId, cabled, feeder, findDef, has, member, mod, mods, place, runCourse, T, unwire, wire, type Actions, type Chapter, type CourseRun, type Step, type Target, type TutorialState } from './model';
+import { asmLike, byId, cabled, feeder, findDef, has, loose, member, mod, mods, place, runCourse, savedAssembly, T, unwire, wire, type Actions, type Chapter, type CourseRun, type Step, type Target, type TutorialState } from './model';
 
 const pct = (p: Patch, type: string, name: string, i = 0): number => mod(p, type, i)?.params[name] ?? NaN;
 const WAVE = { sine: 0, triangle: 1, saw: 2, square: 3 };
@@ -43,7 +44,14 @@ const knob = (what: string, m: (s: S) => M, param: string, ok: (v: number) => bo
   [what.startsWith('track') ? 'Tick track' : what.includes(' off ') ? `Move ${what}` : `Set ${what}`, (s) => { const x = m(s); return !!x && ok(x.params[param] ?? NaN); }, (s) => T.param(m(s), param)];
 const main = (s: S): M => mod(s.patch, 'fm1');
 const out = (s: S): M => mod(s.patch, 'output');
+const mix = (s: S): M => loose(s.patch, 'mixer');
 const one = (type: string, i = 0) => (s: S): M => mod(s.patch, type, i);
+
+/** An ungraded listening experiment: the learner chooses when to continue. */
+const listen = (id: string, title: string, text: string, type: string): Step => ({
+  id, title, text, listen: true, transient: true, check: () => true, todo: () => [],
+  focus: (s) => T.module(mod(s.patch, type)?.id), apply: () => {},
+});
 
 // the course run headlessly, for the bundled copies of the assemblies the user saves (chapters 4, 5, 6, 7, 11)
 let course: CourseRun | null = null;
@@ -140,10 +148,10 @@ const ch1: Chapter = {
       apply: (a) => { const o = mod(a.patch(), 'osc'); if (o) a.probe(o.id, 'out'); },
     },
     {
-      id: 'wave', title: 'Change the wave',
-      text: 'Hold a note and switch the Oscillator’s wave to saw, then square. Drag the level slider too: every slider is a parameter you can set or, later, modulate.',
-      ...need(knob('the Oscillator’s wave to saw', one('osc'), 'wave', (v) => v === WAVE.saw)),
-      apply: (a) => a.edit((p) => { mod(p, 'osc')!.params.wave = WAVE.saw; }),
+      id: 'wave', title: 'Change the wave', listen: true, transient: true,
+      text: 'Start Riff below. Compare sine, saw and square on the same notes: pure, buzzy, then hollow. Try the level slider and leave your favorite wave selected. Continue when you have heard the difference.',
+      ...need(['Listen with Note or Riff, or play your keyboard', (s) => s.seen.notes > 0, (s) => T.param(one('osc')(s), 'wave')]),
+      apply: (a) => { a.edit((p) => { mod(p, 'osc')!.params.wave = WAVE.saw; }); a.note(); },
     },
   ],
 };
@@ -174,7 +182,7 @@ const ch2: Chapter = {
       apply: (a) => a.edit((p) => { wire(p, mod(p, 'fm1'), 'gate', mod(p, 'adsr'), 'gate'); wire(p, mod(p, 'adsr'), 'env', mod(p, 'vca'), 'cv'); unwire(p, mod(p, 'fm1'), 'gate', mod(p, 'vca'), 'cv'); }),
     },
     {
-      id: 'shape', title: 'Draw the shape',
+      id: 'shape', title: 'Draw the shape', superseded: true,
       text: 'Drag the ADSR’s a (attack) to about 0.3 s and r (release) to about 1 s. Hold a note: it swells in and fades out after you let go.',
       why: 'Attack and release are times, sustain is a level. Pads have long attacks and releases; the next step makes the opposite.',
       ...need(knob('a (attack) to 0.1 s or more', one('adsr'), 'a', (v) => v >= 0.1), knob('r (release) to 0.5 s or more', one('adsr'), 'r', (v) => v >= 0.5)),
@@ -182,9 +190,9 @@ const ch2: Chapter = {
     },
     {
       id: 'pluck', title: 'Make it percussive',
-      text: 'Set s (sustain) to 0.1 and d (decay) to about 0.2 s. Hold a note: it rings out and dies although the key is still down. Plucked and struck sounds have no sustain.',
-      ...need(knob('s (sustain) to 0.3 or less', one('adsr'), 's', (v) => v <= 0.3), knob('d (decay) to 0.4 s or less', one('adsr'), 'd', (v) => v <= 0.4)),
-      apply: (a) => a.edit((p) => { const e = mod(p, 'adsr')!; e.params.s = 0.1; e.params.d = 0.2; }),
+      text: 'Set a (attack) to 0.005 s, s (sustain) to 0 and d (decay) to about 0.2 s. Hold a note: it rings out and dies although the key is still down. Plucked and struck sounds have no sustain.',
+      ...need(knob('a (attack) to 0.01 s or less', one('adsr'), 'a', (v) => v <= 0.01), knob('s (sustain) to 0', one('adsr'), 's', (v) => v === 0), knob('d (decay) to 0.4 s or less', one('adsr'), 'd', (v) => v <= 0.4)),
+      apply: (a) => a.edit((p) => { const e = mod(p, 'adsr')!; e.params.a = 0.005; e.params.s = 0; e.params.d = 0.2; }),
     },
     {
       id: 'thumb', title: 'A slider thumb is a jack',
@@ -232,10 +240,16 @@ const ch3: Chapter = {
     },
     {
       id: 'cutoff', title: 'Sweep the cutoff',
-      text: 'Hold a note and drag cutoff down from 16 kHz to about 400 Hz: the tone gets darker. Raise res to about 0.6: a whistle sits on the cutoff.',
+      text: 'Start Riff and drag cutoff down from 16 kHz to about 400 Hz: the tone gets darker. Move slowly and hear the upper harmonics disappear. Leave cutoff below 800 Hz.',
       why: 'The cutoff slider is logarithmic, like pitch: every octave gets the same distance. Resonance feeds a little of the output back, which makes the filter ring at its cutoff.',
-      ...need(knob('cutoff to 800 Hz or below', one('filter'), 'cutoff', (v) => v <= 800), knob('res to 0.5 or more', one('filter'), 'res', (v) => v >= 0.5)),
-      apply: (a) => a.edit((p) => { const f = mod(p, 'filter')!; f.params.cutoff = 400; f.params.res = 0.6; }),
+      ...need(knob('cutoff to 800 Hz or below', one('filter'), 'cutoff', (v) => v <= 800)),
+      apply: (a) => a.edit((p) => { const f = mod(p, 'filter')!; f.params.cutoff = 400; }),
+    },
+    {
+      id: 'resonance', title: 'Give the cutoff a voice', listen: true,
+      text: 'Keep Riff playing and raise Filter res to about 0.6. A whistle appears at the cutoff. Optional: sweep cutoff to hear the peak travel, then return it below 800 Hz before continuing.',
+      ...need(knob('res to 0.5 or more', one('filter'), 'res', (v) => v >= 0.5)),
+      apply: (a) => a.edit((p) => { mod(p, 'filter')!.params.res = 0.6; }),
     },
     {
       id: 'track', title: 'Track the keyboard',
@@ -343,7 +357,7 @@ const ch4: Chapter = {
     {
       id: 'save', title: 'Save it to your library', transient: true,
       text: 'Click save on the card and keep the name My voice. It is now in the Library tab and in + Add assembly, under Your library, ready for any patch.',
-      ...need(['Save it as "My voice" (save on the card)', (s) => !!findDef(s.library, 'my-voice', 'My voice'), voiceAsm]),
+      ...need(['Save it as "My voice" (save on the card)', (s) => savedAssembly(s, myVoice(s.patch)) && !!findDef(s.library, 'my-voice', 'My voice'), voiceAsm]),
       apply: (a) => { const p = a.patch(); const v = myVoice(p)!; v.name = 'My voice'; a.saveAssembly(toDef(p, v), 'my-voice'); },
     },
     {
@@ -373,23 +387,22 @@ const ch5: Chapter = {
   start: () => null,
   steps: [
     {
-      id: 'add', title: 'Add Delay, Reverb and Chorus',
-      text: 'Add a Delay, a Reverb and a Chorus. Three cards, each with in on the left and out on the right (the Chorus has l and r: it is stereo).',
-      ...need(added('a Delay', 'delay'), added('a Reverb', 'reverb'), added('a Chorus', 'chorus')),
-      apply: (a) => a.edit((p) => { for (const t of SPACE_TYPES) if (!has(p, t)) place(p, t); }),
+      id: 'delay', title: 'Hear one echo', superseded: true, listen: true,
+      text: 'Add Delay. Cable My voice out → Delay in and Delay out → Output l. Remove My voice out → Output l. Tap Note, then Release notes: the repeats continue after the note. Try mix at 0, then 0.4.',
+      ...need(added('a Delay', 'delay'), cable('My voice out → Delay in', voiceOut, 'out', one('delay'), 'in'), cable('Delay out → Output l', one('delay'), 'out', out, 'l'), gone('My voice out → Output l', voiceOut, 'out', out, 'l')),
+      apply: (a) => a.edit((p) => { const d = mod(p, 'delay') ?? place(p, 'delay'); const v = member(p, myVoice(p), 'vca'); wire(p, v, 'out', d, 'in'); wire(p, d, 'out', mod(p, 'output'), 'l'); unwire(p, v, 'out', mod(p, 'output'), 'l'); }),
     },
     {
-      id: 'chain', title: 'Chain them',
-      text: 'Cable My voice out → Delay in → Reverb in → Chorus in, then Chorus l → Output l and Chorus r → Output r. Remove the cable from My voice to Output.',
-      ...need(
-        cable('My voice out → Delay in', voiceOut, 'out', one('delay'), 'in'),
-        cable('Delay out → Reverb in', one('delay'), 'out', one('reverb'), 'in'),
-        cable('Reverb out → Chorus in', one('reverb'), 'out', one('chorus'), 'in'),
-        cable('Chorus l → Output l', one('chorus'), 'l', out, 'l'),
-        cable('Chorus r → Output r', one('chorus'), 'r', out, 'r'),
-        gone('My voice out → Output l', voiceOut, 'out', out, 'l'),
-      ),
-      apply: (a) => a.edit((p) => { const v = member(p, myVoice(p), 'vca'); const o = mod(p, 'output'); wire(p, v, 'out', mod(p, 'delay'), 'in'); wire(p, mod(p, 'delay'), 'out', mod(p, 'reverb'), 'in'); wire(p, mod(p, 'reverb'), 'out', mod(p, 'chorus'), 'in'); wire(p, mod(p, 'chorus'), 'l', o, 'l'); wire(p, mod(p, 'chorus'), 'r', o, 'r'); unwire(p, v, 'out', o, 'l'); }),
+      id: 'reverb', title: 'Put the echoes in a room', superseded: true, listen: true,
+      text: 'Add Reverb. Cable Delay out → Reverb in and Reverb out → Output l; remove Delay out → Output l. Compare size 0.2 and 0.8: a small room versus a long wash. These are optional listening settings.',
+      ...need(added('a Reverb', 'reverb'), cable('Delay out → Reverb in', one('delay'), 'out', one('reverb'), 'in'), cable('Reverb out → Output l', one('reverb'), 'out', out, 'l'), gone('Delay out → Output l', one('delay'), 'out', out, 'l')),
+      apply: (a) => a.edit((p) => { const r = mod(p, 'reverb') ?? place(p, 'reverb'); wire(p, mod(p, 'delay'), 'out', r, 'in'); wire(p, r, 'out', mod(p, 'output'), 'l'); unwire(p, mod(p, 'delay'), 'out', mod(p, 'output'), 'l'); }),
+    },
+    {
+      id: 'chorus', title: 'Spread the sound', listen: true,
+      text: 'Add Chorus. Cable Reverb out → Chorus in, Chorus l → Output l and Chorus r → Output r; remove Reverb out → Output l. Start Riff and compare Chorus mix 0 and 0.5: the sound widens. Leave the mix you like.',
+      ...need(added('a Chorus', 'chorus'), cable('Reverb out → Chorus in', one('reverb'), 'out', one('chorus'), 'in'), cable('Chorus l → Output l', one('chorus'), 'l', out, 'l'), cable('Chorus r → Output r', one('chorus'), 'r', out, 'r'), gone('Reverb out → Output l', one('reverb'), 'out', out, 'l')),
+      apply: (a) => a.edit((p) => { const c = mod(p, 'chorus') ?? place(p, 'chorus'); wire(p, mod(p, 'reverb'), 'out', c, 'in'); wire(p, c, 'l', mod(p, 'output'), 'l'); wire(p, c, 'r', mod(p, 'output'), 'r'); unwire(p, mod(p, 'reverb'), 'out', mod(p, 'output'), 'l'); }),
     },
     {
       id: 'tune', title: 'Tune the space',
@@ -424,7 +437,7 @@ const ch5: Chapter = {
     {
       id: 'save', title: 'Save My space', transient: true,
       text: 'Click save on the My space card. Your library now holds an instrument and an effect; the next chapters use both.',
-      ...need(['Save it as "My space" (save on the card)', (s) => !!findDef(s.library, 'my-space', 'My space'), spaceAsm]),
+      ...need(['Save it as "My space" (save on the card)', (s) => savedAssembly(s, mySpace(s.patch)) && !!findDef(s.library, 'my-space', 'My space'), spaceAsm]),
       apply: (a) => { const p = a.patch(); const sp = mySpace(p)!; sp.name = 'My space'; a.saveAssembly(toDef(p, sp), 'my-space'); },
     },
   ],
@@ -456,10 +469,16 @@ const ch6: Chapter = {
       apply: (a) => a.edit((p) => { const o = mod(p, 'osc') ?? place(p, 'osc'); wire(p, mod(p, 'fm1'), 'pitch', o, 'pitch'); }),
     },
     {
+      id: 'dry', title: 'Hear the carrier first', superseded: true, listen: true,
+      text: 'Add a VCA. Cable the Oscillator out → VCA in, Main gate → VCA cv, and VCA out → Output l. Play Note: a pure sine. Stop it before adding the second oscillator.',
+      ...need(added('a VCA', 'vca'), cable('Oscillator out → VCA in', one('osc'), 'out', one('vca'), 'in'), cable('Main gate → VCA cv', main, 'gate', one('vca'), 'cv'), cable('VCA out → Output l', one('vca'), 'out', out, 'l')),
+      apply: (a) => a.edit((p) => { const v = mod(p, 'vca') ?? place(p, 'vca'); wire(p, mod(p, 'osc'), 'out', v, 'in'); wire(p, mod(p, 'fm1'), 'gate', v, 'cv'); wire(p, v, 'out', mod(p, 'output'), 'l'); }),
+    },
+    {
       id: 'dup', title: 'Duplicate it',
-      text: 'Click the Oscillator to select it and press Ctrl+D (Cmd+D), or Commands → Duplicate selection. The copy keeps its settings and its pitch cable.',
+      text: 'Click the Oscillator to select it and press Ctrl+D (Cmd+D), or Commands → Duplicate selection. The copy keeps its settings. Cables from outside the selection are not copied: connect Main pitch to the new Oscillator’s pitch.',
       ...need(['Duplicate the Oscillator (Ctrl+D)', (s) => has(s.patch, 'osc', 2), (s) => T.module(one('osc')(s)?.id)], ['Cable Main pitch → the second Oscillator’s pitch', (s) => mods(s.patch, 'osc').every((o) => cabled(s.patch, main(s), 'pitch', o, 'pitch')), (s) => { const left = mods(s.patch, 'osc').filter((o) => !cabled(s.patch, main(s), 'pitch', o, 'pitch')); return (left.length ? left : mods(s.patch, 'osc')).flatMap((o) => T.port(o, 'pitch', 'in')); }]),
-      apply: (a) => a.edit((p) => { const o = place(p, 'osc'); wire(p, mod(p, 'fm1'), 'pitch', o, 'pitch'); }),
+      apply: (a) => a.edit((p) => { while (!has(p, 'osc', 2)) place(p, 'osc'); for (const o of mods(p, 'osc')) wire(p, mod(p, 'fm1'), 'pitch', o, 'pitch'); }),
     },
     {
       id: 'pm', title: 'Modulator into carrier',
@@ -477,23 +496,23 @@ const ch6: Chapter = {
     },
     {
       id: 'env', title: 'Loudness from a level / rate envelope', superseded: true,
-      text: 'Add a VCA and an Env L/R. Cable carrier out → VCA in, Main gate → Env gate, Env env → VCA cv, VCA out → Output l.',
+      text: 'Add an Env L/R. Remove Main gate → VCA cv. Cable carrier out → VCA in, Main gate → Env gate, Env env → VCA cv, VCA out → Output l.',
       why: 'Env L/R is the DX7 envelope: four levels and the rate to reach each one. The last level, l4, is where the note ends after the key is released.',
       ...need(
         added('a VCA', 'vca'),
         added('an Env L/R', 'env'),
         cable('carrier out → VCA in', carrier, 'out', one('vca'), 'in'),
-        cable('Main gate → Env gate', main, 'gate', one('env'), 'gate'),
+        cable('Main gate → Env gate', main, 'gate', one('env'), 'gate'), gone('Main gate → VCA cv', main, 'gate', one('vca'), 'cv'),
         cable('Env env → VCA cv', one('env'), 'env', one('vca'), 'cv'),
         cable('VCA out → Output l', one('vca'), 'out', out, 'l'),
       ),
-      apply: (a) => a.edit((p) => { const v = mod(p, 'vca') ?? place(p, 'vca'); const e = mod(p, 'env') ?? place(p, 'env'); wire(p, carrier({ patch: p } as S), 'out', v, 'in'); wire(p, mod(p, 'fm1'), 'gate', e, 'gate'); wire(p, e, 'env', v, 'cv'); wire(p, v, 'out', mod(p, 'output'), 'l'); }),
+      apply: (a) => a.edit((p) => { const v = mod(p, 'vca') ?? place(p, 'vca'); const e = mod(p, 'env') ?? place(p, 'env'); wire(p, carrier({ patch: p } as S), 'out', v, 'in'); wire(p, mod(p, 'fm1'), 'gate', e, 'gate'); wire(p, e, 'env', v, 'cv'); unwire(p, mod(p, 'fm1'), 'gate', v, 'cv'); wire(p, v, 'out', mod(p, 'output'), 'l'); }),
     },
     {
       id: 'index', title: 'Brightness from the same envelope',
-      text: 'Alt-drag the carrier’s pm thumb onto the Env’s env jack. Set the Env’s l2 to 0.3 and r2 to 0.4 s: the note starts bright and mellows while it decays.',
-      ...need(['Drop the Env’s env on the carrier’s pm thumb', (s) => pinned(s.patch, mod(s.patch, 'env'), 'env', carrier(s), 'pm'), (s) => [...T.param(carrier(s), 'pm'), ...T.port(one('env')(s), 'env', 'out')]], knob('the Env’s l2 to 0.5 or less', one('env'), 'l2', (v) => v <= 0.5)),
-      apply: (a) => a.edit((p) => { const c = carrier({ patch: p } as S)!; const e = mod(p, 'env')!; connectParameter(p, DEFS, { module: e.id, port: 'env' }, c.id, 'pm'); e.params.l2 = 0.3; e.params.r2 = 0.4; }),
+      text: 'Alt-drag the carrier’s pm thumb onto the Env’s env jack. Set the Env’s l2 and l3 to 0.3 and r2 to 0.4 s: the note starts bright and mellows while it decays.',
+      ...need(['Drop the Env’s env on the carrier’s pm thumb', (s) => pinned(s.patch, mod(s.patch, 'env'), 'env', carrier(s), 'pm'), (s) => [...T.param(carrier(s), 'pm'), ...T.port(one('env')(s), 'env', 'out')]], knob('the Env’s l2 to 0.3', one('env'), 'l2', (v) => v === 0.3), knob('the Env’s l3 to 0.3', one('env'), 'l3', (v) => v === 0.3), knob('the Env’s r2 to about 0.4 s', one('env'), 'r2', (v) => v >= 0.3 && v <= 0.5)),
+      apply: (a) => a.edit((p) => { const c = carrier({ patch: p } as S)!; const e = mod(p, 'env')!; connectParameter(p, DEFS, { module: e.id, port: 'env' }, c.id, 'pm'); e.params.l2 = 0.3; e.params.l3 = 0.3; e.params.r2 = 0.4; }),
     },
     {
       id: 'group', title: 'Group it as FM keys',
@@ -528,7 +547,7 @@ const ch6: Chapter = {
     {
       id: 'save', title: 'Save FM keys', transient: true,
       text: 'Click save on the FM keys card. My space travels inside it.',
-      ...need(['Save it as "FM keys" (save on the card)', (s) => !!findDef(s.library, 'fm-keys', 'FM keys'), fmAsm]),
+      ...need(['Save it as "FM keys" (save on the card)', (s) => savedAssembly(s, fmKeys(s.patch)) && !!findDef(s.library, 'fm-keys', 'FM keys'), fmAsm]),
       apply: (a) => { const p = a.patch(); const k = fmKeys(p)!; k.name = 'FM keys'; a.saveAssembly(toDef(p, k), 'fm-keys'); },
     },
   ],
@@ -561,7 +580,7 @@ const ch7: Chapter = {
     },
     {
       id: 'decay', title: 'Let it ring',
-      text: 'Set the String’s decay to about 4 s and damp to 0.1: a long, bright note. Switch burst to pulse for a harder pick.',
+      text: 'Set the String’s decay to about 4 s and damp to 0.1: a long, bright note. Optional: switch burst to pulse for a harder pick.',
       why: 'The string is a delay line as long as one period, with feedback. decay sets how much is fed back, damp how fast the highs are lost on each round trip.',
       ...need(knob('decay to 3 s or more', one('string'), 'decay', (v) => v >= 3), knob('damp to 0.15 or less', one('string'), 'damp', (v) => v <= 0.15)),
       apply: (a) => a.edit((p) => { const st = mod(p, 'string')!; st.params.decay = 4; st.params.damp = 0.1; }),
@@ -580,7 +599,7 @@ const ch7: Chapter = {
         added('a Modal', 'modal'),
         cable('String out → Modal in', one('string'), 'out', one('modal'), 'in'),
         cable('Modal out → Output r', one('modal'), 'out', out, 'r'),
-        knob('struct to 0.3 or more', one('modal'), 'struct', (v) => v >= 0.3),
+        knob('struct to 0.3 or more', one('modal'), 'struct', (v) => v >= 0.3), knob('Modal decay to about 2 s', one('modal'), 'decay', (v) => v >= 1.8 && v <= 2.2),
       ),
       apply: (a) => a.edit((p) => { const m = mod(p, 'modal') ?? place(p, 'modal'); wire(p, mod(p, 'string'), 'out', m, 'in'); wire(p, m, 'out', mod(p, 'output'), 'r'); m.params.struct = 0.5; m.params.decay = 2; }),
     },
@@ -601,7 +620,7 @@ const ch7: Chapter = {
     {
       id: 'fb', title: 'Make it ring',
       text: 'Set the Comb’s fb to 0.95 and damp to 0.1: the noise turns into a breathy, whistling tone at the note.',
-      ...need(knob('the Comb’s fb to 0.9 or more', one('comb'), 'fb', (v) => v >= 0.9)),
+      ...need(knob('the Comb’s fb to 0.9 or more', one('comb'), 'fb', (v) => v >= 0.9), knob('Comb damp to 0.1', one('comb'), 'damp', (v) => v === 0.1)),
       apply: (a) => a.edit((p) => { const c = mod(p, 'comb')!; c.params.fb = 0.95; c.params.damp = 0.1; }),
     },
     {
@@ -609,7 +628,7 @@ const ch7: Chapter = {
       text: 'Add a Glide. Cable Main pitch → Glide in and Glide out → Comb pitch, and remove the cable from Main’s pitch to the Comb. Set time to 0.3 s and play two notes.',
       why: 'Glide (portamento) slews a control signal: the pitch takes time to arrive. It works on any control cable, not only pitch.',
       ...need(
-        added('a Glide', 'glide'),
+        added('a Glide', 'glide'), knob('Glide time to about 0.3 s', one('glide'), 'time', (v) => v >= 0.25 && v <= 0.35),
         cable('Main pitch → Glide in', main, 'pitch', one('glide'), 'in'),
         cable('Glide out → Comb pitch', one('glide'), 'out', one('comb'), 'pitch'),
         gone('Main pitch → Comb pitch', main, 'pitch', one('comb'), 'pitch'),
@@ -630,7 +649,7 @@ const ch7: Chapter = {
     {
       id: 'save', title: 'Save Pluck', transient: true,
       text: 'Click save on the Pluck card. Chapter 10 plays it from a melody machine.',
-      ...need(['Save it as "Pluck" (save on the card)', (s) => !!findDef(s.library, 'pluck', 'Pluck'), pluckAsm]),
+      ...need(['Save it as "Pluck" (save on the card)', (s) => savedAssembly(s, pluck(s.patch)) && !!findDef(s.library, 'pluck', 'Pluck'), pluckAsm]),
       apply: (a) => { const p = a.patch(); const pl = pluck(p)!; pl.name = 'Pluck'; a.saveAssembly(toDef(p, pl), 'pluck'); },
     },
   ],
@@ -642,14 +661,20 @@ const ch8: Chapter = {
   id: 'wavetables-and-grains',
   title: 'Wavetables and grains',
   patchName: 'Tutorial pad',
-  intro: 'A wavetable oscillator holds a row of waveforms and sweeps through them: the timbre moves without a filter. A granular module chops audio into grains a few milliseconds long and scatters them in time and pitch: a cloud out of a note. Both are texture tools, and this patch grows big enough to need the zoom.',
-  start: () => newPatch(DEFS, 'Tutorial pad'),
+  intro: 'A wavetable oscillator holds a row of waveforms and sweeps through them: the timbre moves without a filter. A granular module chops audio into grains a few milliseconds long and scatters them in time and pitch: a cloud out of a note. This patch starts with four voices so Chord can fill the granular buffer. Both are texture tools; zoom out as the canvas grows.',
+  start: () => ({ ...newPatch(DEFS, 'Tutorial pad'), voices: 4 }),
   steps: [
     {
       id: 'wt', title: 'A wavetable oscillator',
-      text: 'Add a Wavetable and cable Main pitch → Wavetable pitch. Set bank to formant and drag pos (the position in the table) while a note holds: the vowel moves.',
+      text: 'Add a Wavetable and cable Main pitch → Wavetable pitch. Set bank to formant. Next we give it a gated output, then listen to the vowels.',
       ...need(added('a Wavetable', 'wavetable'), cable('Main pitch → Wavetable pitch', main, 'pitch', one('wavetable'), 'pitch'), knob('bank to formant', one('wavetable'), 'bank', (v) => v === 2)),
       apply: (a) => a.edit((p) => { const w = mod(p, 'wavetable') ?? place(p, 'wavetable'); wire(p, mod(p, 'fm1'), 'pitch', w, 'pitch'); w.params.bank = 2; }),
+    },
+    {
+      id: 'dry', title: 'Hear a vowel', superseded: true, listen: true,
+      text: 'Add a VCA. Cable Wavetable out → VCA in, Main gate → VCA cv and VCA out → Output l. Start Note and move Wavetable pos: the vowel changes. The VCA keeps the sound under your control.',
+      ...need(added('a VCA', 'vca'), cable('Wavetable out → VCA in', one('wavetable'), 'out', one('vca'), 'in'), cable('Main gate → VCA cv', main, 'gate', one('vca'), 'cv'), cable('VCA out → Output l', one('vca'), 'out', out, 'l')),
+      apply: (a) => a.edit((p) => { const v = mod(p, 'vca') ?? place(p, 'vca'); wire(p, mod(p, 'wavetable'), 'out', v, 'in'); wire(p, mod(p, 'fm1'), 'gate', v, 'cv'); wire(p, v, 'out', mod(p, 'output'), 'l'); }),
     },
     {
       id: 'lfo', title: 'Sweep the table',
@@ -659,38 +684,38 @@ const ch8: Chapter = {
     },
     {
       id: 'env', title: 'A slow envelope',
-      text: 'Add an ADSR and a VCA. Cable Main gate → ADSR gate, ADSR env → VCA cv, Wavetable out → VCA in. Set a to 1 s and r to 2 s: a pad.',
+      text: 'Add an ADSR. Remove Main gate → VCA cv. Cable Main gate → ADSR gate, ADSR env → VCA cv, Wavetable out → VCA in. Set a to 1 s and r to 2 s: a pad.',
       ...need(
         added('an ADSR', 'adsr'), added('a VCA', 'vca'),
         cable('Main gate → ADSR gate', main, 'gate', one('adsr'), 'gate'),
-        cable('ADSR env → VCA cv', one('adsr'), 'env', one('vca'), 'cv'),
+        cable('ADSR env → VCA cv', one('adsr'), 'env', one('vca'), 'cv'), gone('Main gate → VCA cv', main, 'gate', one('vca'), 'cv'),
         cable('Wavetable out → VCA in', one('wavetable'), 'out', one('vca'), 'in'),
         knob('a to 0.5 s or more', one('adsr'), 'a', (v) => v >= 0.5), knob('r to 1 s or more', one('adsr'), 'r', (v) => v >= 1),
       ),
-      apply: (a) => a.edit((p) => { const e = mod(p, 'adsr') ?? place(p, 'adsr'); const v = mod(p, 'vca') ?? place(p, 'vca'); wire(p, mod(p, 'fm1'), 'gate', e, 'gate'); wire(p, e, 'env', v, 'cv'); wire(p, mod(p, 'wavetable'), 'out', v, 'in'); e.params.a = 1; e.params.r = 2; }),
+      apply: (a) => a.edit((p) => { const e = mod(p, 'adsr') ?? place(p, 'adsr'); const v = mod(p, 'vca') ?? place(p, 'vca'); wire(p, mod(p, 'fm1'), 'gate', e, 'gate'); wire(p, e, 'env', v, 'cv'); unwire(p, mod(p, 'fm1'), 'gate', v, 'cv'); wire(p, mod(p, 'wavetable'), 'out', v, 'in'); e.params.a = 1; e.params.r = 2; }),
     },
     {
-      id: 'grain', title: 'Into the cloud',
-      text: 'Add a Granular. Cable VCA out → Granular in and Main gate → Granular trig. Set size to 0.15 s, density to 40, spray to 0.5 and pitch to +12.',
+      id: 'grain', title: 'Into the cloud', superseded: true, listen: true,
+      text: 'Add a Granular. Cable VCA out → Granular in and Main gate → Granular trig. Cable Granular out → Output l and remove VCA out → Output l. Set size to 0.15 s, density to 40, spray to 0.5 and pitch to +12.',
       why: 'The granular module records what comes in and plays tiny windows of it, spread over position, time and pitch. spray is how far the grains wander from the position.',
       ...need(
-        added('a Granular', 'grain'),
+        added('a Granular', 'grain'), cable('Granular out → Output l', one('grain'), 'out', out, 'l'), gone('VCA out → Output l', one('vca'), 'out', out, 'l'), knob('size to about 0.15 s', one('grain'), 'size', (v) => v >= 0.12 && v <= 0.18), knob('density to 40', one('grain'), 'density', (v) => v === 40),
         cable('VCA out → Granular in', one('vca'), 'out', one('grain'), 'in'),
         cable('Main gate → Granular trig', main, 'gate', one('grain'), 'trig'),
         knob('spray to 0.3 or more', one('grain'), 'spray', (v) => v >= 0.3), knob('pitch off 0', one('grain'), 'pitch', (v) => v !== 0),
       ),
-      apply: (a) => a.edit((p) => { const g = mod(p, 'grain') ?? place(p, 'grain'); wire(p, mod(p, 'vca'), 'out', g, 'in'); wire(p, mod(p, 'fm1'), 'gate', g, 'trig'); Object.assign(g.params, { size: 0.15, density: 40, spray: 0.5, pitch: 12 }); }),
+      apply: (a) => a.edit((p) => { const g = mod(p, 'grain') ?? place(p, 'grain'); wire(p, mod(p, 'vca'), 'out', g, 'in'); wire(p, mod(p, 'fm1'), 'gate', g, 'trig'); wire(p, g, 'out', mod(p, 'output'), 'l'); unwire(p, mod(p, 'vca'), 'out', mod(p, 'output'), 'l'); Object.assign(g.params, { size: 0.15, density: 40, spray: 0.5, pitch: 12 }); }),
     },
     {
       id: 'pan', title: 'Place it in the stereo field', superseded: true,
-      text: 'Add a Pan. Cable Granular out → Pan in, Pan l → Output l, Pan r → Output r. Then drop the LFO’s out on the pan slider’s thumb: pos is the Pan’s built-in input, so the cable goes there.',
+      text: 'Add a Pan. Cable Granular out → Pan in, Pan l → Output l, Pan r → Output r. Remove Granular out → Output l. Then drop the LFO’s out on the pan slider’s thumb: pos is the Pan’s built-in input, so the cable goes there.',
       ...need(
-        added('a Pan', 'pan'),
+        added('a Pan', 'pan'), gone('Granular out → Output l', one('grain'), 'out', out, 'l'),
         cable('Granular out → Pan in', one('grain'), 'out', one('pan'), 'in'),
         cable('Pan l → Output l', one('pan'), 'l', out, 'l'), cable('Pan r → Output r', one('pan'), 'r', out, 'r'),
         cable('LFO out → Pan pos (drop it on the pan thumb)', one('lfo'), 'out', one('pan'), 'pos'),
       ),
-      apply: (a) => a.edit((p) => { const pn = mod(p, 'pan') ?? place(p, 'pan'); const o = mod(p, 'output'); wire(p, mod(p, 'grain'), 'out', pn, 'in'); wire(p, pn, 'l', o, 'l'); wire(p, pn, 'r', o, 'r'); wire(p, mod(p, 'lfo'), 'out', pn, 'pos'); }),
+      apply: (a) => a.edit((p) => { const pn = mod(p, 'pan') ?? place(p, 'pan'); const o = mod(p, 'output'); wire(p, mod(p, 'grain'), 'out', pn, 'in'); unwire(p, mod(p, 'grain'), 'out', o, 'l'); wire(p, pn, 'l', o, 'l'); wire(p, pn, 'r', o, 'r'); wire(p, mod(p, 'lfo'), 'out', pn, 'pos'); }),
     },
     {
       id: 'phaser', title: 'A phaser on the way out',
@@ -752,7 +777,7 @@ const ch9: Chapter = {
     },
     {
       id: 'wire', title: 'Cable the second instrument',
-      text: 'Cable Main pitch → FM keys pitch and Main gate → FM keys gate. Both instruments now play together.',
+      text: 'Cable Main pitch → FM keys pitch and Main gate → FM keys gate. Both instruments are ready for the mixer in the next step.',
       ...need(
         ['Cable Main pitch → FM keys pitch', (s) => fmOscs(s.patch).length > 0 && fmOscs(s.patch).every((o) => cabled(s.patch, main(s), 'pitch', o, 'pitch')), (s) => [...T.port(main(s), 'pitch', 'out'), ...fmOscs(s.patch).filter((o) => !cabled(s.patch, main(s), 'pitch', o, 'pitch')).flatMap((o) => T.port(o, 'pitch', 'in'))]],
         cable('Main gate → FM keys gate', main, 'gate', fmEnv, 'gate'),
@@ -763,13 +788,13 @@ const ch9: Chapter = {
       id: 'mixer', title: 'Mix them',
       text: 'Add a Mixer 4. Cable My voice out → in1, FM keys l → in2, FM keys r → in3, and Mixer out → Output l and r. l1..l4 are the levels.',
       ...need(
-        added('a Mixer 4', 'mixer'),
-        cable('My voice out → Mixer in1', voiceOut, 'out', one('mixer'), 'in1'),
-        cable('FM keys l → Mixer in2', spaceOut, 'l', one('mixer'), 'in2'),
-        cable('FM keys r → Mixer in3', spaceOut, 'r', one('mixer'), 'in3'),
-        cable('Mixer out → Output l', one('mixer'), 'out', out, 'l'), cable('Mixer out → Output r', one('mixer'), 'out', out, 'r'),
+        ['Add a Mixer 4 outside the assemblies', (s) => !!mix(s), () => T.ui('add-btn')],
+        cable('My voice out → Mixer in1', voiceOut, 'out', mix, 'in1'),
+        cable('FM keys l → Mixer in2', spaceOut, 'l', mix, 'in2'),
+        cable('FM keys r → Mixer in3', spaceOut, 'r', mix, 'in3'),
+        cable('Mixer out → Output l', mix, 'out', out, 'l'), cable('Mixer out → Output r', mix, 'out', out, 'r'),
       ),
-      apply: (a) => a.edit((p) => { const s = { patch: p } as S; const mx = mod(p, 'mixer') ?? place(p, 'mixer'); const o = mod(p, 'output'); wire(p, voiceOut(s), 'out', mx, 'in1'); wire(p, spaceOut(s), 'l', mx, 'in2'); wire(p, spaceOut(s), 'r', mx, 'in3'); wire(p, mx, 'out', o, 'l'); wire(p, mx, 'out', o, 'r'); }),
+      apply: (a) => a.edit((p) => { const s = { patch: p } as S; const mx = loose(p, 'mixer') ?? place(p, 'mixer'); const o = mod(p, 'output'); wire(p, voiceOut(s), 'out', mx, 'in1'); wire(p, spaceOut(s), 'l', mx, 'in2'); wire(p, spaceOut(s), 'r', mx, 'in3'); wire(p, mx, 'out', o, 'l'); wire(p, mx, 'out', o, 'r'); }),
     },
     {
       id: 'arp', title: 'Let the arpeggiator play', transient: true,
@@ -779,20 +804,27 @@ const ch9: Chapter = {
     },
     {
       id: 'macro', title: 'A knob with a range',
-      text: 'Cable Main k2 → My voice p1 (the pin of the Filter inside). Open the ⋯ menu of My voice’s cutoff, tick P1 and Map between two values, then set the ends to about 0.3 and 0.8.',
+      text: 'Cable Main k2 → My voice p1 (the pin of the Filter inside). Open the ⋯ menu of My voice’s cutoff, tick P1 and Map between two values, then set the ends to 150 Hz and 4000 Hz. Set the Filter’s P1 depth to 1 so the knob reaches both ends.',
       why: 'A macro range maps the knob’s whole travel onto a slice of the parameter: the useful part of the cutoff instead of 20 Hz to 16 kHz.',
       ...need(
         cable('Main k2 → My voice p1', main, 'k2', inVoice('filter'), 'p1'),
         ['Tick P1 in the ⋯ menu of cutoff', (s) => !!inVoice('filter')(s)?.map?.p1.includes('cutoff'), (s) => T.param(inVoice('filter')(s), 'cutoff')],
-        ['Tick "Map between two values" for cutoff', (s) => !!inVoice('filter')(s)?.range?.p1?.cutoff, (s) => T.param(inVoice('filter')(s), 'cutoff')],
+        ['Map cutoff from 150 Hz to 4000 Hz with P1 depth 1', (s) => { const f = inVoice('filter')(s); const r = f?.range?.p1?.cutoff; const pd = DEFS.filter.params.find((x) => x.name === 'cutoff')!; return !!r && Math.abs(r[0] - paramUnit(pd, 150)) < 0.02 && Math.abs(r[1] - paramUnit(pd, 4000)) < 0.02 && f?.att?.[0] === 1; }, (s) => T.param(inVoice('filter')(s), 'cutoff')],
       ),
-      apply: (a) => a.edit((p) => { const f = member(p, myVoice(p), 'filter')!; wire(p, mod(p, 'fm1'), 'k2', f, 'p1'); setParameterInput(f, 'p1', 'cutoff', true); ((f.range ??= {}).p1 ??= {}).cutoff = [0.3, 0.8]; }),
+      apply: (a) => a.edit((p) => { const f = member(p, myVoice(p), 'filter')!; wire(p, mod(p, 'fm1'), 'k2', f, 'p1'); setParameterInput(f, 'p1', 'cutoff', true); const pd = DEFS.filter.params.find((x) => x.name === 'cutoff')!; ((f.range ??= {}).p1 ??= {}).cutoff = [paramUnit(pd, 150), paramUnit(pd, 4000)]; (f.att ??= [1, 1])[0] = 1; }),
     },
     {
-      id: 'morph', title: 'Morph between two settings', transient: true,
-      text: 'Commands → Set snapshot A. Change a few sliders (cutoff, the mixer levels), then Commands → Set snapshot B. Press Alt+B to flip between them; the Main card’s morph slider fades from one to the other once the B side is picked.',
+      id: 'snapshots', title: 'Compare two snapshots', transient: true,
+      text: 'Commands → Set snapshot A. Change a few sliders (cutoff, the mixer levels), then Commands → Set snapshot B. Press Alt+B to flip between them. Listen to the change in balance: snapshots switch the whole patch instantly. The next step makes a continuous fade.',
       ...need(['Set snapshot A (Commands)', (s) => !!s.snapshots.A, () => T.ui('palette-btn')], ['Set snapshot B (Commands)', (s) => !!s.snapshots.B, () => T.ui('palette-btn')], ['Press Alt+B', (s) => s.seen.flips > 0, () => T.ui('palette-btn')]),
-      apply: (a) => { a.snapshot('A'); a.edit((p) => { const mx = mod(p, 'mixer'); if (mx) mx.params.l1 = 0.4; }); a.snapshot('B'); a.flipAB(); },
+      apply: (a) => { a.snapshot('A'); a.edit((p) => { const mx = loose(p, 'mixer'); if (mx) mx.params.l1 = 0.4; }); a.snapshot('B'); a.flipAB(); },
+    },
+    {
+      id: 'morph', title: 'Fade between the snapshots', listen: true,
+      text: 'On Main, open the B side picker and choose Snapshot B. Move morph from 0 to 1, then leave it halfway. You now hear a continuous change in the mixer balance; Alt+B alone only switches snapshots.',
+      why: 'A morph target must have the same modules and cables. Snapshot B is a complete compatible patch; selecting it copies its parameters into the B side. Main itself is not morphed.',
+      ...need(['Choose Snapshot B in Main’s B side picker', (s) => s.patch.modules.some((m) => !!m.paramsB), (s) => T.module(main(s)?.id)], knob('Main morph between 0 and 1', main, 'morph', (v) => v > 0 && v < 1)),
+      apply: (a, s) => a.edit((p) => { if (!s.snapshots.B) throw new Error('Set snapshot B first'); const b = JSON.parse(s.snapshots.B) as Patch; b.name = 'Snapshot B'; setMorphTarget(p, b, DEFS); mod(p, 'fm1')!.params.morph = 0.5; }),
     },
   ],
 };
@@ -845,14 +877,14 @@ const ch10: Chapter = {
       apply: (a) => { if (!pluck(a.patch())) insertDef(a, 'pluck', 'Pluck'); a.edit((p) => { const pl = pluck(p); const st = member(p, pl, 'string'); wire(p, mod(p, 'quant'), 'out', st, 'pitch'); wire(p, mod(p, 'clkdiv'), 'out', st, 'gate'); wire(p, st, 'out', mod(p, 'output'), 'l'); }); },
     },
     {
-      id: 'pulse', title: 'FM keys on every second tick',
+      id: 'pulse', title: 'FM keys on every second tick', superseded: true,
       text: 'Add a Pulse with time 0.05 s and cable Clock div d2 → Pulse trig. Insert FM keys; cable Quantizer out → FM keys pitch, Pulse out → FM keys gate, FM keys l → Output r.',
-      why: 'A divider output stays high for half its period, which would hold FM keys’ envelope open. The pulse makes a short gate out of each tick instead.',
+      why: 'A divider passes selected input pulses with their original width. Pulse makes a predictable 0.05 s gate regardless of the clock’s pulse width.',
       ...need(
         added('a Pulse', 'pulse'), knob('the Pulse’s time to 0.1 s or less', one('pulse'), 'time', (v) => v <= 0.1),
         cable('Clock div d2 → Pulse trig', one('clkdiv'), 'd2', one('pulse'), 'trig'),
         ['Insert FM keys from your library', (s) => !!fmKeys(s.patch), () => T.ui('add-assembly-btn')],
-        ['Cable Quantizer out → FM keys pitch', (s) => fmOscs(s.patch).some((o) => cabled(s.patch, one('quant')(s), 'out', o, 'pitch')), (s) => [...T.port(one('quant')(s), 'out', 'out'), ...T.port(fmOscs(s.patch)[0], 'pitch', 'in')]],
+        ['Cable Quantizer out → FM keys pitch', (s) => fmOscs(s.patch).length === 2 && fmOscs(s.patch).every((o) => cabled(s.patch, one('quant')(s), 'out', o, 'pitch')), (s) => [...T.port(one('quant')(s), 'out', 'out'), ...T.port(fmOscs(s.patch)[0], 'pitch', 'in')]],
         cable('Pulse out → FM keys gate', one('pulse'), 'out', fmEnv, 'gate'),
         cable('FM keys l → Output r', spaceOut, 'l', out, 'r'),
       ),
@@ -860,26 +892,35 @@ const ch10: Chapter = {
     },
     {
       id: 'seq', title: 'A written melody instead',
-      text: 'Add a Sequencer, cable LFO out → Sequencer clock and Sequencer out → Quantizer in, and remove the cable from the S&H to the Quantizer. Set s1..s4 to a few different values; len to 4.',
+      text: 'Add a Sequencer, cable Clock div out → Sequencer clock and Sequencer out → Quantizer in, and remove the cable from the S&H to the Quantizer. Set s1..s4 to a few different values; len to 4.',
       why: 'The Sequencer’s steps are the same kind of signal the S&H made, just chosen by you. Through the quantizer the steps land on scale notes whatever you set them to.',
       ...need(
         added('a Sequencer', 'seq'),
-        cable('LFO out → Sequencer clock', one('lfo'), 'out', one('seq'), 'clock'),
+        cable('Clock div out → Sequencer clock', one('clkdiv'), 'out', one('seq'), 'clock'),
         cable('Sequencer out → Quantizer in', one('seq'), 'out', one('quant'), 'in'),
         gone('S&H out → Quantizer in', one('sh'), 'out', one('quant'), 'in'),
         knob('len to 4 or less', one('seq'), 'len', (v) => v <= 4),
       ),
-      apply: (a) => a.edit((p) => { const sq = mod(p, 'seq') ?? place(p, 'seq'); wire(p, mod(p, 'lfo'), 'out', sq, 'clock'); wire(p, sq, 'out', mod(p, 'quant'), 'in'); unwire(p, mod(p, 'sh'), 'out', mod(p, 'quant'), 'in'); Object.assign(sq.params, { s1: 0, s2: 0.25, s3: 0.583, s4: 0.417, len: 4 }); }),
+      apply: (a) => a.edit((p) => { const sq = mod(p, 'seq') ?? place(p, 'seq'); wire(p, mod(p, 'clkdiv'), 'out', sq, 'clock'); wire(p, sq, 'out', mod(p, 'quant'), 'in'); unwire(p, mod(p, 'sh'), 'out', mod(p, 'quant'), 'in'); Object.assign(sq.params, { s1: 0, s2: 0.25, s3: 0.583, s4: 0.417, len: 4 }); }),
     },
     {
       id: 'mainclock', title: 'Lock to the arpeggiator’s clock',
-      text: 'Cable Main clock → Clock div clock and remove the LFO’s cable to it; set the Clock div’s div to 6. Press Space: Main’s clock now ticks 24 times per beat at the arp tempo, and on the FM-1 it follows MIDI clock.',
+      text: 'Cable Main clock → Clock div clock and remove the LFO’s cable to it; set the Clock div’s div to 6. Add a second Clock div: first out → second clock, second d2 → Pulse trig; remove first d2 → Pulse trig. Press Space: Main’s clock now ticks 24 times per beat at the arp tempo, and on the FM-1 it follows MIDI clock.',
       ...need(
         cable('Main clock → Clock div clock', main, 'clock', one('clkdiv'), 'clock'),
         gone('LFO out → Clock div clock', one('lfo'), 'out', one('clkdiv'), 'clock'),
-        knob('the Clock div’s div to 4 or more', one('clkdiv'), 'div', (v) => v >= 4),
+        knob('the first Clock div’s div to 6', one('clkdiv'), 'div', (v) => v === 6),
+        ['Add a second Clock div', (s) => has(s.patch, 'clkdiv', 2), () => T.ui('add-btn')],
+        cable('first divider out → second divider clock', one('clkdiv'), 'out', one('clkdiv', 1), 'clock'),
+        cable('second divider d2 → Pulse trig', one('clkdiv', 1), 'd2', one('pulse'), 'trig'),
+        gone('first divider d2 → Pulse trig', one('clkdiv'), 'd2', one('pulse'), 'trig'),
       ),
-      apply: (a) => { a.edit((p) => { const d = mod(p, 'clkdiv')!; wire(p, mod(p, 'fm1'), 'clock', d, 'clock'); unwire(p, mod(p, 'lfo'), 'out', d, 'clock'); d.params.div = 6; }); a.arpPlay(true); },
+      apply: (a) => { a.edit((p) => { const d = mod(p, 'clkdiv')!; wire(p, mod(p, 'fm1'), 'clock', d, 'clock'); unwire(p, mod(p, 'lfo'), 'out', d, 'clock'); d.params.div = 6; const slow = mod(p, 'clkdiv', 1) ?? place(p, 'clkdiv'); wire(p, d, 'out', slow, 'clock'); wire(p, slow, 'd2', mod(p, 'pulse'), 'trig'); unwire(p, d, 'd2', mod(p, 'pulse'), 'trig'); }); a.arpPlay(true); },
+    },
+    {
+      id: 'play', title: 'Hear the machine lock together', transient: true, listen: true,
+      text: 'Press Space to start the arpeggiator clock. Change Main’s tempo: the written melody, Pluck and every-second-tick FM part stay together. Optional: change s1–s4 to write a four-note answer to the random melody.',
+      ...need(['Start the arpeggiator clock (Space)', (s) => s.arpPlay, (s) => T.module(main(s)?.id)]), apply: (a) => a.arpPlay(true),
     },
   ],
 };
@@ -896,6 +937,7 @@ const gateOf = (p: Patch, name: string) => factoryAsm(p, name)?.inputs.find((r) 
 const outOf = (p: Patch, name: string) => factoryAsm(p, name)?.outputs[0];
 const drumGate = (name: string) => (s: S): M => { const g = gateOf(s.patch, name); return g && byId(s.patch, g.module); };
 const drumOut = (name: string) => (s: S): M => { const r = outOf(s.patch, name); return r && byId(s.patch, r.module); };
+const drumTriggered = (s: S, name: string, port: string): boolean => { const g = gateOf(s.patch, name); return !!g && [g, ...(g.also ?? [])].every((r) => cabled(s.patch, one('clkdiv')(s), port, byId(s.patch, r.module), r.port)); };
 const drumGatePort = (name: string, s: S): string => gateOf(s.patch, name)?.port ?? 'gate';
 const drumOutPort = (name: string, s: S): string => outOf(s.patch, name)?.port ?? 'out';
 
@@ -914,21 +956,21 @@ const ch11: Chapter = {
     },
     {
       id: 'env', title: 'A very short envelope', superseded: true,
-      text: 'Add an Env L/R and a VCA. Cable Filter hp → VCA in, Main gate → Env gate, Env env → VCA cv, VCA out → Output l. Set the Env’s l2 to 0 and r2 to 0.08 s. Tap a key.',
+      text: 'Add an Env L/R and a VCA. Cable Filter hp → VCA in, Main gate → Env gate, Env env → VCA cv, VCA out → Output l. Set l1 to 1, r1 to 0.001 s, l2 to 0, r2 to 0.08 s, l3 to 0 and l4 to 0. Hold a key: one crisp hiss dies away and stays silent.',
       ...need(
         added('an Env L/R', 'env'), added('a VCA', 'vca'),
         cable('Filter hp → VCA in', one('filter'), 'hp', one('vca'), 'in'),
         cable('Main gate → Env gate', main, 'gate', one('env'), 'gate'),
         cable('Env env → VCA cv', one('env'), 'env', one('vca'), 'cv'),
         cable('VCA out → Output l', one('vca'), 'out', out, 'l'),
-        knob('the Env’s l2 to 0.1 or less', one('env'), 'l2', (v) => v <= 0.1), knob('the Env’s r2 to 0.15 s or less', one('env'), 'r2', (v) => v <= 0.15),
+        knob('l1 to 1', one('env'), 'l1', (v) => v === 1), knob('r1 to 0.001 s', one('env'), 'r1', (v) => v <= 0.001), knob('l2 to 0', one('env'), 'l2', (v) => v === 0), knob('r2 to about 0.08 s', one('env'), 'r2', (v) => v >= 0.06 && v <= 0.1), knob('l3 to 0', one('env'), 'l3', (v) => v === 0), knob('l4 to 0', one('env'), 'l4', (v) => v === 0),
       ),
       apply: (a) => a.edit((p) => { const e = mod(p, 'env') ?? place(p, 'env'); const v = mod(p, 'vca') ?? place(p, 'vca'); wire(p, mod(p, 'filter'), 'hp', v, 'in'); wire(p, mod(p, 'fm1'), 'gate', e, 'gate'); wire(p, e, 'env', v, 'cv'); wire(p, v, 'out', mod(p, 'output'), 'l'); Object.assign(e.params, { l1: 1, r1: 0.001, l2: 0, r2: 0.08, l3: 0, l4: 0 }); }),
     },
     {
       id: 'group', title: 'Group it as Hat and save it', transient: true,
       text: 'Select the Noise, Filter, Env and VCA, press Ctrl+G (Cmd+G) and name it Hat. Click save on its card.',
-      ...need(['Group the Noise, Filter, Env and VCA (Ctrl+G)', (s) => !!hat(s.patch), (s) => HAT_TYPES.flatMap((t) => T.module(mod(s.patch, t)?.id))], ['Save it as "Hat" (save on the card)', (s) => !!findDef(s.library, 'hat', 'Hat'), hatAsm]),
+      ...need(['Group the Noise, Filter, Env and VCA (Ctrl+G)', (s) => !!hat(s.patch), (s) => HAT_TYPES.flatMap((t) => T.module(mod(s.patch, t)?.id))], ['Save it as "Hat" (save on the card)', (s) => savedAssembly(s, hat(s.patch)) && !!findDef(s.library, 'hat', 'Hat'), hatAsm]),
       apply: (a) => { a.edit((p) => { if (!hat(p)) makeAssembly(p, HAT_TYPES.map((t) => mod(p, t)!.id), 'Hat'); }); const p = a.patch(); const h = hat(p)!; h.name = 'Hat'; a.saveAssembly(toDef(p, h), 'hat'); },
     },
     {
@@ -938,7 +980,7 @@ const ch11: Chapter = {
       apply: (a) => { for (const n of ['kick', 'snare']) if (!factoryAsm(a.patch(), n)) a.edit((p) => insertAt(p, FACTORY_BY_NAME(n))); },
     },
     {
-      id: 'clock', title: 'A clock and a divider',
+      id: 'clock', title: 'A clock and a divider', superseded: true,
       text: 'Add an LFO (square, 8 Hz) and a Clock div with div 2. Cable LFO out → Clock div clock.',
       ...need(
         added('an LFO', 'lfo'), knob('the LFO’s wave to square', one('lfo'), 'wave', (v) => v === WAVE.square), knob('the LFO’s rate to 6 Hz or more', one('lfo'), 'rate', (v) => v >= 6),
@@ -948,12 +990,12 @@ const ch11: Chapter = {
       apply: (a) => a.edit((p) => { const l = mod(p, 'lfo') ?? place(p, 'lfo'); const d = mod(p, 'clkdiv') ?? place(p, 'clkdiv'); l.params.wave = WAVE.square; l.params.rate = 8; d.params.div = 2; wire(p, l, 'out', d, 'clock'); }),
     },
     {
-      id: 'pattern', title: 'A pattern from the divisions',
+      id: 'pattern', title: 'A pattern from the divisions', superseded: true,
       text: 'Cable LFO out → Hat gate (every eighth), Clock div d2 → kick gate (every beat) and Clock div d4 → snare gate (every second beat). Remove the cable from Main’s gate to the Hat.',
       ...need(
         cable('LFO out → Hat gate', one('lfo'), 'out', hatGate, 'gate'),
-        ['Cable Clock div d2 → kick gate', (s) => cabled(s.patch, one('clkdiv')(s), 'd2', drumGate('kick')(s), drumGatePort('kick', s)), (s) => [...T.port(one('clkdiv')(s), 'd2', 'out'), ...T.port(drumGate('kick')(s), drumGatePort('kick', s), 'in')]],
-        ['Cable Clock div d4 → snare gate', (s) => cabled(s.patch, one('clkdiv')(s), 'd4', drumGate('snare')(s), drumGatePort('snare', s)), (s) => [...T.port(one('clkdiv')(s), 'd4', 'out'), ...T.port(drumGate('snare')(s), drumGatePort('snare', s), 'in')]],
+        ['Cable Clock div d2 → kick gate', (s) => drumTriggered(s, 'kick', 'd2'), (s) => [...T.port(one('clkdiv')(s), 'd2', 'out'), ...T.port(drumGate('kick')(s), drumGatePort('kick', s), 'in')]],
+        ['Cable Clock div d4 → snare gate', (s) => drumTriggered(s, 'snare', 'd4'), (s) => [...T.port(one('clkdiv')(s), 'd4', 'out'), ...T.port(drumGate('snare')(s), drumGatePort('snare', s), 'in')]],
         gone('Main gate → Hat gate', main, 'gate', hatGate, 'gate'),
       ),
       apply: (a) => a.edit((p) => { const h = member(p, hat(p), 'env'); wire(p, mod(p, 'lfo'), 'out', h, 'gate'); unwire(p, mod(p, 'fm1'), 'gate', h, 'gate'); for (const [n, port] of [['kick', 'd2'], ['snare', 'd4']] as const) { const g = gateOf(p, n)!; wire(p, mod(p, 'clkdiv'), port, byId(p, g.module), g.port); for (const t of g.also ?? []) wire(p, mod(p, 'clkdiv'), port, byId(p, t.module), t.port); } }),
@@ -962,23 +1004,70 @@ const ch11: Chapter = {
       id: 'mix', title: 'Mix the kit',
       text: 'Add a Mixer 4: kick out → in1, snare out → in2, Hat out → in3, and Mixer out → Output l and r. Remove the Hat’s own cable to Output. Set l1 to 0.9 and l3 to 0.4.',
       ...need(
-        added('a Mixer 4', 'mixer'),
-        ['Cable kick out → Mixer in1', (s) => cabled(s.patch, drumOut('kick')(s), drumOutPort('kick', s), one('mixer')(s), 'in1'), (s) => [...T.port(drumOut('kick')(s), drumOutPort('kick', s), 'out'), ...T.port(one('mixer')(s), 'in1', 'in')]],
-        ['Cable snare out → Mixer in2', (s) => cabled(s.patch, drumOut('snare')(s), drumOutPort('snare', s), one('mixer')(s), 'in2'), (s) => [...T.port(drumOut('snare')(s), drumOutPort('snare', s), 'out'), ...T.port(one('mixer')(s), 'in2', 'in')]],
-        cable('Hat out → Mixer in3', hatOut, 'out', one('mixer'), 'in3'),
-        cable('Mixer out → Output l', one('mixer'), 'out', out, 'l'), cable('Mixer out → Output r', one('mixer'), 'out', out, 'r'),
+        ['Add a Mixer 4 outside the assemblies', (s) => !!mix(s), () => T.ui('add-btn')],
+        ['Cable kick out → Mixer in1', (s) => cabled(s.patch, drumOut('kick')(s), drumOutPort('kick', s), mix(s), 'in1'), (s) => [...T.port(drumOut('kick')(s), drumOutPort('kick', s), 'out'), ...T.port(mix(s), 'in1', 'in')]],
+        ['Cable snare out → Mixer in2', (s) => cabled(s.patch, drumOut('snare')(s), drumOutPort('snare', s), mix(s), 'in2'), (s) => [...T.port(drumOut('snare')(s), drumOutPort('snare', s), 'out'), ...T.port(mix(s), 'in2', 'in')]],
+        cable('Hat out → Mixer in3', hatOut, 'out', mix, 'in3'),
+        cable('Mixer out → Output l', mix, 'out', out, 'l'), cable('Mixer out → Output r', mix, 'out', out, 'r'),
+        knob('Mixer l1 to 0.9', mix, 'l1', (v) => v === 0.9), knob('Mixer l3 to 0.4', mix, 'l3', (v) => v === 0.4),
         gone('Hat out → Output l', hatOut, 'out', out, 'l'),
       ),
-      apply: (a) => a.edit((p) => { const mx = mod(p, 'mixer') ?? place(p, 'mixer'); const o = mod(p, 'output'); for (const [n, port] of [['kick', 'in1'], ['snare', 'in2']] as const) { const r = outOf(p, n)!; wire(p, byId(p, r.module), r.port, mx, port); } const hv = member(p, hat(p), 'vca'); wire(p, hv, 'out', mx, 'in3'); unwire(p, hv, 'out', o, 'l'); wire(p, mx, 'out', o, 'l'); wire(p, mx, 'out', o, 'r'); mx.params.l1 = 0.9; mx.params.l3 = 0.4; }),
+      apply: (a) => a.edit((p) => { const mx = loose(p, 'mixer') ?? place(p, 'mixer'); const o = mod(p, 'output'); for (const [n, port] of [['kick', 'in1'], ['snare', 'in2']] as const) { const r = outOf(p, n)!; wire(p, byId(p, r.module), r.port, mx, port); } const hv = member(p, hat(p), 'vca'); wire(p, hv, 'out', mx, 'in3'); unwire(p, hv, 'out', o, 'l'); wire(p, mx, 'out', o, 'l'); wire(p, mx, 'out', o, 'r'); mx.params.l1 = 0.9; mx.params.l3 = 0.4; }),
+    },
+    {
+      id: 'beats', title: 'Place the backbeat', listen: true, superseded: true,
+      text: 'Build the beat below: three Sequencers replace the divider gates. At 120 bpm, kick lands on beats 1 and 3, snare on 2 and 4, and hats on each beat. A step at −1 is a rest; 0 is a hit. Optional: change one rest into an extra hit and listen to the push it creates.',
+      why: 'Each Sequencer receives the same 4 Hz clock. Its gate triggers one drum. The engine advances on the first tick, so the first sounding slot is s2; s1 is the last eighth of the bar.',
+      ...need(['Build three drum sequencers', (s) => hasBeat(s.patch), () => T.ui('add-btn')]),
+      apply: (a) => a.edit(buildBeat),
+    },
+    {
+      id: 'performance', title: 'An eight-bar miniature', listen: true,
+      text: 'Build the arrangement below, adding steady eighth-note hats. Bars 1–2 establish your beat; 3–6 add your saved Pluck melody; bar 7 opens the hats for a flourish; bar 8 returns to the beat. It repeats every 16 seconds at 120 bpm. Change the kick Sequencer’s hit values to change the melody; expand Eight-bar arrangement to change the form; your patch stores the performance.',
+      why: 'One divider ticks once per bar. A slow Sequencer brings in the melody and lengthens the hat tail for a flourish. The same clock drives the notes and the form. If you skipped Pluck, the bundled instrument stands in for it.',
+      ...need(['Build the eight-bar arrangement with Pluck', (s) => hasPerformance(s.patch), () => T.ui('add-assembly-btn')]),
+      apply: (a) => a.edit((p) => buildPerformance(p, tutorialDef('pluck', 'Pluck', a.library()).def)),
     },
     {
       id: 'share', title: 'Share it', transient: true,
-      text: 'Commands → Share patch link copies a link to this patch to your clipboard. Anyone who opens it gets the drum machine, Hat and all. That is the end of the course.',
+      text: 'Commands → Share patch link copies a link to this patch to your clipboard. Anyone who opens it gets the beat, your Pluck instrument and the eight-bar arrangement. Name and save a personal variation at the finish.',
       ...need(['Copy a share link (Commands → Share patch link)', (s) => s.seen.shares > 0, () => T.ui('palette-btn')]),
       apply: (a) => a.share(),
     },
   ],
 };
+
+const after = (ch: Chapter, id: string, step: Step): void => { ch.steps.splice(ch.steps.findIndex((s) => s.id === id) + 1, 0, step); };
+after(ch2, 'pluck', listen('compare', 'A pluck or a pad?', 'Start Riff and hear the pluck die before the next note. Optional: compare attack 0.3 s, sustain 0.6, release 1 s for a swelling pad; then restore attack 0.005 s and sustain 0 to continue the pluck lesson. The contrast is time and shape, not a new oscillator.', 'adsr'));
+after(ch3, 'cv', listen('wobble', 'From a slow wah to a wobble', 'Start Riff. Optional: try LFO rate 0.5 Hz, then 4 Hz. The same cutoff movement becomes a rhythm. Return to 0.5 Hz before continuing; keep notes short if the high resonance is sharp.', 'lfo'));
+after(ch4, 'collapse', listen('instrument', 'Five modules, one instrument', 'Play your new instrument. Move the exposed cutoff and release sliders: one changes color, the other changes the tail. Optional: give the card a personal name, then use My voice for the library save so later chapters can find it.', 'filter'));
+after(ch6, 'ratio', listen('colors', 'Three colors from two sines', 'Start Riff. Optional: compare modulator coarse +12 with pm 1 (hollow), coarse +7 with pm 4 (metallic), then coarse +12 with pm 0.3 (mellow). Return pm to 2 and coarse to +12 before continuing. Save your favorite as a named variation.', 'osc'));
+after(ch7, 'modal', listen('body', 'Muted string, ringing body', 'Use Chord with four voices. Optional: try String damp 0.8 for a muted pick, then 0.1 for a ringing string. Bypass Modal to hear the dry string on the left; turn it back on to hear the body on the right. Return damp to 0.1 before continuing.', 'string'));
+after(ch7, 'fb', listen('breath', 'Separate the breath from the string', 'Optional: bypass String and Modal, then play Note to hear only noise through Comb. Change Comb damp from 0.1 to 0.8: the breath loses its whistle. Switch both models back on and return damp to 0.1 when finished.', 'comb'));
+after(ch8, 'grain', listen('freeze', 'Keep a moment in a cloud', 'With Main voices at 4, play Chord for two seconds to fill the buffer, then switch Granular freeze on. Stop the notes: the captured sound remains. Optional: change pitch and spray, then turn freeze off before continuing. Bypass Granular to compare the dry pad.', 'grain'));
+after(ch9, 'mixer', listen('layers', 'Hear what each layer contributes', 'Start Riff. Optional: put Mixer l2 and l3 at 0 to hear My voice alone; restore them, then put l1 at 0 to hear FM keys alone. Bring l1 back up until neither layer hides the other. This balance is your choice.', 'mixer'));
+after(ch10, 'pulse', listen('random', 'Let chance write the first phrase', 'Listen for several repeats before replacing the random source. Optional: change Quantizer scale and hear the same random movement obey another set of notes. Return to pent min; the next step lets you write a four-note reply.', 'quant'));
+
+// Listening settings are checked once; later creative choices must not invalidate earlier exploration.
+for (const [ch, ids] of [[ch1, ['note', 'scope']], [ch2, ['shape', 'pluck']], [ch3, ['cutoff', 'track', 'cv', 'live']], [ch4, ['resize']], [ch5, ['tune', 'bypass']], [ch6, ['pm', 'ratio', 'index']], [ch7, ['decay', 'voices', 'modal', 'fb', 'glide']], [ch8, ['lfo', 'env', 'spectrum']], [ch9, ['arp', 'macro', 'snapshots']], [ch11, ['env']]] as [Chapter, string[]][]) {
+  for (const st of ch.steps) if (ids.includes(st.id)) st.listen = true;
+}
+ch4.steps.find((s) => s.id === 'resize')!.optional = true;
+
+const rewards: [string, string][] = [
+  ['You turned a continuous oscillator into notes you can start and stop.', 'Choose a favorite wave and name its character: velvet, brass, arcade, or something of your own.'],
+  ['One oscillator now speaks with two different shapes: a swelling pad and a pluck.', 'Make a tiny bell or a very slow sunrise; save both variations.'],
+  ['Your filter can move by itself and follow a performance knob.', 'Find the moment where a gentle wah becomes a rhythm.'],
+  ['Five modules fold into your first reusable instrument.', 'Give the instrument a stage name and keep a personal variation.'],
+  ['Your instrument carries a room, echoes and stereo movement.', 'Make a small room and an impossible cavern. Compare each with bypass.'],
+  ['Two pure tones became a playable FM instrument with its own space.', 'Save a mellow key and a metallic bell from the same two oscillators.'],
+  ['You built a string, a resonating body and a breathy pipe.', 'Write a three-note call and answer with muted and ringing settings.'],
+  ['You can turn a vowel into a moving, frozen cloud.', 'Capture a chord and find a texture that sounds nothing like its source.'],
+  ['Your two instruments play together, and a single slider moves their balance.', 'Find a halfway morph you prefer to either endpoint.'],
+  ['Chance and a written sequence now share one musical clock.', 'Write a four-note answer to the random machine.'],
+  ['Noise became a hat, a kit, and a small performance with your own instruments.', 'Perform eight bars: establish the beat, bring in the melody, add a fill, return home.'],
+];
+[ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8, ch9, ch10, ch11].forEach((ch, i) => { [ch.payoff, ch.challenge] = rewards[i]; });
 
 export const CHAPTERS: Chapter[] = [ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8, ch9, ch10, ch11];
 

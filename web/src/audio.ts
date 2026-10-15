@@ -8,6 +8,12 @@ import type { ParameterValues } from './engine';
 export class AudioHost {
   private ctx: AudioContext | null = null;
   private node: AudioWorkletNode | null = null;
+  private gain: GainNode | null = null;
+  muted = false;
+  mute(on: boolean): void {
+    this.muted = on;
+    if (this.gain && this.ctx) this.gain.gain.setTargetAtTime(on ? 0 : 1, this.ctx.currentTime, 0.01);
+  }
   private ready: Promise<void> | null = null;
   private early: HostMsg[] = [];
   private pending: Patch | null = null;
@@ -25,6 +31,7 @@ export class AudioHost {
   }
 
   async start(): Promise<void> {
+    this.mute(false);
     if (!this.ctx) {
       const ctx = new AudioContext({ latencyHint: 'interactive' });
       this.ctx = ctx;
@@ -52,7 +59,10 @@ export class AudioHost {
           if (ev.data.revision === this.revision) this.latestValues = ev.data.values;
         }
       };
-      node.connect(ctx.destination);
+      this.gain = ctx.createGain();
+      this.gain.gain.value = this.muted ? 0 : 1;
+      node.connect(this.gain);
+      this.gain.connect(ctx.destination);
       this.node = node;
       ctx.onstatechange = () => this.watchValues();
       if (this.pending) {

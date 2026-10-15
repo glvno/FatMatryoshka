@@ -28,11 +28,13 @@ function peak(p: Patch, key = true): number {
 describe('tutorial course', () => {
   const run = courseRun();
 
-  it('has eleven chapters with 6 to 11 steps each, every step with a title, text, check and apply', () => {
+  it('has eleven chapters with deliberate listening breaks, every step with a title, text, check and apply', () => {
     expect(CHAPTERS).toHaveLength(11);
     for (const ch of CHAPTERS) {
       expect(ch.steps.length).toBeGreaterThanOrEqual(6);
-      expect(ch.steps.length).toBeLessThanOrEqual(11);
+      expect(ch.steps.some((st) => st.listen)).toBe(true);
+      expect(ch.payoff).toBeTruthy();
+      expect(ch.challenge).toBeTruthy();
       expect(ch.intro.length).toBeGreaterThan(80);
       for (const st of ch.steps) {
         expect(st.title).toBeTruthy();
@@ -49,8 +51,7 @@ describe('tutorial course', () => {
     for (const st of ch.steps) {
       s.state.entry = JSON.parse(JSON.stringify(s.state.patch)) as Patch;
       s.state.seen = noSeen();
-      expect(st.check(s.state), `${ch.id}/${st.id} already passes`).toBe(false);
-      expect(st.todo!(s.state).length, `${ch.id}/${st.id} says nothing about what is missing`).toBeGreaterThan(0);
+      if (!st.check(s.state)) expect(st.todo!(s.state).length, `${ch.id}/${st.id} says nothing about what is missing`).toBeGreaterThan(0);
       expect(st.focus!(s.state).length, `${ch.id}/${st.id} points at nothing`).toBeGreaterThan(0);
       st.apply(s, s.state);
       expect(st.check(s.state), `${ch.id}/${st.id} fails after apply`).toBe(true);
@@ -100,19 +101,14 @@ describe('tutorial course', () => {
     expect(tutorialDef('my-voice', 'My voice', [named]).which).toBe('yours');
   });
 
-  it('walks a finished patch straight through: preparatory steps count as done once a later step holds', () => {
-    // chapter 4 on its own result: "select the modules" cannot be redone (they sit inside the assembly) and is moot
-    const s = headlessState(chapterEnd(3), run.library);
+  it('never skips expansion because grouping created an already-collapsed card', () => {
     const ch = CHAPTERS[3];
-    expect(stepDone(ch, 0, s)).toEqual({ met: false, moot: true });
-    expect(stepDone(ch, 1, s).met).toBe(true); // group
-    expect(stepDone(ch, 2, s)).toEqual({ met: false, moot: true }); // expand, superseded by collapse
-    expect(stepDone(ch, 5, s).met).toBe(true); // collapse
-    // the last, transient step (zoom) is not moot: nothing structural follows it
-    expect(stepDone(ch, ch.steps.length - 1, s)).toEqual({ met: false, moot: false });
-    // on the canned start nothing is moot
-    const s0 = headlessState(chapterStart(3), []);
-    for (let i = 0; i < ch.steps.length; i++) expect(stepDone(ch, i, s0).moot, `${ch.steps[i].id}`).toBe(false);
+    const session = new HeadlessSession(chapterStart(3));
+    ch.steps[0].apply(session, session.state);
+    ch.steps[1].apply(session, session.state);
+    expect(stepDone(ch, 2, session.state)).toEqual({ met: false, moot: false });
+    ch.steps[2].apply(session, session.state);
+    expect(stepDone(ch, 2, session.state).met).toBe(true);
   });
 
   it('judges whether a patch continues a chapter by its structure only', () => {

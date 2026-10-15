@@ -1,76 +1,51 @@
-# Tutorial design (decided with the owner, 2026-10-14; implemented in web/src/tutorial/)
+# Tutorial design
 
-The editor's tutorial is a **course of 11 chapters** that teaches the editor and, at the same time, how to build synths from
-modules. It replaces the five-step tour (`web/src/tour.ts`).
+The course has eleven chapters. Each teaches a synthesis idea through a playable patch and a practical editor technique. This document records the QA revisions requested on 2026-10-14; implementation tickets are [#23–#35](https://github.com/glvno/matryoshka/issues?q=is%3Aissue+label%3Aready-for-agent).
 
-## Rules
+## Progress and recovery
 
-- **Hybrid do-it-yourself.** Every step tells the user one action; the tutorial watches the patch and editor state and shows a
-  check mark when the step's **strict structural check** passes (this cable exists, this module exists, this parameter is in
-  this range, the assembly is expanded, the scope watches this jack, a note-on arrived, undo restored the previous state).
-  A done step shows its check mark for a moment and the tutorial moves on by itself (decided 2026-10-14, replacing the earlier "Next unlocks" rule); after Back the previous step is held until Next is pressed. **Do it for me** applies the step and advances. If a later edit breaks an
-  earlier step the panel says so and Do it for me restores it. Back re-reads the previous step without undoing anything.
-  No skip-chapter button: the chapter menu jumps anywhere.
-- **Chapters have canned start and end patches.** Starting chapter N always loads its canned start (chapter N−1's canned
-  end for the Tutorial voice chapters 2..5, a bare patch for the rest, chapter 1 included: its New patch step counts the
-  button press, since a full canned start would make the later steps hold already); it
-  never continues with whatever the user left open (decided 2026-10-14, replacing the earlier "continue with your patch when
-  it passes chapter N−1" rule: differences accumulated between the user's patch and the checks). The canned end patches are
-  listed in the Examples picker under "Tutorial".
-- **Nothing is lost.** Starting a chapter puts the open patch into the bank under its name unless it is a tutorial patch
-  (name starting with "Tutorial"; the user's own New patch is renamed to the chapter's name when its step is done); the
-  chapter patch becomes the working patch. The chapter-done page offers "Save patch to the bank".
-- **Library is real.** Assemblies saved in the course ("My voice" ch 4, "My space" ch 5, "FM keys" ch 6, "Pluck" ch 7) go to
-  the real library with a `tutorial` tag on the definition. Later chapters look them up by tag, then name, then fall back to a
-  bundled copy and say which they used.
-- **Browser only.** K1..K4 are explained as the FM-1's knobs; the device bar and diff are not in the course. Morph A/B is
-  taught in chapter 9, the share link closes chapter 11.
-- **Text.** Each chapter opens with a short intro that carries the synthesis concept; steps are one action in two or three
-  sentences, key first and button in the same sentence ("press Ctrl+G, or click Make assembly"); a step with a real idea in it has a
-  collapsible "Why" paragraph, closed by default. UI words: "Tutorial", "Chapter 3 of 11".
-- **Targeting.** The step's target element(s) (card, jack, slider, button) get a pulsing outline and are scrolled into view.
-  No ghost cables.
-- **Panel.** The bottom-right panel, draggable like the scope; docks to the bottom edge under 650 px. An "audio is off"
-  hint line appears whenever audio is not enabled (chapter 1 makes enabling audio its first step).
-- **Menu.** Sidebar button "Tutorial" (replaces "How a patch works") opens a dialog listing the chapters with ticks, Resume
-  on the current one, Start on the others, Reset progress at the bottom. The first-visit welcome leads to chapter 1. Progress
-  lives in localStorage.
-- **Tests.** For every chapter the Do-it-for-me chain from the canned start passes every check, ends at the canned end,
-  validates, and sound chapters render non-silence for a held note. A check must fail on the canned start before its step.
+Construction steps show a checklist and advance after 900 ms when their own check passes. Listening steps have `listen: true` and wait for **Continue**. Creative comparisons are ungraded; their text distinguishes optional settings from the settings needed for the next exercise. Frame resizing is explicitly optional. Back holds the previous step without undoing work.
 
-## Fixed links (done first, own commit)
+A later matching state never makes a preparatory step moot: a newly grouped, collapsed assembly is not evidence that the learner expanded it. Structural prerequisites that are still relevant must hold before advancing or finishing. `superseded` marks work deliberately replaced later; `transient` marks editor events or listening that should not be used to judge a finished patch.
 
-A parameter whose definition names a dedicated input (`ParamDef.input`: VCA gain from `cv`, filter / ladder cutoff from `cv`,
-filter and Main `morph`, shift `cv`, pan / crossfade `pos`, vowel) is **permanently** fed by it: that wiring defines the
-module. The route is always drawn, grey, dashed, not interactive (tooltip "built in: cv sets cutoff"). `disabledInputs` is
-dropped by `validatePatch` (old patches get the link back), the encoder never writes flag bit 2, the firmware keeps reading
-it. User-made routes (`inputMap`, side input to slider thumb) stay coloured and editable. Alt-dragging the thumb of a
-parameter with a fixed input cables the source to that input.
+**Do it for me** applies work atomically and then waits for the actual check. It does not advance after an exception or while an asynchronous action is pending. Restore repairs only broken, still-relevant prerequisites. Checklists name the missing work and point to its controls. Close cancels pending advances and audition; Resume restarts polling. The saved page and stable step ID survive reload, with a fresh entry snapshot for delta-based checks.
 
-## Chapters
+Every chapter loads a prepared starting patch. Before replacing the open patch, the runtime stores an immutable variation in `matryoshka.tutorial.variations`, including patches whose names begin with Tutorial. This archive is independent of the 32-slot hardware upload bank. It never evicts or replaces a different same-named version. A storage failure is shown and leaves the open patch in place. Named sketches can also be saved during any exercise or at chapter completion. **Tutorial → Your saved variations → Restore** first keeps the current patch, then restores the selected copy.
 
-1. **Hello sound** - enable audio, New patch (Main + Output), an Oscillator with its pitch, a VCA fed by it, the gate into
-   the VCA's cv, and only then VCA → Output: the sound is under the key's control before it ever reaches the speaker (the
-   Output's default level is 0.15 for the same reason). Play, scope ◎, change the wave. Teaches: add module, cable colours,
-   the VCA's built-in cv → gain link, keys, scope.
-2. **Shaping a note** - ADSR replaces the bare gate; attack / release, then a percussive sustain / decay; thumb = jack,
-   Alt-drag; undo / redo.
-3. **Subtractive voice** - Filter: cutoff, resonance, morph, track; LFO into the filter's cv (fixed link, depth = cvamt);
-   K1 into p1 with the matrix sending it to cutoff and resonance (attenuverter). Teaches: pins, att, matrix, knob colours,
-   rest ticks, live thumb vs base tick.
-4. **Your first assembly** - select osc + ADSR + VCA + filter, G, expose pitch / gate / out, promote cutoff and release, name
-   "My voice", expand, resize, collapse, save. Teaches: select, group, expose / promote, expand / resize, library.
-5. **An effect assembly** - Delay + Reverb + Chorus, promote time / mix, B to bypass, Ctrl+D, zoom to fit; save "My space".
-6. **Second instrument: FM** - new patch, two oscillators (pm, fb), level / rate envelope; insert "My space" inside the new
-   assembly (nesting), merged gate inputs, edit "My voice" to expose p1; save "FM keys".
-7. **Plucked and struck** - String (gate plucks it; a noise burst through exc), Modal body, Comb; glide; ×N polyphony;
-   save "Pluck".
-8. **Wavetables and grains** - Wavetable pad into Granular, Pan, Phaser; a big patch: zoom, pinch, Fit.
-9. **Two instruments, one keyboard** - insert My voice + FM keys, Mixer, Pan, Output; arp on the Main card (Space); voices
-   count; macro range on a knob; morph A/B.
-10. **A random melody machine** - square LFO clock → Clock divider, Noise → S&H → Quantizer → pitch, Pulse → gate, driving
-    Pluck and FM keys; Sequencer as the alternative; last step swaps the LFO for Main's clock (arp / MIDI clock).
-11. **Drums from noise** - a hi-hat from Noise + level / rate env + Filter; factory kick and snare; Sequencer + divider
-    rhythm; share link.
+Assembly saves go to the real library. Helper saves retain a changed prior instrument under a unique “previous” name and leave one active tutorial tag; failed storage writes are reported. A fresh save check compares the definition actually saved during the step with the current assembly, including its modules, cables and exposed controls; saving an unrelated assembly does not count. Later chapters use the learner's tagged or named instrument when available, otherwise the bundled version. All canned examples are generated by the same course actions.
 
-Sound sources covered: osc (1), noise (10, 11), wavetable and granular (8), string / modal / comb (7).
+## Listening and panel behavior
+
+Every exercise and chapter finish has Note, Chord and a repeating Riff. These are toggles; **Release notes** lets tails decay, while **Stop** silences playback, including autonomous patches. Chord respects Main's voice count; chapter 8 starts with four voices. Navigation, close, blur and Panic cancel tutorial notes and timers. A cancelled audio startup cannot restart playback afterward.
+
+An intro's **Preview the finished sound** sends the completed patch to the audio engine for eight seconds without changing the editor patch, layout, history, selection, snapshots or library. Normal preview completion restores the editor sound and previous transport/mute state. Explicit Stop, blur and close silence it. Audio starts from a playback click.
+
+The panel docks at bottom right by default. **Follow** optionally places it near the highlighted target and scrolls that target into view. Drag the handle, or use its arrow keys to move it; Home docks it again. Below 650 px it docks immediately at the bottom, clears desktop inline positions and scrolls internally. Reduced-motion preferences suppress movement and pulsing. Required controls, then the optional Why, then expected listening outcomes keep the lesson readable.
+
+## Chapter payoffs
+
+| Chapter | Build and audible payoff |
+| --- | --- |
+| 1. Hello sound | Gated oscillator before Output; compare sine, saw and square on the same riff without a timer rushing the choice. |
+| 2. Shaping a note | Swelling attack/release versus a fast, zero-sustain pluck; the held pluck really dies. |
+| 3. Subtractive voice | Separate cutoff and resonance listening; keyboard tracking, slow wah versus rhythmic wobble, then knob routing and live/base values. |
+| 4. Your first assembly | Fold five modules into one instrument, expand explicitly, promote two controls, optionally resize, then save the current instrument. |
+| 5. An effect assembly | Insert and audition Delay, Reverb and Chorus separately before grouping. Compare dry, small room and large space. |
+| 6. Second instrument: FM | Hear the gated carrier before modulation. Manually duplicated oscillators need a new pitch cable; helper repairs partial work. Compare mellow/hollow/metallic ratios, then envelope and nested space. |
+| 7. Plucked and struck | Hear the string and modal body before adding noise through a comb. Compare muted/ringing chords and breathy tone; save Pluck. |
+| 8. Wavetables and grains | Hear a gated dry vowel first; keep an output through every insert. Capture a four-note chord, freeze it, explore pitch/spray and return to live input. |
+| 9. Two instruments | Solo and blend layers. Map a full-depth knob to 150–4000 Hz. Compare snapshots, then explicitly choose Snapshot B as a compatible morph target and move Main morph. |
+| 10. Melody machine | Listen to chance before writing a reply. Sequence changes and instrument gates share the musical subdivision; a second divider derives every-other-note FM triggers after 24-ppqn conversion. Divider outputs retain input pulse width. |
+| 11. Drums and performance | A held hat dies with the documented levels/rates. Mix through a loose mixer outside factory drums. Place kick/snare beats with sequencers, then build an eight-bar arrangement using the saved Pluck. |
+
+Each finish names a specific accomplishment, offers an optional creative challenge, and lets the learner name a variation. The finale is an ordinary shareable patch within the 32-module limit: two bars of beat, four with melody, an open-hat flourish on bar seven, then a return. A divider and slow sequencer store the form; no browser timer is needed. The arrangement reuses the kick sequence for melody and drives hats with the eighth-note clock. Engine sequencers advance on the first edge, so the first sounding slot is s2, then s3…s8, s1. The pattern builder accounts for that phase explicitly.
+
+## QA boundaries
+
+Headless course tests validate every generated start/end and saved assembly, and render sound from every completed chapter. Regressions cover manual duplication, nested factory mixers, held-note envelope tails, audible intermediate patches, real morph targets and macro units, the clock hierarchy, stale library saves, the actual eight-bar control sequence, audition cancellation and immutable variation storage/failure.
+
+Browser checks exercise close/resume, reload at a delta-based step, assembly expansion, deliberate Continue, playback controls, preview, saved variations and desktop/mobile docking. Browser audio lifecycle is separate from DSP tests; neither is a claim of firmware or device validation. The existing development server on port 5173 is used; do not start a second server.
+
+## Fixed links
+
+Dedicated parameter inputs remain permanently linked (`ParamDef.input`). Their routes are grey and inert; user-made routes remain editable. This tutorial revision changes browser behavior and course patches, not the firmware patch format or DSP definitions.
