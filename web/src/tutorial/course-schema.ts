@@ -56,7 +56,8 @@ export type Part =
   /** a macro range of `pin` on `param`, from `min` to `max` in the parameter's units; `depth` also requires that attenuverter */
   | { kind: 'macroRange'; ref: Ref; pin: Pin; param: string; min: number; max: number; depth?: number; label?: string }
   /** a fact about an assembly role; `type` + `param` / `port` name a member's control, `child` a nested role, `tag` + `name` a save */
-  | { kind: 'assembly'; role: string; fact: AssemblyFact; type?: string; param?: string; port?: string; child?: string; tag?: string; name?: string; label?: string }
+  /** `type` + `index` (0-based, absent = the first) name the member module of a promoted / exposed fact */
+  | { kind: 'assembly'; role: string; fact: AssemblyFact; type?: string; index?: number; param?: string; port?: string; child?: string; tag?: string; name?: string; label?: string }
   | { kind: 'voices'; min: number; label?: string }
   /** `count` (default 1) for counters; `ref` + `port` for a probe; `types` for a selection; `ref` + `on` for a bypass state */
   | { kind: 'event'; event: EventName; count?: number; ref?: Ref; port?: string; types?: string[]; on?: boolean; label?: string }

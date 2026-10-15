@@ -59,6 +59,8 @@ const typeLabel = (type: string): string => DEFS[type]?.label ?? type;
 const ORDINAL = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'];
 export function roleLabel(roles: Roles, name: string): string { return roles[name]?.label ?? ROLES[name]?.label ?? name; }
 
+/** "second " for a member module after the first of its type, else nothing */
+const memberOrdinal = (index?: number): string => (index ? `${ORDINAL[index] ?? `#${index + 1}`} ` : '');
 /** how a checklist line names a module: "VCA", "the second Oscillator", "My voice’s Filter", "every Oscillator" */
 export function refName(roles: Roles, ref: Ref): string {
   if (ref.role && !ref.type) return roleLabel(roles, ref.role);
@@ -190,8 +192,8 @@ export function partLabel(part: Part, roles: Roles): string {
         case 'exists': return `Group or insert ${a}`;
         case 'open': return `Expand ${a}`;
         case 'collapsed': return `Collapse ${a}`;
-        case 'promoted': return `Promote the ${typeLabel(part.type ?? '')}’s ${part.param} (click ○ beside it)`;
-        case 'exposed': return `Expose the ${typeLabel(part.type ?? '')}’s ${part.port} (click ○ beside it)`;
+        case 'promoted': return `Promote the ${memberOrdinal(part.index)}${typeLabel(part.type ?? '')}’s ${part.param} (click ○ beside it)`;
+        case 'exposed': return `Expose the ${memberOrdinal(part.index)}${typeLabel(part.type ?? '')}’s ${part.port} (click ○ beside it)`;
         case 'merged': return `Merge the ${part.port} inputs of ${a} (merge into…)`;
         case 'contains': return `Drag the ${roleLabel(roles, part.child ?? '')} card into the ${a} frame`;
         case 'resized': return 'Resize the frame (drag ◢)';
@@ -254,8 +256,8 @@ export function partCheck(part: Part, s: S, roles: Roles): boolean {
         case 'exists': return true;
         case 'open': return a.open;
         case 'collapsed': return !a.open;
-        case 'promoted': { const m = member(p, a, part.type ?? ''); return !!m && a.params.some((r) => r.module === m.id && r.param === part.param); }
-        case 'exposed': { const m = member(p, a, part.type ?? ''); return !!m && a.outputs.some((r) => r.module === m.id && r.port === part.port); }
+        case 'promoted': { const m = member(p, a, part.type ?? '', part.index ?? 0); return !!m && a.params.some((r) => r.module === m.id && r.param === part.param); }
+        case 'exposed': { const m = member(p, a, part.type ?? '', part.index ?? 0); return !!m && a.outputs.some((r) => r.module === m.id && r.port === part.port); }
         case 'merged': return a.inputs.some((r) => r.port === part.port && !!r.also?.length);
         case 'contains': { const c = roleAssembly(p, roles, part.child ?? ''); return !!c && !!a.children?.includes(c.id); }
         case 'resized': { const e = roleAssembly(s.entry, roles, part.role); return !!a.frameSize && JSON.stringify(a.frameSize) !== JSON.stringify(e?.frameSize); }
@@ -313,8 +315,8 @@ export function partTargets(part: Part, s: S, roles: Roles): Target[] {
           const free = types.map((t) => mod(p, t)).filter((m): m is ModuleInst => !!m);
           return free.length ? free.flatMap((m) => T.module(m.id)) : T.ui('add-assembly-btn');
         }
-        case 'promoted': return T.param(member(p, a, part.type ?? ''), part.param ?? '');
-        case 'exposed': return T.port(member(p, a, part.type ?? ''), part.port ?? '', 'out');
+        case 'promoted': return T.param(member(p, a, part.type ?? '', part.index ?? 0), part.param ?? '');
+        case 'exposed': return T.port(member(p, a, part.type ?? '', part.index ?? 0), part.port ?? '', 'out');
         case 'contains': return [...asm, ...T.asm(roleAssembly(p, roles, part.child ?? '')?.id)];
         default: return asm;
       }

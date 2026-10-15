@@ -488,6 +488,7 @@ async function mount() {
         const memberTypes: [string, string][] = r?.kind === 'assembly' ? [...new Set(r.types)].map((t) => [t, DEFS[t]?.label ?? t]) : TYPES;
         body.append(labelled('role', select(asmRoles, part.role, (v) => set({ ...part, role: v }))), labelled('fact', select(ASSEMBLY_FACTS.map((f) => [f, FACTS[f]]), part.fact, (v) => set({ ...part, fact: v as AssemblyFact }))));
         if (part.fact === 'promoted' || part.fact === 'exposed') body.append(labelled('member', select(memberTypes, part.type ?? '', (v) => set({ ...part, type: v, param: part.fact === 'promoted' ? fixParam(v, part.param ?? '') : undefined, port: part.fact === 'exposed' ? fixPort(v, part.port ?? '', 'out') : undefined }))));
+        if (part.fact === 'promoted' || part.fact === 'exposed') body.append(labelled('which', select(ORD.map((o, i) => [String(i), o]), String(part.index ?? 0), (v) => { const { index: _, ...rest } = part; set(Number(v) ? { ...rest, index: Number(v) } : rest); }, 'Which member of that type')));
         if (part.fact === 'promoted') body.append(paramPicker(part.type, part.param ?? '', (v) => set({ ...part, param: v })));
         if (part.fact === 'exposed') body.append(portPicker(part.type, part.port ?? '', 'out', (v) => set({ ...part, port: v })));
         if (part.fact === 'merged') body.append(labelled('input', textInput(part.port ?? '', (v) => set({ ...part, port: v }, false), 'input', 'pitch')));

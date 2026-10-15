@@ -58,6 +58,11 @@ export function refFor(p: Patch, roles: Roles, m: ModuleInst): Ref {
 }
 
 /** the assembly roles that name this assembly in the patch */
+/** a member module as an assembly part names it: its type, and which of that type (as `member` counts them) after the first */
+function memberOf(p: Patch, a: AssemblyInst, m: ModuleInst): { type: string; index?: number } {
+  const index = allModules(p, a).map((id) => byId(p, id)).filter((x) => x?.type === m.type).findIndex((x) => x?.id === m.id);
+  return index > 0 ? { type: m.type, index } : { type: m.type };
+}
 const rolesOf = (p: Patch, roles: Roles, a: AssemblyInst): string[] => Object.keys(roles).filter((name) => roles[name].kind !== 'member' && roleAssembly(p, roles, name)?.id === a.id);
 
 export function capture(rec: Recorded, roles: Roles): Capture {
@@ -141,10 +146,10 @@ export function capture(rec: Recorded, roles: Roles): Capture {
     if (was && was.open !== a.open) add({ kind: 'assembly', role, fact: a.open ? 'open' : 'collapsed' });
     else if (!was && !a.open) add({ kind: 'assembly', role, fact: 'collapsed' }, false);
     for (const r of a.params) if (!was?.params.some((x) => x.module === r.module && x.param === r.param)) {
-      const m = byId(after, r.module); if (m) add({ kind: 'assembly', role, fact: 'promoted', type: m.type, param: r.param });
+      const m = byId(after, r.module); if (m) add({ kind: 'assembly', role, fact: 'promoted', ...memberOf(after, a, m), param: r.param });
     }
     for (const r of a.outputs) if (!was?.outputs.some((x) => x.module === r.module && x.port === r.port)) {
-      const m = byId(after, r.module); if (m) add({ kind: 'assembly', role, fact: 'exposed', type: m.type, port: r.port });
+      const m = byId(after, r.module); if (m) add({ kind: 'assembly', role, fact: 'exposed', ...memberOf(after, a, m), port: r.port });
     }
     for (const r of a.inputs) if (r.also?.length && !was?.inputs.some((x) => x.port === r.port && x.module === r.module && x.also?.length)) add({ kind: 'assembly', role, fact: 'merged', port: r.port });
     for (const c of a.children ?? []) if (!was?.children?.includes(c)) {
