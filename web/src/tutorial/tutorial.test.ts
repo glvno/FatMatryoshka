@@ -77,9 +77,12 @@ describe('tutorial course', () => {
     for (let i = 0; i < CHAPTERS.length; i++) expect(chapterEnd(i).modules.length).toBeGreaterThan(2);
   });
 
-  it('chapter 1 drones once the Oscillator reaches the Output, and the VCA silences it until a key opens it', () => {
-    expect(peak(ref(0, 'out'), false), 'out: the bare Oscillator drones').toBeGreaterThan(0.01);
-    for (const st of ['vca', 'gate', 'note', 'scope', 'wave']) expect(peak(stepStart(0, CHAPTERS[0].steps.findIndex((x) => x.id === st) + 1), false), `${st}: sound without a key`).toBeLessThan(1e-4);
+  it('chapter 1 lets the bare Oscillator drone, and once a VCA is in the patch nothing sounds without a key', () => {
+    // found by what the patches do, not by step id, so a rewrite in the lesson editor keeps the test meaningful
+    const refs = CHAPTERS[0].steps.map((st) => [st.id, referenceOf(COURSE, CHAPTERS[0].id, st.id)?.patch] as const).filter((x): x is [string, Patch] => !!x[1]);
+    expect(refs.some(([, p]) => !p.modules.some((m) => m.type === 'vca') && peak(p, false) > 0.01), 'some step drones without a key before the VCA').toBe(true);
+    for (const [id, p] of refs) if (p.modules.some((m) => m.type === 'vca')) expect(peak(p, false), `${id}: sound without a key`).toBeLessThan(1e-4);
+    expect(peak(chapterEnd(0), false)).toBeLessThan(1e-4);
     expect(peak(chapterEnd(0))).toBeGreaterThan(0.01);
   });
 
@@ -108,8 +111,11 @@ describe('tutorial course', () => {
   it('judges whether a patch continues a chapter by its structure only', () => {
     expect(completes(CHAPTERS[0], chapterEnd(0), [])).toBe(true);
     expect(completes(CHAPTERS[0], chapterStart(0), [])).toBe(false);
+    // a transient step (an event, a counter) never holds on a stored patch, yet the finished patch completes the chapter
     const s = headlessState(chapterEnd(0));
-    expect(CHAPTERS[0].steps.find((st) => st.id === 'note')!.check(s)).toBe(false); // transient: not part of the judgement
+    const transient = CHAPTERS[0].steps.filter((st) => st.transient && st.kind === 'task');
+    expect(transient.length).toBeGreaterThan(0);
+    for (const st of transient) expect(st.check(s), st.id).toBe(false);
   });
 });
 
@@ -146,11 +152,18 @@ describe('course data', () => {
   });
 
   it('catches a reference patch that no longer passes its step', () => {
+    // the first structural step whose own check needs a cable, broken by removing every cable from its reference
+    const ch = CHAPTERS[0];
+    const k = ch.steps.findIndex((st) => {
+      const r = referenceOf(COURSE, ch.id, st.id);
+      return r && !st.transient && st.kind === 'task' && !st.check({ ...headlessState({ ...r.patch, cables: [] }), entry: stepStart(0, ch.steps.indexOf(st)) });
+    });
+    expect(k).toBeGreaterThanOrEqual(0);
+    const id = ch.steps[k].id;
     const broken = structuredClone(COURSE);
-    const out = broken.references['hello-sound/out'].patch;
-    out.cables = [];
+    broken.references[`${ch.id}/${id}`].patch.cables = [];
     const report = validateCourse(broken);
-    expect(report.errors.some((e) => e.step === 'out' && /fails its own requirement/.test(e.message))).toBe(true);
+    expect(report.errors.some((e) => e.step === id && /fails its own requirement/.test(e.message)), id).toBe(true);
   });
 
   it('catches a requirement that names a port the module does not have', () => {

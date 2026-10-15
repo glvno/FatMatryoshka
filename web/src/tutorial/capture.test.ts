@@ -2,9 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import { capture, type Recorded } from './capture';
 import { COURSE, CHAPTERS, referenceOf, stepStart } from './chapters';
-import { headlessState, noSeen } from './model';
+import { headlessState, mod, noSeen, place, unwire, wire } from './model';
 import { partCheck } from './parts';
-import type { Patch } from '../patch';
+import { DEFS } from '../modules';
+import { newPatch, type Patch } from '../patch';
 
 const at = (chapter: number, step: string) => CHAPTERS[chapter].steps.findIndex((s) => s.id === step);
 function recorded(chapter: number, step: string, extra: Partial<Recorded> = {}): Recorded {
@@ -14,6 +15,26 @@ function recorded(chapter: number, step: string, extra: Partial<Recorded> = {}):
     seen: noSeen(), probes: [], selected: [], arpPlay: false, audio: false, snapshots: { A: false, B: false }, ...extra,
   };
 }
+const idle = { probes: [], selected: [], arpPlay: false, audio: false, snapshots: { A: false, B: false } };
+/** Main, Output and an Oscillator droning into the Output: built here, so these tests do not follow the course's wording */
+function drone(): Patch {
+  const p = newPatch(DEFS);
+  const osc = place(p, 'osc');
+  wire(p, mod(p, 'fm1'), 'pitch', osc, 'pitch');
+  wire(p, osc, 'out', mod(p, 'output'), 'l');
+  return p;
+}
+/** the drone with a gated VCA put between the Oscillator and the Output */
+function gated(): Patch {
+  const p = drone();
+  const vca = place(p, 'vca');
+  unwire(p, mod(p, 'osc'), 'out', mod(p, 'output'), 'l');
+  wire(p, mod(p, 'osc'), 'out', vca, 'in');
+  wire(p, mod(p, 'fm1'), 'gate', vca, 'cv');
+  wire(p, vca, 'out', mod(p, 'output'), 'l');
+  return p;
+}
+
 /** every proposal holds on the patch it was captured from */
 function holds(rec: Recorded): void {
   const { proposals } = capture(rec, COURSE.roles);
@@ -23,10 +44,11 @@ function holds(rec: Recorded): void {
 
 describe('capture', () => {
   it('turns putting a VCA between the Oscillator and the Output into the step’s parts', () => {
-    const { proposals } = capture(recorded(0, 'vca'), COURSE.roles);
+    const { proposals } = capture({ before: drone(), after: gated(), seen: noSeen(), ...idle }, COURSE.roles);
     expect(proposals.map((p) => p.part)).toEqual([
       { kind: 'module', type: 'vca' },
       { kind: 'cable', from: { type: 'osc' }, fromPort: 'out', to: { type: 'vca' }, toPort: 'in' },
+      { kind: 'cable', from: { type: 'fm1' }, fromPort: 'gate', to: { type: 'vca' }, toPort: 'cv' },
       { kind: 'cable', from: { type: 'vca' }, fromPort: 'out', to: { type: 'output' }, toPort: 'l' },
       { kind: 'noCable', from: { type: 'osc' }, fromPort: 'out', to: { type: 'output' }, toPort: 'l' },
     ]);
@@ -47,14 +69,16 @@ describe('capture', () => {
     expect(grouped).toContainEqual({ kind: 'assembly', role: 'myVoice', fact: 'exists' });
   });
 
-  it.each([[0, 'gate'], [2, 'knob'], [3, 'promote'], [5, 'env'], [5, 'nest'], [8, 'macro'], [10, 'mix']] as const)('every proposal for %i/%s holds on the recorded patch', (chapter, step) => {
+  // every recorded structural step of the course, whatever the lesson editor has made of it since
+  const structural = CHAPTERS.flatMap((ch, i) => ch.steps.filter((st) => st.kind === 'task' && !st.transient && referenceOf(COURSE, ch.id, st.id)).map((st) => [i, st.id] as const));
+  it.each(structural)('every proposal for %i/%s holds on the recorded patch', (chapter, step) => {
     holds(recorded(chapter, step));
   });
 
   it('offers events, unticked when the step also changed the patch', () => {
-    const quiet = capture(recorded(0, 'note', { seen: { ...noSeen(), notes: 3 } }), COURSE.roles).proposals;
+    const quiet = capture({ before: drone(), after: drone(), seen: { ...noSeen(), notes: 3 }, ...idle }, COURSE.roles).proposals;
     expect(quiet).toEqual([{ part: { kind: 'event', event: 'notes' }, keep: true }]);
-    const busy = capture(recorded(0, 'vca', { seen: { ...noSeen(), notes: 1 } }), COURSE.roles).proposals;
+    const busy = capture({ before: drone(), after: gated(), seen: { ...noSeen(), notes: 1 }, ...idle }, COURSE.roles).proposals;
     expect(busy.find((p) => p.part.kind === 'event')).toEqual({ part: { kind: 'event', event: 'notes' }, keep: false });
   });
 });
