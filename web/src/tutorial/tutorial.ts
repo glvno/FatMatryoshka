@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The tutorial runtime: a draggable step panel, the chapter menu, progress in localStorage, the checks polled against
-// the editor, highlighted targets, and the Actions adapter "do it for me" uses. Chapters are in ./chapters.ts, the
-// model in ./model.ts, the design in docs/TUTORIAL.md.
+// the editor and highlighted targets. The course is data (course.json, compiled by ./chapters.ts), the model in
+// ./model.ts, the design in docs/TUTORIAL.md.
 import { Audition } from './audition';
+import { lessonChallenge, lessonProse } from './markdown';
 import { keepVariation, variations } from './variations';
-import { newPatch, type Patch } from '../patch';
-import { DEFS } from '../modules';
+import type { Patch } from '../patch';
 import type { AssemblyDef } from '../assembly';
 import { assemblyOf, hiddenModules } from '../assembly';
 import type { Editor } from '../editor';
-import { CHAPTERS, chapterStart, chapterEnd, tutorialDef } from './chapters';
-import { noSeen, stepDone, type Actions, type Chapter, type Seen, type Step, type Target, type TutorialState } from './model';
+import { CHAPTERS, chapterStart, chapterEnd, stepStart, tutorialDef } from './chapters';
+import { noSeen, stepDone, type Chapter, type Seen, type Step, type Target, type TutorialState } from './model';
 
 export interface TutorialHost {
   editor: Editor;
@@ -72,13 +72,13 @@ export class Tutorial {
   private previewTimer = 0;
   private previewTransport = false;
   private previewMuted = false;
-  private busy = false;
   private error = '';
   private followTarget = false;
   /** the chapter page: the intro before the steps, the steps, the end */
   private page: 'intro' | 'steps' | 'done' = 'intro';
   private lastRender = '';
-  private actions: Actions;
+  /** the patch as the learner had it when entering each step of this chapter: Back restarts a step from it */
+  private entries = new Map<number, Patch>();
   /** the element the panel sits beside and where it was; a drag pins the panel until the target changes */
   private beside: Element | null = null;
   private besideRect = '';
@@ -97,7 +97,6 @@ export class Tutorial {
     this.progress = this.loadProgress();
     this.page = this.progress.page ?? (this.progress.step > 0 ? 'steps' : 'intro');
     this.entry = structuredClone(this.host.editor.patch);
-    this.actions = this.makeActions();
     window.addEventListener('resize', () => { if (this.active) { this.pinned = false; this.place(this.beside, true); }; });
   }
 
@@ -137,59 +136,21 @@ export class Tutorial {
     };
   }
 
+  /** also told about every event (the lesson editor's link to this synth, in development) */
+  observer?: { event(name: keyof Seen): void; saved(def: AssemblyDef): void };
+  private happened(name: keyof Seen): void { this.seen[name]++; this.observer?.event(name); this.refresh(); }
+
   /** the host reports what happened; the step panel re-checks */
-  noteOn(): void { this.seen.notes++; this.refresh(); }
-  newPatchPressed(): void { this.seen.news++; this.refresh(); }
-  undone(): void { this.seen.undos++; this.refresh(); }
-  redone(): void { this.seen.redos++; this.refresh(); }
-  zoomed(): void { this.seen.zooms++; this.refresh(); }
-  flipped(): void { this.seen.flips++; this.refresh(); }
-  saved(def: AssemblyDef): void { this.lastSaved = structuredClone(def); this.seen.saves++; this.refresh(); }
-  shared(): void { this.seen.shares++; this.refresh(); }
-  bypassed(): void { this.seen.bypasses++; this.refresh(); }
+  noteOn(): void { this.happened('notes'); }
+  newPatchPressed(): void { this.happened('news'); }
+  undone(): void { this.happened('undos'); }
+  redone(): void { this.happened('redos'); }
+  zoomed(): void { this.happened('zooms'); }
+  flipped(): void { this.happened('flips'); }
+  saved(def: AssemblyDef): void { this.lastSaved = structuredClone(def); this.seen.saves++; this.observer?.saved(def); this.refresh(); }
+  shared(): void { this.happened('shares'); }
+  bypassed(): void { this.happened('bypasses'); }
   refresh(): void { if (this.active) this.render(); }
-
-  // ---- do it for me
-
-  private makeActions(): Actions {
-    const h = this.host;
-    const e = h.editor;
-    return {
-      patch: () => e.patch,
-      edit: (fn) => { const next = structuredClone(e.patch); fn(next); if (!e.transact(() => { Object.assign(e.patch, next); })) e.rebuild(); },
-      load: (p) => h.load(p),
-      newPatch: (name) => { h.load(newPatch(DEFS, name)); this.seen.news++; },
-      setZoom: (z) => e.setZoom(z),
-      zoomToFit: () => e.zoomToFit(),
-      probe: (id, port) => h.probe(id, port),
-      arpPlay: (on) => h.arpPlay(on),
-      select: (ids) => e.selectOnly(ids),
-      undo: () => e.undo(),
-      redo: () => e.redo(),
-      note: () => { void this.play('riff'); },
-      startAudio: () => h.startAudio(),
-      saveAssembly: (def, tag) => { h.saveAssembly({ ...def, tutorial: tag }); this.saved(def); },
-      library: () => h.library(),
-      snapshot: (side) => h.snapshot(side),
-      flipAB: () => h.flipAB(),
-      share: () => h.share(),
-      bypass: (id, on) => h.bypass(id, on),
-    };
-  }
-
-  private async doStep(i: number): Promise<boolean> {
-    const ch = this.chapter;
-    if (!ch) return false;
-    const st = ch.steps[i];
-    try {
-      if (!st.check(this.state())) await st.apply(this.actions, this.state());
-      return st.check(this.state());
-    } catch (err) {
-      this.error = `Could not complete this step: ${(err as Error).message}`;
-      this.host.status(this.error);
-      return false;
-    }
-  }
 
   // ---- entry points
 
@@ -199,7 +160,7 @@ export class Tutorial {
     this.panel.hidden = false;
     this.panel.replaceChildren(
       this.head('Tutorial'),
-      el('p', { textContent: 'Eleven short chapters build synths from modules, one cable at a time, and show the editor on the way: assemblies, your library, the scope, the arpeggiator. Every step can be done for you.' }),
+      el('p', { textContent: 'Eleven short chapters build synths from modules, one cable at a time, and show the editor on the way: assemblies, your library, the scope, the arpeggiator. Each chapter starts from a prepared patch, so you can begin anywhere.' }),
       el('div', { class: 'tour-actions' },
         this.button('Start chapter 1', () => this.start(0), true),
         this.button('Later', () => { this.markSeen(); this.panel.hidden = true; })),
@@ -250,6 +211,7 @@ export class Tutorial {
     this.hold = false;
     clearTimeout(this.advanceTimer); this.advanceTimer = 0;
     this.page = 'intro';
+    this.entries.clear();
     this.saveProgress();
     this.enterStep();
     this.panel.hidden = false;
@@ -259,6 +221,7 @@ export class Tutorial {
 
   private enterStep(): void {
     this.entry = JSON.parse(JSON.stringify(this.host.editor.patch)) as Patch;
+    if (this.page === 'steps') this.entries.set(this.progress.step, structuredClone(this.entry));
     this.seen = noSeen();
     this.lastSaved = undefined;
     this.error = '';
@@ -415,7 +378,7 @@ export class Tutorial {
     const done = this.page === 'steps' && st ? stepDone(ch, this.progress.step, s) : { met: false, moot: false };
     const ok = done.met || done.moot;
     const broken = this.page === 'steps' ? ch.steps.slice(0, this.progress.step).map((x, k) => (!x.transient && !x.superseded && !x.check(s) ? k : -1)).filter((k) => k >= 0) : [];
-    const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, s.audio, this.busy, this.error, this.previewing, this.auditionMode, ok ? [] : st?.todo?.(s) ?? []]);
+    const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, s.audio, this.error, this.previewing, this.auditionMode, ok ? [] : st?.todo?.(s) ?? []]);
     if (!force && key === this.lastRender) return;
     this.lastRender = key;
     const count = el('span', { class: 'tour-count', textContent: `Chapter ${i + 1} of ${CHAPTERS.length} · ${ch.title}` });
@@ -423,35 +386,33 @@ export class Tutorial {
     if (this.error) parts.push(el('p', { class: 'tutorial-warn', textContent: this.error }));
     if (!s.audio) parts.push(el('p', { class: 'tutorial-hint', textContent: 'Sound is paused. Press a playback button, or the audio button in the sidebar, to listen.' }));
     if (this.page === 'intro') {
-      parts.push(el('p', { textContent: ch.intro }));
+      parts.push(lessonProse(ch.intro));
       parts.push(el('p', { textContent: 'Your previous patch was saved in Tutorial → Your saved variations. Each chapter starts from a prepared patch; your own sketches remain recoverable.' }));
       parts.push(this.button(this.previewing ? 'Stop preview' : 'Preview the finished sound', () => this.preview()));
       parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.stop(); this.page = 'steps'; this.enterStep(); this.saveProgress(); this.render(true); }, true), this.button('Chapters', () => this.open())));
     } else if (this.page === 'steps' && st) {
       parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? (this.hold || st.listen ? ' · ✓ ready when you are' : ' · ✓ done, moving on') : ''}` }));
-      parts.push(el('p', { textContent: st.text }));
-      if (st.why) parts.push(el('details', { class: 'tutorial-why' }, el('summary', { textContent: 'Why' }), el('p', { textContent: st.why })));
+      parts.push(lessonProse(st.text));
+      if (st.why) parts.push(el('details', { class: 'tutorial-why' }, el('summary', { textContent: 'Why' }), lessonProse(st.why)));
       const todo = ok ? [] : st.todo?.(s) ?? [];
       if (todo.length) parts.push(el('div', { class: 'tutorial-todo' }, el('span', { textContent: 'Still to do' }), el('ul', {}, ...todo.map((t) => el('li', { textContent: t })))));
-      parts.push(this.auditionControls());
+      if (st.playback !== false) parts.push(this.auditionControls());
       if (broken.length) {
         const k = broken[0];
-        parts.push(el('p', { class: 'tutorial-warn' }, `Step ${k + 1} (${ch.steps[k].title}) no longer holds. `, el('button', { class: 'sm', textContent: 'Restore', onclick: async () => { if (this.busy) return; this.busy = true; this.error = ''; this.render(true); for (const j of broken) if (!await this.doStep(j)) break; this.busy = false; this.render(true); } })));
+        parts.push(el('p', { class: 'tutorial-warn', textContent: `Step ${k + 1} (${ch.steps[k].title}) no longer holds: put it back, or go Back to redo it.` }));
       }
       const actions = el('div', { class: 'tour-actions' });
-      if (this.progress.step > 0) actions.append(this.button('← Back', () => { this.stop(); this.cancelAdvance(); this.progress.step--; this.hold = true; this.saveProgress(); this.enterStep(); this.render(true); }));
-      const helper = this.button(this.busy ? 'Working…' : 'Do it for me', async () => { if (this.busy) return; this.busy = true; this.error = ''; this.cancelAdvance(); this.render(true); await this.doStep(this.progress.step); this.busy = false; this.render(true); });
-      helper.disabled = this.busy; if (!ok || !st.listen) actions.append(helper);
+      if (this.progress.step > 0) actions.append(this.button('← Back', () => this.back()));
       if (st.optional) actions.append(this.button('Skip optional exercise', () => this.advance(true)));
-      if (ok && !broken.length && !this.busy && (this.hold || st.listen)) actions.append(this.button(this.progress.step < ch.steps.length - 1 ? 'Continue →' : 'Finish', () => this.advance(), true));
+      if (ok && !broken.length && (this.hold || st.listen)) actions.append(this.button(this.progress.step < ch.steps.length - 1 ? 'Continue →' : 'Finish', () => this.advance(), true));
       parts.push(actions);
       parts.push(el('details', {}, el('summary', { textContent: 'Keep a variation' }), this.saveControls()));
-      if (ok && !broken.length && !this.busy && !st.listen && !this.hold && !this.menu.open && !this.advanceTimer) this.advanceTimer = window.setTimeout(() => { this.advanceTimer = 0; const d = stepDone(ch, this.progress.step, this.state()); if (this.active && !this.menu.open && this.step === st && (d.met || d.moot)) this.advance(); }, ADVANCE_MS);
-      if ((!ok || broken.length || this.busy || this.menu.open) && this.advanceTimer) { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
+      if (ok && !broken.length && !st.listen && !this.hold && !this.menu.open && !this.advanceTimer) this.advanceTimer = window.setTimeout(() => { this.advanceTimer = 0; const d = stepDone(ch, this.progress.step, this.state()); if (this.active && !this.menu.open && this.step === st && (d.met || d.moot)) this.advance(); }, ADVANCE_MS);
+      if ((!ok || broken.length || this.menu.open) && this.advanceTimer) { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
     } else {
       const last = i === CHAPTERS.length - 1;
-      parts.push(el('p', { textContent: ch.payoff ?? 'Your instrument is ready to play.' }));
-      parts.push(el('p', { textContent: `Optional challenge: ${ch.challenge ?? 'Make it your own.'}` }));
+      parts.push(lessonProse(ch.payoff ?? 'Your instrument is ready to play.'));
+      parts.push(lessonChallenge(ch.challenge ?? 'Make it your own.'));
       parts.push(this.auditionControls());
       parts.push(this.saveControls());
       parts.push(el('p', { textContent: last ? 'Keep your performance with Save variation. Find your sketches in Tutorial → Your saved variations, or share this patch from Commands.' : 'The next chapter saves a recoverable copy of this patch before loading its prepared start. Find every copy in Tutorial → Your saved variations.' }));
@@ -465,9 +426,27 @@ export class Tutorial {
     this.focus(this.targetsOf(st, s));
   }
 
+  /** restart the previous step from the patch it began with (the learner's own, else the canned one); the current patch is
+   * kept as a variation first */
+  private back(): void {
+    const ch = this.chapter;
+    if (!ch || this.progress.step === 0) return;
+    this.stop();
+    this.cancelAdvance();
+    if (!this.keepCurrent()) return;
+    const k = this.progress.step - 1;
+    const start = this.entries.get(k) ?? stepStart(this.chapterIndex, k);
+    this.host.load(structuredClone(start));
+    this.progress.step = k;
+    this.hold = true;
+    this.saveProgress();
+    this.enterStep();
+    this.render(true);
+  }
+
   private advance(optional = false): void {
     const ch = this.chapter;
-    if (!ch || this.busy || this.page !== 'steps') return;
+    if (!ch || this.page !== 'steps') return;
     const s = this.state();
     if (!(optional && this.step?.optional) && !this.step?.check(s)) return;
     if (ch.steps.slice(0, this.progress.step).some((st) => !st.transient && !st.superseded && !st.check(s))) return;

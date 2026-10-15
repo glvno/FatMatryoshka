@@ -369,7 +369,35 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .tutorial-handle:active { cursor: grabbing; }
 .tour-count { font-size: 10px; letter-spacing: .12em; color: var(--secondary); font-weight: 700; text-transform: uppercase; }
 .tour-step { display: block; margin-top: 8px; font-size: 11px; color: var(--muted); }
-.tutorial p { color: var(--muted); line-height: 1.6; margin: 8px 0; }
+.tutorial p { white-space: pre-line; color: var(--muted); line-height: 1.6; margin: 8px 0; }
+.tutorial-prose { margin: 8px 0; color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; }
+.tutorial .tutorial-prose p { white-space: normal; color: inherit; }
+.tutorial-prose > :first-child { margin-top: 0; }
+.tutorial-prose > :last-child { margin-bottom: 0; }
+.tutorial-prose :is(strong, em) { color: var(--ink); }
+.tutorial .tutorial-prose :is(h3, h4, h5, h6) { margin: 16px 0 6px; font: 700 16px/1.3 system-ui, sans-serif; color: var(--ink); }
+.tutorial .tutorial-prose :is(h4, h5, h6) { font-size: 14px; }
+.tutorial-prose :is(ul, ol) { padding-left: 24px; margin: 8px 0; }
+.tutorial-prose li { margin: 4px 0; }
+.tutorial-prose li::marker { color: var(--secondary); }
+.tutorial-prose blockquote { margin: 12px 0; padding: 4px 12px; border-left: 3px solid var(--secondary); background: var(--surface-tint); }
+.tutorial-prose code { font: .9em/1.5 ui-monospace, monospace; color: var(--ink); background: var(--surface-tint); border-radius: 3px; padding: 1px 4px; }
+.tutorial-prose pre { max-width: 100%; overflow-x: auto; white-space: pre; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-tint); }
+.tutorial-prose pre code { padding: 0; background: transparent; }
+.tutorial-prose hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+.tutorial-prose img { display: block; max-width: 100%; height: auto; margin: 10px 0; }
+.tutorial-table { max-width: 100%; overflow-x: auto; margin: 12px 0; }
+.tutorial-prose table { border-collapse: collapse; width: 100%; font-size: .9em; }
+.tutorial-prose :is(th, td) { padding: 6px 8px; border: 1px solid var(--line); text-align: left; }
+.tutorial-prose th { color: var(--ink); background: var(--surface-tint); }
+.tutorial-prose .footnote-ref { font-size: .8em; line-height: 0; }
+.tutorial-prose .footnote-ref a { padding: 2px; }
+.tutorial-prose .footnotes { font-size: .9em; }
+.tutorial-prose .footnote-item { scroll-margin-block: 12px; }
+.tutorial-prose .footnote-backref { display: inline-block; padding: 2px 5px; text-decoration: none; }
+.tutorial-challenge { margin: 12px 0; }
+.tutorial-challenge > strong { color: var(--secondary); font-size: 13px; }
+@media (max-width: 650px) { .tutorial-prose { font-size: 12px; } }
 .tutorial-hint { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--ink); }
 .tutorial-warn { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--ink); }
 .tutorial-why { font-size: 13px; margin: 6px 0; }

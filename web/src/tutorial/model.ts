@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The tutorial's model: chapters of steps with a structural check and a "do it for me" apply, the state the checks can
-// see, the actions an apply may take, and a headless session that runs the course without a DOM (canned chapter starts
-// and ends, bundled copies of the assemblies the course saves, tests). The design is in docs/TUTORIAL.md.
+// The tutorial's model: chapters of steps with a structural check, the state the checks can see, and the helpers checks
+// use to find modules by shape. The course itself is data (course.json, compiled by chapters.ts). The design is in
+// docs/TUTORIAL.md.
 import { DEFS } from '../modules';
 import { addModule, connect, disconnect, newPatch, sameEnd, type ModuleInst, type Patch } from '../patch';
 import { allModules, assembliesOf, freeSpot, hiddenModules, reconcileAll, toDef, type AssemblyDef, type AssemblyInst, type Rect } from '../assembly';
@@ -39,34 +39,6 @@ export interface TutorialState {
   seen: Seen;
 }
 
-/** what "do it for me" may do; the host wires these to the editor, the headless session to its own state */
-export interface Actions {
-  patch(): Patch;
-  /** a structural change (undoable in the editor) */
-  edit(fn: (p: Patch) => void): void;
-  /** replace the patch */
-  load(p: Patch): void;
-  /** what the New patch button does: a bare patch with this name */
-  newPatch(name: string): void;
-  setZoom(z: number): void;
-  zoomToFit(): void;
-  probe(moduleId: number, port: string): void;
-  arpPlay(on: boolean): void;
-  select(ids: number[]): void;
-  undo(): void;
-  redo(): void;
-  /** play a C for a moment */
-  note(): void;
-  startAudio(): void;
-  /** put a definition into the library, tagged for later chapters (replaces one with the same tag or name) */
-  saveAssembly(def: AssemblyDef, tag: string): void;
-  library(): AssemblyDef[];
-  snapshot(side: 'A' | 'B'): void;
-  flipAB(): void;
-  share(): void;
-  bypass(moduleId: number, on: boolean): void;
-}
-
 export type Target =
   | { kind: 'module'; id: number }
   | { kind: 'asm'; id: number }
@@ -76,6 +48,8 @@ export type Target =
 
 export interface Step {
   id: string;
+  /** `task`: a check made of parts; `continue`: no requirements, waits for Continue (reading or listening) */
+  kind: 'task' | 'continue';
   title: string;
   /** Listening and exploration wait for Continue instead of advancing on a timer. */
   listen?: boolean;
@@ -93,7 +67,8 @@ export interface Step {
   todo?(s: TutorialState): string[];
   /** the elements of the first unmet part: what the highlight points at next */
   focus?(s: TutorialState): Target[];
-  apply(a: Actions, s: TutorialState): void;
+  /** a Continue step shows the playback buttons */
+  playback?: boolean;
   /** fallback highlight when `focus` gives nothing */
   target?(s: TutorialState): Target[];
 }
@@ -105,9 +80,6 @@ export interface Chapter {
   intro: string;
   /** the name the chapter's patch gets */
   patchName: string;
-  /** the canned start: a fresh patch, or null for the previous chapter's canned end. The runtime always loads it
-   * (`chapterStart`): no chapter continues with whatever the user left open */
-  start(): Patch | null;
   steps: Step[];
   payoff?: string;
   challenge?: string;
@@ -214,95 +186,4 @@ export function stepDone(ch: Chapter, i: number, s: TutorialState): { met: boole
 
 export function headlessState(patch: Patch, library: AssemblyDef[] = []): TutorialState {
   return { patch, entry: patch, zoom: 1, probes: new Set(), arpPlay: false, audio: false, selected: new Set(), library, snapshots: { A: null, B: null }, seen: noSeen() };
-}
-
-// ---- a session without a DOM: the course run by "do it for me" alone
-
-export class HeadlessSession implements Actions {
-  state: TutorialState;
-  private history: string[] = [];
-  private future: string[] = [];
-  constructor(patch: Patch, library: AssemblyDef[] = []) {
-    this.state = headlessState(patch, library);
-  }
-  patch(): Patch { return this.state.patch; }
-  edit(fn: (p: Patch) => void): void {
-    const before = JSON.stringify(this.state.patch);
-    const next = structuredClone(this.state.patch);
-    fn(next);
-    reconcileAll(next, DEFS);
-    this.state.patch = next;
-    if (JSON.stringify(this.state.patch) !== before) { this.history.push(before); this.future = []; }
-  }
-  load(p: Patch): void { this.state.patch = p; this.state.entry = p; this.state.probes.clear(); this.state.selected.clear(); }
-  newPatch(name: string): void { this.load(newPatch(DEFS, name)); this.state.seen.news++; }
-  setZoom(z: number): void { this.state.zoom = z; this.state.seen.zooms++; }
-  zoomToFit(): void { this.setZoom(0.8); }
-  probe(moduleId: number, port: string): void { this.state.probes.add(`${moduleId}:${port}`); }
-  arpPlay(on: boolean): void { this.state.arpPlay = on; }
-  select(ids: number[]): void { this.state.selected = new Set(ids); }
-  undo(): void {
-    const s = this.history.pop();
-    if (s !== undefined) { this.future.push(JSON.stringify(this.state.patch)); this.state.patch = JSON.parse(s) as Patch; }
-    this.state.seen.undos++;
-  }
-  redo(): void {
-    const s = this.future.pop();
-    if (s !== undefined) { this.history.push(JSON.stringify(this.state.patch)); this.state.patch = JSON.parse(s) as Patch; }
-    this.state.seen.redos++;
-  }
-  note(): void { this.state.seen.notes++; }
-  startAudio(): void { this.state.audio = true; }
-  saveAssembly(def: AssemblyDef, tag: string): void {
-    this.state.seen.saves++;
-    this.state.lastSaved = def;
-    const d = { ...def, tutorial: tag };
-    const lib = this.state.library.filter((x) => x.tutorial !== tag && x.name !== def.name);
-    this.state.library = [...lib, d];
-  }
-  library(): AssemblyDef[] { return this.state.library; }
-  snapshot(side: 'A' | 'B'): void { this.state.snapshots[side] = JSON.stringify(this.state.patch); }
-  flipAB(): void { this.state.seen.flips++; }
-  share(): void { this.state.seen.shares++; }
-  bypass(moduleId: number, on: boolean): void {
-    const m = byId(this.state.patch, moduleId);
-    if (!m) return;
-    if (on) m.bypass = true;
-    else delete m.bypass;
-    this.state.seen.bypasses++;
-  }
-  /** run every step of a chapter: a step whose check already passes is left alone */
-  run(ch: Chapter): void {
-    for (const st of ch.steps) {
-      this.state.entry = JSON.parse(JSON.stringify(this.state.patch)) as Patch;
-      this.state.seen = noSeen();
-      this.state.lastSaved = undefined;
-      if (!st.check(this.state)) st.apply(this, this.state);
-    }
-  }
-}
-
-export interface CourseRun {
-  starts: Patch[];
-  ends: Patch[];
-  library: AssemblyDef[];
-}
-
-/** the whole course by "do it for me": canned starts and ends of every chapter and the assemblies it saves */
-export function runCourse(chapters: Chapter[], fallbackStart: () => Patch): CourseRun {
-  const starts: Patch[] = [];
-  const ends: Patch[] = [];
-  let library: AssemblyDef[] = [];
-  let prev: Patch | null = null;
-  for (const ch of chapters) {
-    const fresh = ch.start();
-    const start: Patch = fresh ? fresh : prev ? (JSON.parse(JSON.stringify(prev)) as Patch) : fallbackStart();
-    starts.push(JSON.parse(JSON.stringify(start)) as Patch);
-    const s = new HeadlessSession(start, library);
-    s.run(ch);
-    library = s.library();
-    prev = s.patch();
-    ends.push(JSON.parse(JSON.stringify(prev)) as Patch);
-  }
-  return { starts, ends, library };
 }

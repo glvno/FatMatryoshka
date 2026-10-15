@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { CHAPTERS, chapterStart, chapterEnd, courseRun } from './chapters';
-import { HeadlessSession, byId, cabled, loose, mod, mods, noSeen, place } from './model';
+import { COURSE, CHAPTERS, bundledLibrary, chapterEnd, referenceOf, stepStart } from './chapters';
+import { byId, cabled, headlessState, loose, mod, mods, place } from './model';
 import { storeTutorialAssembly, loadLibrary } from '../assemblies';
-import { allModules } from '../assembly';
+import { allModules, assembliesOf, toDef } from '../assembly';
 import { Engine } from '../engine';
 import { DEFS } from '../modules';
 import { paramValue, removeModule, validatePatch, type Patch } from '../patch';
@@ -11,18 +11,11 @@ import { buildPerformance, hasPerformance } from './performance';
 import { Audition } from './audition';
 import { keepVariation, variations } from './variations';
 
-function before(chapter: number, step: string): HeadlessSession {
-  const session = new HeadlessSession(chapterStart(chapter), structuredClone(courseRun().library));
-  for (const st of CHAPTERS[chapter].steps) {
-    session.state.seen = noSeen(); session.state.entry = structuredClone(session.patch());
-    if (st.id === step) break;
-    if (!st.check(session.state)) st.apply(session, session.state);
-  }
-  return session;
-}
-function apply(chapter: number, step: string, s: HeadlessSession): void {
-  CHAPTERS[chapter].steps.find((st) => st.id === step)!.apply(s, s.state);
-}
+const index = (chapter: number, step: string): number => CHAPTERS[chapter].steps.findIndex((st) => st.id === step);
+const step = (chapter: number, id: string) => CHAPTERS[chapter].steps[index(chapter, id)];
+/** the patch a step begins from, and the patch after it (its reference) */
+const before = (chapter: number, id: string): Patch => stepStart(chapter, index(chapter, id));
+const after = (chapter: number, id: string): Patch => structuredClone(referenceOf(COURSE, COURSE.chapters[chapter].id, id)!.patch);
 function tail(patch: Patch): number {
   const e = new Engine(48000); e.load(patch); e.noteOn(60, 0.8);
   const l = new Float32Array(128), r = new Float32Array(128); let peak = 0;
@@ -33,45 +26,37 @@ function tail(patch: Patch): number {
   return peak;
 }
 describe('manual tutorial regressions', () => {
-  it('repairs a manually duplicated oscillator without adding a third', () => {
-    const s = before(5, 'dup');
-    s.edit((p) => { const copy = place(p, 'osc'); copy.params = { ...mod(p, 'osc')!.params }; });
-    expect(CHAPTERS[5].steps.find((x) => x.id === 'dup')!.check(s.state)).toBe(false);
-    apply(5, 'dup', s);
-    expect(mods(s.patch(), 'osc')).toHaveLength(2);
-    for (const o of mods(s.patch(), 'osc')) expect(cabled(s.patch(), mod(s.patch(), 'fm1'), 'pitch', o, 'pitch')).toBe(true);
+  it('a manually duplicated oscillator still needs its own pitch cable', () => {
+    const p = before(5, 'dup');
+    const copy = place(p, 'osc'); copy.params = { ...mod(p, 'osc')!.params };
+    const s = headlessState(p);
+    expect(step(5, 'dup').check(s)).toBe(false);
+    expect(step(5, 'dup').todo!(s)).toEqual(['Cable Main pitch → the second Oscillator’s pitch']);
+    const done = after(5, 'dup');
+    expect(mods(done, 'osc')).toHaveLength(2);
+    for (const o of mods(done, 'osc')) expect(cabled(done, mod(done, 'fm1'), 'pitch', o, 'pitch')).toBe(true);
   });
-  it('selects a manually added external drum mixer and preserves factory internals', () => {
-    const s = before(10, 'mix');
-    const factoryIds = new Set(s.patch().assemblies!.filter((a) => ['kick', 'snare'].includes(a.name)).flatMap((a) => allModules(s.patch(), a)));
-    const internal = () => s.patch().cables.filter((c) => factoryIds.has(c.from.module) && factoryIds.has(c.to.module));
-    const cables = structuredClone(internal());
-    s.edit((p) => place(p, 'mixer'));
-    const id = loose(s.patch(), 'mixer')!.id;
-    apply(10, 'mix', s);
-    expect(loose(s.patch(), 'mixer')!.id).toBe(id);
-    expect(internal()).toEqual(cables);
-    const mixer = loose(s.patch(), 'mixer')!;
-    expect(s.patch().cables.filter((c) => c.to.module === mixer.id)).toHaveLength(3);
+  it('the drum mixer sits outside the factory drums and leaves their internals alone', () => {
+    const start = before(10, 'mix'), p = after(10, 'mix');
+    const internal = (q: Patch) => { const ids = new Set(assembliesOf(q).filter((a) => ['kick', 'snare'].includes(a.name)).flatMap((a) => allModules(q, a))); return q.cables.filter((c) => ids.has(c.from.module) && ids.has(c.to.module)); };
+    expect(internal(p)).toEqual(internal(start));
+    const mixer = loose(p, 'mixer')!;
+    expect(p.cables.filter((c) => c.to.module === mixer.id)).toHaveLength(3);
   });
-  it('manual hat settings have no held-note sustain and match helper settings', () => {
-    const s = before(10, 'env'); apply(10, 'env', s);
-    const env = mod(s.patch(), 'env')!;
-    expect(env.params).toMatchObject({ l1: 1, r1: 0.001, l2: 0, r2: 0.08, l3: 0, l4: 0 });
-    expect(tail(s.patch())).toBeLessThan(1e-6);
-    env.params.l3 = 0.6;
-    expect(CHAPTERS[10].steps.find((x) => x.id === 'env')!.check(s.state)).toBe(false);
-    expect(tail(s.patch())).toBeGreaterThan(0.01);
+  it('the hat settings have no held-note sustain, and a sustain fails the step', () => {
+    const p = after(10, 'env');
+    expect(mod(p, 'env')!.params).toMatchObject({ l1: 1, r1: 0.001, l2: 0, r2: 0.08, l3: 0, l4: 0 });
+    expect(tail(p)).toBeLessThan(1e-6);
+    mod(p, 'env')!.params.l3 = 0.6;
+    expect(step(10, 'env').check(headlessState(p))).toBe(false);
+    expect(tail(p)).toBeGreaterThan(0.01);
   });
   it('the pluck dies while held and the FM envelope cannot rise to default sustain', () => {
-    const pluck = before(1, 'pluck'); apply(1, 'pluck', pluck);
-    expect(tail(pluck.patch())).toBeLessThan(1e-6);
-    const fm = before(5, 'index'); apply(5, 'index', fm);
-    expect(mod(fm.patch(), 'env')!.params.l3).toBe(0.3);
+    expect(tail(after(1, 'pluck'))).toBeLessThan(1e-6);
+    expect(mod(after(5, 'index'), 'env')!.params.l3).toBe(0.3);
   });
-  it.each([[5, 'dry'], [7, 'dry'], [7, 'grain']] as const)('chapter %i has an audible path at %s', (chapter, step) => {
-    const s = before(chapter, step); apply(chapter, step, s);
-    const e = new Engine(48000); e.load(s.patch()); e.noteOn(60, 0.8);
+  it.each([[5, 'dry'], [7, 'dry'], [7, 'grain']] as const)('chapter %i has an audible path at %s', (chapter, id) => {
+    const e = new Engine(48000); e.load(after(chapter, id)); e.noteOn(60, 0.8);
     const l = new Float32Array(128), r = new Float32Array(128); let peak = 0;
     for (let i = 0; i < 750; i++) { e.render(l, r); for (const sample of l) peak = Math.max(peak, Math.abs(sample)); }
     expect(peak).toBeGreaterThan(0.005);
@@ -94,12 +79,16 @@ describe('manual tutorial regressions', () => {
     expect(cabled(p, beat, 'd2', mod(p, 'pulse'), 'trig')).toBe(false);
   });
   it('does not accept a stale library name as a new save', () => {
-    const s = before(3, 'save');
-    expect(CHAPTERS[3].steps.find((x) => x.id === 'save')!.check(s.state)).toBe(false);
-    s.saveAssembly(courseRun().library.find((d) => d.tutorial === 'my-space')!, 'my-space');
-    expect(CHAPTERS[3].steps.find((x) => x.id === 'save')!.check(s.state)).toBe(false);
-    apply(3, 'save', s);
-    expect(CHAPTERS[3].steps.find((x) => x.id === 'save')!.check(s.state)).toBe(true);
+    const lib = bundledLibrary();
+    const p = before(3, 'save');
+    const s = headlessState(p, lib.filter((d) => d.tutorial !== 'my-voice'));
+    expect(step(3, 'save').check(s)).toBe(false);
+    s.seen.saves++; s.lastSaved = lib.find((d) => d.tutorial === 'my-space')!; s.library = [...s.library, s.lastSaved];
+    expect(step(3, 'save').check(s)).toBe(false);
+    const voice = assembliesOf(p)[0]; voice.name = 'My voice';
+    const def = { ...toDef(p, voice), tutorial: 'my-voice' };
+    s.lastSaved = def; s.library = [...s.library, def];
+    expect(step(3, 'save').check(s)).toBe(true);
   });
   it('the finale validates within the module budget and stores its eight-bar form', () => {
     const p = chapterEnd(10); expect(p.modules.length).toBeLessThanOrEqual(32);
@@ -153,7 +142,7 @@ it('tutorial saves preserve the previous instrument and leave only one active ta
   const data = new Map<string, string>();
   vi.stubGlobal('localStorage', { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => data.set(k, v) });
   try {
-    const original = structuredClone(courseRun().library[0]);
+    const original = structuredClone(bundledLibrary()[0]);
     storeTutorialAssembly(original);
     const updated = structuredClone(original); updated.name = 'My new voice'; updated.modules[0].params.wave = 3;
     storeTutorialAssembly(updated);
@@ -167,7 +156,7 @@ it('tutorial saves preserve the previous instrument and leave only one active ta
 
 
 it('repairs missing finale wiring and a deleted form sequencer without duplicating instruments', () => {
-  const p = chapterEnd(10); const def = courseRun().library.find((d) => d.tutorial === 'pluck')!;
+  const p = chapterEnd(10); const def = bundledLibrary().find((d) => d.tutorial === 'pluck')!;
   const a = p.assemblies!.find((x) => x.name === 'Eight-bar arrangement')!;
   const form = allModules(p, a).map((id) => byId(p, id)!).find((m) => m.type === 'seq')!;
   p.cables = p.cables.filter((c) => c.from.module !== form.id);
