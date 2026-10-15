@@ -5,7 +5,7 @@ import { DEFS } from '../modules';
 import { validatePatch, type Patch } from '../patch';
 import { validateAssemblyDef } from '../assembly';
 import { CHAPTERS, chapterEnd, chapterStart, courseRun, tutorialDef } from './chapters';
-import { completes, HeadlessSession, headlessState, noSeen, runCourse } from './model';
+import { completes, HeadlessSession, headlessState, noSeen, runCourse, stepDone } from './model';
 
 const SR = 48000;
 /** peak of a second of audio with a C held */
@@ -98,6 +98,21 @@ describe('tutorial course', () => {
     expect(tutorialDef('my-voice', 'My voice', [renamed])).toEqual({ def: renamed, which: 'yours' });
     const named = { ...run.library[0], name: 'my voice', tutorial: undefined };
     expect(tutorialDef('my-voice', 'My voice', [named]).which).toBe('yours');
+  });
+
+  it('walks a finished patch straight through: preparatory steps count as done once a later step holds', () => {
+    // chapter 4 on its own result: "select the modules" cannot be redone (they sit inside the assembly) and is moot
+    const s = headlessState(chapterEnd(3), run.library);
+    const ch = CHAPTERS[3];
+    expect(stepDone(ch, 0, s)).toEqual({ met: false, moot: true });
+    expect(stepDone(ch, 1, s).met).toBe(true); // group
+    expect(stepDone(ch, 2, s)).toEqual({ met: false, moot: true }); // expand, superseded by collapse
+    expect(stepDone(ch, 5, s).met).toBe(true); // collapse
+    // the last, transient step (zoom) is not moot: nothing structural follows it
+    expect(stepDone(ch, ch.steps.length - 1, s)).toEqual({ met: false, moot: false });
+    // on the canned start nothing is moot
+    const s0 = headlessState(chapterStart(3), []);
+    for (let i = 0; i < ch.steps.length; i++) expect(stepDone(ch, i, s0).moot, `${ch.steps[i].id}`).toBe(false);
   });
 
   it('judges whether a patch continues a chapter by its structure only', () => {

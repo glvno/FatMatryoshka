@@ -184,6 +184,18 @@ export function completes(ch: Chapter, patch: Patch, library: AssemblyDef[]): bo
   return ch.steps.filter((st) => !st.transient && !st.superseded).every((st) => st.check(s));
 }
 
+/**
+ * A step whose work is already in the patch: its own check holds, or it only prepares a later step (transient: select
+ * the modules, play a note; superseded: a cable a later step replaces) and a later structural step already holds. So a
+ * chapter walked again on a finished patch flows through to its end instead of asking for work that is done.
+ */
+export function stepDone(ch: Chapter, i: number, s: TutorialState): { met: boolean; moot: boolean } {
+  const st = ch.steps[i];
+  const met = st.check(s);
+  const moot = !met && !!(st.transient || st.superseded) && ch.steps.slice(i + 1).some((x) => !x.transient && !x.superseded && x.check(s));
+  return { met, moot };
+}
+
 export function headlessState(patch: Patch, library: AssemblyDef[] = []): TutorialState {
   return { patch, entry: patch, zoom: 1, probes: new Set(), arpPlay: false, audio: false, selected: new Set(), library, snapshots: { A: null, B: null }, seen: noSeen() };
 }

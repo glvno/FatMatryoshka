@@ -7,7 +7,7 @@ import type { AssemblyDef } from '../assembly';
 import { assemblyOf, hiddenModules } from '../assembly';
 import type { Editor } from '../editor';
 import { CHAPTERS, chapterStart, tutorialDef } from './chapters';
-import { completes, noSeen, type Actions, type Chapter, type Seen, type Step, type Target, type TutorialState } from './model';
+import { completes, noSeen, stepDone, type Actions, type Chapter, type Seen, type Step, type Target, type TutorialState } from './model';
 
 export interface TutorialHost {
   editor: Editor;
@@ -307,7 +307,8 @@ export class Tutorial {
     const i = this.chapterIndex;
     const s = this.state();
     const st = this.step;
-    const ok = this.page === 'steps' && !!st && st.check(s);
+    const done = this.page === 'steps' && st ? stepDone(ch, this.progress.step, s) : { met: false, moot: false };
+    const ok = done.met || done.moot;
     const broken = this.page === 'steps' ? ch.steps.slice(0, this.progress.step).map((x, k) => (!x.transient && !x.superseded && !x.check(s) ? k : -1)).filter((k) => k >= 0) : [];
     const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, s.audio, ok ? [] : st?.todo?.(s) ?? []]);
     if (!force && key === this.lastRender) return;
@@ -319,7 +320,7 @@ export class Tutorial {
       parts.push(el('p', { textContent: ch.intro }));
       parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.page = 'steps'; this.enterStep(); this.render(true); }, true), this.button('Chapters', () => this.open())));
     } else if (this.page === 'steps' && st) {
-      parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? (this.hold ? ' · ✓ done' : ' · ✓ done, moving on') : ''}` }));
+      parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? (this.hold ? ' · ✓ done' : done.moot ? ' · ✓ already in the patch, moving on' : ' · ✓ done, moving on') : ''}` }));
       parts.push(el('p', { textContent: st.text }));
       if (st.why) parts.push(el('details', { class: 'tutorial-why' }, el('summary', { textContent: 'Why' }), el('p', { textContent: st.why })));
       const todo = ok ? [] : st.todo?.(s) ?? [];
@@ -334,7 +335,7 @@ export class Tutorial {
       actions.append(this.button('Do it for me', () => { this.doStep(this.progress.step); this.advance(); }));
       if (ok && this.hold) actions.append(this.button(this.progress.step < ch.steps.length - 1 ? 'Next →' : 'Finish', () => this.advance(), true));
       parts.push(actions);
-      if (ok && !this.hold && !this.advanceTimer) this.advanceTimer = window.setTimeout(() => { this.advanceTimer = 0; if (this.step === st && st.check(this.state())) this.advance(); }, ADVANCE_MS);
+      if (ok && !this.hold && !this.advanceTimer) this.advanceTimer = window.setTimeout(() => { this.advanceTimer = 0; const d = stepDone(ch, this.progress.step, this.state()); if (this.step === st && (d.met || d.moot)) this.advance(); }, ADVANCE_MS);
       if (!ok && this.advanceTimer) { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
     } else {
       const last = i === CHAPTERS.length - 1;
