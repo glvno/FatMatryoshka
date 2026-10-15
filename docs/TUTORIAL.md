@@ -2,6 +2,10 @@
 
 The course has eleven chapters. Each teaches a synthesis idea through a playable patch and a practical editor technique. This document records the QA revisions requested on 2026-10-14; implementation tickets are [#23–#35](https://github.com/glvno/matryoshka/issues?q=is%3Aissue+label%3Aready-for-agent).
 
+## Panel size
+
+The docked panel grows up from its corner and scrolls once it reaches the top margin (CSS). A panel placed by its top edge (Follow, a drag, the middle of the screen) does the same: `Tutorial.fit`, run by a `ResizeObserver` on the panel, after every placement and on window resize, moves it up as its content grows until it reaches the top margin, and caps its height at the window minus the margins, so a long step scrolls instead of running off the screen.
+
 ## The offer
 
 Every visit to the Patch tab (not one opened from a share link) shows a centred card offering the tutorial: **Start the tutorial** (the first published chapter) or, with progress in a published chapter, **Resume**; **Not now** or Escape closes it for this visit. Ticking **Don't show this again** stores `matryoshka.tutorial-offer-off` in localStorage and reveals a note saying where the tutorial lives (**Tutorial ↗** in the sidebar, or **☰ Workspace → Tutorial ↗** below 700 px, where the sidebar is folded away) while that button pulses; unticking undoes both. `Tutorial.welcome()` in `tutorial.ts`.

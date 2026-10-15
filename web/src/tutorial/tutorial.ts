@@ -98,7 +98,9 @@ export class Tutorial {
     this.progress = this.loadProgress();
     this.page = this.progress.page ?? (this.progress.step > 0 ? 'steps' : 'intro');
     this.entry = structuredClone(this.host.editor.patch);
-    window.addEventListener('resize', () => { if (this.active) { this.pinned = false; this.place(this.beside, true); }; });
+    window.addEventListener('resize', () => { if (this.active) { this.pinned = false; this.place(this.beside, true); }; this.fit(); });
+    // a step's text can grow the panel after it was placed (a longer step, Why opened, an image loading)
+    new ResizeObserver(() => this.fit()).observe(this.panel);
   }
 
   // ---- progress
@@ -564,11 +566,25 @@ export class Tutorial {
    * covering it), so the eye does not travel between the text and the highlight. Repositions when the target or its place
    * changes, not while the user has dragged the panel; without a target the panel returns to the bottom right corner.
    */
+  /**
+   * A panel placed by its top edge (Follow, a drag, the middle of the screen) keeps its bottom on screen: as it grows it
+   * moves up until it reaches the top margin, and only then scrolls. The docked panel grows up from the bottom corner by
+   * CSS and needs nothing here.
+   */
+  private fit(): void {
+    const s = this.panel.style;
+    if (this.panel.hidden || !s.top || s.top === 'auto') { s.removeProperty('max-height'); return; }
+    const margin = 12, H = window.innerHeight;
+    s.maxHeight = `${H - 2 * margin}px`;
+    const top = parseFloat(s.top), h = this.panel.offsetHeight;
+    if (top + h > H - margin) s.top = `${Math.max(margin, H - margin - h)}px`;
+  }
+
   private place(el: Element | null, force = false, avoid: Element[] = []): void {
     if (window.innerWidth <= 650 || (!this.followTarget && !this.pinned)) {
       this.panel.style.removeProperty('left'); this.panel.style.removeProperty('top');
       this.panel.style.removeProperty('right'); this.panel.style.removeProperty('bottom');
-      this.beside = el; return;
+      this.fit(); this.beside = el; return;
     }
     const rect = el?.getBoundingClientRect();
     const key = rect ? [Math.round(rect.left / 8), Math.round(rect.top / 8), Math.round(rect.width / 8)].join(',') : `none:${this.page}:${this.progress.chapter}:${this.progress.step}`;
@@ -584,6 +600,7 @@ export class Tutorial {
       style.right = style.bottom = 'auto';
       style.left = `${Math.max(12, Math.round((window.innerWidth - this.panel.offsetWidth) / 2))}px`;
       style.top = `${Math.max(12, Math.round((window.innerHeight - this.panel.offsetHeight) / 2))}px`;
+      this.fit();
       return;
     }
     const gap = 16;
@@ -610,6 +627,7 @@ export class Tutorial {
     style.right = style.bottom = 'auto';
     style.left = `${clampX(spot.x)}px`;
     style.top = `${clampY(spot.y)}px`;
+    this.fit();
   }
 }
 
