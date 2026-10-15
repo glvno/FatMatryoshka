@@ -44,7 +44,8 @@ interface Progress {
   stepId?: string;
 }
 const STORE = 'matryoshka.tutorial';
-const SEEN = 'fatmatryoshka.tour-seen';
+/** set by the offer card's "Don't show this again" */
+const OFFER_OFF = 'matryoshka.tutorial-offer-off';
 const POLL_MS = 400;
 /** a done step shows its check mark this long, then the tutorial moves on by itself */
 const ADVANCE_MS = 900;
@@ -120,7 +121,6 @@ export class Tutorial {
     this.progress.stepId = this.step?.id;
     try { localStorage.setItem(STORE, JSON.stringify(this.progress)); } catch { /* storage optional */ }
   }
-  private markSeen(): void { try { localStorage.setItem(SEEN, '1'); } catch { /* storage optional */ } }
 
   get active(): boolean { return !this.panel.hidden && this.progress.chapter !== null; }
   private get chapterIndex(): number { return CHAPTERS.findIndex((c) => c.id === this.progress.chapter); }
@@ -155,25 +155,52 @@ export class Tutorial {
 
   // ---- entry points
 
-  /** the first visit: offer chapter 1 */
+  /** every visit, until "Don't show this again" is ticked: a card in the middle of the screen offering the tutorial (or
+   * the chapter the learner is in). Ticking the box points at where the tutorial lives from then on. */
   welcome(): void {
-    try { if (localStorage.getItem(SEEN) || localStorage.getItem(STORE)) return; } catch { /* storage optional */ }
-    this.panel.hidden = false;
-    this.panel.replaceChildren(
-      this.head('Tutorial'),
-      el('p', { textContent: 'Short chapters build synths from modules, one cable at a time, and show the editor on the way: assemblies, your library, the scope, the arpeggiator. Each chapter starts from a prepared patch, so you can begin anywhere.' }),
+    try { if (localStorage.getItem(OFFER_OFF)) return; } catch { /* storage optional: offer anyway */ }
+    const ci = this.chapterIndex;
+    const resume = this.chapter && LISTED.includes(ci) ? this.chapter : null;
+    const card = el('section', { class: 'tutorial-offer' });
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-labelledby', 'tutorial-offer-title');
+    const onKey = (ev: KeyboardEvent): void => { if (ev.key === 'Escape') close(); };
+    const close = (): void => { card.remove(); this.clearFocus(); document.removeEventListener('keydown', onKey); };
+    const go = (): void => {
+      close();
+      if (resume) { this.panel.hidden = false; this.render(true); this.schedule(); } else this.start(LISTED[0]);
+    };
+    // the sidebar folds away on narrow screens: then the way in is its toggle
+    const compact = window.matchMedia('(max-width: 700px)').matches;
+    const where = el('p', { class: 'tutorial-offer-where', hidden: true },
+      'You can start the tutorial any time from ', el('strong', { textContent: compact ? '☰ Workspace → Tutorial ↗' : 'Tutorial ↗' }), compact ? ' (highlighted above).' : ' in the sidebar (highlighted).');
+    where.setAttribute('aria-live', 'polite');
+    const box = el('input', { type: 'checkbox' });
+    box.onchange = () => {
+      try { if (box.checked) localStorage.setItem(OFFER_OFF, '1'); else localStorage.removeItem(OFFER_OFF); } catch { /* storage optional */ }
+      where.hidden = !box.checked;
+      this.clearFocus();
+      if (box.checked) document.getElementById(compact ? 'sidebar-toggle' : 'tour-btn')?.classList.add('tour-focus');
+    };
+    card.append(
+      el('h2', { id: 'tutorial-offer-title', textContent: resume ? 'Pick up the tutorial?' : 'New here? Take the tutorial' }),
+      el('p', { textContent: resume
+        ? `You were in chapter ${LISTED.indexOf(ci) + 1}, ${resume.title}. Carry on where you left off.`
+        : 'Short chapters build synths from modules, one cable at a time, and show the editor on the way. Each chapter starts from a prepared patch.' }),
       el('div', { class: 'tour-actions' },
-        this.button('Start chapter 1', () => this.start(0), true),
-        this.button('Later', () => { this.markSeen(); this.panel.hidden = true; })),
+        this.button(resume ? 'Resume' : 'Start the tutorial', go, true),
+        this.button('Not now', close)),
+      el('label', { class: 'tutorial-offer-check' }, box, ' Don’t show this again'),
+      where,
     );
-    this.place(null, true);
+    document.body.append(card);
+    document.addEventListener('keydown', onKey);
   }
 
   /** the chapter menu */
   open(): void {
     this.stop();
     this.cancelAdvance();
-    this.markSeen();
     const rows = LISTED.map((i, n) => {
       const c = CHAPTERS[i];
       const done = this.progress.done.includes(c.id);
@@ -202,7 +229,6 @@ export class Tutorial {
   start(i: number): void {
     const ch = CHAPTERS[i];
     if (!ch || !LISTED.includes(i)) return;
-    this.markSeen();
     this.stop();
     this.cancelAdvance();
     if (!this.keepCurrent()) return;
