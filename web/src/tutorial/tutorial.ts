@@ -538,6 +538,8 @@ export class Tutorial {
       case 'asm': return document.querySelector(`.module[data-asm="${t.id}"], .frame[data-asm="${t.id}"]`);
       case 'port': return document.querySelector(`.dot[data-mod="${t.id}"][data-port="${t.port}"][data-dir="${t.dir}"]`) ?? card(t.id);
       case 'param': return document.querySelector(`.slider-port[data-mod="${t.id}"][data-param="${t.param}"]`)?.closest('.param') ?? card(t.id);
+      // the button, else its output's jack (the output is hidden inside a closed assembly), else the card
+      case 'probe': return document.querySelector(`.prb[data-key="${t.id}:${t.port}"]`) ?? document.querySelector(`.dot[data-mod="${t.id}"][data-port="${t.port}"][data-dir="out"]`) ?? card(t.id);
       case 'ui': return document.getElementById(t.id);
     }
   }

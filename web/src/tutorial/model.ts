@@ -45,6 +45,8 @@ export type Target =
   | { kind: 'asm'; id: number }
   | { kind: 'port'; id: number; port: string; dir: 'in' | 'out' }
   | { kind: 'param'; id: number; param: string }
+  /** the ◎ scope-probe button beside an output */
+  | { kind: 'probe'; id: number; port: string }
   | { kind: 'ui'; id: string };
 
 export interface Step {
@@ -177,6 +179,7 @@ export const T = {
   asm: (id: number | undefined): Target[] => (id === undefined ? [] : [{ kind: 'asm', id }]),
   port: (m: ModuleInst | undefined, port: string, dir: 'in' | 'out'): Target[] => (m ? [{ kind: 'port', id: m.id, port, dir }] : []),
   param: (m: ModuleInst | undefined, param: string): Target[] => (m ? [{ kind: 'param', id: m.id, param }] : []),
+  probe: (m: ModuleInst | undefined, port: string): Target[] => (m ? [{ kind: 'probe', id: m.id, port }] : []),
   ui: (id: string): Target[] => [{ kind: 'ui', id }],
 };
 

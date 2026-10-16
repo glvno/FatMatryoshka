@@ -357,7 +357,7 @@ export function partTargets(part: PartSpec, s: S, roles: Roles): Target[] {
         case 'news': return T.ui('new-patch-btn');
         case 'notes': return T.param(mod(p, 'output'), 'level');
         case 'arpPlay': return T.module(mod(p, 'fm1')?.id);
-        case 'probe': return T.port(part.ref && one(part.ref), part.port ?? 'out', 'out');
+        case 'probe': return T.probe(part.ref && one(part.ref), part.port ?? 'out');
         case 'bypassed': case 'bypasses': return T.module(part.ref ? one(part.ref)?.id : undefined);
         case 'selected': {
           const types = part.types ?? [];
