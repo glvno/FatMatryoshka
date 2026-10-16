@@ -253,8 +253,10 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 /* A knob tick: centred on the track like the base tick, where that FM-1 knob alone leaves the parameter at rest; a thumb over it hides it. */
 .slider-knob { position: absolute; z-index: 1; pointer-events: auto; top: calc(50% - 6px); width: 3px; height: 12px; border-radius: 2px; background: currentColor;
   left: calc(var(--at) * (100% - var(--jack-size)) + var(--jack-size) / 2 - 1.5px); }
-.slider-port { position: absolute; z-index: 2; box-sizing: border-box; width: var(--jack-size); height: var(--jack-size); top: 50%; left: calc(var(--position) * (100% - var(--jack-size))); transform: translateY(-50%); pointer-events: none; border-width: 3px; box-shadow: inset 0 0 0 2px var(--panel); }
-.patching .slider-port { pointer-events: auto; }
+.slider-port { position: absolute; z-index: 2; box-sizing: border-box; width: var(--jack-size); height: var(--jack-size); top: 50%; left: calc(var(--position) * (100% - var(--jack-size))); transform: translateY(-50%); pointer-events: auto; cursor: ew-resize; touch-action: none; border-width: 3px; box-shadow: inset 0 0 0 2px var(--panel); }
+.patching .slider-port { cursor: crosshair; }
+/* the thumb above the card's interior cables (z-index 3), the bare track below them */
+.module .slider-port { z-index: 4; }
 .dot.connected { background: currentColor; box-shadow: inset 0 0 0 3px var(--panel); }
 .dot.armed { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 40%, transparent); }
 .ports .dot { position: relative; z-index: 2; }
