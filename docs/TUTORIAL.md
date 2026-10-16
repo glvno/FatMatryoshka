@@ -8,7 +8,7 @@ The docked panel grows up from its corner and scrolls once it reaches the top ma
 
 ## The offer
 
-Every visit to the Patch tab (not one opened from a share link) shows a centred card offering the tutorial: **Start the tutorial** (the first published chapter) or, with progress in a published chapter, **Resume**; **Not now** or Escape closes it for this visit. Ticking **Don't show this again** stores `matryoshka.tutorial-offer-off` in localStorage and reveals a note saying where the tutorial lives (**Tutorial ↗** in the sidebar, or **☰ Workspace → Tutorial ↗** below 700 px, where the sidebar is folded away) while that button pulses; unticking undoes both. `Tutorial.welcome()` in `tutorial.ts`.
+Every visit to the Patch tab (not one opened from a share link) shows a centred card offering the tutorial: **Start the tutorial** (the first published chapter) or, with progress in a published chapter, **Resume**; **I know what I'm doing, just show me around** starts the tour (below); **Not now** or Escape closes it for this visit. Ticking **Don't show this again** stores `matryoshka.tutorial-offer-off` in localStorage and reveals a note saying where the tutorial lives (**Tutorial ↗** in the sidebar, or **☰ Workspace → Tutorial ↗** below 700 px, where the sidebar is folded away) while that button pulses; unticking undoes both. `Tutorial.welcome()` in `tutorial.ts`.
 
 ## Progress and recovery
 
@@ -33,6 +33,12 @@ Every exercise and chapter finish has Note, Chord and a repeating Riff. A step c
 An intro's **Preview the finished sound** sends the completed patch to the audio engine for eight seconds without changing the editor patch, layout, history, selection, snapshots or library. Normal preview completion restores the editor sound and previous transport/mute state. Explicit Stop, blur and close silence it. Audio starts from a playback click.
 
 The panel docks at bottom right by default. **Follow** optionally places it near the highlighted target and scrolls that target into view. Drag the handle, or use its arrow keys to move it; Home docks it again. Below 650 px it docks immediately at the bottom, clears desktop inline positions and scrolls internally. The highlight on what to do next (gone once the task step's requirements are met; a Continue step's pointer stays) is a steady 3 px outline plus a ring that grows out of it and fades every 1.2 s (`tour-ping` in style.css), wide enough to catch in peripheral vision while reading. Reduced-motion preferences suppress movement and pulsing (the highlight becomes a still halo). Required controls, then the optional Why, then expected listening outcomes keep the lesson readable.
+
+## The tour
+
+A chapter with `tour: true` (the lesson editor's **Tour** check box; at most one, and it cannot continue from or into another chapter) is not numbered: `LISTED` leaves it out, `TOUR` (chapters.ts) points at it, the offer card's third button starts it, the tutorial menu lists it first with an arrow, and its panel says "Tour" instead of "Chapter n of m". Its end offers chapter 1. It is the last entry of `course.json` so the chapter indices do not move.
+
+The tour ("A tour for synthesists") is for people who already patch. It starts from the factory patch Warm Pad and stops at what is different here: assemblies (expand stack voice), slider thumbs as jacks (LFO onto the filter's `res`, with the base and knob ticks), the Main card as the FM-1 panel (knobs, voices, arpeggiator, morph), the command palette (add a Wavetable), a list of the notable modules, and the listening tools (scope, A/B, bypass, changes, share links).
 
 ## Chapter payoffs
 

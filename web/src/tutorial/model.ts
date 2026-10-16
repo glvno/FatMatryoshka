@@ -89,6 +89,8 @@ export interface Chapter {
   patchName: string;
   /** learners see it; the dev server lists unpublished chapters too */
   published: boolean;
+  /** the tour, outside the numbered chapters */
+  tour: boolean;
   steps: Step[];
   payoff?: string;
   challenge?: string;

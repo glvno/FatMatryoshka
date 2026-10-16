@@ -4,7 +4,7 @@ import { Engine } from '../engine';
 import { DEFS } from '../modules';
 import { validatePatch, type Patch } from '../patch';
 import { validateAssemblyDef } from '../assembly';
-import { COURSE, CHAPTERS, bundledLibrary, listedChapters, chapterEnd, chapterStart, referenceOf, stepStart, tutorialDef } from './chapters';
+import { COURSE, CHAPTERS, bundledLibrary, listedChapters, tourChapter, chapterEnd, chapterStart, referenceOf, stepStart, tutorialDef } from './chapters';
 import { completes, headlessState, stepDone } from './model';
 import { validateCourse } from './validate';
 import { formatCourse, slugId, validateShape } from './course-schema';
@@ -30,8 +30,9 @@ function peak(p: Patch, key = true): number {
 const ref = (chapter: number, step: string): Patch => referenceOf(COURSE, COURSE.chapters[chapter].id, step)!.patch;
 
 describe('tutorial course', () => {
-  it('has eleven chapters whose steps wait for Continue, every step with a title and text', () => {
-    expect(CHAPTERS).toHaveLength(11);
+  it('has eleven chapters and a tour whose steps wait for Continue, every step with a title and text', () => {
+    expect(CHAPTERS).toHaveLength(12);
+    expect(CHAPTERS.filter((c) => c.tour).map((c) => c.id)).toEqual(['tour']);
     for (const ch of CHAPTERS) {
       expect(ch.steps.length).toBeGreaterThanOrEqual(6);
       expect(ch.steps.every((st) => st.listen)).toBe(true);
@@ -175,9 +176,31 @@ describe('course data', () => {
 
 describe('publishing', () => {
   it('offers only published chapters in the built site, and every chapter on the dev server', () => {
-    expect(CHAPTERS.map((c) => c.published)).toEqual(CHAPTERS.map((_, i) => i === 0));
+    expect(CHAPTERS.map((c) => c.published)).toEqual(CHAPTERS.map((c, i) => i === 0 || c.tour));
     expect(listedChapters(CHAPTERS, false)).toEqual([0]);
-    expect(listedChapters(CHAPTERS, true)).toEqual(CHAPTERS.map((_, i) => i));
+    expect(listedChapters(CHAPTERS, true)).toEqual(CHAPTERS.flatMap((c, i) => (c.tour ? [] : [i])));
+  });
+  it('offers the tour apart from the numbered chapters, published or on the dev server', () => {
+    const t = CHAPTERS.findIndex((c) => c.tour);
+    expect(tourChapter(CHAPTERS, false)).toBe(t);
+    const hidden = CHAPTERS.map((c) => ({ ...c, published: c.published && !c.tour }));
+    expect(tourChapter(hidden, false)).toBe(-1);
+    expect(tourChapter(hidden, true)).toBe(t);
+  });
+  it('has one tour, standing alone', () => {
+    const two = structuredClone(COURSE); two.chapters[1].tour = true;
+    expect(validateCourse(two).errors.map((e) => e.message)).toContain('Only one chapter can be the tour');
+    const cont = structuredClone(COURSE); cont.chapters.find((c) => c.tour)!.start = { kind: 'continue' };
+    expect(validateCourse(cont).errors.map((e) => e.message).join('\n')).toMatch(/cannot continue/);
+    const bad = structuredClone(COURSE); (bad.chapters[0] as unknown as Record<string, unknown>).tour = 'yes';
+    expect(() => validateShape(bad)).toThrow('tour');
+  });
+  it('starts the tour on Warm Pad with its assemblies closed', () => {
+    const t = CHAPTERS.findIndex((c) => c.tour);
+    const p = chapterStart(t);
+    expect(p.assemblies!.map((a) => [a.name, a.open])).toEqual([['stack voice', false], ['echo', false]]);
+    expect(CHAPTERS[t].steps[0].check(headlessState(p))).toBe(false);
+    expect(peak(chapterEnd(t))).toBeGreaterThan(0.01);
   });
   it('keeps the flag a boolean, after the title, and absent when published', () => {
     const course = structuredClone(COURSE);

@@ -256,7 +256,7 @@ async function mount() {
       if (!chapterMatch && !visibleSteps.length) return;
       matches++;
       const group = el('div', 'lesson-chapter');
-      const open = button(`${i + 1}. ${ch.title}`, () => select_({ kind: 'chapter', chapter: ch.id }), 'lesson-chapter-title');
+      const open = button(`${ch.tour ? 'Tour:' : `${i + 1}.`} ${ch.title}`, () => select_({ kind: 'chapter', chapter: ch.id }), 'lesson-chapter-title');
       if (changed({ kind: 'chapter', chapter: ch.id }) || ch.steps.some((s) => changed({ kind: 'step', chapter: ch.id, step: s.id }))) open.append(el('span', 'lesson-dirty', ' •'));
       if (issuesOf(ch.id).length) open.append(el('span', 'lesson-bad', ' ✗'));
       if (ch.unpublished) open.append(el('span', 'lesson-unpublished', 'unpublished'));
@@ -306,12 +306,19 @@ async function mount() {
       if (r) draft.references[refKey(toChapter, s)] = copy(r);
     }
   }
-  /** the flag sits after the title, as in course.json */
+  /** the flags sit after the title, as in course.json */
   function setPublished(ch: ChapterData, on: boolean) {
     const { id, title, unpublished: _, ...rest } = ch;
     for (const k of Object.keys(ch)) delete (ch as unknown as Record<string, unknown>)[k];
     Object.assign(ch, { id, title, ...(on ? {} : { unpublished: true }), ...rest });
   }
+  function setTour(ch: ChapterData, on: boolean) {
+    const { id, title, unpublished, tour: _, ...rest } = ch;
+    for (const k of Object.keys(ch)) delete (ch as unknown as Record<string, unknown>)[k];
+    Object.assign(ch, { id, title, ...(unpublished ? { unpublished } : {}), ...(on ? { tour: true } : {}), ...rest });
+  }
+  /** "Chapter 3", or "Tour" for the tour (it has no number in the tutorial) */
+  const chapterName = (ch: ChapterData, ci: number): string => (ch.tour ? 'Tour' : `Chapter ${ci + 1}`);
   function addChapter() {
     const at = page.kind === 'chapter' || page.kind === 'step' ? chapterIndex(page.chapter) + 1 : draft.chapters.length;
     const id = slugId('New chapter', draft.chapters.map((c) => c.id));
@@ -592,7 +599,7 @@ async function mount() {
     if (!ch) { select_({ kind: 'roles' }); return; }
     const ci = chapterIndex(ch.id);
     if (page.kind === 'chapter') {
-      heading.textContent = `Chapter ${ci + 1} · ${ch.title}`;
+      heading.textContent = `${chapterName(ch, ci)} · ${ch.title}`;
       context.textContent = 'The chapter’s idea, its starting patch, and what the learner made.';
       pageTools.append(
         button('+ Task step at start', () => addStep(ch.id, -1, 'task')), button('+ Continue step at start', () => addStep(ch.id, -1, 'continue')),
@@ -602,6 +609,7 @@ async function mount() {
       fields.append(
         textField('Title', ch.title, 1, (v) => { ch.title = v; }, true),
         check('Published', !ch.unpublished, (v) => { setPublished(ch, v); edited(); }, 'unpublished chapters are left out of the built site; this dev server still lists them, marked'),
+        check('Tour', !!ch.tour, (v) => { setTour(ch, v); edited(); }, 'not a numbered chapter: the offer card’s “just show me around” starts it, and the tutorial menu lists it first'),
         textField('Patch name', ch.patchName, 1, (v) => { ch.patchName = v; }, true),
         startEditor(ch, ci),
         textField('Introduction', ch.intro, 10, (v) => { ch.intro = v; }),
@@ -612,7 +620,7 @@ async function mount() {
     const st = stepOf(page)!;
     const k = stepIndex(page);
     const key = refKey(ch.id, st.id);
-    heading.textContent = `Chapter ${ci + 1} · Step ${k + 1}. ${st.title}`;
+    heading.textContent = `${chapterName(ch, ci)} · Step ${k + 1}. ${st.title}`;
     context.textContent = st.kind === 'continue' ? 'A Continue step: text to read (and optionally listen to), no requirements. The learner presses Continue.' : 'A task step: the learner meets every requirement below, then presses Continue.';
     pageTools.append(
       button('+ Task step after', () => addStep(ch.id, k, 'task')), button('+ Continue step after', () => addStep(ch.id, k, 'continue')),
@@ -626,7 +634,7 @@ async function mount() {
       edited({ fields: true });
     }, 'Step kind'));
     fields.append(
-      textField('Title', st.title, 1, (v) => { st.title = v; heading.textContent = `Chapter ${ci + 1} · Step ${k + 1}. ${v}`; }, true),
+      textField('Title', st.title, 1, (v) => { st.title = v; heading.textContent = `${chapterName(ch, ci)} · Step ${k + 1}. ${v}`; }, true),
       instructionsField(st),
       textField('Why (optional)', st.why, 5, (v) => { st.why = v; }),
       kindRow);
@@ -772,7 +780,7 @@ async function mount() {
       const ci = i.chapter ? chapterIndex(i.chapter) : -1;
       const ch = ci >= 0 ? draft.chapters[ci] : undefined;
       const k = ch && i.step ? ch.steps.findIndex((s) => s.id === i.step) : -1;
-      return { label: ch ? `Chapter ${ci + 1}${k >= 0 ? `, step ${k + 1} (${ch.steps[k].title})` : ''}` : 'Course', page: (ch ? (k >= 0 ? { kind: 'step', chapter: ch.id, step: ch.steps[k].id } : { kind: 'chapter', chapter: ch.id }) : null) as Page | null };
+      return { label: ch ? `${chapterName(ch, ci)}${k >= 0 ? `, step ${k + 1} (${ch.steps[k].title})` : ''}` : 'Course', page: (ch ? (k >= 0 ? { kind: 'step', chapter: ch.id, step: ch.steps[k].id } : { kind: 'chapter', chapter: ch.id }) : null) as Page | null };
     };
     for (const [title, list, cls] of [['Errors', report.errors, 'lesson-issue'], ['Warnings', report.warnings, 'lesson-hint'], ['Hints', report.hints, 'muted']] as const) {
       fields.append(el('h3', '', `${title} (${list.length})`));
@@ -795,7 +803,7 @@ async function mount() {
     const head = el('div', 'tutorial-head');
     const st = stepOf(page);
     head.append(el('h2', '', st ? st.title : ch.title));
-    card.append(head, el('span', 'tour-count', `Chapter ${ci + 1} of ${draft.chapters.length} · ${ch.title}`));
+    card.append(head, el('span', 'tour-count', `${ch.tour ? 'Tour' : `Chapter ${ci + 1} of ${draft.chapters.length}`} · ${ch.title}`));
     if (!st) {
       card.append(lessonProse(ch.intro));
       const done = el('div', 'tutorial lesson-card');

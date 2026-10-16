@@ -105,7 +105,10 @@ export function validateCourse(course: CourseData): Report {
     }
   }
   // names first: a broken name would make the reference checks meaningless
-  for (const ch of course.chapters) {
+  if (course.chapters.filter((ch) => ch.tour).length > 1) report.errors.push({ message: 'Only one chapter can be the tour' });
+  for (const [ci, ch] of course.chapters.entries()) {
+    if (ch.tour && ch.start.kind === 'continue') report.errors.push({ chapter: ch.id, message: 'The tour stands alone: it cannot continue from the chapter before it' });
+    if (ch.start.kind === 'continue' && course.chapters[ci - 1]?.tour) report.errors.push({ chapter: ch.id, message: 'A chapter cannot continue from the tour' });
     if (ch.start.kind === 'preset' && !PRESETS[ch.start.name]) report.errors.push({ chapter: ch.id, message: `There is no factory patch "${ch.start.name}"` });
     if (ch.start.kind === 'continue' && ch === course.chapters[0]) report.warnings.push({ chapter: ch.id, message: 'The first chapter cannot continue from a previous one; it starts from a new patch' });
     for (const [f, label] of [['title', 'Title'], ['patchName', 'Patch name'], ['intro', 'Introduction'], ['payoff', 'Payoff'], ['challenge', 'Optional challenge']] as const) {

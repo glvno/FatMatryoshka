@@ -9,7 +9,7 @@ import type { Patch } from '../patch';
 import type { AssemblyDef } from '../assembly';
 import { assemblyOf, hiddenModules } from '../assembly';
 import type { Editor } from '../editor';
-import { CHAPTERS, LISTED, chapterStart, chapterEnd, stepStart, tutorialDef } from './chapters';
+import { CHAPTERS, LISTED, TOUR, offered, chapterStart, chapterEnd, stepStart, tutorialDef } from './chapters';
 import { noSeen, stepDone, type Chapter, type Seen, type Step, type Target, type TutorialState } from './model';
 
 export interface TutorialHost {
@@ -112,7 +112,7 @@ export class Tutorial {
       const raw = JSON.parse(localStorage.getItem(STORE) ?? 'null') as Partial<Progress> | null;
       if (raw && Array.isArray(raw.done)) {
         // progress in a chapter that is no longer offered (unpublished since) starts from the menu
-        const ch = LISTED.map((k) => CHAPTERS[k]).find((c) => c.id === raw.chapter);
+        const ch = CHAPTERS.find((c, k) => offered(k) && c.id === raw.chapter);
         const named = ch?.steps.findIndex((st) => st.id === raw.stepId) ?? -1;
         const step = named >= 0 ? named : Math.max(0, Math.min(ch ? ch.steps.length - 1 : 0, Math.floor(Number(raw.step) || 0)));
         return { done: raw.done.filter((d) => CHAPTERS.some((c) => c.id === d)), chapter: ch?.id ?? null, step, page: raw.page === 'done' || raw.page === 'steps' ? raw.page : 'intro' };
@@ -160,11 +160,12 @@ export class Tutorial {
   // ---- entry points
 
   /** every visit, until "Don't show this again" is ticked: a card in the middle of the screen offering the tutorial (or
-   * the chapter the learner is in). Ticking the box points at where the tutorial lives from then on. */
+   * the chapter the learner is in), and the tour for those who know synths. Ticking the box points at where the tutorial
+   * lives from then on. */
   welcome(): void {
     try { if (localStorage.getItem(OFFER_OFF)) return; } catch { /* storage optional: offer anyway */ }
     const ci = this.chapterIndex;
-    const resume = this.chapter && LISTED.includes(ci) ? this.chapter : null;
+    const resume = this.chapter && offered(ci) ? this.chapter : null;
     const card = el('section', { class: 'tutorial-offer' });
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-labelledby', 'tutorial-offer-title');
@@ -187,12 +188,13 @@ export class Tutorial {
       if (box.checked) document.getElementById(compact ? 'sidebar-toggle' : 'tour-btn')?.classList.add('tour-focus');
     };
     card.append(
-      el('h2', { id: 'tutorial-offer-title', textContent: resume ? 'Pick up the tutorial?' : 'New here? Take the tutorial' }),
+      el('h2', { id: 'tutorial-offer-title', textContent: resume ? (resume.tour ? 'Pick up the tour?' : 'Pick up the tutorial?') : 'New here? Take the tutorial' }),
       el('p', { textContent: resume
-        ? `You were in chapter ${LISTED.indexOf(ci) + 1}, ${resume.title}. Carry on where you left off.`
+        ? `You were ${resume.tour ? 'on the tour' : `in chapter ${LISTED.indexOf(ci) + 1}`}, ${resume.title}. Carry on where you left off.`
         : 'Short chapters build synths from modules, one cable at a time, and show the editor on the way. Each chapter starts from a prepared patch.' }),
       el('div', { class: 'tour-actions' },
         this.button(resume ? 'Resume' : 'Start the tutorial', go, true),
+        ...(TOUR >= 0 && TOUR !== ci ? [this.button('I know what I’m doing, just show me around', () => { close(); this.start(TOUR); })] : []),
         this.button('Not now', close)),
       el('label', { class: 'tutorial-offer-check' }, box, ' Don’t show this again'),
       where,
@@ -205,12 +207,13 @@ export class Tutorial {
   open(): void {
     this.stop();
     this.cancelAdvance();
-    const rows = LISTED.map((i, n) => {
+    // the tour first, unnumbered
+    const rows = [...(TOUR >= 0 ? [TOUR] : []), ...LISTED].map((i) => {
       const c = CHAPTERS[i];
       const done = this.progress.done.includes(c.id);
       const current = this.progress.chapter === c.id;
-      const row = el('div', { class: 'tutorial-row' + (done ? ' done' : '') + (current ? ' current' : '') },
-        el('span', { class: 'n', textContent: done ? '✓' : String(n + 1) }),
+      const row = el('div', { class: 'tutorial-row' + (done ? ' done' : '') + (current ? ' current' : '') + (c.tour ? ' tour' : '') },
+        el('span', { class: 'n', textContent: done ? '✓' : c.tour ? '→' : String(LISTED.indexOf(i) + 1) }),
         el('span', { class: 'grow', textContent: c.title }, ...(c.published ? [] : [el('small', { class: 'tutorial-unpublished', textContent: 'unpublished' })])),
         el('button', { textContent: current ? 'Resume' : done ? 'Again' : 'Start', class: current ? 'primary' : '', onclick: () => { this.menu.close(); if (current) { this.panel.hidden = false; this.render(true); this.schedule(); } else this.start(i); } }));
       return row;
@@ -232,7 +235,7 @@ export class Tutorial {
    * tutorial patch), so no difference from an earlier chapter can carry over */
   start(i: number): void {
     const ch = CHAPTERS[i];
-    if (!ch || !LISTED.includes(i)) return;
+    if (!ch || !offered(i)) return;
     this.stop();
     this.cancelAdvance();
     if (!this.keepCurrent()) return;
@@ -415,8 +418,8 @@ export class Tutorial {
     const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, this.error, this.previewing, this.auditionMode, this.page === 'steps' ? st?.met?.(s) : null, this.clicked]);
     if (!force && key === this.lastRender) return;
     this.lastRender = key;
-    const count = el('span', { class: 'tour-count', textContent: `Chapter ${LISTED.indexOf(i) + 1} of ${LISTED.length}${ch.published ? '' : ' (unpublished)'} · ${ch.title}` });
-    const parts: (Node | string)[] = [this.head(this.page === 'steps' && st ? st.title : this.page === 'done' ? 'Chapter done' : ch.title), count];
+    const count = el('span', { class: 'tour-count', textContent: `${ch.tour ? 'Tour' : `Chapter ${LISTED.indexOf(i) + 1} of ${LISTED.length}`}${ch.published ? '' : ' (unpublished)'} · ${ch.title}` });
+    const parts: (Node | string)[] = [this.head(this.page === 'steps' && st ? st.title : this.page === 'done' ? (ch.tour ? 'Tour done' : 'Chapter done') : ch.title), count];
     if (this.error) parts.push(el('p', { class: 'tutorial-warn', textContent: this.error }));
     if (this.page === 'intro') {
       parts.push(lessonProse(ch.intro));
@@ -442,7 +445,8 @@ export class Tutorial {
       if (ok && !broken.length && !st.listen && !this.hold && !this.menu.open && !this.advanceTimer) this.advanceTimer = window.setTimeout(() => { this.advanceTimer = 0; const d = stepDone(ch, this.progress.step, this.state()); if (this.active && !this.menu.open && this.step === st && (d.met || d.moot)) this.advance(); }, ADVANCE_MS);
       if ((!ok || broken.length || this.menu.open) && this.advanceTimer) { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
     } else {
-      const next = LISTED[LISTED.indexOf(i) + 1];
+      // after the tour, the first chapter
+      const next = ch.tour ? LISTED[0] : LISTED[LISTED.indexOf(i) + 1];
       const last = next === undefined;
       parts.push(lessonProse(ch.payoff ?? 'Your instrument is ready to play.'));
       parts.push(lessonChallenge(ch.challenge ?? 'Make it your own.'));

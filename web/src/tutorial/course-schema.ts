@@ -116,6 +116,8 @@ export interface ChapterData {
   title: string;
   /** hidden from learners in the built site (the dev server still lists it, marked); absent = published */
   unpublished?: boolean;
+  /** the tour: not a numbered chapter; the offer card's "just show me around" starts it, the menu lists it first */
+  tour?: boolean;
   intro: string;
   payoff: string;
   challenge: string;
@@ -188,6 +190,7 @@ export function validateShape(value: unknown, allowEmpty = false): asserts value
     chapterIds.add(ch.id as string);
     text(ch.title, `${path}.title`, true);
     if (ch.unpublished !== undefined && typeof ch.unpublished !== 'boolean') fail(`${path}.unpublished`, 'expected true or false');
+    if (ch.tour !== undefined && typeof ch.tour !== 'boolean') fail(`${path}.tour`, 'expected true or false');
     text(ch.intro, `${path}.intro`, true);
     text(ch.payoff, `${path}.payoff`, true);
     text(ch.challenge, `${path}.challenge`, true);

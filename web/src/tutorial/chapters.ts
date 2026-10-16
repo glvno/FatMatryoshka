@@ -46,18 +46,24 @@ export function compileStep(st: StepData, roles: Roles): Step {
 }
 
 export function compileChapter(ch: ChapterData, roles: Roles): Chapter {
-  return { id: ch.id, title: ch.title, intro: ch.intro, payoff: ch.payoff, challenge: ch.challenge, patchName: ch.patchName, published: !ch.unpublished, steps: ch.steps.map((st) => compileStep(st, roles)) };
+  return { id: ch.id, title: ch.title, intro: ch.intro, payoff: ch.payoff, challenge: ch.challenge, patchName: ch.patchName, published: !ch.unpublished, tour: !!ch.tour, steps: ch.steps.map((st) => compileStep(st, roles)) };
 }
 
 export const compileCourse = (course: CourseData): Chapter[] => course.chapters.map((ch) => compileChapter(ch, course.roles));
 
 export const CHAPTERS: Chapter[] = compileCourse(COURSE);
 
-/** the indices (into CHAPTERS) of the chapters the tutorial offers: the published ones, or all of them on the dev server so
- * authors can play a chapter before publishing it */
+/** the indices (into CHAPTERS) of the numbered chapters the tutorial offers: the published ones, or all of them on the dev
+ * server so authors can play a chapter before publishing it. The tour is not among them (see TOUR). */
 export const listedChapters = (chapters: Chapter[] = CHAPTERS, all: boolean = import.meta.env.DEV): number[] =>
-  chapters.flatMap((c, i) => (c.published || all ? [i] : []));
+  chapters.flatMap((c, i) => ((c.published || all) && !c.tour ? [i] : []));
 export const LISTED: number[] = listedChapters();
+/** the index of the offered tour (the first tour chapter, published or on the dev server), else -1 */
+export const tourChapter = (chapters: Chapter[] = CHAPTERS, all: boolean = import.meta.env.DEV): number =>
+  chapters.findIndex((c) => c.tour && (c.published || all));
+export const TOUR: number = tourChapter();
+/** whether the tutorial offers chapter i: a listed chapter or the tour */
+export const offered = (i: number): boolean => i >= 0 && (LISTED.includes(i) || i === TOUR);
 
 /** the reference of a task step, if it has one */
 export const referenceOf = (course: CourseData, chapter: string, step: string) => course.references[refKey(chapter, step)];
