@@ -390,7 +390,7 @@ The current course behavior is specified in [docs/TUTORIAL.md](docs/TUTORIAL.md)
 
 - Click-to-connect draws a ghost cable to the pointer (`Editor.ghostCable`, shared with dragging; `armGhost` stopped by `cancelArm`); a click on the empty canvas drops the arm.
 - Deck: one `#audio-btn`, "Audio on" while not running or muted, "Panic" (`panic()` in main.ts) while playing (`AudioHost.onState` → `syncAudioBtn`); `#panic-btn` is gone. The arp play switch `#arp-btn` ("Play") is made in main.ts and handed to the dock as `Editor.dockArp`, beside the Arpeggiator button (`arpLine`); the tutorial's `arpPlay` target is it.
-- Sidebar buttons look like the dock's octave buttons (outlined, condensed capitals); remaining filled yellow buttons (Library) use `--btn-yellow`, a muted gate colour.
+- The VIEW (canvas) panel's TIDY / FIT look like the dock's octave buttons (outlined); the other sidebar buttons keep their fills (Add module coral, Add assembly teal, the rest yellow). Filled yellow buttons (sidebar, Library) use `--btn-yellow`, a muted gate colour.
 - A parameter's ⋮ routing menu (was a hover ⋯) is always shown in a 14 px slot right of the bar; every bar of a card / dock column / arp panel with one keeps the slot. Course text says ⋮ for it; the card header's menu stays ⋯.
 - Choice / switch rows: the jack stands left of the shading (`.param.bar.jacked` margin-left 18 px); the picker arrows are transparent so the picker sits inside the shading.
 - Dedicated-input links (VCA cv → gain etc.) are drawn again on the parameter's own row (grey, inert).

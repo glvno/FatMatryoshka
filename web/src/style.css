@@ -827,10 +827,14 @@ input#patch-name:hover { border-color: var(--line); }
 input#patch-name:focus { border-color: var(--secondary); background: var(--bar); outline: none; }
 .sbody { display: grid; gap: 6px; padding: 8px; }
 .sidebar button { min-height: 30px; padding: 4px 8px; border-radius: 5px; white-space: nowrap; }
-/* the buttons look like the dock's octave buttons: outlined on the panel, condensed capitals, the border teal on hover */
-.sidebar .sbody button, .sidebar .sbody #tour-btn, .sidebar #palette-btn { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); font-size: 11px; letter-spacing: .06em; }
-.sidebar .sbody button:hover, .sidebar .sbody #tour-btn:hover, .sidebar #palette-btn:hover { border-color: var(--secondary); }
-.sidebar #palette-btn kbd { color: var(--muted); }
+/* the plain buttons in the (muted) gate colour: a grey fill read as a slider's bar */
+.sidebar button:not(.primary), .sidebar #tour-btn, .sidebar #palette-btn { background: var(--btn-yellow); border-color: var(--btn-yellow); color: var(--accent-ink); }
+.sidebar button:not(.primary):hover, .sidebar #tour-btn:hover, .sidebar #palette-btn:hover { border-color: var(--ink); color: var(--accent-ink); filter: brightness(1.08); }
+.sidebar #palette-btn kbd { color: inherit; opacity: .7; }
+#add-assembly-btn { background: var(--secondary); border-color: var(--secondary); color: var(--panel); }
+/* the canvas panel's buttons (TIDY, FIT) look like the dock's octave buttons: outlined on the panel, the border teal on hover */
+.sidebar .view-row button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); font-size: 11px; letter-spacing: .06em; }
+.sidebar .view-row button:hover { border-color: var(--secondary); color: var(--ink); filter: none; }
 .view-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 /* the cable slack and zoom sliders are cards' value bars (sliderJack; main.ts sideSlider) with a small name and a thumb as tall
    as the bar. Their thumbs are jacks (the easter egg): a cable from any output dropped on one moves it (Patch.slackFrom / zoomFrom) */
