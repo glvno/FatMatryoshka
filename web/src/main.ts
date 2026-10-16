@@ -28,7 +28,7 @@ import { Tutorial } from './tutorial/tutorial';
 import { synthLink } from './tutorial/link';
 import { CHAPTERS, LISTED, chapterEnd } from './tutorial/chapters';
 import { PRESETS } from './presets';
-import { deviceBudget, SHORT } from './patchbin';
+import { deviceBudget } from './patchbin';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const STORE = 'modular-1.patch';
@@ -78,7 +78,7 @@ device.onStatus = devStatus;
 /** upload the current patch; changes made meanwhile cause one more upload */
 async function sendPatch(): Promise<boolean> {
   if (!fitsDevice) {
-    devStatus('over the FM-1 budget: not sent (the meter under the patch name says what is over)');
+    devStatus('over the FM-1 budget: not sent (the FM-1 budget beside the knobs says what is over)');
     return false;
   }
   if (uploading) {
@@ -225,6 +225,7 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
 editor.wheelHost = $('wheels');
 editor.dockWheels = hands.wheels;
 editor.dockOctave = piano.octaveControls;
+editor.dockBudget = $('budget');
 editor.rebuild();
 showBudget();
 snapshotCandidates = () => editor.snapshots.B ? [{ name: 'Snapshot B', patch: { ...JSON.parse(editor.snapshots.B) as Patch, name: 'Snapshot B' } }] : [];
@@ -283,7 +284,7 @@ nameInput.oninput = () => {
   editor.patch.name = nameInput.value;
   queueSave(editor.patch);
 };
-/** the FM-1 budget meter under the patch name: the fullest limit as a bar, every limit in the list it opens */
+/** the FM-1 budget meter in the Main dock: memory (the fullest limit) and CPU as bars; open, a card above the deck with every limit and the costliest modules */
 /** a meter row: name, bar, percent; `near` / `over` colour it */
 function meterRow(row: Element, name: string, frac: number, text: string): void {
   row.classList.toggle('over', frac > 1);
@@ -320,9 +321,8 @@ function showBudget(): void {
   el.classList.toggle('over', !b.fits);
   const memOver = b.over.filter((i) => i.key !== 'cpu');
   const fullest = memOver[0] ?? b.fullest;
-  const memName = fullest && fullest.key !== 'cpu' && b.memory >= 0.5 ? SHORT[fullest.key] : 'memory';
   const [mem, cpu] = el.querySelectorAll('.budget-row');
-  meterRow(mem, memName, memOver.length ? 1.01 : b.memory, memOver.length ? 'over' : `${Math.round(b.memory * 100)} %`);
+  meterRow(mem, 'MEM', memOver.length ? 1.01 : b.memory, memOver.length ? 'over' : `${Math.round(b.memory * 100)} %`);
   meterRow(cpu, 'CPU', b.cpu.use, `~${Math.round(b.cpu.use * 100)} %`);
   el.querySelector('summary')!.title = b.fits
     ? `Fits the FM-1. Memory: the fullest limit (${fullest?.label ?? 'none'}) is ${Math.round(b.memory * 100)} % used. CPU: about ${Math.round(b.cpu.use * 100)} % of the audio time, an estimate. Open for the details.`
@@ -356,7 +356,26 @@ function showBudget(): void {
     : 'Plays in the browser. The FM-1 cannot run it: Send, Store and Live stay off, and the Library keeps it under "Over budget".';
   list.append(note);
   if (was && !b.fits && device.connected) devStatus('over the FM-1 budget: Live paused until the patch fits');
+  requestAnimationFrame(placeBudget);
 }
+// the open budget is a card above the deck, centred on the meter (fixed: the dock scrolls sideways and would clip it); a
+// click elsewhere or Escape closes it
+const budgetEl = $('budget') as HTMLDetailsElement;
+function placeBudget(): void {
+  const budgetEl = $('budget') as HTMLDetailsElement;
+  if (!budgetEl.open) return;
+  const list = budgetEl.querySelector<HTMLElement>('.budget-list')!;
+  const r = budgetEl.getBoundingClientRect();
+  list.style.left = `${Math.max(8, Math.min(innerWidth - list.offsetWidth - 8, r.left + r.width / 2 - list.offsetWidth / 2))}px`;
+}
+budgetEl.addEventListener('toggle', placeBudget);
+addEventListener('resize', placeBudget);
+document.addEventListener('pointerdown', (e) => {
+  if (budgetEl.open && !budgetEl.contains(e.target as Node)) budgetEl.open = false;
+});
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && budgetEl.open) budgetEl.open = false;
+}, true);
 const browser = new AssemblyBrowser((d) => { switchTab('patch'); editor.insert(d); });
 
 // ---- diff against the baseline (the patch as last loaded, uploaded or stored) and A / B

@@ -80,19 +80,24 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 syste
 input#patch-name { padding: 6px 0; background: transparent; border-color: transparent; border-radius: 0; font-size: 18px; font-weight: 650; letter-spacing: -.025em; cursor: text; }
 input#patch-name:hover, input#patch-name:focus { border-bottom-color: var(--line); }
 .patch-controls #preset { font-size: 12px; }
-/* the FM-1 budget meter: memory (named by its fullest limit) and the estimated CPU load as bars; open, every limit and the
- * costliest modules */
-.budget summary { display: grid; gap: 3px; list-style: none; cursor: pointer; font-size: 12px; color: var(--muted); }
+/* the FM-1 budget meter, a column of the Main dock right of the knobs: memory (the fullest limit) and the estimated CPU
+ * load as bars; open, a card above the deck with every limit and the costliest modules */
+.budget { margin: 0; }
+.budget summary { display: grid; gap: 4px; width: 150px; list-style: none; cursor: pointer; font-size: 11px; color: var(--muted); }
 .budget summary::-webkit-details-marker { display: none; }
-.budget-row { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 8px; }
-.budget-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-title { font-size: 10px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.budget-row { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 6px; }
+.budget-name { font-weight: 650; letter-spacing: 0.04em; }
 .budget-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .budget-bar > span { display: block; height: 100%; background: var(--secondary); }
 .budget-pct { min-width: 34px; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
 .budget-row.near .budget-bar > span { background: var(--accent); }
 .budget-row.over .budget-bar > span { width: 100% !important; background: var(--danger); }
-.budget-row.over .budget-pct, .budget-row.over .budget-name { color: var(--danger); font-weight: 650; }
-.budget-list { display: grid; gap: 2px; padding: 6px 0 0; font-size: 11.5px; }
+.budget-row.over .budget-pct, .budget-row.over .budget-name { color: var(--danger); }
+.budget[open] summary .budget-title { color: var(--secondary); }
+.budget-list { position: fixed; z-index: 30; bottom: calc(var(--piano-h) + 8px); width: 260px; max-height: calc(100dvh - var(--piano-h) - 32px); overflow: auto;
+  display: grid; gap: 2px; padding: 8px 12px; font-size: 11.5px; background: var(--panel); border: 1px solid var(--muted); border-radius: 8px; box-shadow: 0 4px 16px var(--shadow); }
+.budget-list > .budget-head:first-child { margin-top: 0; }
 .budget-head { margin-top: 4px; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .budget-item { display: grid; grid-template-columns: minmax(0, 1fr) 30px auto; align-items: center; gap: 6px; }
 .budget-item > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

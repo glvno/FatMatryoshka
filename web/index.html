@@ -24,7 +24,6 @@
       <div class="patch-controls">
         <button id="new-patch-btn">New patch</button>
         <input id="patch-name" aria-label="Patch name" title="Rename patch" />
-        <details id="budget" class="budget"><summary title="How much of the FM-1 this patch uses"><span class="budget-row" data-k="mem"><span class="budget-name">memory</span><span class="budget-bar"><span></span></span><span class="budget-pct"></span></span><span class="budget-row" data-k="cpu"><span class="budget-name">CPU</span><span class="budget-bar"><span></span></span><span class="budget-pct"></span></span></summary><div class="budget-list"></div></details>
         <button id="add-btn" class="primary">+ Add module</button>
         <button id="add-assembly-btn" class="primary">+ Add assembly</button>
         <button id="tidy-btn" title="Line the cards up in columns, keeping their order (undo with Ctrl/Cmd+Z)">Tidy up</button>
@@ -58,6 +57,8 @@
     <section id="tab-about" class="tab" aria-label="About Matryoshka" hidden></section>
     </main>
     <div id="wheels" class="wheels" role="group" aria-label="Wheels"></div>
+    <!-- the FM-1 budget: placed in the Main dock beside the knobs by the editor (Editor.dockBudget) -->
+    <details id="budget" class="budget"><summary title="How much of the FM-1 this patch uses"><span class="budget-title">FM-1 budget</span><span class="budget-row" data-k="mem"><span class="budget-name">MEM</span><span class="budget-bar"><span></span></span><span class="budget-pct"></span></span><span class="budget-row" data-k="cpu"><span class="budget-name">CPU</span><span class="budget-bar"><span></span></span><span class="budget-pct"></span></span></summary><div class="budget-list"></div></details>
     <div class="dock-wrap"><div id="dock" class="dock" role="group" aria-label="Main"></div><svg class="dock-cables cables" aria-hidden="true"></svg></div>
     <footer id="deck" class="deck" aria-label="Performance">
       <div class="deck-row">

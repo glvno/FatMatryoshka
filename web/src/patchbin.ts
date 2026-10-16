@@ -164,12 +164,6 @@ export type BudgetKey = keyof typeof DEVICE;
 /** one line of the budget: what the patch uses of one FM-1 limit (`cpu`: the estimated load in percent of 100) */
 export interface BudgetItem { key: BudgetKey | 'cpu'; label: string; used: number; max: number }
 
-/** short names for the meter's label */
-export const SHORT: Record<BudgetKey, string> = {
-  modules: 'modules', cables: 'cables', poly: 'poly', parts: 'parts', instances: 'instances', buffers: 'buffers',
-  delays: 'delays', reverbs: 'reverbs', strings: 'strings', chorus: 'chorus', grains: 'grains', bytes: 'bytes',
-};
-
 const LABELS: Record<BudgetKey, string> = {
   modules: 'modules', cables: 'cables', poly: 'poly assemblies', parts: 'parts', instances: 'module instances', buffers: 'signal buffers',
   delays: 'delays', reverbs: 'reverbs', strings: 'string / comb lines', chorus: 'choruses', grains: 'granular lines', bytes: 'patch bytes',
