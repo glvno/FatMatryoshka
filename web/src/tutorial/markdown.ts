@@ -52,6 +52,25 @@ export function placedRequirements(source: string): string[][] {
   return out;
 }
 
+/**
+ * Tick the placed requirements under `root`: a box is done when all its ids are met (every box when `met` is null: the
+ * step is done); the first unticked box, or the one whose ids are `pick` while it is unticked, is marked next.
+ */
+export function tickRequirements(root: ParentNode, met: Record<string, boolean> | null, pick: string | null = null): HTMLElement[] {
+  const boxes = [...root.querySelectorAll<HTMLElement>('.req')];
+  if (pick && !boxes.some((b) => b.dataset.req === pick && !(b.dataset.req ?? '').split(',').every((id) => met?.[id]))) pick = null;
+  let next = false;
+  for (const box of boxes) {
+    const done = !met || (box.dataset.req ?? '').split(',').every((id) => met[id]);
+    box.classList.toggle('done', done);
+    box.setAttribute('role', 'checkbox'); box.setAttribute('aria-checked', String(done));
+    const isNext = !done && !next && (!pick || pick === box.dataset.req);
+    box.classList.toggle('next', isNext);
+    if (isNext) next = true;
+  }
+  return boxes;
+}
+
 // The lesson title is h2; prose headings start below it, even when written as #.
 for (const rule of ['heading_open', 'heading_close']) {
   markdown.renderer.rules[rule] = (tokens, index, options, _env, renderer) => {

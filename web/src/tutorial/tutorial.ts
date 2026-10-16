@@ -3,7 +3,7 @@
 // the editor and highlighted targets. The course is data (course.json, compiled by ./chapters.ts), the model in
 // ./model.ts, the design in docs/TUTORIAL.md.
 import { Audition } from './audition';
-import { lessonChallenge, lessonProse } from './markdown';
+import { lessonChallenge, lessonProse, tickRequirements } from './markdown';
 import { keepVariation, variations } from './variations';
 import type { Patch } from '../patch';
 import type { AssemblyDef } from '../assembly';
@@ -547,15 +547,12 @@ export class Tutorial {
   /** the text's checkboxes: ticked when their requirements are met (all of them when `met` is null: the step is done),
    * the first unticked one marked as next; clicking one points the highlight at its controls */
   private checklist(prose: HTMLElement, met: Record<string, boolean> | null): HTMLElement {
-    let next = false;
-    const pick = this.clicked && met && !this.clicked.every((id) => met[id]) ? this.clicked.join() : null;
-    for (const box of prose.querySelectorAll<HTMLElement>('.req')) {
-      const ids = (box.dataset.req ?? '').split(',');
-      const done = !met || ids.every((id) => met[id]);
-      box.classList.toggle('done', done);
-      box.setAttribute('role', 'checkbox'); box.setAttribute('aria-checked', String(done));
-      if (!done && !next && (!pick || pick === box.dataset.req)) { box.classList.add('next'); next = true; }
-      box.addEventListener('click', (e) => { if ((e.target as Element).closest('a')) return; this.clicked = done ? null : ids; this.render(true); this.refocus(); });
+    for (const box of tickRequirements(prose, met, this.clicked?.join() ?? null)) {
+      box.addEventListener('click', (e) => {
+        if ((e.target as Element).closest('a')) return;
+        this.clicked = box.classList.contains('done') ? null : (box.dataset.req ?? '').split(',');
+        this.render(true); this.refocus();
+      });
     }
     return prose;
   }

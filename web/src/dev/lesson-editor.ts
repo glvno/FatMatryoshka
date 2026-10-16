@@ -18,7 +18,7 @@ import { CUSTOM, ROLES } from '../tutorial/registry';
 import { validateCourse, type Issue, type Report } from '../tutorial/validate';
 import { capture, type Proposal } from '../tutorial/capture';
 import { editorLink, linkedState, type SynthState } from '../tutorial/link';
-import { lessonChallenge, lessonProse } from '../tutorial/markdown';
+import { lessonChallenge, lessonProse, placedRequirements, tickRequirements } from '../tutorial/markdown';
 
 type Page =
   | { kind: 'chapter'; chapter: string }
@@ -118,6 +118,8 @@ async function mount() {
   /** the patch the synth was given for the selected step (Try / Record): the checks' entry state */
   let linkEntry: { key: string; patch: Patch } | null = null;
   let recording: { key: string; before: Patch } | null = null;
+  /** the step page's Instructions box: Insert in text places a requirement at its cursor */
+  let instructions: HTMLTextAreaElement | null = null;
   try {
     const raw = sessionStorage.getItem(DRAFT) ?? localStorage.getItem(DRAFT);
     if (raw) {
@@ -434,11 +436,15 @@ async function mount() {
     const dot = el('span', 'lesson-dot'); dot.dataset.part = String(i); dot.title = 'Live check against the synth';
     const kind = select(PART_KINDS.map((k) => [k, KINDS[k]]), part.kind, (v) => set(defaultPart(v as PartKind, draft)), 'Requirement kind');
     const gen = el('span', 'lesson-part-label', partLabel({ ...part, label: undefined } as Part, roles));
-    head.append(dot, kind, gen,
+    const where = el('span', 'lesson-place'); where.dataset.id = part.id;
+    head.append(dot, kind, gen, where,
+      button('Insert in text', () => placeInText(st, part), 'sm', 'Wrap the selected instruction, or insert the generated line at the cursor, as this requirement’s checkbox'),
+      check('hidden', !!part.hidden, (v) => { parts[i] = { ...parts[i], hidden: v || undefined } as Part; edited(); refreshPlacement(st); }, ''),
       button('↑', () => { if (i > 0) { [parts[i - 1], parts[i]] = [parts[i], parts[i - 1]]; edited(); onStructure(); } }, 'sm', 'Move up'),
       button('↓', () => { if (i < parts.length - 1) { [parts[i + 1], parts[i]] = [parts[i], parts[i + 1]]; edited(); onStructure(); } }, 'sm', 'Move down'),
       button('✕', () => { parts.splice(i, 1); edited(); onStructure(); }, 'sm', 'Remove this requirement'));
     if (momentary(part)) head.append(el('small', 'muted', ' momentary'));
+    head.append(el('code', 'lesson-part-id', part.id));
     const body = el('div', 'lesson-part-body');
     const T = (r: Ref) => refType(roles, r);
     switch (part.kind) {
@@ -525,7 +531,35 @@ async function mount() {
     const label = textInput(part.label ?? '', (v) => { parts[i] = { ...parts[i], label: v || undefined } as Part; edited(); }, 'Checklist line (optional)', 'Checklist line: leave empty to use the generated one');
     label.className = 'lesson-part-override';
     row.append(head, body, label);
+    queueMicrotask(() => refreshPlacement(st));
     return row;
+  }
+
+  /** each requirement row says whether the Instructions place it, and how often */
+  function refreshPlacement(st: StepData) {
+    const placed = placedRequirements(st.text).flat();
+    for (const w of fields.querySelectorAll<HTMLElement>('.lesson-place')) {
+      const part = st.parts?.find((p) => p.id === w.dataset.id);
+      const n = placed.filter((id) => id === w.dataset.id).length;
+      w.textContent = part?.hidden ? (n ? '⚠ hidden but placed' : 'hidden') : n ? `✓ placed${n > 1 ? ` ×${n}` : ''}` : '⚠ not in the text';
+      w.className = `lesson-place ${part?.hidden ? (n ? 'bad' : '') : n ? 'ok' : 'bad'}`;
+    }
+  }
+
+  /** wrap the Instructions' selection (else insert the generated line at the cursor) as the requirement's checkbox */
+  function placeInText(st: StepData, part: Part) {
+    const ta = instructions;
+    if (!ta) return;
+    const a = ta.selectionStart, b = ta.selectionEnd;
+    const chosen = ta.value.slice(a, b);
+    // keep a heading's or list item's marker outside the link
+    const lead = /^\s*(?:#{1,6}\s+)?(?:[-*+]\s+|\d+[.)]\s+)?/.exec(chosen)![0];
+    const words = chosen.slice(lead.length).replace(/\s+$/, '');
+    const tail = chosen.slice(lead.length + words.length);
+    const link = `[${words || partLabel({ ...part, label: undefined } as PartSpec, draft.roles)}](req:${part.id})`;
+    ta.setRangeText(lead + link + tail, a, b, 'end');
+    ta.focus();
+    ta.dispatchEvent(new Event('input'));
   }
 
   // ---- pages
@@ -539,6 +573,13 @@ async function mount() {
     const measure = () => { const n = wordCount(input.value); count.textContent = `${n} ${n === 1 ? 'word' : 'words'}`; };
     input.oninput = () => { onInput(input.value); measure(); edited(); };
     measure(); field.append(input); if (!single) field.append(count);
+    return field;
+  }
+
+  function instructionsField(st: StepData): HTMLElement {
+    const field = textField('Instructions', st.text, 10, (v) => { st.text = v; refreshPlacement(st); });
+    instructions = field.querySelector('textarea');
+    if (st.kind === 'task') field.append(el('small', 'muted', ' Place each requirement as a checkbox: select its instruction, then Insert in text on the requirement. [words](req:id) by hand works too; several ids comma-separated.'));
     return field;
   }
 
@@ -588,7 +629,7 @@ async function mount() {
     }, 'Step kind'));
     fields.append(
       textField('Title', st.title, 1, (v) => { st.title = v; heading.textContent = `Chapter ${ci + 1} · Step ${k + 1}. ${v}`; }, true),
-      textField('Instructions', st.text, 10, (v) => { st.text = v; }),
+      instructionsField(st),
       textField('Why (optional)', st.why, 5, (v) => { st.why = v; }),
       kindRow);
     for (const issue of issuesOf(ch.id, st.id)) fields.append(el('p', 'lesson-issue', issue.message));
@@ -775,7 +816,7 @@ async function mount() {
     card.append(todo);
     const n = wordCount(`${st.title} ${st.text} ${st.why}`);
     preview.replaceChildren(el('h3', '', 'Lesson card preview'), card,
-      el('p', 'muted lesson-preview-note', `About ${Math.max(1, Math.ceil(n / 200 * 60))} seconds to read. The checklist shows what the synth still lacks (or every requirement when the synth is not connected).`),
+      el('p', 'muted lesson-preview-note', `About ${Math.max(1, Math.ceil(n / 200 * 60))} seconds to read. Checkboxes tick against the linked synth; requirements the text does not place are listed under it.`),
       el('h3', '', 'Synth'), linkPanel());
     updateLive();
   }
@@ -845,10 +886,18 @@ async function mount() {
     if (!ch || !st) return;
     const todo = preview.querySelector<HTMLElement>('[data-live]');
     const parts = st.kind === 'task' ? st.parts ?? [] : [];
+    const placed = new Set(placedRequirements(st.text).flat());
+    const leftovers = (left: Part[]) => {
+      const loose = left.filter((p) => !p.hidden && !placed.has(p.id));
+      if (!todo) return;
+      if (!loose.length) { todo.replaceChildren(); todo.hidden = true; return; }
+      const ul = el('ul'); ul.append(...loose.map((p) => el('li', '', partLabel(p, draft.roles))));
+      todo.hidden = false; todo.replaceChildren(el('span', '', 'Not in the text'), ul);
+    };
     if (!synth || !link.connected()) {
       for (const d of fields.querySelectorAll<HTMLElement>('.lesson-dot')) { d.textContent = '–'; d.className = 'lesson-dot'; }
-      if (todo) todo.replaceChildren();
-      if (todo && parts.length) { const ul = el('ul'); ul.append(...parts.map((p) => el('li', '', partLabel(p, draft.roles)))); todo.replaceChildren(el('span', '', 'Still to do'), ul); }
+      tickRequirements(preview, {});
+      leftovers(parts);
       return;
     }
     const entry = linkEntry?.key === refKey(ch.id, st.id) ? linkEntry.patch : stepStart(chapterIndex(ch.id), ch.steps.indexOf(st), draft);
@@ -858,11 +907,8 @@ async function mount() {
       const ok = results[Number(d.dataset.part)];
       d.textContent = ok ? '✓' : '✗'; d.className = `lesson-dot ${ok ? 'ok' : 'bad'}`;
     }
-    if (todo) {
-      const left = parts.filter((_, i) => !results[i]);
-      if (!left.length) todo.replaceChildren(el('span', '', parts.length ? '✓ The synth meets this step' : ''));
-      else { const ul = el('ul'); ul.append(...left.map((p) => el('li', '', partLabel(p, draft.roles)))); todo.replaceChildren(el('span', '', 'Still to do'), ul); }
-    }
+    tickRequirements(preview, Object.fromEntries(parts.map((p, i) => [p.id, results[i]])));
+    leftovers(parts.filter((_, i) => !results[i]));
   }
   window.setInterval(updateLive, 1000);
 
