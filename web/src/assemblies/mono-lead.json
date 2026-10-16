@@ -6,6 +6,13 @@
   "modules": [
     {
       "id": 1,
+      "type": "part",
+      "x": 0,
+      "y": 560,
+      "params": {}
+    },
+    {
+      "id": 2,
       "type": "glide",
       "x": 0,
       "y": 0,
@@ -31,7 +38,7 @@
       }
     },
     {
-      "id": 2,
+      "id": 3,
       "type": "osc",
       "x": 270,
       "y": 0,
@@ -46,8 +53,7 @@
         "unison": 2,
         "detune": 6,
         "blend": 0.5,
-        "stack": 0,
-        "drift": 0
+        "stack": 0
       },
       "att": [
         1,
@@ -67,7 +73,7 @@
       }
     },
     {
-      "id": 3,
+      "id": 4,
       "type": "ladder",
       "x": 540,
       "y": 0,
@@ -96,7 +102,7 @@
       }
     },
     {
-      "id": 4,
+      "id": 5,
       "type": "adsr",
       "x": 270,
       "y": 560,
@@ -124,7 +130,7 @@
       }
     },
     {
-      "id": 5,
+      "id": 6,
       "type": "vca",
       "x": 540,
       "y": 560,
@@ -151,108 +157,135 @@
     {
       "from": {
         "module": 1,
-        "port": "out"
-      },
-      "to": {
-        "module": 2,
         "port": "pitch"
-      }
-    },
-    {
-      "from": {
-        "module": 2,
-        "port": "out"
       },
       "to": {
-        "module": 3,
+        "module": 2,
         "port": "in"
       }
     },
     {
       "from": {
-        "module": 3,
-        "port": "lp24"
+        "module": 1,
+        "port": "legato"
+      },
+      "to": {
+        "module": 2,
+        "port": "p1"
+      }
+    },
+    {
+      "from": {
+        "module": 1,
+        "port": "gate"
       },
       "to": {
         "module": 5,
+        "port": "gate"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "pitch"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "out"
+      },
+      "to": {
+        "module": 4,
         "port": "in"
       }
     },
     {
       "from": {
         "module": 4,
+        "port": "lp24"
+      },
+      "to": {
+        "module": 6,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 5,
         "port": "env"
       },
       "to": {
-        "module": 5,
+        "module": 6,
         "port": "cv"
       }
     }
   ],
   "inputs": [
     {
-      "module": 1,
-      "port": "in",
-      "label": "pitch"
-    },
-    {
       "module": 4,
-      "port": "gate",
-      "label": "gate"
-    },
-    {
-      "module": 3,
       "port": "cv",
       "label": "cutoff cv"
     }
   ],
   "outputs": [
     {
-      "module": 5,
+      "module": 6,
       "port": "out",
       "label": "out"
     }
   ],
   "params": [
     {
-      "module": 1,
+      "module": 2,
       "param": "time",
       "label": "porta"
     },
     {
-      "module": 1,
+      "module": 2,
       "param": "curve",
       "label": "curve"
     },
     {
-      "module": 3,
+      "module": 4,
       "param": "cutoff",
       "label": "cutoff"
     },
     {
-      "module": 3,
+      "module": 4,
       "param": "res",
       "label": "res"
     },
     {
-      "module": 4,
+      "module": 5,
       "param": "a",
       "label": "a"
     },
     {
-      "module": 4,
+      "module": 5,
       "param": "d",
       "label": "d"
     },
     {
-      "module": 4,
+      "module": 5,
       "param": "s",
       "label": "s"
     },
     {
-      "module": 4,
+      "module": 5,
       "param": "r",
       "label": "r"
     }
-  ]
+  ],
+  "poly": {
+    "parts": 1,
+    "assign": 0,
+    "legato": 0,
+    "priority": 0,
+    "unit": 0
+  }
 }

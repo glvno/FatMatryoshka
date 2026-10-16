@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // What changed between two versions of a patch (the diff view): parameters by module id, modules and cables added or
 // removed, and the rest (attenuverters, matrix, bypass, macro ranges, voices, arpeggiator, morph) as one line each.
-import type { ModuleDef, Patch } from './patch';
+import type { ModuleDef, Patch, PolyCfg } from './patch';
 import { ARP_FIELDS } from './arp';
 
 export interface PatchDiff {
@@ -51,7 +51,15 @@ export function diffPatches(a: Patch, b: Patch, defs: Record<string, ModuleDef>)
   const bc = new Set(b.cables.map((c) => key(b, c)));
   for (const k of bc) if (!ac.has(k)) d.cablesAdded.push(k);
   for (const k of ac) if (!bc.has(k)) d.cablesRemoved.push(k);
-  if ((a.voices ?? 1) !== (b.voices ?? 1)) d.other.push(`voices ${a.voices ?? 1} → ${b.voices ?? 1}`);
+  // poly assemblies: a switch turned on or off, a setting changed (by label)
+  const polyOf = (p: Patch): Map<string, PolyCfg> => new Map((p.assemblies ?? []).filter((x) => x.poly).map((x) => [x.label, x.poly!]));
+  const pa = polyOf(a), pb = polyOf(b);
+  for (const [label, cfg] of pb) {
+    const was = pa.get(label);
+    if (!was) d.other.push(`${label}: poly on (${cfg.parts} parts)`);
+    else for (const k of Object.keys(cfg) as (keyof PolyCfg)[]) if (was[k] !== cfg[k]) d.other.push(`${label}: ${k} ${was[k]} → ${cfg[k]}`);
+  }
+  for (const label of pa.keys()) if (!pb.has(label)) d.other.push(`${label}: poly off`);
   if (JSON.stringify(a.arp ?? null) !== JSON.stringify(b.arp ?? null)) {
     const changed = a.arp && b.arp ? ARP_FIELDS.filter((f) => a.arp![f] !== b.arp![f]).map((f) => `${f} ${a.arp![f]} → ${b.arp![f]}`) : [];
     d.other.push(`arpeggiator ${changed.length ? changed.join(', ') : b.arp ? 'set' : 'removed'}`);

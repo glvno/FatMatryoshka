@@ -47,7 +47,9 @@ export type Target =
   | { kind: 'param'; id: number; param: string }
   /** an output's jack, to shift-click for the scope */
   | { kind: 'probe'; id: number; port: string }
-  | { kind: 'ui'; id: string };
+  | { kind: 'ui'; id: string }
+  /** a poly assembly's setting picker (else its poly button, else its card) */
+  | { kind: 'poly'; id: number; setting: string };
 
 export interface Step {
   id: string;

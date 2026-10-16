@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { Engine } from './engine';
+import { BLOCK, Engine } from './engine';
 import { DEFS, DELAY_TIME_MAX, DELAY_TIME_MIN } from './modules';
-import { addModule, clearMorph, connect, disconnect, emptyPatch, fromUnit, hasMorph, modulate, morphValue, paramUnit, paramValue, processingOrder, removeModule, sameStructure, setMorphTarget, toUnit, validatePatch, voiceSplit, type Patch } from './patch';
+import { addModule, clearMorph, connect, disconnect, emptyPatch, fromUnit, hasMorph, modulate, morphValue, paramUnit, paramValue, processingOrder, removeModule, sameStructure, setMorphTarget, toUnit, validatePatch, POLY_DEFAULT, type Patch, type PolyCfg } from './patch';
+import { copiesOf, polyGroups } from './poly';
+import { fixAssemblies, makeAssembly } from './assembly';
+import { polyCfg, withParts } from './test-poly';
 import { PRESETS } from './presets';
 import { encodePatch, recordSize } from './patchbin';
 
@@ -132,7 +135,7 @@ describe('engine', () => {
   it('every module but fm1 and output has the two parameter inputs and a matrix', () => {
     for (const d of Object.values(DEFS)) {
       const has = d.inputs.filter((i) => i.pin).map((i) => i.name);
-      if (['fm1', 'output'].includes(d.type)) expect(has, d.type).toEqual([]);
+      if (['fm1', 'output'].includes(d.type) || !d.params.length) expect(has, d.type).toEqual([]); // nothing to modulate (the Part)
       else expect(has, d.type).toEqual(['p1', 'p2']);
       const m = addModule(emptyPatch(), d, 0, 0);
       expect(!!m.map, d.type).toBe(!!d.paramInputs);
@@ -566,7 +569,7 @@ describe('morph', () => {
     const { e, out } = play(a.p);
     expect(bright(out)).toBeCloseTo(b1, 2);
     expect(e.morph).toBe(1);
-    expect(voiceSplit({ ...a.p, voices: 3 }).has(a.kb)).toBe(false); // the Main's own input never makes it per voice
+    expect(copiesOf(withParts(a.p, 3)).has(a.kb)).toBe(false); // the Main module never runs per part
   });
 
   it('encodes the B side after the cables with the header flag', () => {
@@ -829,16 +832,16 @@ describe('granular', () => {
     expect(Math.abs(freq(render(e2, SR).l) - 523.2)).toBeLessThan(80);
   });
 
-  it('is shared: it runs once in a polyphonic patch', () => {
+  it('is shared: it runs once inside a poly assembly', () => {
     const p = emptyPatch();
     const kb = addModule(p, DEFS.fm1, 0, 0);
     const o = addModule(p, DEFS.osc, 0, 0);
     const g = addModule(p, DEFS.grain, 0, 0);
-    p.voices = 4;
     connect(p, DEFS, { module: kb.id, port: 'pitch' }, { module: o.id, port: 'pitch' });
     connect(p, DEFS, { module: o.id, port: 'out' }, { module: g.id, port: 'in' });
-    expect(voiceSplit(p).has(o.id)).toBe(true);
-    expect(voiceSplit(p).has(g.id)).toBe(false);
+    const q = withParts(p, 4);
+    expect(copiesOf(q).get(o.id)).toBe(4);
+    expect(copiesOf(q).get(g.id)).toBeUndefined();
   });
 
   it('freeze keeps playing the buffer after the input stops, mix 0 passes the input', () => {
@@ -1133,9 +1136,8 @@ describe('ladder filter', () => {
 
 describe('polyphony', () => {
   /** panel -> osc -> filter -> vca (adsr) -> delay -> output, plus a free LFO into the filter's p1 and an LFO driven by the envelope */
-  function polyPatch(voices: number): { p: Patch; ids: Record<string, number> } {
+  function polyPatch(parts: number, cfg: Partial<PolyCfg> = {}): { p: Patch; ids: Record<string, number> } {
     const p = emptyPatch('poly');
-    p.voices = voices;
     const kb = addModule(p, DEFS.fm1, 0, 0);
     const osc = addModule(p, DEFS.osc, 0, 0);
     const flt = addModule(p, DEFS.filter, 0, 0);
@@ -1158,28 +1160,30 @@ describe('polyphony', () => {
     w(dly.id, 'out', out.id, 'l');
     w(lfo.id, 'out', flt.id, 'p1');
     w(env.id, 'env', lfo2.id, 'p1');
-    return { p, ids: { kb: kb.id, osc: osc.id, flt: flt.id, env: env.id, vca: vca.id, dly: dly.id, out: out.id, lfo: lfo.id, lfo2: lfo2.id } };
+    const q = withParts(p, parts, cfg);
+    const part = q.modules.find((m) => m.type === 'part');
+    return { p: q, ids: { kb: kb.id, osc: osc.id, flt: flt.id, env: env.id, vca: vca.id, dly: dly.id, out: out.id, lfo: lfo.id, lfo2: lfo2.id, part: part?.id ?? -1 } };
   }
 
-  it('splits the patch: what hears pitch / gate / vel runs per voice, delay / reverb / output and free modules once', () => {
+  it('converts an old patch with voices: what heard pitch / gate / vel goes into a poly assembly with a Part; delay / output and free modules stay outside', () => {
     const { p, ids } = polyPatch(4);
-    const poly = voiceSplit(p);
-    expect([...poly].sort()).toEqual([ids.osc, ids.flt, ids.env, ids.vca, ids.lfo2].sort());
-    expect(poly.has(ids.kb)).toBe(false);
-    expect(poly.has(ids.lfo)).toBe(false); // nothing per voice reaches it: one LFO for all voices
-    p.voices = 1;
-    expect(voiceSplit(p).size).toBe(0);
-    delete p.voices;
-    expect(voiceSplit(p).size).toBe(0);
+    const [g] = polyGroups(p);
+    expect(g.cfg).toMatchObject({ parts: 4, assign: 2 });
+    expect([...g.modules].sort()).toEqual([ids.osc, ids.flt, ids.env, ids.vca, ids.lfo2, ids.part].sort());
+    expect(p.cables.some((c) => c.from.module === ids.part && c.from.port === 'pitch' && c.to.module === ids.osc)).toBe(true);
+    expect(p.cables.some((c) => c.from.module === ids.kb && c.to.module === ids.osc)).toBe(false);
+    expect('voices' in p).toBe(false);
+    expect(polyGroups(polyPatch(1).p)).toHaveLength(0); // one voice: nothing to convert
   });
 
-  it('one voice is the mono engine as it was: voices 1 and no voices field render the same', () => {
+  it('a one-part poly assembly plays like the patch without one (mono, legato auto)', () => {
     const a = new Engine(SR);
     const b = new Engine(SR);
-    const { p } = polyPatch(1);
-    a.load(p);
-    delete p.voices;
-    b.load(p);
+    const mono = polyPatch(1).p;
+    const one = polyPatch(2).p;
+    polyCfg(one).parts = 1;
+    a.load(mono);
+    b.load(one);
     for (const e of [a, b]) {
       e.noteOn(60);
       e.noteOn(67);
@@ -1187,11 +1191,11 @@ describe('polyphony', () => {
     const x = render(a, 4096).l;
     const y = render(b, 4096).l;
     expect(rms(x)).toBeGreaterThan(0.01);
-    expect(x).toEqual(y);
+    expect(y).toEqual(x);
   });
 
-  it('two voices sound both notes: the output is the sum of the two mono notes', () => {
-    const mono = (note: number): Float32Array => {
+  it('two parts sound both notes: the output is the sum of the two mono notes', () => {
+    const build = (): Patch => {
       const p = emptyPatch();
       const kb = addModule(p, DEFS.fm1, 0, 0);
       const o = addModule(p, DEFS.osc, 0, 0);
@@ -1199,21 +1203,16 @@ describe('polyphony', () => {
       o.params.level = 0.3;
       connect(p, DEFS, { module: kb.id, port: 'pitch' }, { module: o.id, port: 'pitch' });
       connect(p, DEFS, { module: o.id, port: 'out' }, { module: out.id, port: 'l' });
+      return p;
+    };
+    const mono = (note: number): Float32Array => {
       const e = new Engine(SR);
-      e.load(p);
+      e.load(build());
       e.noteOn(note);
       return render(e, 2048).l;
     };
-    const p = emptyPatch();
-    p.voices = 2;
-    const kb = addModule(p, DEFS.fm1, 0, 0);
-    const o = addModule(p, DEFS.osc, 0, 0);
-    const out = addModule(p, DEFS.output, 0, 0);
-    o.params.level = 0.3;
-    connect(p, DEFS, { module: kb.id, port: 'pitch' }, { module: o.id, port: 'pitch' });
-    connect(p, DEFS, { module: o.id, port: 'out' }, { module: out.id, port: 'l' });
     const e = new Engine(SR);
-    e.load(p);
+    e.load(withParts(build(), 2));
     e.noteOn(60);
     e.noteOn(67);
     const both = render(e, 2048).l;
@@ -1223,7 +1222,7 @@ describe('polyphony', () => {
     expect(rms(both)).toBeGreaterThan(rms(a));
   });
 
-  it('allocates voices: a free one first (the longest free), then the oldest is stolen; note off frees', () => {
+  it('assign reuse: a free part first (the one that played the key, else the longest free), then the oldest is taken over; note off frees', () => {
     const e = new Engine(SR);
     e.load(polyPatch(3).p);
     e.noteOn(60);
@@ -1235,13 +1234,52 @@ describe('polyphony', () => {
     e.noteOff(64);
     e.noteOff(62);
     expect(e.voiceNotes().map((v) => v.on)).toEqual([true, false, false]);
-    e.noteOn(67); // 64 was freed first: its voice is taken first
+    e.noteOn(67); // 64 was freed first: its part is taken first
     expect(e.voiceNotes().map((v) => v.note)).toEqual([65, 62, 67]);
-    e.noteOn(65); // the same key again stays on its voice
+    e.noteOn(65); // the same key again stays on its part
+    expect(e.voiceNotes().map((v) => v.note)).toEqual([65, 62, 67]);
+    e.noteOff(65);
+    e.noteOn(62); // its key played on part 1, which is free
     expect(e.voiceNotes().map((v) => v.note)).toEqual([65, 62, 67]);
     e.allNotesOff();
     expect(e.voiceNotes().every((v) => !v.on)).toBe(true);
     expect(e.nvoices).toBe(3);
+  });
+
+  it('assign rotate takes the next part in turn, lowest the lowest free one', () => {
+    const rot = new Engine(SR);
+    rot.load(polyPatch(3, { assign: 0 }).p);
+    for (const n of [60, 61, 62, 63]) {
+      rot.noteOn(n);
+      rot.noteOff(n);
+    }
+    expect(rot.voiceNotes().map((v) => v.note)).toEqual([63, 61, 62]); // 60 on part 0, 61 on 1, 62 on 2, 63 back on 0
+    const low = new Engine(SR);
+    low.load(polyPatch(3, { assign: 1 }).p);
+    for (const n of [60, 61, 62]) {
+      low.noteOn(n);
+      low.noteOff(n);
+    }
+    expect(low.voiceNotes().map((v) => v.note)).toEqual([62, -1, -1]);
+  });
+
+  it('priority low / high: with every part busy a key only takes over a higher / lower note', () => {
+    const lo = new Engine(SR);
+    lo.load(polyPatch(2, { priority: 1 }).p);
+    lo.noteOn(60);
+    lo.noteOn(64);
+    lo.noteOn(67); // higher than both: does not sound
+    expect(lo.voiceNotes().map((v) => v.note)).toEqual([60, 64]);
+    lo.noteOn(55); // lower: takes over the highest (64)
+    expect(lo.voiceNotes().map((v) => v.note)).toEqual([60, 55]);
+    const hi = new Engine(SR);
+    hi.load(polyPatch(2, { priority: 2 }).p);
+    hi.noteOn(60);
+    hi.noteOn(64);
+    hi.noteOn(55);
+    expect(hi.voiceNotes().map((v) => v.note)).toEqual([60, 64]);
+    hi.noteOn(67); // higher: takes over the lowest (60)
+    expect(hi.voiceNotes().map((v) => v.note)).toEqual([67, 64]);
   });
 
   it('a chord through the shared delay and output is finite and louder than one note; released notes fade', () => {
@@ -1262,7 +1300,7 @@ describe('polyphony', () => {
     expect(rms(render(e, 4800).l)).toBeLessThan(1e-3);
   });
 
-  it('keeps the voices sounding when the patch is edited, and resets them when the voice count changes', () => {
+  it('keeps the parts sounding when the patch is edited, and resets them when the part count changes', () => {
     const e = new Engine(SR);
     const { p, ids } = polyPatch(4);
     e.load(p);
@@ -1274,20 +1312,94 @@ describe('polyphony', () => {
     e.load(p);
     expect(rms(render(e, 1200).l)).toBeGreaterThan(before * 0.3);
     expect(e.voiceNotes().filter((v) => v.on)).toHaveLength(2);
-    p.voices = 2;
+    polyCfg(p).parts = 2;
     e.load(p);
     expect(e.nvoices).toBe(2);
     expect(e.voiceNotes().every((v) => !v.on)).toBe(true);
   });
 
-  it('a patch file carries the voice count and it survives validation', () => {
+  it('a patch file carries the poly settings and they survive validation, clamped', () => {
     const { p } = polyPatch(6);
     const q = validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
-    expect(q.voices).toBe(6);
-    const r = validatePatch(JSON.parse(JSON.stringify({ ...p, voices: 99 })), DEFS);
-    expect(r.voices).toBe(8);
-    const m = validatePatch(JSON.parse(JSON.stringify({ ...p, voices: undefined })), DEFS);
-    expect(m.voices).toBeUndefined();
+    fixAssemblies(q, DEFS);
+    expect(polyCfg(q)).toEqual(polyCfg(p));
+    const raw = JSON.parse(JSON.stringify(p));
+    raw.assemblies.find((a: { poly?: unknown }) => a.poly).poly = { parts: 99, assign: 7, legato: -1, priority: 'x', unit: 64 };
+    const r = validatePatch(raw, DEFS);
+    fixAssemblies(r, DEFS);
+    expect(polyCfg(r)).toEqual({ parts: 8, assign: 2, legato: 0, priority: 0, unit: 63 });
+  });
+
+  it('two poly assemblies layer: each plays every note on its own parts; a cable out of one sums its parts', () => {
+    const p = emptyPatch();
+    const out = addModule(p, DEFS.output, 0, 0);
+    out.params.level = 1;
+    const voice = (level: number): number => {
+      const part = addModule(p, DEFS.part, 0, 0);
+      const o = addModule(p, DEFS.osc, 0, 0);
+      o.params.level = level;
+      connect(p, DEFS, { module: part.id, port: 'pitch' }, { module: o.id, port: 'pitch' });
+      connect(p, DEFS, { module: o.id, port: 'out' }, { module: out.id, port: 'l' });
+      makeAssembly(p, [part.id, o.id], 'v').poly = { ...POLY_DEFAULT, parts: 2 };
+      return o.id;
+    };
+    voice(0.2);
+    voice(0.1);
+    expect(polyGroups(p).map((g) => g.cfg.parts)).toEqual([2, 2]);
+    const e = new Engine(SR);
+    e.load(p);
+    e.noteOn(60);
+    e.noteOn(67);
+    const l = render(e, 2048).l;
+    expect(Math.max(...l.map(Math.abs))).toBeGreaterThan(0.45); // two notes at 0.2 and two at 0.1 summed
+    expect(Math.max(...l.map(Math.abs))).toBeLessThanOrEqual(0.6 + 1e-6);
+  });
+});
+
+describe('Part and Random', () => {
+  it('Part: index is -1..1 across the parts (0 with one), legato and jump per part', () => {
+    const p = emptyPatch();
+    const part = addModule(p, DEFS.part, 0, 0);
+    makeAssembly(p, [part.id], 'v').poly = { ...POLY_DEFAULT, parts: 3, assign: 1 };
+    const e = new Engine(SR);
+    e.load(p);
+    e.noteOn(60);
+    e.noteOn(72);
+    render(e, BLOCK);
+    const out = (port: string, v: number): number => (e as unknown as { nodes: Map<number, { inst: { out: Record<string, Float32Array> }[] }> }).nodes.get(part.id)!.inst[v].out[port][0];
+    expect([0, 1, 2].map((v) => out('index', v))).toEqual([-1, 0, 1]);
+    expect(out('legato', 0)).toBe(0);
+    expect(out('legato', 1)).toBe(1); // 72 began over the held 60
+    expect(out('jump', 1)).toBeCloseTo(1, 6); // from C4 up an octave
+    expect(out('pitch', 1)).toBeCloseTo(1, 6);
+  });
+
+  it('Random fixed: a value per part that differs between parts and units and never moves; walk wanders within -1..1', () => {
+    const build = (mode: number, unit: number): { e: Engine; id: number } => {
+      const p = emptyPatch();
+      const r = addModule(p, DEFS.random, 0, 0);
+      r.params.mode = mode;
+      makeAssembly(p, [r.id], 'v').poly = { ...POLY_DEFAULT, parts: 2, unit };
+      const e = new Engine(SR);
+      e.load(p);
+      return { e, id: r.id };
+    };
+    const vals = (x: { e: Engine; id: number }): number[] => {
+      render(x.e, BLOCK);
+      return (x.e as unknown as { nodes: Map<number, { inst: { out: Record<string, Float32Array> }[] }> }).nodes.get(x.id)!.inst.map((i) => i.out.out[0]);
+    };
+    const a = build(0, 3);
+    const first = vals(a);
+    render(a.e, SR);
+    expect(vals(a)).toEqual(first);
+    expect(first[0]).not.toBe(first[1]);
+    expect(vals(build(0, 4))).not.toEqual(first);
+    const w = build(1, 0);
+    const seen: number[] = [];
+    for (let i = 0; i < 400; i++) seen.push(vals(w)[0]);
+    expect(seen.every((v) => v >= -1 && v <= 1)).toBe(true);
+    expect(Math.max(...seen) - Math.min(...seen)).toBeGreaterThan(0.05);
+    for (let i = 1; i < seen.length; i++) expect(Math.abs(seen[i] - seen[i - 1])).toBeLessThan(0.05); // smooth
   });
 });
 
@@ -1456,7 +1568,7 @@ describe('sync, glide, shaper, spread', () => {
     expect(bright(fold)).toBeGreaterThan(bright(hard)); // the fold's extra zero crossings
   });
 
-  it('spread is -1..1 across the voices and 0 in mono: through 0.2 s + 0.2 the voices sum to 0.2 per voice', () => {
+  it('an old patch\'s Main spread becomes the Part index, -1..1 across the parts and 0 with one: through 0.2 s + 0.2 the parts sum to 0.2 each', () => {
     const build = (voices?: number): Engine => {
       const p = emptyPatch();
       const kb = addModule(p, DEFS.fm1, 0, 0).id;
@@ -1465,11 +1577,10 @@ describe('sync, glide, shaper, spread', () => {
       sc.params.gain = 0.2;
       sc.params.offset = 0.2;
       out.params.level = 1;
-      wire(p, kb, 'spread', sc.id, 'in');
+      p.cables.push({ from: { module: kb, port: 'spread' }, to: { module: sc.id, port: 'in' } }); // an old patch's cable
       wire(p, sc.id, 'out', out.id, 'l');
-      if (voices) p.voices = voices;
       const e = new Engine(SR);
-      e.load(p);
+      e.load(withParts(p, voices ?? 1));
       return e;
     };
     expect(render(build(), 256).l[100]).toBeCloseTo(0.2, 5);
@@ -1644,10 +1755,10 @@ describe('level/rate envelope, string, wavetable, chorus', () => {
       wire(p, o.id, 'out', ch.id, 'in');
       wire(p, ch.id, 'l', out.id, 'l');
       wire(p, ch.id, 'r', out.id, 'r');
-      p.voices = voices;
-      expect(voiceSplit(p).has(ch.id)).toBe(false);
+      const q = withParts(p, voices);
+      expect(copiesOf(q).has(ch.id)).toBe(false);
       const e = new Engine(SR);
-      e.load(p);
+      e.load(q);
       e.noteOn(60);
       return e;
     };
@@ -2160,7 +2271,6 @@ describe('live parameter displays', () => {
 
   it('follows the newest held polyphonic voice, then a remaining held note', () => {
     const p = emptyPatch();
-    p.voices = 2;
     const main = addModule(p, DEFS.fm1, 0, 0);
     const amp = addModule(p, DEFS.vca, 0, 0);
     amp.params.gain = 0;
@@ -2170,7 +2280,7 @@ describe('live parameter displays', () => {
     open.params.value = 1;
     connect(p, DEFS, { module: open.id, port: 'out' }, { module: amp.id, port: 'cv' });
     const e = new Engine(SR);
-    e.load(p);
+    e.load(withParts(p, 2));
     e.noteOn(60, 0.2);
     e.noteOn(64, 0.7);
     render(e, 128);

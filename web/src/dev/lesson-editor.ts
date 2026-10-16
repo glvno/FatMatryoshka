@@ -10,7 +10,7 @@ import './lesson-editor.css';
 import { DEFS } from '../modules';
 import { PRESETS } from '../presets';
 import type { Patch } from '../patch';
-import { formatCourse, refKey, slugId, validateShape, ASSEMBLY_FACTS, EVENT_NAMES, PART_KINDS, SLIDER_OPS, type AssemblyFact, type ChapterData, type CourseData, type EventName, type Part, type PartKind, type PartSpec, type Pointer, type Ref, type RoleDef, type SliderOp, type StartRule, type StepData } from '../tutorial/course-schema';
+import { formatCourse, refKey, slugId, validateShape, ASSEMBLY_FACTS, EVENT_NAMES, PART_KINDS, POLY_SETTINGS, SLIDER_OPS, type AssemblyFact, type ChapterData, type CourseData, type EventName, type Part, type PartKind, type PartSpec, type PolySetting, type Pointer, type Ref, type RoleDef, type SliderOp, type StartRule, type StepData } from '../tutorial/course-schema';
 import { compileStep, stepStart } from '../tutorial/chapters';
 import { parseMidi } from '../tutorial/riff';
 import { momentary, partCheck, partLabel, refType, withId } from '../tutorial/parts';
@@ -74,7 +74,7 @@ const ORD = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const OPS: Record<SliderOp, string> = { le: '≤ at most', ge: '≥ at least', eq: '= exactly', ne: '≠ not', between: 'between', changed: 'moved from its start' };
 const KINDS: Record<PartKind, string> = {
   module: 'Module present', cable: 'Cable', noCable: 'Cable removed', slider: 'Slider', routed: 'Routed to a parameter', pinMap: 'Pin map',
-  att: 'Modulation depth', macroRange: 'Macro range', assembly: 'Assembly', voices: 'Voices', event: 'Event', sound: 'Sound', custom: 'Custom check',
+  att: 'Modulation depth', macroRange: 'Macro range', assembly: 'Assembly', poly: 'Poly assembly', event: 'Event', sound: 'Sound', custom: 'Custom check',
 };
 const FACTS: Record<AssemblyFact, string> = { exists: 'exists', open: 'is expanded', collapsed: 'is collapsed', promoted: 'has a promoted slider', exposed: 'has an exposed output', merged: 'has merged inputs', contains: 'contains another assembly', resized: 'was resized', saved: 'was saved to the library' };
 const EVENTS: Record<EventName, string> = {
@@ -101,7 +101,7 @@ const defaultPart = (kind: PartKind, course: CourseData): PartSpec => {
     case 'att': return { kind, ref: { type: 'filter' }, param: 'cutoff', op: 'ne', value: 1, tolerance: 0.05 };
     case 'macroRange': return { kind, ref: { type: 'filter' }, param: 'cutoff', min: 150, max: 4000 };
     case 'assembly': return { kind, role: asmRole, fact: 'exists' };
-    case 'voices': return { kind, min: 2 };
+    case 'poly': return { kind, setting: 'parts', op: 'ge', value: 2 };
     case 'event': return { kind, event: 'notes' };
     case 'sound': return { kind, mode: 'held' };
     case 'custom': return { kind, name: Object.keys(CUSTOM)[0] };
@@ -512,7 +512,12 @@ async function mount() {
         if (part.fact === 'saved') body.append(labelled('tag', textInput(part.tag ?? '', (v) => set({ ...part, tag: v }, false), 'tag', 'my-voice')), labelled('name', textInput(part.name ?? '', (v) => set({ ...part, name: v }, false), 'name', 'My voice')));
         break;
       }
-      case 'voices': body.append(labelled('at least', numberInput(part.min, (v) => set({ ...part, min: v ?? 2 }, false), 'voices', '1'))); break;
+      case 'poly':
+        body.append(labelled('setting', select(POLY_SETTINGS.map((x) => [x, x]), part.setting, (v) => set({ ...part, setting: v as PolySetting }))),
+          labelled('is', select(SLIDER_OPS.map((o) => [o, OPS[o]]), part.op, (v) => set({ ...part, op: v as SliderOp }))));
+        if (part.op !== 'changed') body.append(labelled('value', numberInput(part.value, (v) => set({ ...part, value: v ?? 0 }, false), 'value', '1')));
+        if (part.op === 'between') body.append(labelled('and', numberInput(part.max, (v) => set({ ...part, max: v ?? 0 }, false), 'upper value', '1')));
+        break;
       case 'event': {
         body.append(labelled('event', select(EVENT_NAMES.map((e) => [e, EVENTS[e]]), part.event, (v) => set({ kind: 'event', event: v as EventName }))));
         if (['notes', 'undos', 'redos', 'zooms', 'flips', 'shares', 'bypasses', 'news', 'saves'].includes(part.event)) body.append(labelled('times', numberInput(part.count, (v) => set({ ...part, count: v && v > 1 ? v : undefined }, false), 'at least', '1')));
@@ -698,7 +703,6 @@ async function mount() {
       else if (synth) set({ kind: 'patch', patch: copy(synth.patch) });
       else { tell('Open the synth (Open synth) to store its current patch as the start.', true); renderFields(); }
     }, 'Start'));
-    if (ch.start.kind === 'new') box.append(labelled('voices', numberInput(ch.start.voices, (v) => { ch.start = { kind: 'new', voices: v && v > 1 ? v : undefined }; edited(); }, '1', '1')));
     if (ch.start.kind === 'preset') box.append(select(Object.keys(PRESETS).map((n) => [n, n]), ch.start.name, (v) => set({ kind: 'preset', name: v }), 'Factory patch'));
     if (ch.start.kind === 'patch') box.append(el('span', 'muted', ` ${ch.start.patch.modules.length} modules, ${ch.start.patch.cables.length} cables `), button('Use the synth’s current patch', () => { if (synth) set({ kind: 'patch', patch: copy(synth.patch) }); else tell('The synth is not connected.', true); }));
     if (ch.start.kind === 'continue' && ci === 0) box.append(el('p', 'lesson-issue', 'The first chapter has no previous chapter; it starts from a new patch.'));

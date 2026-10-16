@@ -66,12 +66,21 @@ int main(int argc, char **argv)
         fprintf(stderr, "no such preset\n");
         return 1;
     }
-    {   /* a copy of the preset, with the polyphony of argv[9] if given (header byte 3) */
+    {   /* a copy of the preset; with argv[9] (parts, 1..8) all its modules go into one poly group of that many parts */
         static uint8_t bin[4096];
-        memcpy(bin, PRESET_LIST[p].data, PRESET_LIST[p].len);
-        if (argc > 9)
-            bin[3] = (uint8_t)atoi(argv[9]);
-        if (eng_load(bin, PRESET_LIST[p].len)) {
+        uint32_t len = PRESET_LIST[p].len;
+        memcpy(bin, PRESET_LIST[p].data, len);
+        if (argc > 9 && !bin[3] && len + 5u + bin[2] <= sizeof bin) {
+            uint32_t extra = 5u + bin[2];
+            memmove(bin + 8 + extra, bin + 8, len - 8u);
+            bin[3] = 1;
+            bin[8] = (uint8_t)atoi(argv[9]);
+            bin[9] = bin[10] = bin[11] = bin[12] = 0;
+            for (i = 0; i < bin[2]; i++)
+                bin[13 + i] = 1;                 /* eng_load keeps delay, reverb, chorus, granular and output out */
+            len += extra;
+        }
+        if (eng_load(bin, len)) {
             fprintf(stderr, "eng_load failed\n");
             return 1;
         }

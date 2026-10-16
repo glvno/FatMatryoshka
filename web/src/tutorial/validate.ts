@@ -14,7 +14,7 @@ import { compileCourse, chapterEnd, chapterStart, stepStart } from './chapters';
 import { momentary, partCheck, partLabel, refType, type Roles } from './parts';
 import { CUSTOM, ROLES } from './registry';
 import { placedRequirements } from './markdown';
-import { EVENT_NAMES, refKey, SLIDER_OPS, validateShape, type CourseData, type PartSpec, type Ref } from './course-schema';
+import { EVENT_NAMES, POLY_SETTINGS, refKey, SLIDER_OPS, validateShape, type CourseData, type PartSpec, type Ref } from './course-schema';
 import type { AssemblyDef } from '../assembly';
 
 export interface Issue {
@@ -84,7 +84,11 @@ export function partProblems(part: PartSpec, roles: Roles): string[] {
       if (part.fact === 'saved' && !part.tag) out.push('give the saved assembly a tag');
       break;
     }
-    case 'voices': num(part.min, 'voices'); break;
+    case 'poly':
+      if (!POLY_SETTINGS.includes(part.setting)) out.push(`unknown poly setting "${part.setting}"`);
+      if (part.op !== 'changed') num(part.value, part.setting);
+      if (part.op === 'between') num(part.max, 'upper value');
+      break;
     case 'event':
       if (!EVENT_NAMES.includes(part.event)) out.push(`unknown event "${part.event}"`);
       if (part.event === 'probe') port(part.ref ? ref(part.ref, 'probe') : undefined, part.port ?? 'out', 'out', 'probe');

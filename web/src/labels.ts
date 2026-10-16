@@ -43,3 +43,41 @@ export const moduleName = (type: string, label: string): string => MODULES[type]
 
 /** a choice's label (an enum parameter's value) */
 export const choiceName = (type: string, param: string, choice: string): string => CHOICES[`${type}.${param}`]?.[choice] ?? choice;
+
+/** the families a card's tag is coloured by (CSS `--tag-<family>`): sound sources, shapers in the signal path, modulation, effects, utilities */
+export type TagFamily = 'src' | 'shp' | 'mod' | 'fx' | 'util';
+
+const TAGS: Record<string, [string, TagFamily]> = {
+  osc: ['VCO', 'src'], noise: ['NOISE', 'src'], wavetable: ['WAVE', 'src'], string: ['STRING', 'src'], grain: ['GRAIN', 'src'],
+  filter: ['VCF', 'shp'], ladder: ['VCF', 'shp'], vca: ['VCA', 'shp'], shape: ['SHAPE', 'shp'], crush: ['CRUSH', 'shp'],
+  vowel: ['VOWEL', 'shp'], dyn: ['DYN', 'shp'], pan: ['PAN', 'shp'], xfade: ['XFADE', 'shp'],
+  adsr: ['ENV', 'mod'], env: ['ENV', 'mod'], lfo: ['LFO', 'mod'], random: ['RAND', 'mod'], seq: ['SEQ', 'mod'], glide: ['GLIDE', 'mod'],
+  sh: ['S&H', 'mod'], quant: ['QUANT', 'mod'], clkdiv: ['CLOCK', 'mod'], pulse: ['PULSE', 'mod'],
+  delay: ['DELAY', 'fx'], reverb: ['VERB', 'fx'], chorus: ['CHORUS', 'fx'], phaser: ['PHASER', 'fx'], shift: ['SHIFT', 'fx'],
+  comb: ['COMB', 'fx'], modal: ['MODAL', 'fx'],
+  mixer: ['MIX', 'util'], math: ['MATH', 'util'], logic: ['LOGIC', 'util'], const: ['DC', 'util'], scale: ['SCALE', 'util'],
+  output: ['OUT', 'util'], fm1: ['MAIN', 'util'], part: ['PART', 'util'],
+};
+
+/** the short tag before a card's title and the family that colours it */
+export const moduleTag = (type: string): { tag: string; family: TagFamily } => {
+  const [tag, family] = TAGS[type] ?? [type.slice(0, 5).toUpperCase(), 'util'];
+  return { tag, family };
+};
+
+/** three significant figures, trailing zeros dropped */
+const sig = (v: number): string => String(Number(v.toPrecision(3)));
+
+/**
+ * A parameter value for a card: the number and its unit apart (the unit is drawn smaller). Three significant figures;
+ * kHz from 1000 Hz, ms below one second; a + on positive values of a parameter that can go negative.
+ */
+export function formatValue(v: number, unit: string | undefined, signed: boolean): { num: string; unit: string } {
+  if (!Number.isFinite(v)) return { num: String(v), unit: unit ?? '' };
+  let u = unit ?? '';
+  let x = v;
+  if (u === 'Hz' && Math.abs(x) >= 1000) { x /= 1000; u = 'kHz'; }
+  else if (u === 's' && Math.abs(x) < 1 && x !== 0) { x *= 1000; u = 'ms'; }
+  const num = Math.abs(x) < 1e-9 ? '0' : sig(x);
+  return { num: signed && x > 0 ? `+${num}` : num, unit: u };
+}

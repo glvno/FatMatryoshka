@@ -113,8 +113,8 @@ static void m1_set_current(const uint8_t *p, uint32_t len)
 /* byte offset of module `mod`'s record in the patch binary, 0 if the binary is malformed */
 static uint32_t m1_record(uint32_t mod)
 {
-    uint32_t at = 8, i;
-    if (m1_cur_len < 8u || mod >= m1_cur[2])
+    uint32_t at = eng_records_at(m1_cur, m1_cur_len), i;
+    if (!at || mod >= m1_cur[2])
         return 0;
     for (i = 0; i < mod; i++) {
         const def_t *d;
@@ -162,8 +162,8 @@ static void m1_patch_bypass(uint32_t mod, int on)
 /* a patch binary that eng_load would at least not reject for its framing: header, record sizes add up to the length */
 static int m1_valid(const uint8_t *p, uint32_t len)
 {
-    uint32_t at = 8, i, nmod, ncab, npar = 0;
-    if (len < 8u || p[0] != 0xA1 || (p[1] > ENG_PATCH_VERSION || p[1] < ENG_PATCH_COMPAT_VERSION))
+    uint32_t at = eng_records_at(p, len), i, nmod, ncab, npar = 0;
+    if (!at || p[0] != 0xA1 || (p[1] > ENG_PATCH_VERSION || p[1] < ENG_PATCH_COMPAT_VERSION) || p[3] > POLY_MAX_GROUPS)
         return 0;
     if ((p[6] & ~15u) || p[7] || (p[1] < 17u && (p[6] & 4u)) || (p[1] < 18u && (p[6] & 8u)))
         return 0;
@@ -196,8 +196,8 @@ static int m1_valid(const uint8_t *p, uint32_t len)
 /* the offset of the macro range section (its count byte) in the current patch, 0 if the patch has none */
 static uint32_t m1_range_section(void)
 {
-    uint32_t at = 8, i, nmod, ncab, npar = 0;
-    if (m1_cur_len < 8u || !(m1_cur[6] & 2u))
+    uint32_t at = eng_records_at(m1_cur, m1_cur_len), i, nmod, ncab, npar = 0;
+    if (!at || !(m1_cur[6] & 2u))
         return 0;
     nmod = m1_cur[2];
     ncab = (uint32_t)m1_cur[4] | (uint32_t)m1_cur[5] << 8;

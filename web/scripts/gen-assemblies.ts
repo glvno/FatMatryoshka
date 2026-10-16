@@ -4,7 +4,7 @@
 // `voice` and `echo` are kept as files. Run from web/:  npx vite-node scripts/gen-assemblies.ts
 import { writeFileSync } from 'node:fs';
 import { DEFS } from '../src/modules';
-import { defaultMap, defaultParams, type ModuleInst, type Source } from '../src/patch';
+import { defaultMap, defaultParams, POLY_DEFAULT, type ModuleInst, type PolyCfg, type Source } from '../src/patch';
 import { pinsToParams, type AssemblyDef, type PortRef, type ParamRef } from '../src/assembly';
 
 const OUT = new URL('../src/assemblies/', import.meta.url);
@@ -20,7 +20,7 @@ interface B {
   param(label: string, module: number, param: string): void;
 }
 
-function build(name: string, category: string, f: (b: B) => void): AssemblyDef {
+function build(name: string, category: string, f: (b: B) => void, poly?: Partial<PolyCfg>): AssemblyDef {
   const modules: ModuleInst[] = [];
   const cables: AssemblyDef['cables'] = [];
   const inputs: (PortRef & { also?: { module: number; port: string }[] })[] = [];
@@ -68,13 +68,14 @@ function build(name: string, category: string, f: (b: B) => void): AssemblyDef {
     },
   };
   f(b);
-  return { format: 'modular-1-assembly', version: 1, name, category, modules, cables, inputs, outputs, params };
+  return { format: 'modular-1-assembly', version: 1, name, category, modules, cables, inputs, outputs, params, ...(poly ? { poly: { ...POLY_DEFAULT, ...poly } } : {}) };
 }
 
 const defs: AssemblyDef[] = [];
 /** category: the shelf of the editor's assembly browser (CATEGORIES in src/assemblies.ts) */
-const asm = (name: string, category: string, f: (b: B) => void): void => {
-  defs.push(build(name, category, f));
+/** `poly`: a poly assembly (it plays its own Part module's notes, one per part) */
+const asm = (name: string, category: string, f: (b: B) => void, poly?: Partial<PolyCfg>): void => {
+  defs.push(build(name, category, f, poly));
 };
 
 // an FM operator: oscillator, DX-style level / rate envelope, VCA
@@ -507,21 +508,22 @@ asm('stack voice', 'Voices', (b) => {
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
 });
 
-// voicing (issue #22): a mono lead whose portamento only acts on legato playing. Patch Main legato into "glide on legato"
-// (it lengthens the glide by `porta range` of the time range while a note overlaps the one before), Main pitch / gate in
+// a mono lead: a poly assembly of one part (so its legato and priority apply), whose portamento only acts on legato
+// playing: the Part's legato output lengthens the glide by `porta` of the time range while a note overlaps the one before
 asm('mono lead', 'Voices', (b) => {
+  const part = b.add('part', 0, 1);
   const gl = b.add('glide', 0, 0, { time: 0.001 }, { p1: 'time', att: [0.6, 1] });
   const osc = b.add('osc', 1, 0, { wave: 2, level: 0.8, unison: 2, detune: 6 });
   const flt = b.add('ladder', 2, 0, { cutoff: 1800, res: 0.35 });
   const env = b.add('adsr', 1, 1, { a: 0.005, d: 0.25, s: 0.6, r: 0.2 });
   const vca = b.add('vca', 2, 1);
+  b.wire(part, 'pitch', gl, 'in');
+  b.wire(part, 'legato', gl, 'p1');
+  b.wire(part, 'gate', env, 'gate');
   b.wire(gl, 'out', osc, 'pitch');
   b.wire(osc, 'out', flt, 'in');
   b.wire(flt, 'lp24', vca, 'in');
   b.wire(env, 'env', vca, 'cv');
-  b.input('pitch', gl, 'in');
-  b.input('gate', env, 'gate');
-  b.input('glide on legato', gl, 'p1');
   b.input('cutoff cv', flt, 'cv');
   b.output('out', vca, 'out');
   b.param('porta', gl, 'time');
@@ -529,56 +531,86 @@ asm('mono lead', 'Voices', (b) => {
   b.param('cutoff', flt, 'cutoff');
   b.param('res', flt, 'res');
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
-});
+}, { parts: 1 });
 
-// voicing (issue #22): a supersaw. Five detuned copies with the centre one held back (blend), an octave stacked on top,
-// a pan whose position input takes Main spread for width across the notes
+// a supersaw pad of four parts: five detuned copies with the centre one held back (blend), an octave stacked on top, each
+// part panned by its index (spread across the stereo field by `width`)
 asm('supersaw stack', 'Voices', (b) => {
+  const part = b.add('part', 0, 2);
   const osc = b.add('osc', 0, 0, { wave: 2, level: 0.9, unison: 5, detune: 22, blend: 0.65, stack: 1 });
   const flt = b.add('filter', 1, 0, { cutoff: 3500, res: 0.15 });
   const env = b.add('adsr', 0, 1, { a: 0.02, d: 0.4, s: 0.75, r: 0.5 });
   const vca = b.add('vca', 1, 1);
+  const width = b.add('scale', 1, 2, { gain: 0.6, offset: 0 });
   const pan = b.add('pan', 2, 0, { pan: 0 });
+  b.wire(part, 'pitch', osc, 'pitch');
+  b.wire(part, 'gate', env, 'gate');
+  b.wire(part, 'index', width, 'in');
+  b.wire(width, 'out', pan, 'pos');
   b.wire(osc, 'out', flt, 'in');
   b.wire(flt, 'lp12', vca, 'in');
   b.wire(env, 'env', vca, 'cv');
   b.wire(vca, 'out', pan, 'in');
-  b.input('pitch', osc, 'pitch');
-  b.input('gate', env, 'gate');
-  b.input('width', pan, 'pos');
   b.output('l', pan, 'l');
   b.output('r', pan, 'r');
   for (const q of ['unison', 'detune', 'blend', 'stack']) b.param(q, osc, q);
   b.param('cutoff', flt, 'cutoff');
+  b.param('width', width, 'gain');
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
-});
+}, { parts: 4 });
 
-// analog drift (issue #22): a two-oscillator voice that has drifted out of spec. Each oscillator wanders by its drift
-// cents; patch Main tol into "tolerance" (each note's own cutoff and envelope offset) and Main drift into "wander" (a slow
-// shared pitch walk per note on the second oscillator). Unit on the Main module picks another set of tolerances.
+// an analog polysynth voice of four parts that has drifted out of spec: each oscillator's fine tune follows its own slow
+// Random walk (a few cents), a fixed Random per part (its tolerance) offsets the cutoff and the decay. `unit` of the
+// assembly picks another set of values: another instrument of the same model.
 asm('analog voice', 'Voices', (b) => {
-  const o1 = b.add('osc', 0, 0, { wave: 2, level: 0.7, drift: 6 });
-  const o2 = b.add('osc', 0, 1, { wave: 3, pw: 0.45, level: 0.6, fine: 4, drift: 9 }, { p1: 'fine', att: [0.25, 1] });
+  const part = b.add('part', 0, 2);
+  const w1 = b.add('random', 1, 2, { mode: 1, rate: 0.7 });
+  const w2 = b.add('random', 2, 2, { mode: 1, rate: 0.9 });
+  const tol = b.add('random', 3, 2, { mode: 0 });
+  const o1 = b.add('osc', 0, 0, { wave: 2, level: 0.7 }, { p1: 'fine', att: [0.03, 1] });
+  const o2 = b.add('osc', 0, 1, { wave: 3, pw: 0.45, level: 0.6, fine: 4 }, { p1: 'fine', att: [0.045, 1] });
   const mix = b.add('mixer', 1, 0, { l1: 0.7, l2: 0.6, l3: 0, l4: 0 });
   const flt = b.add('filter', 2, 0, { cutoff: 1400, res: 0.25 }, { p1: 'cutoff', att: [0.08, 1] });
   const env = b.add('adsr', 1, 1, { a: 0.008, d: 0.35, s: 0.55, r: 0.3 }, { p1: 'd', att: [0.06, 1] });
   const vca = b.add('vca', 2, 1);
+  b.wire(part, 'pitch', o1, 'pitch');
+  b.wire(part, 'pitch', o2, 'pitch');
+  b.wire(part, 'gate', env, 'gate');
+  b.wire(w1, 'out', o1, 'p1');
+  b.wire(w2, 'out', o2, 'p1');
+  b.wire(tol, 'out', flt, 'p1');
+  b.wire(tol, 'out', env, 'p1');
   b.wire(o1, 'out', mix, 'in1');
   b.wire(o2, 'out', mix, 'in2');
   b.wire(mix, 'out', flt, 'in');
   b.wire(flt, 'lp24', vca, 'in');
   b.wire(env, 'env', vca, 'cv');
-  b.input('pitch', o1, 'pitch', [o2, 'pitch']);
-  b.input('gate', env, 'gate');
-  b.input('tolerance', flt, 'p1', [env, 'p1']);
-  b.input('wander', o2, 'p1');
   b.output('out', vca, 'out');
-  b.param('drift 1', o1, 'drift');
-  b.param('drift 2', o2, 'drift');
+  b.param('drift rate', w1, 'rate');
   b.param('cutoff', flt, 'cutoff');
   b.param('res', flt, 'res');
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
-});
+}, { parts: 4 });
+
+// the plainest polyphonic voice: a poly assembly of four parts (saw, low pass, ADSR, VCA), each playing its own note
+asm('poly voice', 'Voices', (b) => {
+  const part = b.add('part', 0, 1);
+  const osc = b.add('osc', 0, 0, { wave: 2, level: 0.8 });
+  const flt = b.add('filter', 1, 0, { cutoff: 2000, res: 0.2 });
+  const env = b.add('adsr', 1, 1, { a: 0.005, d: 0.3, s: 0.6, r: 0.3 });
+  const vca = b.add('vca', 2, 0);
+  b.wire(part, 'pitch', osc, 'pitch');
+  b.wire(part, 'gate', env, 'gate');
+  b.wire(osc, 'out', flt, 'in');
+  b.wire(flt, 'lp24', vca, 'in');
+  b.wire(env, 'env', vca, 'cv');
+  b.input('cutoff cv', flt, 'cv');
+  b.output('out', vca, 'out');
+  b.param('wave', osc, 'wave');
+  b.param('cutoff', flt, 'cutoff');
+  b.param('res', flt, 'res');
+  for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
+}, { parts: 4 });
 
 // an LFO through a Scale: vibrato (into a pitch input), tremolo (into a VCA's cv with an offset), a filter sweep
 asm('vibrato', 'Utilities', (b) => {

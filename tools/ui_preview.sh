@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Render the device LCD of a factory preset on the host:
 #   tools/ui_preview.sh OUT.png PRESET [MODULE [OCTAVE [PAGE [ARP_STEP [MENU_TAB [MANUAL_LINE [POLY]]]]]]]
-# PAGE 0 module, 1..3 arpeggiator, 4 mixer, 5 menu (MENU_TAB 0..4, 4 = MANUAL from MANUAL_LINE); POLY = the patch's polyphony
+# PAGE 0 module, 1..3 arpeggiator, 4 mixer, 5 menu (MENU_TAB 0..4, 4 = MANUAL from MANUAL_LINE); POLY = parts: the whole patch as one poly group of that many parts
 # M1_VOICES=4 previews the four-voice build (default: engine.h, one voice)
 set -e
 cd "$(dirname "$0")/.."

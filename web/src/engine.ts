@@ -2,22 +2,24 @@
 // Block-based patch engine. Pure TypeScript with no DOM or Web Audio dependency, so it runs in
 // an AudioWorklet, in tests, and (as the reference) next to the firmware port.
 //
-// Polyphony: a patch has `voices` (1..MAX_VOICES). voiceSplit() in patch.ts says which modules run once per voice; those
-// have one instance (state, buffers, effective parameters) per voice. The others run once: a shared module reading a
-// per-voice output gets the sum over the voices, a per-voice module reading a shared output gets that one buffer. The
-// FM-1 panel is shared but its pitch / gate / vel outputs are per voice. With one voice this is exactly the mono engine.
+// Polyphony: a poly assembly (poly.ts) runs its member modules once per part, each copy (instance) with its own state,
+// buffers and effective parameters; its allocator hands the notes to the parts, and its Part module outputs each part's
+// note. Everything else runs once and plays the shared keyboard (the Main module's pitch / gate / vel: one note, the last
+// held). A module reading another group's per-part output gets the sum over those parts; a per-part module reading a
+// shared output gets that one buffer.
 
-import { hash32, IMPLS, instSeed, walkInit, walkStep, type Ctx, type ModuleImpl, type Voice, type Walk } from './modules';
-import { defaultMap, modulate, morphValue, paramValue, processingOrder, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Cable, type Patch, type Range, type Source, thruInput } from './patch';
+import { IMPLS, instSeed, type Ctx, type ModuleImpl, type Voice } from './modules';
+import { defaultMap, modulate, morphValue, paramValue, processingOrder, SOURCES, type Cable, type Patch, type PolyCfg, type Range, type Source, thruInput } from './patch';
+import { polyGroups } from './poly';
 
 export const BLOCK = 128;
 
 /** A display snapshot, detached from the patch and the audio thread's mutable state. */
 export type ParameterValues = { id: number; params: Record<string, number> }[];
 
-/** one running copy of a module: shared modules have one, per-voice modules one per voice */
+/** one running copy of a module: one per part inside a poly assembly, else one */
 interface Inst {
-  /** instSeed of the module index and voice: drift's randomness, the same as the firmware's */
+  /** instSeed of the module index and part: the Random module's seed, the same as the firmware's */
   seed: number;
   state: unknown;
   /** params after modulation, what the module reads */
@@ -40,8 +42,8 @@ interface Node {
   connected: Record<string, boolean>;
   inputRoutes: { port: string; params: string[]; mean: number }[];
   sources: { port: string; from: Node; fromPort: string }[];
-  /** runs once per voice */
-  poly: boolean;
+  /** the poly group it runs in (index in Engine.groups), -1: runs once */
+  group: number;
   /** bypassed: run() copies `thru` (or silence) to the outputs instead of processing */
   bypass: boolean;
   thru: string | undefined;
@@ -50,42 +52,52 @@ interface Node {
   /** macro ranges per pin (patch.ts ModuleInst.range) */
   range: [Record<string, Range>, Record<string, Range>];
   inst: Inst[];
-  /** the FM-1 panel with several voices: its pitch / gate / vel, one buffer per voice */
-  vout: Record<string, Float32Array[]> | null;
 }
 
-/** a voice: what the panel outputs plus what the allocator needs */
+/** a part: what its Part module outputs plus what the allocator needs */
 interface VoiceState extends Voice {
   note: number;
   /** a key holds it (gate up) */
   on: boolean;
   onStamp: number;
   offStamp: number;
-  /** the voice was taken over while sounding: the next block's gate starts with one low sample so envelopes restart */
+  /** the part was taken over while sounding: this block's gate starts with one low sample so envelopes restart */
   retrig: boolean;
-  /** the slow random wander of the Main module's drift output */
-  walk: Walk;
 }
 
-/** the seed of voice i's drift walk (the firmware: eng_load) */
-export const voiceSeed = (i: number): number => hash32(0x51ed270b + i);
-const newVoice = (i = 0): VoiceState => ({
-  pitch: 0, gate: 0, velocity: 0, spread: 0, clock: false, bend: 0, mod: 0, at: 0, index: i, legato: 0, jump: 0, drift: 0, unit: 0,
-  note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false, walk: walkInit(voiceSeed(i), 1),
+/** an allocator and its parts: a poly assembly's, or the shared keyboard (one part, legato auto, last note) */
+interface Group {
+  /** the poly assembly's id and part count: a reload keeps the group (its notes) while these stay */
+  key: string;
+  cfg: PolyCfg;
+  parts: VoiceState[];
+  /** the held keys, oldest first (one part: the sounding key is chosen among them) */
+  held: { note: number; vel: number }[];
+  /** rotate: the part the next note tries first */
+  rot: number;
+}
+
+const newVoice = (index: number, parts: number): VoiceState => ({
+  pitch: 0, gate: 0, velocity: 0, clock: false, bend: 0, mod: 0, at: 0, index, parts, legato: 0, jump: 0, unit: 0,
+  note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false,
 });
-/** the panel's spread output of voice i of n: -1 .. 1 in equal steps, 0 alone */
-export const spreadOf = (i: number, n: number): number => (n > 1 ? (2 * i - (n - 1)) / (n - 1) : 0);
+const KEYBOARD: PolyCfg = { parts: 1, assign: 0, legato: 0, priority: 0, unit: 0 };
+const newGroup = (key: string, cfg: PolyCfg): Group => ({
+  key, cfg: { ...cfg }, parts: Array.from({ length: cfg.parts }, (_, i) => newVoice(i, cfg.parts)), held: [], rot: 0,
+});
 
 export class Engine {
   private nodes = new Map<number, Node>();
   private order: Node[] = [];
   private outputs: Node[] = [];
-  private held: { note: number; vel: number }[] = [];
-  private voices: VoiceState[] = [newVoice()];
+  /** the shared keyboard (the Main module, Part modules outside poly assemblies) */
+  private kb: Group = newGroup('kb', KEYBOARD);
+  /** the poly assemblies' allocators, in polyGroups order */
+  private groups: Group[] = [];
   private stamp = 0;
   private ticks = 0;
   private clockOn = true;
-  /** the performance controls (pitch bend -1..1, mod wheel 0..1, channel aftertouch 0..1): one set, every voice sees it */
+  /** the performance controls (pitch bend -1..1, mod wheel 0..1, channel aftertouch 0..1): one set, every part sees it */
   private ctl = { bend: 0, mod: 0, at: 0 };
   /** the Main module, and the morph position of the current block (its morph parameter plus the block mean of its morph input, one block late) */
   private main: Node | null = null;
@@ -94,19 +106,19 @@ export class Engine {
 
   constructor(readonly sampleRate: number) {}
 
-  /** the number of voices of the loaded patch */
+  /** the part count of the first poly assembly (1 without one), for tests and displays */
   get nvoices(): number {
-    return this.voices.length;
+    return this.groups[0]?.parts.length ?? 1;
   }
 
-  /** the first voice (the voice, with a mono patch) */
+  /** the shared keyboard's note (what the Main module plays) */
   get voice(): Voice {
-    return this.voices[0];
+    return this.kb.parts[0];
   }
 
-  /** the notes the voices hold (for tests and displays): -1 = none, gate up or down */
+  /** the notes the first poly assembly's parts hold (the shared keyboard without one): -1 = none, gate up or down */
   voiceNotes(): { note: number; on: boolean }[] {
-    return this.voices.map((v) => ({ note: v.note, on: v.on }));
+    return (this.groups[0] ?? this.kb).parts.map((v) => ({ note: v.note, on: v.on }));
   }
 
   private newInst(impl: ModuleImpl, seed: number): Inst {
@@ -123,23 +135,26 @@ export class Engine {
     };
   }
 
-  /** Install a patch. Modules whose id, type and voice count are unchanged keep their running state. */
+  /** Install a patch. Modules whose id, type and copy count are unchanged keep their running state; so do poly groups. */
   load(patch: Patch): void {
-    const nv = voicesOf(patch);
-    const poly = voiceSplit(patch);
-    if (nv !== this.voices.length) {
-      this.voices = Array.from({ length: nv }, (_, i) => ({ ...newVoice(i), spread: spreadOf(i, nv) }));
-      this.held = [];
-    }
+    const pg = polyGroups(patch);
+    const oldGroups = new Map(this.groups.map((g) => [g.key, g]));
+    this.groups = pg.map((x) => {
+      const key = `${x.asm.id}:${x.cfg.parts}`;
+      const g = oldGroups.get(key) ?? newGroup(key, x.cfg);
+      g.cfg = { ...x.cfg };
+      return g;
+    });
+    const groupOf = new Map<number, number>();
+    pg.forEach((x, i) => x.modules.forEach((id) => groupOf.set(id, i)));
     const next = new Map<number, Node>();
     for (const [mi, m] of patch.modules.entries()) {
       const impl = IMPLS[m.type];
       if (!impl) throw new Error(`unknown module type "${m.type}"`);
-      const isPoly = poly.has(m.id);
-      const ninst = isPoly ? nv : 1;
-      const panelVoices = m.type === 'fm1' && nv > 1 ? nv : 0;
+      const group = groupOf.get(m.id) ?? -1;
+      const ninst = group >= 0 ? this.groups[group].parts.length : 1;
       const old = this.nodes.get(m.id);
-      const keep = old && old.type === m.type && old.inst.length === ninst && (old.vout ? old.vout.pitch.length : 0) === panelVoices;
+      const keep = old && old.type === m.type && old.inst.length === ninst;
       const node: Node = keep
         ? old!
         : {
@@ -152,14 +167,14 @@ export class Engine {
             connected: {},
             inputRoutes: [],
             sources: [],
-            poly: isPoly,
+            group,
             bypass: false,
             thru: thruInput(impl.def),
             paramsB: null,
             range: [{}, {}],
             inst: Array.from({ length: ninst }, (_, v) => this.newInst(impl, instSeed(mi, v))),
-            vout: panelVoices ? Object.fromEntries([...VOICE_PORTS].map((p) => [p, Array.from({ length: panelVoices }, () => new Float32Array(BLOCK))])) : null,
           };
+      node.group = group;
       node.params = { ...m.params };
       node.att = m.att ? [m.att[0], m.att[1]] : [1, 1];
       node.map = Object.fromEntries(SOURCES.map((s) => [s, [...(m.map?.[s] ?? [])]])) as Record<Source, string[]>;
@@ -191,23 +206,26 @@ export class Engine {
     return this.morphT;
   }
 
-  /** the buffer an output wrote in the last block (voice 0 of a per-voice module; the Main's per-voice ports too), for a scope probe */
+  /** the buffer an output wrote in the last block (part 0 of a per-part module), for a scope probe */
   probe(id: number, port: string): Float32Array | null {
-    const n = this.nodes.get(id);
-    if (!n) return null;
-    if (n.vout && VOICE_PORTS.has(port)) return n.vout[port][0];
-    return n.inst[0]?.out[port] ?? null;
+    return this.nodes.get(id)?.inst[0]?.out[port] ?? null;
   }
 
-  /** Last rendered values. Polyphonic controls follow the newest held voice, or its release. */
-  parameterValues(): ParameterValues {
+  /** the part of a group whose values a display shows: the newest held one, else the newest released */
+  private shownPart(g: Group): number {
     let voice = 0;
-    for (let i = 1; i < this.voices.length; i++) {
-      const a = this.voices[i], b = this.voices[voice];
+    for (let i = 1; i < g.parts.length; i++) {
+      const a = g.parts[i], b = g.parts[voice];
       if ((a.on && !b.on) || (a.on === b.on && a.onStamp > b.onStamp)) voice = i;
     }
+    return voice;
+  }
+
+  /** Last rendered values. Per-part controls follow their poly assembly's newest held part, or its release. */
+  parameterValues(): ParameterValues {
+    const shown = this.groups.map((g) => this.shownPart(g));
     return this.order.map((node) => {
-      const { eff, display } = node.inst[node.poly ? voice : 0];
+      const { eff, display } = node.inst[node.group >= 0 ? shown[node.group] : 0];
       const params = Object.fromEntries(node.impl.def.params.map((pd) => [
         pd.name, node.bypass ? node.params[pd.name] ?? pd.default : display[pd.name] ?? eff[pd.name] ?? node.params[pd.name] ?? pd.default,
       ]));
@@ -252,17 +270,6 @@ export class Engine {
   setBypass(id: number, on: boolean): void {
     const n = this.nodes.get(id);
     if (n && n.type !== 'fm1' && n.type !== 'output') n.bypass = on;
-  }
-
-  /** does this output differ per voice? */
-  private portIsPoly(from: Node, port: string): boolean {
-    return from.vout ? VOICE_PORTS.has(port) : from.poly;
-  }
-
-  /** the buffer of an output as voice `v` sees it */
-  private bufOf(from: Node, port: string, v: number): Float32Array {
-    if (from.vout && VOICE_PORTS.has(port)) return from.vout[port][v];
-    return from.inst[from.poly ? v : 0].out[port];
   }
 
   /**
@@ -329,32 +336,54 @@ export class Engine {
     }
   }
 
-  /** the Main module's voicing choices: legato (0 auto, 1 off, 2 on) and mono priority (0 last, 1 low, 2 high) */
-  private voicing(): { legato: number; priority: number } {
-    const p = this.main?.params;
-    return { legato: Math.round(p?.legato ?? 0), priority: Math.round(p?.priority ?? 0) };
+  noteOn(note: number, velocity = 1): void {
+    for (const g of [this.kb, ...this.groups]) this.groupOn(g, note, velocity);
   }
 
-  noteOn(note: number, velocity = 1): void {
-    if (this.voices.length === 1) {
-      this.held = this.held.filter((h) => h.note !== note);
-      this.held.push({ note, vel: velocity });
-      this.updateVoice();
+  noteOff(note: number): void {
+    for (const g of [this.kb, ...this.groups]) this.groupOff(g, note);
+  }
+
+  /**
+   * A note for one group. One part: the key joins the held list and the sounding key is chosen among them (monoUpdate).
+   * Several: the key already down on a part keeps it; else a free part by the assign mode (rotate: the next in turn;
+   * lowest: the lowest-numbered; reuse: a free part whose last note was the key, else the one free the longest); with none free
+   * one is taken over by priority (last: the oldest note; low / high: the highest / lowest note, only for a lower / higher
+   * key; otherwise the key does not sound). A taken-over part restarts its envelopes unless legato is on.
+   */
+  private groupOn(g: Group, note: number, velocity: number): void {
+    if (g.parts.length === 1) {
+      g.held = g.held.filter((h) => h.note !== note);
+      g.held.push({ note, vel: velocity });
+      this.monoUpdate(g);
       return;
     }
-    const vs = this.voices;
-    const stamp = ++this.stamp;
+    const vs = g.parts;
+    const n = vs.length;
     const over = vs.some((x) => x.on && x.note !== note); // another key is down: this note overlaps it
-    // the key is already down on a voice: that voice again. Else the voice that has been free the longest. Else the oldest.
     let v = vs.findIndex((x) => x.on && x.note === note);
-    if (v < 0) for (let i = 0; i < vs.length; i++) if (!vs[i].on && (v < 0 || vs[i].offStamp < vs[v].offStamp)) v = i;
     if (v < 0) {
-      v = 0;
-      for (let i = 1; i < vs.length; i++) if (vs[i].onStamp < vs[v].onStamp) v = i;
+      const free = vs.map((x, i) => (x.on ? -1 : i)).filter((i) => i >= 0);
+      if (free.length) {
+        const mode = g.cfg.assign;
+        if (mode === 0) {
+          for (let k = 0; k < n && v < 0; k++) if (!vs[(g.rot + k) % n].on) v = (g.rot + k) % n;
+          g.rot = (v + 1) % n;
+        } else if (mode === 1) v = free[0];
+        else v = free.find((i) => vs[i].note === note) ?? free.reduce((a, i) => (vs[i].offStamp < vs[a].offStamp ? i : a), free[0]);
+      } else {
+        const pr = g.cfg.priority;
+        v = 0;
+        for (let i = 1; i < n; i++) {
+          const better = pr === 1 ? vs[i].note > vs[v].note : pr === 2 ? vs[i].note < vs[v].note : vs[i].onStamp < vs[v].onStamp;
+          if (better) v = i;
+        }
+        if ((pr === 1 && note > vs[v].note) || (pr === 2 && note < vs[v].note)) return;
+      }
     }
     const x = vs[v];
-    // a stolen note restarts its envelopes unless legato is on
-    if (x.on && this.voicing().legato !== 2) x.retrig = true;
+    // a taken-over part restarts its envelopes unless legato is on
+    if (x.on && g.cfg.legato !== 2) x.retrig = true;
     x.legato = over ? 1 : 0;
     x.jump = (note - 60) / 12 - x.pitch;
     x.note = note;
@@ -362,16 +391,16 @@ export class Engine {
     x.velocity = velocity;
     x.gate = 1;
     x.on = true;
-    x.onStamp = stamp;
+    x.onStamp = ++this.stamp;
   }
 
-  noteOff(note: number): void {
-    if (this.voices.length === 1) {
-      this.held = this.held.filter((h) => h.note !== note);
-      this.updateVoice();
+  private groupOff(g: Group, note: number): void {
+    if (g.parts.length === 1) {
+      g.held = g.held.filter((h) => h.note !== note);
+      this.monoUpdate(g);
       return;
     }
-    for (const x of this.voices)
+    for (const x of g.parts)
       if (x.on && x.note === note) {
         x.on = false;
         x.gate = 0;
@@ -388,7 +417,7 @@ export class Engine {
     this.clockOn = on;
   }
 
-  /** pitch bend, -1..1: +-2 semitones on the Main module's pitch output, and its bend output */
+  /** pitch bend, -1..1: +-2 semitones on every pitch output, and the Main module's bend output */
   bend(v: number): void {
     this.ctl.bend = Math.max(-1, Math.min(1, v));
   }
@@ -406,30 +435,33 @@ export class Engine {
   }
 
   allNotesOff(): void {
-    this.held = [];
-    for (const x of this.voices) {
-      x.on = false;
-      x.gate = 0;
-      x.retrig = false;
+    for (const g of [this.kb, ...this.groups]) {
+      g.held = [];
+      for (const x of g.parts) {
+        x.on = false;
+        x.gate = 0;
+        x.retrig = false;
+      }
     }
   }
 
   /**
-   * mono: the gate stays up while any key is down; the sounding key is the last, lowest or highest held (priority). A change
-   * of key while the gate is up is a legato transition: the legato output goes to 1 and, with legato off, the envelopes
-   * restart (one low gate sample); auto and on keep them running.
+   * One part: the gate stays up while any key is down; the sounding key is the last, lowest or highest held (priority). A
+   * change of key while the gate is up is a legato transition: the legato output goes to 1 and, with legato off, the
+   * envelopes restart (one low gate sample); auto and on keep them running.
    */
-  private updateVoice(): void {
-    const { legato, priority } = this.voicing();
-    let top = this.held[this.held.length - 1];
-    if (priority) for (const h of this.held) if (priority === 1 ? h.note < top.note : h.note > top.note) top = h;
-    const x = this.voices[0];
+  private monoUpdate(g: Group): void {
+    const { legato, priority } = g.cfg;
+    let top = g.held[g.held.length - 1];
+    if (priority) for (const h of g.held) if (priority === 1 ? h.note < top.note : h.note > top.note) top = h;
+    const x = g.parts[0];
     if (top) {
       const p = (top.note - 60) / 12;
       if (!x.on || top.note !== x.note) {
         x.jump = p - x.pitch;
         x.legato = x.on ? 1 : 0;
         if (x.on && legato === 1) x.retrig = true;
+        x.onStamp = ++this.stamp;
       }
       x.pitch = p;
       x.velocity = top.vel;
@@ -437,24 +469,25 @@ export class Engine {
       x.note = top.note;
       x.on = true;
     } else {
+      if (x.on) x.offStamp = ++this.stamp;
       x.gate = 0;
       x.on = false;
     }
   }
 
-  /** the inputs of one instance: zero, then every cable added (a shared module adds all voices of a per-voice output) */
+  /** the inputs of one instance: zero, then every cable added (another group's per-part output adds all its parts) */
   private gather(node: Node, inst: Inst, v: number, n: number): void {
     for (const name in inst.inp) inst.inp[name].fill(0, 0, n);
-    const nv = this.voices.length;
     for (const s of node.sources) {
       const dst = inst.inp[s.port];
-      if (!node.poly && this.portIsPoly(s.from, s.fromPort)) {
-        for (let k = 0; k < nv; k++) {
-          const src = this.bufOf(s.from, s.fromPort, k);
+      const g = s.from.group;
+      if (g >= 0 && g !== node.group) {
+        for (const k of s.from.inst) {
+          const src = k.out[s.fromPort];
           for (let i = 0; i < n; i++) dst[i] += src[i];
         }
       } else {
-        const src = this.bufOf(s.from, s.fromPort, v);
+        const src = s.from.inst[g >= 0 ? v : 0].out[s.fromPort];
         for (let i = 0; i < n; i++) dst[i] += src[i];
       }
     }
@@ -469,10 +502,7 @@ export class Engine {
     }
     const ctx: Ctx = { sr: this.sampleRate, n, inp: inst.dspInp, out, connected: node.connected, p: inst.eff, voice, display: inst.display };
     node.impl.process(ctx, inst.state);
-    if (node.type === 'fm1' && voice.retrig) {
-      out.gate[0] = 0; // one low sample: the envelopes of a stolen voice see a new gate
-      voice.retrig = false;
-    }
+    if ((node.type === 'fm1' || node.type === 'part') && voice.retrig) out.gate[0] = 0; // one low sample: a taken-over part's envelopes see a new gate
   }
 
   /** Render `left.length` frames (any length; processed in blocks of up to BLOCK). */
@@ -480,48 +510,32 @@ export class Engine {
     const total = left.length;
     left.fill(0);
     right.fill(0);
-    const vs = this.voices;
+    const all = [this.kb, ...this.groups];
     for (let off = 0; off < total; off += BLOCK) {
       const n = Math.min(BLOCK, total - off);
-      const clock = this.ticks > 0; // the Main module's clock output: one pulse per block that saw a tick, the same for every voice
+      const clock = this.ticks > 0; // the Main module's clock output: one pulse per block that saw a tick
       this.ticks = 0;
       this.morphT = this.hasB ? this.morphPosition(n) : 0;
-      const unit = Math.round(this.main?.params.unit ?? 0);
-      for (const x of vs) {
-        walkStep(x.walk);
-        x.drift = x.walk.y[0];
-        x.unit = unit;
-        x.clock = clock;
-        x.bend = this.ctl.bend;
-        x.mod = this.ctl.mod;
-        x.at = this.ctl.at;
-      }
+      for (const g of all)
+        for (const x of g.parts) {
+          x.unit = g.cfg.unit;
+          x.clock = clock;
+          x.bend = this.ctl.bend;
+          x.mod = this.ctl.mod;
+          x.at = this.ctl.at;
+        }
+      const kb = this.kb.parts[0];
       for (const node of this.order) {
-        if (node.poly) {
-          for (let v = 0; v < vs.length; v++) {
-            const inst = node.inst[v];
-            this.gather(node, inst, v, n);
-            this.applyCv(node, inst, n);
-            this.run(node, inst, vs[v], inst.out, n);
-            this.guard(node, inst, n);
-          }
-        } else {
-          const inst = node.inst[0];
-          this.gather(node, inst, 0, n);
+        const parts = node.group >= 0 ? this.groups[node.group].parts : null;
+        for (let v = 0; v < node.inst.length; v++) {
+          const inst = node.inst[v];
+          this.gather(node, inst, v, n);
           this.applyCv(node, inst, n);
-          if (node.vout) {
-            // the panel with several voices: the knobs once, pitch / gate / vel for every voice
-            for (let v = 0; v < vs.length; v++) {
-              const out = { ...inst.out };
-              for (const p of VOICE_PORTS) out[p] = node.vout[p][v];
-              this.run(node, inst, vs[v], out, n);
-            }
-          } else {
-            this.run(node, inst, vs[0], inst.out, n);
-          }
+          this.run(node, inst, parts ? parts[v] : kb, inst.out, n);
           this.guard(node, inst, n);
         }
       }
+      for (const g of all) for (const x of g.parts) x.retrig = false;
       for (const o of this.outputs) {
         const inst = o.inst[0];
         const lvl = inst.eff.level ?? 1;

@@ -15,7 +15,8 @@ import { moduleName } from './labels';
 import { DeckControls } from './deck';
 import { releaseFocusAfterPointer } from './focus';
 import { DEFS } from './modules';
-import { newPatch, validatePatch, voicesOf, type Patch } from './patch';
+import { newPatch, validatePatch, type Patch } from './patch';
+import { polyGroups } from './poly';
 import { ARP_DEFAULT } from './arp';
 import { Scope } from './scope';
 import { diffCount, diffLines, diffPatches } from './diff';
@@ -146,7 +147,7 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
     host.setPatch(p);
     queueSave(p);
     if (live()) queueUpload();
-    if (voicesOf(p) > 1) showVoices();
+    if (polyGroups(p).length) showVoices();
   },
   onAtt(id, index, value) {
     host.send({ t: 'att', id, index, value });
@@ -275,7 +276,7 @@ nameInput.oninput = () => {
 /** the voice count is set on the Main module's card (editor.ts); here only the FM-1 budget warning */
 const showVoices = (): void => {
   const b = deviceBudget(editor.patch);
-  if (!b.fits) status.textContent = `too big for the FM-1: ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} instances (fewer voices or modules)`;
+  if (!b.fits) status.textContent = `too big for the FM-1: ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} instances (fewer parts or modules)`;
 };
 const browser = new AssemblyBrowser((d) => { switchTab('patch'); editor.insert(d); });
 
@@ -355,6 +356,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: scope.visible ? 'Hide oscilloscope' : 'Show oscilloscope', keywords: 'scope window waveform', run: inPatch(() => scope.setVisible(!scope.visible)) },
     { kind: 'command', label: 'Scope: waveform', keywords: 'oscilloscope time', run: inPatch(() => scope.setMode('time')) },
     { kind: 'command', label: 'Scope: spectrum', keywords: 'oscilloscope frequency fft', run: inPatch(() => scope.setMode('spectrum')) },
+    { kind: 'command', label: 'Tidy up the canvas', keywords: 'clean up arrange align layout grid', run: inPatch(() => editor.tidyUp()) },
     { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },
     { kind: 'command', label: 'Reset canvas scale', keywords: 'zoom 100%', run: inPatch(() => editor.setZoom(1)) },
     ...Object.values(DEFS).filter((d) => d.type !== 'fm1').map((d) => ({ kind: 'add module', tags: ['module'], label: moduleName(d.type, d.label), keywords: d.label, run: () => editor.add(d.type) })),
@@ -440,6 +442,7 @@ $('palette-btn').onclick = () => openPalette();
 $('new-patch-btn').onclick = () => { loadNamed(newPatch(DEFS)); tutorial.newPatchPressed(); closeSidebar(); };
 $('add-btn').onclick = () => openPalette('module');
 $('add-assembly-btn').onclick = () => openPalette('assembly');
+$('tidy-btn').onclick = () => editor.tidyUp();
 $('tour-btn').onclick = () => { switchTab('patch'); tutorial.open(); };
 $('mobile-commands').onclick = () => openPalette();
 $('palette-close').onclick = () => palette.close();
@@ -472,7 +475,7 @@ window.addEventListener('keydown', (e) => {
   let done = false;
   if (k === '/' || (mod && k.toLowerCase() === 'k')) (openPalette(), (done = true));
   else if (k === '?') (help.showModal(), (done = true));
-  else if (k === 'Escape') (editor.cancelArm(), (diffPanel.hidden = true), (done = true));
+  else if (k === 'Escape') (editor.cancelArm(), editor.endPick(), (diffPanel.hidden = true), (done = true));
   else if (k === 'Delete' || k === 'Backspace') done = editor.removeSelected();
   else if (mod && k.toLowerCase() === 'd') done = editor.duplicateSelected();
   else if (e.altKey && k.toLowerCase() === 'b') (flipAB(), (done = true));

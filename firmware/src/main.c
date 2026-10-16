@@ -615,41 +615,40 @@ static void master_boot(void)
  * the parameters the selected module's matrix assigns to them (on the FM-1 panel: k1..k4): a click is 1/100 of the range
  * (the parameter's own step if that is larger, so a choice moves one entry), five times that when turned fast. The new
  * values go into the stored copy of the patch too. */
-/* The polyphony of the selected voice's patch (byte 3 of its binary; ALGO on the mixer page): the patch is reloaded with
- * the new count (its module state restarts, held notes end). When the pools have no room for it (signal buffers,
- * instances) the old count comes back. SAVE keeps it, as it is part of the stored patch. */
+/* The parts of the selected voice's first poly group (its group record in the binary, byte 8; ALGO on the mixer page):
+ * the patch is reloaded with the new count (its module state restarts, held notes end). When the pools have no room for it
+ * (signal buffers, instances) the old count comes back. A patch without a poly group has nothing to change. SAVE keeps
+ * it, as it is part of the stored patch. */
 static void poly_set(int32_t n)
 {
     uint8_t old;
     int rc;
     char m[24], num[8], *q = m;
-    if (!m1_cur_len || m1_cur_len < 8u)
+    if (m1_cur_len < 8u)
         return;
-    n = n < 1 ? 1 : n > ENG_MAX_POLY ? ENG_MAX_POLY : n;
-    old = m1_cur[3];
-    if ((old ? old : 1u) == (uint32_t)n)
+    if (!m1_cur[3] || m1_cur_len < 13u) {
+        ui_msg("NO POLY ASSEMBLY", 1500);
         return;
-    m1_cur[3] = (uint8_t)n;
+    }
+    n = n < 1 ? 1 : n > ENG_MAX_PARTS ? ENG_MAX_PARTS : n;
+    old = m1_cur[8];
+    if (old == (uint32_t)n)
+        return;
+    m1_cur[8] = (uint8_t)n;
     eng_run = 0;
     rc = eng_load(m1_cur, m1_cur_len);
     if (rc) {
-        m1_cur[3] = old;
+        m1_cur[8] = old;
         rc = eng_load(m1_cur, m1_cur_len);
     }
     load_err = -rc;
     eng_us_max = 0;
     eng_run = 1;
-    if (m1_cur[3] != (uint8_t)n) {
+    if (m1_cur[8] != (uint8_t)n)
         q = put(q, "NO ROOM FOR ");
-        fmt_int(num, n);
-        put(q, num);
-    } else if (n == 1) {
-        put(q, "MONO");
-    } else {
-        q = put(q, "POLY ");
-        fmt_int(num, n);
-        put(q, num);
-    }
+    fmt_int(num, n);
+    q = put(q, num);
+    put(q, n == 1 ? " PART" : " PARTS");
     ui_msg(m, 1500);
     ui_dirty = 2;
 }
@@ -669,16 +668,18 @@ static void morph_turn(int32_t clicks)
         ui_dirty = 1;
 }
 
-/* the mixer page's K3 / K4: a voicing choice of the Main module (LEGATO, PRIORITY: 0..2), one step per turn */
-static void choice_turn(uint32_t par, int32_t clicks)
+/* the mixer page's K3 / K4: a setting of the first poly group (ENG_POLY_LEGATO, ENG_POLY_PRIORITY: 0..2), one step per
+ * turn, into the running patch and its group record (byte 8 + field) */
+static void poly_turn(uint32_t field, int32_t clicks)
 {
-    int m = eng_find(T_FM1);
-    int32_t v;
-    if (m < 0)
+    int c = eng_poly_get(0, field);
+    if (c < 0 || m1_cur_len < 13u || !m1_cur[3]) {
+        ui_msg("NO POLY ASSEMBLY", 1500);
         return;
-    v = clampi(round_q16(eng_get_param((uint32_t)m, par)) + (clicks > 0 ? 1 : -1), 0, 2) << 16;
-    eng_set_param((uint32_t)m, par, v);
-    m1_patch_param((uint32_t)m, par, v);
+    }
+    c = clampi(c + (clicks > 0 ? 1 : -1), 0, 2);
+    if (eng_poly_set(0, field, (uint32_t)c))
+        m1_cur[8u + field] = (uint8_t)c;
     if (!ui_dirty)
         ui_dirty = 1;
 }
@@ -699,7 +700,7 @@ static void knobs_poll(void)
         preset_step(st[6]);
         return;
     }
-    if (page == PAGE_MIXER) {                       /* K1..K4: the level of voice 1..4; ALGO: the polyphony of the selected voice */
+    if (page == PAGE_MIXER) {                       /* K1..K4: the level of voice 1..4; ALGO: the parts of the selected voice's first poly group */
         for (k = 0; k < ENG_VOICES; k++) {
             uint32_t fast = cfg.accel && fm1_ms - last_ms[k] < 80u;
             if (st[2u + k]) {
@@ -713,13 +714,13 @@ static void knobs_poll(void)
             last_ms[1] = fm1_ms;
             morph_turn(st[3] * (fast ? 5 : 1));
         }
-        if (st[4])                                  /* K3 / K4: the patch's LEGATO / PRIORITY */
-            choice_turn(FM1_P_LEGATO, st[4]);
+        if (st[4])                                  /* K3 / K4: the first poly group's LEGATO / PRIORITY */
+            poly_turn(ENG_POLY_LEGATO, st[4]);
         if (st[5])
-            choice_turn(FM1_P_PRIORITY, st[5]);
+            poly_turn(ENG_POLY_PRIORITY, st[5]);
 #endif
         if (st[1])
-            poly_set(eng_poly() + st[1]);
+            poly_set(eng_parts() + st[1]);
         if (st[0])
             page_set(page);                         /* SELECT: back to the module page */
         return;

@@ -6,6 +6,91 @@
   "modules": [
     {
       "id": 1,
+      "type": "part",
+      "x": 0,
+      "y": 1120,
+      "params": {}
+    },
+    {
+      "id": 2,
+      "type": "random",
+      "x": 270,
+      "y": 1120,
+      "params": {
+        "mode": 1,
+        "rate": 0.7
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "mode"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "random",
+      "x": 540,
+      "y": 1120,
+      "params": {
+        "mode": 1,
+        "rate": 0.9
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "mode"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "random",
+      "x": 810,
+      "y": 1120,
+      "params": {
+        "mode": 0,
+        "rate": 1.5
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "mode"
+        ],
+        "p2": [
+          "rate"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
       "type": "osc",
       "x": 0,
       "y": 0,
@@ -20,47 +105,10 @@
         "unison": 1,
         "detune": 10,
         "blend": 0.5,
-        "stack": 0,
-        "drift": 6
+        "stack": 0
       },
       "att": [
-        1,
-        1
-      ],
-      "map": {
-        "p1": [
-          "wave"
-        ],
-        "p2": [
-          "pw"
-        ],
-        "k1": [],
-        "k2": [],
-        "k3": [],
-        "k4": []
-      }
-    },
-    {
-      "id": 2,
-      "type": "osc",
-      "x": 0,
-      "y": 560,
-      "params": {
-        "wave": 3,
-        "pw": 0.45,
-        "coarse": 0,
-        "fine": 4,
-        "pm": 0,
-        "level": 0.6,
-        "fb": 0,
-        "unison": 1,
-        "detune": 10,
-        "blend": 0.5,
-        "stack": 0,
-        "drift": 9
-      },
-      "att": [
-        0.25,
+        0.03,
         1
       ],
       "map": {
@@ -77,7 +125,42 @@
       }
     },
     {
-      "id": 3,
+      "id": 6,
+      "type": "osc",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "wave": 3,
+        "pw": 0.45,
+        "coarse": 0,
+        "fine": 4,
+        "pm": 0,
+        "level": 0.6,
+        "fb": 0,
+        "unison": 1,
+        "detune": 10,
+        "blend": 0.5,
+        "stack": 0
+      },
+      "att": [
+        0.045,
+        1
+      ],
+      "map": {
+        "p1": [
+          "fine"
+        ],
+        "p2": [
+          "pw"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 7,
       "type": "mixer",
       "x": 270,
       "y": 0,
@@ -105,7 +188,7 @@
       }
     },
     {
-      "id": 4,
+      "id": 8,
       "type": "filter",
       "x": 540,
       "y": 0,
@@ -134,7 +217,7 @@
       }
     },
     {
-      "id": 5,
+      "id": 9,
       "type": "adsr",
       "x": 270,
       "y": 560,
@@ -162,7 +245,7 @@
       }
     },
     {
-      "id": 6,
+      "id": 10,
       "type": "vca",
       "x": 540,
       "y": 560,
@@ -189,11 +272,31 @@
     {
       "from": {
         "module": 1,
-        "port": "out"
+        "port": "pitch"
       },
       "to": {
-        "module": 3,
-        "port": "in1"
+        "module": 5,
+        "port": "pitch"
+      }
+    },
+    {
+      "from": {
+        "module": 1,
+        "port": "pitch"
+      },
+      "to": {
+        "module": 6,
+        "port": "pitch"
+      }
+    },
+    {
+      "from": {
+        "module": 1,
+        "port": "gate"
+      },
+      "to": {
+        "module": 9,
+        "port": "gate"
       }
     },
     {
@@ -202,8 +305,8 @@
         "port": "out"
       },
       "to": {
-        "module": 3,
-        "port": "in2"
+        "module": 5,
+        "port": "p1"
       }
     },
     {
@@ -212,101 +315,131 @@
         "port": "out"
       },
       "to": {
-        "module": 4,
-        "port": "in"
+        "module": 6,
+        "port": "p1"
       }
     },
     {
       "from": {
         "module": 4,
-        "port": "lp24"
+        "port": "out"
       },
       "to": {
-        "module": 6,
-        "port": "in"
+        "module": 8,
+        "port": "p1"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "out"
+      },
+      "to": {
+        "module": 9,
+        "port": "p1"
       }
     },
     {
       "from": {
         "module": 5,
+        "port": "out"
+      },
+      "to": {
+        "module": 7,
+        "port": "in1"
+      }
+    },
+    {
+      "from": {
+        "module": 6,
+        "port": "out"
+      },
+      "to": {
+        "module": 7,
+        "port": "in2"
+      }
+    },
+    {
+      "from": {
+        "module": 7,
+        "port": "out"
+      },
+      "to": {
+        "module": 8,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 8,
+        "port": "lp24"
+      },
+      "to": {
+        "module": 10,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 9,
         "port": "env"
       },
       "to": {
-        "module": 6,
+        "module": 10,
         "port": "cv"
       }
     }
   ],
-  "inputs": [
-    {
-      "module": 1,
-      "port": "pitch",
-      "label": "pitch",
-      "also": [
-        {
-          "module": 2,
-          "port": "pitch"
-        }
-      ]
-    },
-    {
-      "module": 5,
-      "port": "gate",
-      "label": "gate"
-    }
-  ],
+  "inputs": [],
   "outputs": [
     {
-      "module": 6,
+      "module": 10,
       "port": "out",
       "label": "out"
     }
   ],
   "params": [
     {
-      "module": 1,
-      "param": "drift",
-      "label": "drift 1"
-    },
-    {
       "module": 2,
-      "param": "drift",
-      "label": "drift 2"
+      "param": "rate",
+      "label": "drift rate"
     },
     {
-      "module": 4,
+      "module": 8,
       "param": "cutoff",
       "label": "cutoff"
     },
     {
-      "module": 4,
+      "module": 8,
       "param": "res",
       "label": "res"
     },
     {
-      "module": 5,
+      "module": 9,
       "param": "a",
       "label": "a"
     },
     {
-      "module": 5,
+      "module": 9,
       "param": "d",
       "label": "d"
     },
     {
-      "module": 5,
+      "module": 9,
       "param": "s",
       "label": "s"
     },
     {
-      "module": 5,
+      "module": 9,
       "param": "r",
       "label": "r"
-    },
-    {
-      "module": 2,
-      "param": "fine",
-      "label": "fine tune"
     }
-  ]
+  ],
+  "poly": {
+    "parts": 4,
+    "assign": 0,
+    "legato": 0,
+    "priority": 0,
+    "unit": 0
+  }
 }

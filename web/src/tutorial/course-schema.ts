@@ -35,6 +35,9 @@ export type RoleDef =
   | { kind: 'member'; label: string; role: string; type: string; index?: number };
 
 export type SliderOp = 'le' | 'ge' | 'eq' | 'ne' | 'between' | 'changed';
+/** the settings of a poly assembly (patch.ts PolyCfg) */
+export const POLY_SETTINGS = ['parts', 'assign', 'legato', 'priority', 'unit'] as const;
+export type PolySetting = (typeof POLY_SETTINGS)[number];
 export type Pin = 'p1' | 'p2';
 export type AssemblyFact = 'exists' | 'open' | 'collapsed' | 'promoted' | 'exposed' | 'merged' | 'contains' | 'resized' | 'saved';
 /** editor events and states a step can wait for; counts are since the step was entered */
@@ -59,7 +62,8 @@ export type PartSpec =
   /** a fact about an assembly role; `type` + `param` / `port` name a member's control, `child` a nested role, `tag` + `name` a save */
   /** `type` + `index` (0-based, absent = the first) name the member module of a promoted / exposed fact */
   | { kind: 'assembly'; role: string; fact: AssemblyFact; type?: string; index?: number; param?: string; port?: string; child?: string; tag?: string; name?: string }
-  | { kind: 'voices'; min: number }
+  /** a setting of a poly assembly (some poly assembly of the patch satisfies it); `changed` compares with the first one's at the step's start */
+  | { kind: 'poly'; setting: PolySetting; op: SliderOp; value?: number; max?: number }
   /** `count` (default 1) for counters; `ref` + `port` for a probe; `types` for a selection; `ref` + `on` for a bypass state */
   | { kind: 'event'; event: EventName; count?: number; ref?: Ref; port?: string; types?: string[]; on?: boolean }
   /** the patch rendered offline: `held` = it sounds with a key held, `silent` = nothing without a key */
@@ -105,7 +109,7 @@ export interface StepData {
 }
 
 export type StartRule =
-  | { kind: 'new'; voices?: number }
+  | { kind: 'new' }
   /** an empty canvas: no modules, not even Main and Output */
   | { kind: 'empty' }
   | { kind: 'continue' }
@@ -147,7 +151,7 @@ export const refKey = (chapter: string, step: string): string => `${chapter}/${s
 export const SLIDER_OPS: SliderOp[] = ['le', 'ge', 'eq', 'ne', 'between', 'changed'];
 export const ASSEMBLY_FACTS: AssemblyFact[] = ['exists', 'open', 'collapsed', 'promoted', 'exposed', 'merged', 'contains', 'resized', 'saved'];
 export const EVENT_NAMES: EventName[] = ['notes', 'undos', 'redos', 'zooms', 'flips', 'shares', 'bypasses', 'news', 'saves', 'audio', 'arpPlay', 'snapshotA', 'snapshotB', 'probe', 'selected', 'bypassed'];
-export const PART_KINDS: PartKind[] = ['module', 'cable', 'noCable', 'slider', 'routed', 'pinMap', 'att', 'macroRange', 'assembly', 'voices', 'event', 'sound', 'custom'];
+export const PART_KINDS: PartKind[] = ['module', 'cable', 'noCable', 'slider', 'routed', 'pinMap', 'att', 'macroRange', 'assembly', 'poly', 'event', 'sound', 'custom'];
 
 /** a permanent id from a title, unique among `taken` */
 export function slugId(title: string, taken: Iterable<string>): string {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import type { AssemblyInst } from './assembly';
 import { fixArp, type ArpCfg } from './arp';
+import { migrateVoicing } from './poly';
 // Patch data model, shared by the editor, the WebAudio engine and (later) the firmware encoder.
 
 export type SignalKind = 'audio' | 'control' | 'gate';
@@ -130,8 +131,6 @@ export interface Patch {
   name: string;
   modules: ModuleInst[];
   cables: Cable[];
-  /** number of voices, 1 (mono, the default) .. MAX_VOICES. See voiceSplit() for what a voice is. */
-  voices?: number;
   /** groups of modules shown as one card (an editor-only overlay, see assembly.ts); the engine and the FM-1 ignore it */
   assemblies?: AssemblyInst[];
   /** the name of the patch the B side (paramsB) was taken from, for display */
@@ -182,7 +181,36 @@ export function morphValue(pd: ParamDef, a: number, b: number, t: number): numbe
 }
 
 export const MAX_MODULES = 32;
-export const MAX_VOICES = 8;
+
+/**
+ * A poly assembly's settings (AssemblyInst.poly; poly.ts has the rules): its member modules run once per part, and its
+ * own allocator hands the notes to the parts. assign / legato / priority index ASSIGN_MODES / LEGATO_MODES / PRIORITIES.
+ */
+export interface PolyCfg {
+  /** 1 .. MAX_PARTS */
+  parts: number;
+  /** 0 rotate, 1 lowest free, 2 reuse (a free part whose last note was the key) */
+  assign: number;
+  /** 0 auto (legato with one part; a stolen part restarts its envelopes), 1 off (always restart), 2 on (never) */
+  legato: number;
+  /** which held notes sound when there are more than parts: 0 last, 1 low, 2 high */
+  priority: number;
+  /** 0 .. MAX_UNIT: which instrument of the model; reseeds the Random modules inside */
+  unit: number;
+}
+export const MAX_PARTS = 8;
+export const MAX_UNIT = 63;
+export const POLY_DEFAULT: PolyCfg = { parts: 4, assign: 0, legato: 0, priority: 0, unit: 0 };
+
+/** a poly setting from a file or an older editor, every field in range */
+export function fixPoly(raw: unknown): PolyCfg {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const int = (k: keyof PolyCfg, lo: number, hi: number): number => {
+    const v = Math.round(Number(r[k]));
+    return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : POLY_DEFAULT[k];
+  };
+  return { parts: int('parts', 1, MAX_PARTS), assign: int('assign', 0, 2), legato: int('legato', 0, 2), priority: int('priority', 0, 2), unit: int('unit', 0, MAX_UNIT) };
+}
 
 export function emptyPatch(name = 'init'): Patch {
   return { version: 2, name, modules: [], cables: [] };
@@ -203,42 +231,8 @@ export function ensureMain(p: Patch, defs: Record<string, ModuleDef>): boolean {
   return true;
 }
 
-/** the voice count of a patch: a whole number 1..MAX_VOICES, 1 when missing */
-export function voicesOf(p: Pick<Patch, 'voices'>): number {
-  const v = Math.round(Number(p.voices));
-  return Number.isFinite(v) ? Math.max(1, Math.min(MAX_VOICES, v)) : 1;
-}
-
-/** the panel outputs that differ per voice; its knobs are the same for every voice */
-export const VOICE_PORTS = new Set(['pitch', 'gate', 'vel', 'spread', 'legato', 'jump', 'tol', 'drift']);
-/** modules that always run once, however many voices: their inputs sum the voices (big state, or the end of the chain) */
+/** modules that run once even inside a poly assembly: their inputs sum the parts (big state, or the end of the chain) */
 export const SHARED_TYPES = new Set(['delay', 'reverb', 'chorus', 'grain', 'output']);
-
-/**
- * Which modules run once per voice. With more than one voice the FM-1 panel's pitch, gate and vel are per voice, and so
- * is every module that (through any chain of cables, p1 / p2 included) hears them, except the SHARED_TYPES. A cable from a
- * per-voice output into a shared module carries the sum of the voices; a cable from a shared output into a per-voice
- * module reaches every voice. With one voice nothing is per voice: that is the mono engine as it was.
- */
-export function voiceSplit(p: Patch): Set<number> {
-  const poly = new Set<number>();
-  if (voicesOf(p) < 2) return poly;
-  const types = new Map(p.modules.map((m) => [m.id, m.type]));
-  const isPolyPort = (module: number, port: string): boolean =>
-    types.get(module) === 'fm1' ? VOICE_PORTS.has(port) : poly.has(module);
-  for (;;) {
-    let grew = false;
-    for (const c of p.cables) {
-      const t = types.get(c.to.module);
-      if (!t || t === 'fm1' || SHARED_TYPES.has(t) || poly.has(c.to.module)) continue; // the Main module's own input (morph) does not make it per voice
-      if (isPolyPort(c.from.module, c.from.port)) {
-        poly.add(c.to.module);
-        grew = true;
-      }
-    }
-    if (!grew) return poly;
-  }
-}
 
 export function nextId(p: Patch): number {
   return p.modules.reduce((m, x) => Math.max(m, x.id), 0) + 1;
@@ -411,6 +405,7 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
     }
   }
   (p as { version: number }).version = 2;
+  migrateVoicing(p as Patch, defs);
   for (const c of p.cables) {
     const mf = p.modules.find((m) => m.id === c.from?.module);
     if (mf?.type === 'filter' && c.from?.port === 'lp') c.from.port = 'lp12'; // the filter's 12 dB output used to be called lp
@@ -424,7 +419,5 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
   if (!hasMorph(p as Patch) || typeof p.morphName !== 'string') delete p.morphName;
   if (p.arp && typeof p.arp === 'object') p.arp = fixArp(p.arp);
   else delete p.arp;
-  if (p.voices === undefined || p.voices === null) delete p.voices;
-  else p.voices = voicesOf(p);
   return p as Patch;
 }

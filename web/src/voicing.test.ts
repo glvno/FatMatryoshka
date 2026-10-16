@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Voicing (issue #22): legato / priority on the Main module, its legato / jump / tol / drift outputs, the oscillator's
-// blend / stack / drift and the glide curve.
+// Voicing (issue #22, now on poly assemblies): legato / priority of a poly assembly, its Part module's legato / jump
+// outputs, the oscillator's blend / stack, the glide curve, the Random walk, and the conversion of old patches.
 import { describe, expect, it } from 'vitest';
 import { Engine } from './engine';
-import { blendWeights, DEFS, hash32, tolOf, walkInit, walkStep } from './modules';
-import { addModule, connect, emptyPatch, type Patch } from './patch';
+import { blendWeights, DEFS, hash32, walkHold, walkInit, walkStep } from './modules';
+import { addModule, connect, emptyPatch, POLY_DEFAULT, validatePatch, type Patch, type PolyCfg } from './patch';
+import { makeAssembly } from './assembly';
+import { polyGroups } from './poly';
 
 const SR = 48000;
 const BLOCK = 128;
@@ -20,19 +22,20 @@ const wire = (p: Patch, a: number, ap: string, b: number, bp: string): void => {
 };
 const rms = (a: Float32Array): number => Math.sqrt(a.reduce((s, v) => s + v * v, 0) / a.length);
 
-/** Main gate -> ADSR -> output l, Main `port` -> output r */
-function envPatch(port = 'pitch', main: Record<string, number> = {}): { p: Patch; main: number } {
+/** a poly assembly (one part unless `cfg` says) of Part gate -> ADSR -> output l, Part `port` -> output r */
+function envPatch(port = 'pitch', cfg: Partial<PolyCfg> = {}): { p: Patch } {
   const p = emptyPatch();
-  const kb = addModule(p, DEFS.fm1, 0, 0);
-  Object.assign(kb.params, main);
+  addModule(p, DEFS.fm1, 0, 0);
+  const part = addModule(p, DEFS.part, 0, 0);
   const env = addModule(p, DEFS.adsr, 0, 0);
   Object.assign(env.params, { a: 0.005, d: 0.05, s: 0.3, r: 0.05 });
   const out = addModule(p, DEFS.output, 0, 0);
   out.params.level = 1;
-  wire(p, kb.id, 'gate', env.id, 'gate');
+  wire(p, part.id, 'gate', env.id, 'gate');
   wire(p, env.id, 'env', out.id, 'l');
-  wire(p, kb.id, port, out.id, 'r');
-  return { p, main: kb.id };
+  wire(p, part.id, port, out.id, 'r');
+  makeAssembly(p, [part.id, env.id], 'voice').poly = { ...POLY_DEFAULT, parts: 1, ...cfg };
+  return { p };
 }
 
 describe('voicing: legato and priority', () => {
@@ -68,10 +71,9 @@ describe('voicing: legato and priority', () => {
     });
   });
 
-  it('a poly note that steals a sounding voice restarts its envelope unless legato is on', () => {
+  it('a note that takes over a sounding part restarts its envelope unless legato is on', () => {
     for (const [mode, dips] of [[0, true], [2, false]] as const) {
-      const { p } = envPatch('gate', { legato: mode });
-      p.voices = 2;
+      const { p } = envPatch('gate', { legato: mode, parts: 2 });
       p.modules.find((m) => m.type === 'output')!.params.level = 0.4; // two gates sum to 0.8, under the output clamp
       const e = new Engine(SR);
       e.load(p);
@@ -80,7 +82,7 @@ describe('voicing: legato and priority', () => {
       render(e, BLOCK * 4);
       e.noteOn(67); // steals 60
       const r = render(e, BLOCK);
-      // r = the sum of both voices' gates: one low sample on the stolen voice gives 0.4 instead of 0.8
+      // r = the sum of both parts' gates: one low sample on the taken-over part gives 0.4 instead of 0.8
       expect(r.r[0] < 0.6, `mode ${mode}`).toBe(dips);
     }
   });
@@ -111,22 +113,22 @@ describe('voicing: legato and priority', () => {
     }
   });
 
-  it('poly: legato and jump per voice', () => {
-    const { p } = envPatch('legato');
-    p.voices = 3;
+  it('several parts: legato per part', () => {
+    const { p } = envPatch('legato', { parts: 3 });
     const e = new Engine(SR);
     e.load(p);
     e.noteOn(60);
     expect(render(e, BLOCK).r[0]).toBe(0);
     e.noteOn(64);
-    expect(render(e, BLOCK).r[0]).toBe(1); // the sum over the voices: only the second note overlapped
+    expect(render(e, BLOCK).r[0]).toBe(1); // the sum over the parts: only the second note overlapped
   });
 });
 
-/** Main pitch -> glide -> output l; the glide's p1 from Main `src` (through math abs when `abs`) sets its time */
+/** in a one-part poly assembly: Part pitch -> glide -> output l; the glide's p1 from Part `src` (through math abs for jump) sets its time */
 function glidePatch(src: 'legato' | 'jump' | 'none', glide: Record<string, number>, range?: [number, number]): Patch {
   const p = emptyPatch();
-  const kb = addModule(p, DEFS.fm1, 0, 0).id;
+  addModule(p, DEFS.fm1, 0, 0);
+  const kb = addModule(p, DEFS.part, 0, 0).id;
   const g = addModule(p, DEFS.glide, 0, 0);
   Object.assign(g.params, glide);
   g.map = { p1: ['time'], p2: [], k1: [], k2: [], k3: [], k4: [] };
@@ -139,7 +141,11 @@ function glidePatch(src: 'legato' | 'jump' | 'none', glide: Record<string, numbe
     const m = addModule(p, DEFS.math, 0, 0).id;
     wire(p, kb, 'jump', m, 'a');
     wire(p, m, 'abs', g.id, 'p1');
-  } else if (src === 'legato') wire(p, kb, 'legato', g.id, 'p1');
+    makeAssembly(p, [kb, g.id, m], 'voice').poly = { ...POLY_DEFAULT, parts: 1 };
+    return p;
+  }
+  if (src === 'legato') wire(p, kb, 'legato', g.id, 'p1');
+  makeAssembly(p, [kb, g.id], 'voice').poly = { ...POLY_DEFAULT, parts: 1 };
   return p;
 }
 
@@ -192,17 +198,15 @@ describe('voicing: portamento', () => {
 });
 
 /** one oscillator into the output, held at C4 */
-function oscOut(params: Record<string, number>, main: Record<string, number> = {}, voices = 1): Engine {
+function oscOut(params: Record<string, number>): Engine {
   const p = emptyPatch();
   const kb = addModule(p, DEFS.fm1, 0, 0);
-  Object.assign(kb.params, main);
   const o = addModule(p, DEFS.osc, 0, 0);
   Object.assign(o.params, { level: 0.5, ...params });
   const out = addModule(p, DEFS.output, 0, 0);
   out.params.level = 1;
   wire(p, kb.id, 'pitch', o.id, 'pitch');
   wire(p, o.id, 'out', out.id, 'l');
-  p.voices = voices;
   const e = new Engine(SR);
   e.load(p);
   e.noteOn(60);
@@ -219,7 +223,7 @@ function bin(a: Float32Array, hz: number): number {
   return (2 * Math.hypot(re, im)) / a.length;
 }
 
-describe('oscillator: blend, stack, drift', () => {
+describe('oscillator: blend, stack', () => {
   it('blend weights: 0.5 is the plain average, 0 the centre only, 1 the sides only', () => {
     expect(blendWeights(5, 0.5)).toEqual([0.2, 0.2, 0.2, 0.2, 0.2]);
     expect(blendWeights(5, 0)).toEqual([0, 0, 1, 0, 0]);
@@ -243,53 +247,66 @@ describe('oscillator: blend, stack, drift', () => {
     expect(bin(render(oscOut({ wave: 0, detune: 0, stack: 4 }), SR / 2).l, 130.81)).toBeCloseTo(0.25, 2); // -oct
   });
 
-  it('drift 0 changes nothing; drift detunes, differently per unit and per voice', () => {
-    const ref = render(oscOut({ wave: 2 }), 8192).l;
-    expect(rms(ref)).toBeGreaterThan(0.1);
-    const same = render(oscOut({ wave: 2, drift: 0 }, { unit: 5 }), 8192).l;
-    expect(Array.from(same)).toEqual(Array.from(ref));
-    const d = render(oscOut({ wave: 0, drift: 50 }), SR).l;
-    const f = (a: Float32Array): number => {
-      let n = 0;
-      for (let i = 1; i < a.length; i++) if (a[i - 1] < 0 && a[i] >= 0) n++;
-      return n;
-    };
-    const cents = (a: Float32Array): number => 1200 * Math.log2(f(a) / 261.63);
-    const c0 = cents(d);
-    expect(Math.abs(c0)).toBeGreaterThan(1);
-    expect(Math.abs(c0)).toBeLessThan(51);
-    const c1 = cents(render(oscOut({ wave: 0, drift: 50 }, { unit: 1 }), SR).l);
-    expect(c1).not.toBeCloseTo(c0, 0);
-  });
-
-  it('the drift walk stays in -1..1 and moves slowly', () => {
-    const w = walkInit(hash32(7), 5);
+  it('the Random walk stays in -1..1, moves slowly and retargets at its rate', () => {
+    const w = walkInit(hash32(7));
+    const hold = walkHold(SR, 1.5);
+    expect(hold).toBe(250);
     let max = 0, step = 0;
     for (let b = 0; b < 20000; b++) {
-      const y0 = w.y[0];
-      walkStep(w);
-      max = Math.max(max, ...Array.from(w.y, Math.abs));
-      step = Math.max(step, Math.abs(w.y[0] - y0));
+      const y0 = w.y;
+      walkStep(w, hold);
+      max = Math.max(max, Math.abs(w.y));
+      step = Math.max(step, Math.abs(w.y - y0));
     }
     expect(max).toBeLessThanOrEqual(32768);
     expect(step).toBeLessThan(600); // under 2 % of the range per block
   });
 });
 
-describe('Main tol and drift outputs', () => {
-  it('tol is fixed per voice and unit, different between voices; drift wanders slowly per voice', () => {
-    const { p } = envPatch('tol', { unit: 3 });
-    const e = new Engine(SR);
-    e.load(p);
-    e.noteOn(60);
-    expect(render(e, BLOCK).r[0]).toBeCloseTo(tolOf(3, 0) / 32768, 6);
-    expect(tolOf(3, 0)).not.toBe(tolOf(3, 1));
-    expect(tolOf(3, 0)).not.toBe(tolOf(4, 0));
-    const d = envPatch('drift');
-    const f = new Engine(SR);
-    f.load(d.p);
-    const a = render(f, SR * 2).r;
-    expect(Math.max(...a) - Math.min(...a)).toBeGreaterThan(0.01);
-    for (let i = 1; i < a.length; i++) expect(Math.abs(a[i] - a[i - 1])).toBeLessThan(0.02);
+describe('patches from before poly assemblies', () => {
+  /** an old patch: Main pitch / gate -> osc -> output, with old fields */
+  function old(extra: (p: Patch, ids: { kb: number; osc: number; out: number }) => void): Patch {
+    const p = emptyPatch();
+    const kb = addModule(p, DEFS.fm1, 0, 0);
+    const osc = addModule(p, DEFS.osc, 300, 0);
+    const out = addModule(p, DEFS.output, 600, 0);
+    wire(p, kb.id, 'pitch', osc.id, 'pitch');
+    wire(p, osc.id, 'out', out.id, 'l');
+    extra(p, { kb: kb.id, osc: osc.id, out: out.id });
+    return validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
+  }
+
+  it('Main legato / priority / unit move to a one-part poly assembly; a plain mono patch stays as it is', () => {
+    const q = old((p, { kb }) => Object.assign(p.modules.find((m) => m.id === kb)!.params, { legato: 2, priority: 1, unit: 9 }));
+    expect(polyGroups(q)[0].cfg).toEqual({ parts: 1, assign: 2, legato: 2, priority: 1, unit: 9 });
+    expect(q.modules.find((m) => m.type === 'fm1')!.params).not.toHaveProperty('legato');
+    const plain = old(() => {});
+    expect(plain.assemblies).toBeUndefined();
+    expect(plain.modules.map((m) => m.type)).toEqual(['fm1', 'osc', 'output']);
+  });
+
+  it('Main tol / drift become Random modules (fixed / walk) in the region of their destination', () => {
+    const q = old((p, { kb, osc }) => {
+      (p as Patch & { voices: number }).voices = 2;
+      p.cables.push({ from: { module: kb, port: 'tol' }, to: { module: osc, port: 'p1' } }, { from: { module: kb, port: 'drift' }, to: { module: osc, port: 'p2' } });
+    });
+    const rs = q.modules.filter((m) => m.type === 'random');
+    expect(rs.map((r) => r.params.mode).sort()).toEqual([0, 1]);
+    const g = polyGroups(q)[0];
+    for (const r of rs) {
+      expect(g.modules.has(r.id)).toBe(true); // per part, as the old per-voice outputs were
+      expect(q.cables.some((c) => c.from.module === r.id && c.to.port.startsWith('p'))).toBe(true);
+    }
+  });
+
+  it('the oscillator\'s drift becomes a Random walk into fine tune through a free pin, drift / 2 cents at full swing', () => {
+    const q = old((p, { osc }) => (p.modules.find((m) => m.id === osc)!.params.drift = 20));
+    const o = q.modules.find((m) => m.type === 'osc')!;
+    const r = q.modules.find((m) => m.type === 'random')!;
+    expect(o.params).not.toHaveProperty('drift');
+    expect(r.params.mode).toBe(1);
+    expect(q.cables).toContainEqual({ from: { module: r.id, port: 'out' }, to: { module: o.id, port: 'p2' } });
+    expect(o.map!.p2).toEqual(['fine']);
+    expect(o.att![1]).toBeCloseTo(10 / 200, 6);
   });
 });

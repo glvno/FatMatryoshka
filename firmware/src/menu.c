@@ -3,9 +3,9 @@
 /* Two pages of the panel, after ui.c and before main.c:
  *
  * MIXER (GLO): K1..K4 the level of voice 1..4, the black keys F# G# A# C# (OP1..OP4) mute them (and play no notes then),
- * ALGORITHM sets the polyphony of the selected voice's patch (main.c poly_set). A build with fewer voices (engine.h
+ * ALGORITHM sets the parts of the selected voice's first poly group (main.c poly_set). A build with fewer voices (engine.h
  * ENG_VOICES) has that many rows, mute keys and channel rows; the one-voice build uses K2 for the patch's MORPH and K3 / K4
- * for its voicing (LEGATO, PRIORITY of the Main module).
+ * for the first poly group's LEGATO and PRIORITY.
  *
  * MENU (HOME held 0.7 s, HOME again closes it): the settings, in tabs like Felucca's menu (its layout, its rows are ours).
  * ALGORITHM steps between the tabs, PRESET and SELECT between the rows, K1..K4 and OCT- / OCT+ change the value of the
@@ -23,12 +23,12 @@ static void defaults_now(void);
 
 /* ---- mixer */
 
-static int voice_poly(uint32_t v)       /* the polyphony of voice v's patch (0: none loaded) */
+static int voice_poly(uint32_t v)       /* the parts of voice v's first poly group (-1: it has none, 0: no patch loaded) */
 {
     int n;
     uint32_t keep = eng_voice();
     eng_voice_select(v);
-    n = eng_poly();
+    n = eng_groups() ? eng_parts() : eng_parts() ? -1 : 0;
     eng_voice_select(keep);
     return n;
 }
@@ -81,15 +81,12 @@ static void mix_row(uint32_t v, int32_t y)
     }
     pad(p, line, 14);
     text_mid(12, (uint32_t)y + 11u, line, mix_mute[v] ? C_RED : C_FG, C_BG);
-    {                                   /* the polyphony at the right: MONO / POLY n (ALGO changes the selected voice's) */
+    {                                   /* the parts at the right: MONO / n PARTS (ALGO changes the selected voice's) */
         int n = voice_poly(v);
-        if (n <= 1)
+        if (n <= 0)
             p = put(line, n ? "MONO" : "-");
-        else {
-            fmt_int(num, n);
-            p = put(line, "POLY ");
-            p = put(p, num);
-        }
+        else
+            p = put_parts(line, n);
         pad(p, line, 7);
         text_mid(165, (uint32_t)y + 11u, line, v == eng_voice() ? C_FG : C_DIM, C_BG);
     }
@@ -120,22 +117,19 @@ static void morph_row(int32_t y)
     lcd_fill(12 + w, (uint32_t)y + 27u, 216u - w, 4, 0x2104u);
 }
 
-/* the one-voice build's third row: the patch's voicing (the Main module's LEGATO on K3, PRIORITY on K4; main.c choice_turn) */
+/* the one-voice build's third row: the first poly group's LEGATO on K3, PRIORITY on K4 (main.c poly_turn) */
 static void voicing_row(int32_t y)
 {
     char line[40], *p;
-    int m = eng_find(T_FM1);
-    const def_t *d = &DEFS[T_FM1];
     uint32_t j;
     p = put(line, "K3  LEGATO      K4  PRIORITY");
     pad(p, line, 28);
     text5x7(12, (uint32_t)y, line, 1, C_DIM, C_BG);
     for (j = 0; j < 2u; j++) {
-        uint32_t par = j ? FM1_P_PRIORITY : FM1_P_LEGATO;
-        int32_t c = m >= 0 ? clampi(round_q16(eng_get_param((uint32_t)m, par)), 0, 2) : 0;
-        p = put(line, m >= 0 ? d->pchoice[par][c] : "-");
+        int c = eng_poly_get(0, j ? ENG_POLY_PRIORITY : ENG_POLY_LEGATO);
+        p = put(line, c < 0 ? "-" : j ? POLY_PRIORITY_NAME[c] : POLY_LEGATO_NAME[c]);
         pad(p, line, 9);
-        text_mid(12u + 96u * j, (uint32_t)y + 11u, line, m >= 0 ? C_FG : C_DIM, C_BG);
+        text_mid(12u + 96u * j, (uint32_t)y + 11u, line, c >= 0 ? C_FG : C_DIM, C_BG);
     }
 }
 #endif
@@ -144,7 +138,7 @@ static void mixer_draw(int full)
 {
     uint32_t v;
     if (full)
-        text5x7(12, 226, ENG_VOICES > 1 ? "K1-4: LEVEL  OP1-4: MUTE  ALGO: POLY" : "K1 LEVEL K2 MORPH OP1 MUTE ALGO POLY", 1, 0x4208u, C_BG);
+        text5x7(12, 226, ENG_VOICES > 1 ? "K1-4: LEVEL  OP1-4: MUTE  ALGO: PARTS" : "K1 LEVEL K2 MORPH OP1 MUTE ALGO PARTS", 1, 0x4208u, C_BG);
     for (v = 0; v < ENG_VOICES; v++)
         mix_row(v, 32 + 48 * (int32_t)v);
 #if ENG_VOICES == 1

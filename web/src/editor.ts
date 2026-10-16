@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Patch editor: module cards on a canvas, SVG cables, drag-to-connect, a selection, assemblies and undo.
 import { resizeHandle } from './resize-handle';
+import { tidy } from './tidy';
 import { DEFS } from './modules';
 import { parameterInputs, connectParameter, setInputRoute } from './parameter-routing';
 import { parameterMenu } from './parameter-menu';
@@ -8,8 +9,10 @@ import { sliderJack } from './slider-jack';
 import { isKnob, knobRests } from './knob-rest';
 import type { ParameterValues } from './engine';
 import { deviceBudget, DEVICE } from './patchbin';
-import { choiceName, longName, moduleName } from './labels';
+import { choiceName, formatValue, longName, moduleName, moduleTag } from './labels';
 import { picker } from './picker';
+import { copiesOf, makeRoom, polyOfModule, setPoly } from './poly';
+import { ASSIGN_MODES, LEGATO_MODES, PRIORITIES } from './modules';
 import { dragControl } from './deck';
 import { isPin, PinsInUse, removeRoute } from './parameter-routing';
 import {
@@ -27,9 +30,9 @@ import {
   type Patch,
   type PortDef,
   type ParamDef,
-  MAX_VOICES,
-  voiceSplit,
-  voicesOf,
+  MAX_PARTS,
+  MAX_UNIT,
+  type PolyCfg,
   sameStructure,
   setMorphTarget,
   clearMorph,
@@ -90,6 +93,9 @@ function snapTo(pd: ParamDef, v: number): number {
 /** the frame around an expanded assembly: padding around its cards and the height of its header */
 const FRAME_PAD = 12;
 const FRAME_HEAD = 30;
+/** a poly assembly's frame: the settings strip under the header, and the width it needs */
+const POLY_STRIP = 50;
+const POLY_MIN_W = 640;
 
 export interface EditorEvents {
   /** structure changed (modules or cables): the engine needs the whole patch */
@@ -121,6 +127,8 @@ export interface EditorEvents {
 }
 
 /** an SVG path through a cubic Bézier's four points */
+/** how a cable leaves a jack: sideways, up (a docked jack) or down (a jack under a card's bottom edge) */
+type CableEnd = 'side' | 'up' | 'down';
 const pathOf = ([a, b, c, d]: { x: number; y: number }[]): string => `M${a.x},${a.y} C${b.x},${b.y} ${c.x},${c.y} ${d.x},${d.y}`;
 
 /** how far (px) beyond the jack's sides the strip a docked cable is drawn in over the panel reaches: none, so a cable
@@ -134,6 +142,10 @@ type Pt = { x: number; y: number };
 /** the footprint of a new card for the free-spot search: a grid cell less its gutters */
 const CARD_W = 250;
 const CARD_H = 540;
+/** jacks on each side edge of a card; the rest hang off its bottom edge */
+const EDGE_JACKS = 4;
+/** an input for a card's edge layout: its row element and which port it is (a parameter's dedicated input joins its row) */
+type EdgePort = { el: HTMLElement; module: number; port: string };
 /** a drop is judged by the card's header (where it is held), this far below its top */
 const HEAD_Y = 15;
 
@@ -353,20 +365,26 @@ export class Editor {
     this.cards.clear();
     this.frames.clear();
     this.containers.clear();
-    const poly = voiceSplit(this.patch);
+    const copies = copiesOf(this.patch);
     const hidden = hiddenModules(this.patch);
     const hiddenAsm = hiddenAssemblies(this.patch);
-    const perVoice = (a: AssemblyInst): boolean => allModules(this.patch, a).some((id) => poly.has(id));
+    if (this.pickAsm !== null && !assembliesOf(this.patch).some((a) => a.id === this.pickAsm && a.open && !hiddenAsm.has(a.id))) this.pickAsm = null;
+    // an assembly's badge: the part count of the poly assembly it is (or is inside), else none
+    const perVoice = (a: AssemblyInst): number => {
+      const first = allModules(this.patch, a)[0];
+      const root = first === undefined ? undefined : polyOfModule(this.patch, first);
+      return root ? root.poly!.parts : 0;
+    };
     for (const id of this.selected) if (!this.patch.modules.some((m) => m.id === id) || hidden.has(id)) this.selected.delete(id);
     // frames of the outer assemblies first: a nested frame is drawn on top of its parent's
     const visible = assembliesOf(this.patch).filter((a) => !hiddenAsm.has(a.id));
     for (const a of [...visible].sort((u, v) => depthOf(this.patch, u) - depthOf(this.patch, v))) if (a.open) this.modulesEl.append(this.frame(a, perVoice(a)));
     const docked = this.docked();
-    this.dock?.replaceChildren(...(docked ? [this.dockPanel(docked, poly.has(docked.id))] : []));
+    this.dock?.replaceChildren(...(docked ? [this.dockPanel(docked)] : []));
     for (const m of this.patch.modules) {
       if (hidden.has(m.id) || m === docked) continue;
       const a = assemblyOf(this.patch, m.id);
-      this.modulesEl.append(this.card(m, DEFS[m.type], poly.has(m.id), a));
+      this.modulesEl.append(this.card(m, DEFS[m.type], copies.get(m.id) ?? 0, a));
     }
     for (const a of visible) if (!a.open) this.modulesEl.append(this.container(a, perVoice(a), parentOf(this.patch, a.id)));
     this.applyStack();
@@ -426,11 +444,12 @@ export class Editor {
     this.space.style.height = `${Math.ceil(h * this.zoom)}px`;
   }
 
-  private badge(): HTMLElement {
+  /** ×N on a card or assembly that runs once per part of its poly assembly */
+  private badge(n: number): HTMLElement {
     const badge = document.createElement('span');
     badge.className = 'voices';
-    badge.textContent = `×${voicesOf(this.patch)}`;
-    badge.title = `runs once per voice (${voicesOf(this.patch)} voices)`;
+    badge.textContent = `×${n}`;
+    badge.title = `runs once per part (${n} parts)`;
     return badge;
   }
 
@@ -464,7 +483,7 @@ export class Editor {
    * The Main module as the panel above the keyboard: its jacks along the top edge (towards the canvas), the knobs
    * K1..K4 with their outputs' jacks in the middle (in place of their sliders and output rows), then its settings.
    */
-  private dockPanel(m: ModuleInst, perVoice: boolean): HTMLElement {
+  private dockPanel(m: ModuleInst): HTMLElement {
     const def = DEFS[m.type];
     const el = document.createElement('div');
     el.className = 'dock-main';
@@ -472,7 +491,6 @@ export class Editor {
     const title = document.createElement('span');
     title.className = 'dock-title';
     title.textContent = def.label;
-    if (perVoice) title.append(' ', this.badge());
     // a column: its jacks along the top (where the cables come down), the rest centred in the height that is left
     const col = (cls: string, top: HTMLElement | null, ...items: HTMLElement[]): HTMLElement => {
       const c = document.createElement('div');
@@ -492,8 +510,8 @@ export class Editor {
     const param = (name: string): HTMLElement => this.paramRow(m, def, def.params.find((pd) => pd.name === name)!);
     // outputs with a home next to the control or setting that makes them; the rest in the strip
     const wheels = this.dockWheels;
-    const WHEELS = wheels ? ['bend', 'mod'] : [], VOICES = ['spread'], VOICING = ['legato', 'jump'], DRIFT = ['tol', 'drift'], ARP = ['clock'];
-    const homed = [...WHEELS, ...VOICES, ...VOICING, ...DRIFT, ...ARP];
+    const WHEELS = wheels ? ['bend', 'mod'] : [], ARP = ['clock'];
+    const homed = [...WHEELS, ...ARP];
     const strip = jacks(def.outputs.map((p) => p.name).filter((n) => !isKnob(n) && !homed.includes(n)));
     const knobs = document.createElement('div');
     knobs.className = 'deck-knobs';
@@ -519,18 +537,15 @@ export class Editor {
       ...(wheelCol ? [col('dock-wheels', null, ...wheelCol)] : []),
       col('dock-outputs', strip, ...(this.dockOctave ? [this.dockOctave] : [])),
       col('dock-knobs', null, knobs),
-      col('dock-voices', jacks(VOICES), this.voicesRow()),
-      col('dock-voicing', jacks(VOICING), param('legato'), param('priority')),
       col('dock-morph', null, morph, this.morphRow()),
-      col('dock-drift', jacks(DRIFT), param('unit')),
       col('dock-arp', jacks(ARP), arp));
     return el;
   }
 
 
-  private card(m: ModuleInst, def: ModuleDef, perVoice: boolean, open?: AssemblyInst): HTMLElement {
+  private card(m: ModuleInst, def: ModuleDef, perVoice: number, open?: AssemblyInst): HTMLElement {
     const el = document.createElement('div');
-    el.className = 'module' + (this.selected.has(m.id) ? ' selected' : '') + (open ? ' member' : '');
+    el.className = 'module' + (this.selected.has(m.id) ? ' selected' : '') + (open ? ' member' : '') + (this.picking(open) ? ' picking' : '');
     el.style.left = `${m.x}px`;
     el.style.top = `${m.y}px`;
     el.dataset.id = String(m.id);
@@ -539,8 +554,8 @@ export class Editor {
     const head = document.createElement('div');
     head.className = 'mhead';
     const title = document.createElement('span');
-    title.textContent = moduleName(def.type, def.label);
-    if (perVoice) title.append(' ', this.badge());
+    title.append(this.tag(def.type), moduleName(def.type, def.label));
+    if (perVoice) title.append(this.badge(perVoice));
     const del = this.button('×', `Remove ${def.label}`, () => this.change(() => removeModule(this.patch, m.id)), 'x');
     const tools = document.createElement('span');
     tools.className = 'tools';
@@ -552,27 +567,88 @@ export class Editor {
 
     const body = document.createElement('div');
     body.className = 'mbody';
-    const ins = document.createElement('div');
-    ins.className = 'ports in';
+    const ins: EdgePort[] = [];
     for (const p of def.inputs) {
-      if (!isPin(p.name)) ins.append(this.port(m, p, 'in', { open }));
-      else if (this.unrouted(m, p.name)) ins.append(this.unroutedPort(m, p));
+      if (!isPin(p.name)) ins.push({ el: this.port(m, p, 'in', { open, short: true }), module: m.id, port: p.name });
+      else if (this.unrouted(m, p.name)) ins.push({ el: this.unroutedPort(m, p), module: m.id, port: p.name });
     }
-    const outs = document.createElement('div');
-    outs.className = 'ports out';
-    for (const p of def.outputs) outs.append(this.port(m, p, 'out', { open }));
-    const io = document.createElement('div');
-    io.className = 'io';
-    io.append(ins, outs);
-
-    const params = document.createElement('div');
-    params.className = 'params';
-    for (const pd of def.params) params.append(this.paramRow(m, def, pd, { open }));
-    body.append(io);
-    if (def.type === 'fm1') params.append(this.voicesRow(), this.morphRow(), this.arpPanel());
-    body.append(params);
+    const outs = def.outputs.map((p) => this.port(m, p, 'out', { open, short: true }));
+    const params = def.params.map((pd) => ({ el: this.paramRow(m, def, pd, { open }), input: pd.input ? { module: m.id, port: pd.input } : undefined }));
+    // a second Main card (from an old patch) keeps its B side and arpeggiator under the rows
+    const extra = def.type === 'fm1' ? [this.morphRow(), this.arpPanel()] : [];
+    body.append(...this.edgeLayout(ins, outs, params, extra));
     el.append(head, body);
     return el;
+  }
+
+  /** the tag before a card's title (VCO, VCF, ENV ...), coloured by the module's family */
+  private tag(type: string | null): HTMLElement {
+    const t = document.createElement('span');
+    const { tag, family } = type ? moduleTag(type) : { tag: 'ASM', family: 'asm' };
+    t.className = `mtag ${family}`;
+    t.textContent = tag;
+    return t;
+  }
+
+  /**
+   * A card's body: rows of [input jack | parameter | output jack]. A parameter's dedicated input (ParamDef.input) sits on
+   * its row; at most EDGE_JACKS jacks hang on each side edge (the outputs from the top, the other inputs in the free rows),
+   * the rest hang off the bottom edge with their labels above them. `extra` goes under the rows, across the card.
+   */
+  private edgeLayout(ins: EdgePort[], outs: HTMLElement[], params: { el: HTMLElement; input?: Target }[], extra: HTMLElement[] = []): HTMLElement[] {
+    type Row = { l: HTMLElement | null; m: HTMLElement | null; r: HTMLElement | null };
+    const rows: Row[] = params.map((p) => ({ l: null, m: p.el, r: null }));
+    const free = [...ins];
+    let fixed = 0;
+    params.forEach((p, i) => {
+      const k = p.input ? free.findIndex((x) => x.module === p.input!.module && x.port === p.input!.port) : -1;
+      if (k < 0) return;
+      rows[i].l = free.splice(k, 1)[0].el;
+      fixed++;
+    });
+    const sideIns = free.splice(0, Math.max(0, EDGE_JACKS - fixed));
+    const sideOuts = outs.slice(0, EDGE_JACKS);
+    while (rows.length < sideOuts.length) rows.push({ l: null, m: null, r: null });
+    for (const x of sideIns) {
+      let r = rows.find((y) => !y.l);
+      if (!r) rows.push((r = { l: null, m: null, r: null }));
+      r.l = x.el;
+    }
+    sideOuts.forEach((el, i) => (rows[i].r = el));
+    const cell = (cls: string, child: HTMLElement | null): HTMLElement => {
+      const c = document.createElement('div');
+      c.className = cls;
+      if (child) c.append(child);
+      return c;
+    };
+    const grid = document.createElement('div');
+    grid.className = 'erows';
+    for (const r of rows) {
+      const row = document.createElement('div');
+      row.className = 'erow';
+      row.append(cell('el', r.l), cell('em', r.m), cell('er', r.r));
+      grid.append(row);
+    }
+    const out: HTMLElement[] = rows.length ? [grid] : [];
+    out.push(...extra);
+    const bottomIns = free.map((x) => x.el), bottomOuts = outs.slice(EDGE_JACKS);
+    if (bottomIns.length || bottomOuts.length) {
+      const foot = document.createElement('div');
+      foot.className = 'mfoot';
+      const group = (els: HTMLElement[]): HTMLElement => {
+        const g = document.createElement('div');
+        for (const el of els) {
+          el.classList.add('bottom');
+          const dot = el.querySelector<HTMLElement>('.dot');
+          if (dot) dot.dataset.edge = 'bottom'; // its cables leave downwards
+        }
+        g.append(...els);
+        return g;
+      };
+      foot.append(group(bottomIns), group(bottomOuts));
+      out.push(foot);
+    }
+    return out;
   }
 
   /** the power button of a card: bypass on / off (the through input, or silence, replaces the module's outputs) */
@@ -598,7 +674,7 @@ export class Editor {
 
   private paramRow(m: ModuleInst, def: ModuleDef, pd: ParamDef, o: { open?: AssemblyInst; label?: string; rename?: () => void } = {}): HTMLElement {
     const row = document.createElement('div');
-    row.className = 'param';
+    row.className = 'param bar';
     const knob = def.type === 'fm1' && isKnob(pd.name) ? pd.name : null;
     if (knob) {
       row.classList.add('knob');
@@ -612,15 +688,13 @@ export class Editor {
     const jacked = choice || !!pd.toggle;
     if (jacked) row.classList.add('choice');
     if (pd.toggle) row.classList.add('toggle');
+    let pickBox: HTMLElement | null = null; // pick mode's check box, last in the row (the name stays its first child)
     if (o.open) {
       const a = o.open;
       const on = isPromoted(a, m.id, pd.name);
-      name.prepend(
-        this.button(on ? '●' : '○', on ? `${pd.name} is on the "${a.label}" card: click to take it off` : `show ${pd.name} on the "${a.label}" card`, () =>
-          this.change(() => (on ? demote(a, m.id, pd.name) : promote(a, m.id, pd.name))),
-        'tog'),
-        ' ',
-      );
+      row.classList.toggle('shown', on);
+      this.promoteClick(row, a, () => (on ? demote(a, m.id, pd.name) : promote(a, m.id, pd.name)));
+      if (this.picking(a)) pickBox = this.pickBox(on);
     }
     if (o.rename) {
       name.title = 'click to rename';
@@ -631,12 +705,26 @@ export class Editor {
       };
     }
     const val = document.createElement('output');
-    const fmt = (v: number, params = m.params): string =>
-      pd.altText && params[pd.altText.when] >= 0.5 ? pd.altText.text(v)
-        : pd.choices ? choiceName(def.type, pd.name, pd.choices[Math.round(v)] ?? '')
-        : `${Number(v.toFixed(3))}${pd.unit ? ' ' + pd.unit : ''}`;
-    val.textContent = fmt(m.params[pd.name]);
-    this.refreshers.set(row, () => (val.textContent = fmt(m.params[pd.name])));
+    // the number and its unit apart: the unit is drawn smaller (labels.ts formatValue)
+    const parts = (v: number, params = m.params): { num: string; unit: string } =>
+      pd.altText && params[pd.altText.when] >= 0.5 ? { num: pd.altText.text(v), unit: '' }
+        : pd.choices ? { num: choiceName(def.type, pd.name, pd.choices[Math.round(v)] ?? ''), unit: '' }
+        : formatValue(v, pd.unit, pd.min < 0);
+    const fmt = (v: number, params = m.params): string => { const p = parts(v, params); return p.unit ? `${p.num} ${p.unit}` : p.num; };
+    let shown = '';
+    const show = (v: number, params = m.params): void => {
+      const text = fmt(v, params);
+      if (text === shown) return;
+      shown = text;
+      const p = parts(v, params);
+      if (!p.unit) { val.textContent = p.num; return; }
+      const unit = document.createElement('span');
+      unit.className = 'unit';
+      unit.textContent = p.unit;
+      val.replaceChildren(p.num, unit);
+    };
+    show(m.params[pd.name]);
+    this.refreshers.set(row, () => show(m.params[pd.name]));
     const input = document.createElement('input');
     input.type = 'range';
     if (pd.log) {
@@ -676,7 +764,7 @@ export class Editor {
       const pos = Math.min(Number(input.max), Math.max(Number(input.min), Number(input.value) - offset));
       const v = pd.log ? snapTo(pd, fromUnit(pd, pos / 1000)) : Number(pos.toFixed(6));
       m.params[pd.name] = v;
-      if (!offset) val.textContent = fmt(v); // else the live text keeps coming from the engine
+      if (!offset) show(v); // else the live text keeps coming from the engine
       thumb?.setBase(offset ? toUnit(pd, v) : null);
       this.ev.onParam(m.id, pd.name, v);
       this.refreshKnobTicks(); // a knob moved, or a base a knob rests on
@@ -687,7 +775,7 @@ export class Editor {
       input.oninput = () => {
         const v = input.checked ? 1 : 0;
         m.params[pd.name] = v;
-        val.textContent = fmt(v);
+        show(v);
         for (const el of row.parentElement?.children ?? []) this.refreshers.get(el as HTMLElement)?.(); // a toggle can change how its siblings show (altText)
         this.ev.onParam(m.id, pd.name, v);
         this.refreshKnobTicks();
@@ -697,6 +785,9 @@ export class Editor {
     // the parameter's dedicated input, or a side input already routed to it
     const canPatch = !!def.paramInputs || !!pd.input || parameterInputs(m, pd).length > 0;
     const thumb = canPatch && !pd.toggle && !choice ? sliderJack(input, (e, jack) => this.beginDrag(e, jack)) : null;
+    // a slider with nothing to patch keeps the bar and a plain thumb (not a jack: no cable lands on it)
+    const plain = !thumb && !pd.toggle && !choice ? sliderJack(input, () => {}) : null;
+    plain?.jack.classList.replace('slider-port', 'slider-thumb');
     // a picker's jack: the same role as a slider's thumb (routes and cables end on it), standing above the picker
     const pickJack = canPatch && jacked ? document.createElement('span') : null;
     row.classList.toggle('jacked', !!pickJack); // the outline ties the jack to its picker
@@ -734,7 +825,7 @@ export class Editor {
         input.title = automated ? `Live: ${text}. Base: ${fmt(base)}. ${gesture || 'Drag to edit the base value.'}` : gesture;
       }
       if (!editing || automated) {
-        if (val.textContent !== text) val.textContent = text;
+        show(v, values ?? m.params);
         input.setAttribute('aria-valuetext', text);
       }
       row.classList.toggle('automated', automated);
@@ -769,42 +860,51 @@ export class Editor {
       line.className = 'toggle-line';
       line.append(input, val);
       row.append(line);
-    } else row.append(thumb?.element ?? input);
+    } else row.append(thumb?.element ?? plain?.element ?? input);
+    if (plain) this.parameterDisplays.push({ id: m.id, update: () => { if (!editing) plain.update(); } });
+    if (pickBox) row.append(pickBox);
     return row;
   }
 
-  /** the patch's voice count, on the Main card: 1 is the mono engine, more runs every module that hears pitch / gate / vel once per voice */
-  private voicesRow(): HTMLElement {
-    const row = document.createElement('div');
-    row.className = 'param voices-row';
-    const name = document.createElement('span');
-    name.textContent = 'voices';
-    const val = document.createElement('output');
-    const shown = document.createElement('output');
-    const set = (n: number): void => {
-      this.change(() => {
-        if (n > 1) this.patch.voices = n;
-        else delete this.patch.voices;
-      });
+  /**
+   * A poly assembly's settings: parts (with the FM-1's budget), how notes are assigned, legato, priority and unit. Every
+   * change goes through change() (undo, engine reload). `row`: one line (a frame's header strip), else a two-column grid.
+   */
+  private polySettings(a: AssemblyInst, row: boolean): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'poly-set' + (row ? ' row' : '');
+    const item = (label: string, names: (i: number) => string, count: number, key: keyof PolyCfg, title: string, lo = 0): HTMLElement => {
+      const box = document.createElement('div');
+      box.className = 'poly-item';
+      box.title = title;
+      box.dataset.asm = String(a.id);
+      box.dataset.setting = key;
+      const name = document.createElement('span');
+      name.textContent = label;
+      const shown = document.createElement('span');
+      const cfg = (): PolyCfg => a.poly!;
+      shown.textContent = names(cfg()[key]);
+      const pick = picker({ label: `${a.label} ${label}`, value: shown, count: () => count, get: () => cfg()[key] - lo, set: (i) => this.change(() => (a.poly![key] = i + lo)) });
+      box.append(name, pick);
+      return box;
     };
-    const sel = picker({ label: 'voices', value: shown, count: () => MAX_VOICES, get: () => voicesOf(this.patch) - 1, set: (i) => set(i + 1) });
-    const show = (): void => {
-      const n = voicesOf(this.patch);
-      const b = deviceBudget(this.patch);
-      shown.textContent = n === 1 ? 'mono' : String(n);
-      val.textContent = n === 1 ? '' : b.fits ? `${b.buffers}/${DEVICE.buffers} buffers` : 'too big for FM-1';
-      sel.classList.toggle('over', !b.fits);
-      row.title = `Voices. With more than one, every module that hears pitch, gate or vel (×N on its card) runs once per voice; delay, reverb and output stay single and sum the voices. On the FM-1 this patch takes ${b.buffers} of ${DEVICE.buffers} signal buffers and ${b.instances} of ${DEVICE.instances} module instances${b.fits ? '.' : ': too many, the FM-1 will refuse it.'}`;
-    };
-    show();
-    row.append(name, val, sel);
-    return row;
+    const b = deviceBudget(this.patch);
+    const parts = item('parts', String, MAX_PARTS, 'parts', `How many copies of the modules inside run: one per note that can sound at once. ${b.fits ? `On the FM-1 this patch takes ${b.buffers} of ${DEVICE.buffers} signal buffers and ${b.instances} of ${DEVICE.instances} module instances.` : `Too big for the FM-1: ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} instances.`}`, 1);
+    parts.querySelector('.picker')!.classList.toggle('over', !b.fits);
+    el.append(
+      parts,
+      item('assign', (i) => ASSIGN_MODES[i], ASSIGN_MODES.length, 'assign', "Which free part a new note takes: rotate (the next in turn, like a polysynth's voice cards), lowest (the lowest-numbered), reuse (a free part whose last note was that key, else the one free the longest)."),
+      item('legato', (i) => LEGATO_MODES[i], LEGATO_MODES.length, 'legato', 'auto: with one part, a new key while one is held only changes the pitch; a taken-over part restarts its envelopes. off: always restart. on: never.'),
+      item('priority', (i) => PRIORITIES[i], PRIORITIES.length, 'priority', 'With more keys held than parts: which notes sound (the last played, the lowest or the highest).'),
+      item('unit', String, MAX_UNIT + 1, 'unit', 'Which instrument of the model: every Random module inside gets a different set of values (tolerances, drift).'),
+    );
+    return el;
   }
 
   /** the morph picker: the B side of the patch (another patch of the same structure); the `morph` slider above fades every parameter A -> B */
   private morphRow(): HTMLElement {
     const row = document.createElement('div');
-    row.className = 'param morph-row';
+    row.className = 'param bar morph-row';
     const name = document.createElement('span');
     name.textContent = 'B side';
     const val = document.createElement('output');
@@ -848,6 +948,25 @@ export class Editor {
     this.sizeCanvas();
     this.drawCables();
     this.onZoom(this.zoom);
+  }
+
+  /** Tidy up: line the cards up in columns, keeping their arrangement (tidy.ts); one undo step */
+  tidyUp(): void {
+    const size = (el: HTMLElement | undefined): { w: number; h: number } => ({ w: el?.offsetWidth || CARD_W, h: el?.offsetHeight || CARD_H });
+    const before = JSON.stringify(this.patch);
+    const docked = this.docked();
+    tidy(this.patch, {
+      module: (id) => size(this.cards.get(id)),
+      container: (id) => size(this.containers.get(id)),
+      frame: (a) => ({ pad: FRAME_PAD, head: FRAME_HEAD + (a.poly ? POLY_STRIP : 0), minW: a.poly ? POLY_MIN_W : 0 }),
+    }, new Set(docked ? [docked.id] : []));
+    if (JSON.stringify(this.patch) === before) return this.ev.onError('already tidy');
+    this.history.push(before);
+    if (this.history.length > HISTORY) this.history.shift();
+    this.future = [];
+    this.rebuild();
+    this.canvas.scrollTo(0, 0);
+    this.ev.onLayout(this.patch);
   }
 
   /** every card in view: the zoom that fits the whole patch into the canvas */
@@ -1160,14 +1279,15 @@ export class Editor {
    * A port row. On a member card of an expanded assembly it gets the expose toggle; on an assembly card (`label`) the dot
    * still belongs to the inner module, so cables and drags work the same, and the label renames on click.
    */
-  private port(m: ModuleInst, p: PortDef, dir: 'out' | 'in', o: { open?: AssemblyInst; label?: string; rename?: () => void; also?: Target[] } = {}): HTMLElement {
+  private port(m: ModuleInst, p: PortDef, dir: 'out' | 'in', o: { open?: AssemblyInst; label?: string; rename?: () => void; also?: Target[]; short?: boolean } = {}): HTMLElement {
     const row = document.createElement('div');
     row.className = `port ${dir}`;
     const dot = this.jack(m, p, dir);
     const long = longName(m.type, p.name);
     dot.title = (o.label ? `${o.label}: ${DEFS[m.type].label} ${long} (${p.kind})` : `${long} (${p.kind})`) + SCOPE_HINT;
     const label = document.createElement('span');
-    label.textContent = o.label ?? long;
+    // a card's edge has little room: a long name gives way to the short one (the jack's tooltip has the long one)
+    label.textContent = o.label ?? (o.short && long.length > 6 ? p.name : long);
     if (o.rename) {
       label.classList.add('rename');
       label.title = 'click to rename';
@@ -1178,11 +1298,11 @@ export class Editor {
       const a = o.open;
       const on = isExposed(a, dir, m.id, p.name);
       const ref = findRef(a, dir, m.id, p.name);
-      const t = this.button(on ? '●' : '○', on ? `${ref!.label} is on the "${a.label}" card: click to hide it` : `show ${p.name} on the "${a.label}" card`, () =>
-        this.change(() => (on ? hidePort(this.patch, a, dir, m.id, p.name) : exposePort(a, dir, m.id, p.name, o.also))),
-      'tog');
-      if (dir === 'in') parts.push(t, ...this.mergeTools(a, m, p, ref));
-      else parts.unshift(t);
+      row.classList.toggle('shown', on);
+      this.promoteClick(row, a, () => (on ? hidePort(this.patch, a, dir, m.id, p.name) : exposePort(a, dir, m.id, p.name, o.also)));
+      // pick mode: the check box between the label and the jack
+      if (this.picking(a)) parts.splice(1, 0, this.pickBox(on));
+      if (dir === 'in') parts.push(...this.mergeTools(a, m, p, ref, this.picking(a)));
     }
     if (o.also?.length) dot.dataset.also = JSON.stringify(o.also);
     if (o.also?.length && !o.open) {
@@ -1293,7 +1413,7 @@ export class Editor {
    * On an exposed input inside an expanded assembly: a "merge into…" list of the other exposed inputs of the same kind, a
    * badge with the count on a merged jack and a button to split it again.
    */
-  private mergeTools(a: AssemblyInst, m: ModuleInst, p: PortDef, ref: PortRef | undefined): HTMLElement[] {
+  private mergeTools(a: AssemblyInst, m: ModuleInst, p: PortDef, ref: PortRef | undefined, tools: boolean): HTMLElement[] {
     if (!ref) return [];
     const out: HTMLElement[] = [];
     const me: Target = { module: m.id, port: p.name };
@@ -1304,11 +1424,11 @@ export class Editor {
       n.textContent = primary ? `×${ref.also.length + 1}` : `→ ${ref.label}`;
       n.title = primary ? `"${ref.label}" is one jack for ${ref.also.length + 1} inputs` : `fed by the "${ref.label}" jack`;
       out.push(n);
-      if (primary) out.push(this.button('split', `Split "${ref.label}": one jack per input again`, () => this.change(() => unmergePort(a, m.id, p.name))));
+      if (primary && tools) out.push(this.button('split', `Split "${ref.label}": one jack per input again`, () => this.change(() => unmergePort(a, m.id, p.name))));
     }
     const kindOf = (t: Target): string => DEFS[this.patch.modules.find((x) => x.id === t.module)!.type].inputs.find((q) => q.name === t.port)!.kind;
     const others = a.inputs.filter((r) => r !== ref && kindOf(r) === p.kind);
-    if (!others.length) return out;
+    if (!others.length || !tools) return out; // merging is part of choosing the card: pick mode only
     const sel = document.createElement('select');
     sel.className = 'merge';
     sel.title = `Merge "${ref.label}" into another jack of the "${a.label}" card: one jack feeds both`;
@@ -1326,6 +1446,63 @@ export class Editor {
   }
 
   // ---- assemblies on the canvas
+
+  /** the expanded assembly whose collapsed card is being chosen (its frame's card button), else null */
+  private pickAsm: number | null = null;
+
+  /** leave pick mode (Esc); false when it was not on */
+  endPick(): boolean {
+    if (this.pickAsm === null) return false;
+    this.pickAsm = null;
+    this.rebuild();
+    return true;
+  }
+
+  private picking(a: AssemblyInst | undefined): boolean {
+    return !!a && this.pickAsm === a.id;
+  }
+
+  /**
+   * A row of a member card that can go on the assembly's collapsed card: a click adds it or takes it off in pick mode,
+   * a Cmd / Ctrl-click any time. In pick mode a jack still patches (a plain press on it).
+   */
+  private promoteClick(el: HTMLElement, a: AssemblyInst, toggle: () => void): void {
+    const mod = (e: MouseEvent): boolean => e.metaKey || e.ctrlKey;
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || !(this.picking(a) || mod(e))) return;
+      const t = e.target as HTMLElement;
+      if (t.closest('select, button.sm')) return;
+      if (!mod(e) && t.closest('.dot:not(.slider-port)')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.change(toggle);
+    }, true);
+    // macOS: Ctrl-click is also a right click; it toggled already, so no context menu
+    el.addEventListener('contextmenu', (e) => { if (e.ctrlKey) { e.preventDefault(); e.stopPropagation(); } });
+    el.title = this.picking(a) ? `Click: show on the "${a.label}" card or take it off` : `Cmd / Ctrl-click: show on the "${a.label}" card or take it off`;
+  }
+
+  /** pick mode's check box: on = shown on the assembly card */
+  private pickBox(on: boolean): HTMLElement {
+    const box = document.createElement('span');
+    box.className = 'pickbox' + (on ? ' on' : '');
+    box.textContent = on ? '✓' : '';
+    box.setAttribute('aria-hidden', 'true');
+    return box;
+  }
+
+  /** the frame's card button: pick mode on / off, with how many jacks and parameters the collapsed card has */
+  private pickButton(a: AssemblyInst): HTMLButtonElement {
+    const on = this.picking(a);
+    const n = a.inputs.length + a.outputs.length + a.params.length;
+    const b = this.button(on ? 'done' : `card · ${n}`, on
+      ? 'Done choosing (Esc)'
+      : `Choose what the collapsed "${a.label}" card shows: click jacks and parameters to add or remove them (Cmd / Ctrl-click does it any time)`,
+    () => { this.pickAsm = on ? null : a.id; this.rebuild(); }, 'sm pick-btn');
+    b.setAttribute('aria-pressed', String(on));
+    b.dataset.asm = String(a.id);
+    return b;
+  }
 
   private rename(a: AssemblyInst): void {
     const v = window.prompt('Label of this assembly', a.label)?.trim();
@@ -1357,21 +1534,34 @@ export class Editor {
         this.change(() => {
           a.open = !a.open;
           if (a.open && overlapping(this.patch, a)) tileMembers(this.patch, a); // stacked cards (an old file, members added at one spot) spread out
+          if (a.open && a.poly) makeRoom(this.patch, a);
         }),
       ),
+      this.polyButton(a),
       this.button('save', 'Save to the assembly library', () => this.saveAssembly(a)),
       this.button('ungroup', 'Dissolve: the modules stay as plain modules', () => this.change(() => ungroup(this.patch, a.id))),
       this.button('×', `Remove "${a.label}" with its modules`, () => this.change(() => deleteAssembly(this.patch, a.id)), 'x'),
     ];
   }
 
-  private titleOf(a: AssemblyInst, perVoice: boolean): HTMLElement {
+  /** the Poly switch: the modules inside run once per part, with their own allocator (poly.ts setPoly) */
+  private polyButton(a: AssemblyInst): HTMLButtonElement {
+    const b = this.button('poly', a.poly
+      ? 'Poly is on: the modules inside run once per part. Click to turn it off (one copy, played by the shared keyboard).'
+      : 'Make it a poly assembly: the modules inside run once per part, each part playing its own note (a Part module inside gives each part its note).',
+    () => this.change(() => setPoly(this.patch, DEFS, a, !a.poly)), 'sm poly-btn');
+    b.setAttribute('aria-pressed', String(!!a.poly));
+    b.dataset.asm = String(a.id);
+    return b;
+  }
+
+  private titleOf(a: AssemblyInst, perVoice: number): HTMLElement {
     const title = document.createElement('span');
     title.className = 'rename';
     title.textContent = a.label;
     title.title = `${a.name}: double-click to rename`;
     title.ondblclick = () => this.rename(a);
-    if (perVoice) title.append(' ', this.badge());
+    if (perVoice) title.append(' ', this.badge(perVoice));
     return title;
   }
 
@@ -1379,9 +1569,9 @@ export class Editor {
    * The collapsed assembly: one card with the exposed ports and the promoted parameters. Inside an expanded parent (`open`)
    * its rows get the parent's expose / pin toggles, like a member card's.
    */
-  private container(a: AssemblyInst, perVoice: boolean, open?: AssemblyInst): HTMLElement {
+  private container(a: AssemblyInst, perVoice: number, open?: AssemblyInst): HTMLElement {
     const el = document.createElement('div');
-    el.className = 'module assembly' + (open ? ' member' : '') + (a.bypass ? ' off' : '');
+    el.className = 'module assembly' + (open ? ' member' : '') + (a.bypass ? ' off' : '') + (this.picking(open) ? ' picking' : '');
     el.style.left = `${a.x}px`;
     el.style.top = `${a.y}px`;
     el.dataset.asm = String(a.id);
@@ -1391,41 +1581,34 @@ export class Editor {
     const tools = document.createElement('span');
     tools.className = 'tools';
     tools.append(...this.assemblyButtons(a));
-    head.append(this.titleOf(a, perVoice), tools);
+    const title = this.titleOf(a, perVoice);
+    title.prepend(this.tag(null));
+    head.append(title, tools);
     this.assemblyDrag(el, head, a);
 
     const body = document.createElement('div');
     body.className = 'mbody';
+    if (a.poly) body.append(this.polySettings(a, false));
     const mod = (id: number): ModuleInst => this.patch.modules.find((m) => m.id === id)!;
-    const ins = document.createElement('div');
-    ins.className = 'ports in';
+    const ins: EdgePort[] = [];
     for (const r of a.inputs) {
       const m = mod(r.module);
       const pd = DEFS[m.type].inputs.find((q) => q.name === r.port)!;
       if (isPin(pd.name) && !this.unrouted(m, pd.name)) continue; // routed pins are shown as promoted parameters
-      ins.append(this.port(m, pd, 'in', { label: r.label, rename: () => this.renameRef(r, 'input'), also: r.also, open }));
+      ins.push({ el: this.port(m, pd, 'in', { label: r.label, rename: () => this.renameRef(r, 'input'), also: r.also, open }), module: m.id, port: pd.name });
     }
-    const outs = document.createElement('div');
-    outs.className = 'ports out';
-    for (const r of a.outputs) {
+    const outs = a.outputs.map((r) => {
       const m = mod(r.module);
       const pd = DEFS[m.type].outputs.find((q) => q.name === r.port)!;
-      outs.append(this.port(m, pd, 'out', { label: r.label, rename: () => this.renameRef(r, 'output'), open }));
-    }
-    const io = document.createElement('div');
-    io.className = 'io';
-    io.append(ins, outs);
-    body.append(io);
-    if (a.params.length) {
-      const params = document.createElement('div');
-      params.className = 'params';
-      for (const r of a.params) {
-        const m = mod(r.module);
-        const def = DEFS[m.type];
-        params.append(this.paramRow(m, def, def.params.find((q) => q.name === r.param)!, { label: r.label, rename: () => this.renameRef(r, 'parameter'), open }));
-      }
-      body.append(params);
-    }
+      return this.port(m, pd, 'out', { label: r.label, rename: () => this.renameRef(r, 'output'), open });
+    });
+    const params = a.params.map((r) => {
+      const m = mod(r.module);
+      const def = DEFS[m.type];
+      const pd = def.params.find((q) => q.name === r.param)!;
+      return { el: this.paramRow(m, def, pd, { label: r.label, rename: () => this.renameRef(r, 'parameter'), open }), input: pd.input ? { module: m.id, port: pd.input } : undefined };
+    });
+    body.append(...this.edgeLayout(ins, outs, params));
     if (!a.inputs.length && !a.outputs.length && !a.params.length) {
       const hint = document.createElement('p');
       hint.className = 'muted empty';
@@ -1442,7 +1625,7 @@ export class Editor {
   }
 
   /** the frame around an expanded assembly's cards, with its header; placed by layoutFrames() once the cards have a size */
-  private frame(a: AssemblyInst, perVoice: boolean): HTMLElement {
+  private frame(a: AssemblyInst, perVoice: number): HTMLElement {
     const el = document.createElement('div');
     el.className = 'frame' + (a.bypass ? ' off' : '');
     el.dataset.asm = String(a.id);
@@ -1450,9 +1633,17 @@ export class Editor {
     head.className = 'fhead';
     const tools = document.createElement('span');
     tools.className = 'tools';
-    tools.append(...this.assemblyButtons(a));
-    head.append(this.titleOf(a, perVoice), tools);
+    tools.append(this.pickButton(a), ...this.assemblyButtons(a));
+    el.classList.toggle('picking', this.picking(a));
+    const title = this.titleOf(a, perVoice);
+    title.prepend(this.tag(null));
+    head.append(title, tools);
     el.append(head);
+    if (a.poly) {
+      const strip = this.polySettings(a, true);
+      strip.classList.add('fpoly');
+      el.append(strip);
+    }
     this.frames.set(a.id, el);
     this.frameDrag(head, a);
     this.resizeAssembly(el, a);
@@ -1490,7 +1681,9 @@ export class Editor {
       }
     }
     if (x0 === Infinity) return null;
-    return { x: x0 - FRAME_PAD, y: y0 - FRAME_PAD - FRAME_HEAD, w: Math.max(x1 - x0 + 2 * FRAME_PAD, a.frameSize?.width ?? 0), h: Math.max(y1 - y0 + 2 * FRAME_PAD + FRAME_HEAD, a.frameSize?.height ?? 0) };
+    const head = FRAME_HEAD + (a.poly ? POLY_STRIP : 0);
+    const minW = a.poly ? POLY_MIN_W : 0;
+    return { x: x0 - FRAME_PAD, y: y0 - FRAME_PAD - head, w: Math.max(x1 - x0 + 2 * FRAME_PAD, a.frameSize?.width ?? 0, minW), h: Math.max(y1 - y0 + 2 * FRAME_PAD + head, a.frameSize?.height ?? 0) };
   }
 
   private layoutFrames(exclude?: Set<number>, excludeAsm?: number): void {
@@ -1765,15 +1958,24 @@ export class Editor {
     return { x: (r.left - c.left + r.width / 2) / this.zoom - origin.clientLeft, y: (r.top - c.top + r.height / 2) / this.zoom - origin.clientTop };
   }
 
-  /** a cable's Bézier points from a to b; an end on a docked jack leaves it upwards (the dock is below the canvas) */
-  private curvePts(a: Pt, b: Pt, upA = false, upB = false): Pt[] {
+  /**
+   * A cable's Bézier points from a to b. An end leaves its jack sideways (out to the right, in from the left), upwards on
+   * a docked jack (the dock is below the canvas) and downwards on a jack under a card's bottom edge.
+   */
+  private curvePts(a: Pt, b: Pt, dirA: CableEnd = 'side', dirB: CableEnd = 'side'): Pt[] {
     const dx = Math.max(40, Math.abs(b.x - a.x) / 2);
     const dy = Math.max(60, Math.abs(b.y - a.y) / 2);
-    return [a, upA ? { x: a.x, y: a.y - dy } : { x: a.x + dx, y: a.y }, upB ? { x: b.x, y: b.y - dy } : { x: b.x - dx, y: b.y }, b];
+    const ctl = (p: Pt, dir: CableEnd, sx: number): Pt => (dir === 'up' ? { x: p.x, y: p.y - dy } : dir === 'down' ? { x: p.x, y: p.y + dy } : { x: p.x + sx, y: p.y });
+    return [a, ctl(a, dirA, dx), ctl(b, dirB, -dx), b];
   }
 
-  private curve(a: Pt, b: Pt, upA = false, upB = false): string {
-    return pathOf(this.curvePts(a, b, upA, upB));
+  private curve(a: Pt, b: Pt, dirA: CableEnd = 'side', dirB: CableEnd = 'side'): string {
+    return pathOf(this.curvePts(a, b, dirA, dirB));
+  }
+
+  /** which way a cable leaves this jack */
+  private endOf(el: HTMLElement): CableEnd {
+    return this.inDock(el) ? 'up' : el.dataset.edge === 'bottom' ? 'down' : 'side';
   }
 
   /** the cables' continuation over the dock (see positionCables) */
@@ -1796,7 +1998,7 @@ export class Editor {
     const w = this.world.getBoundingClientRect();
     const o = this.dockCables?.getBoundingClientRect();
     for (const { path, from, to, origin } of this.cablePaths) {
-      const pts = this.curvePts(this.center(from, origin), this.center(to, origin), this.inDock(from), this.inDock(to));
+      const pts = this.curvePts(this.center(from, origin), this.center(to, origin), this.endOf(from), this.endOf(to));
       path.setAttribute('d', pathOf(pts));
       const over = this.overPaths.get(path);
       if (!over || !o) continue;
@@ -1909,7 +2111,10 @@ export class Editor {
     for (const { m, pd, jack } of this.sliderPorts) for (const port of parameterInputs(m, pd)) {
       const side = this.inputJack({ module: m.id, port });
       if (!side || (this.inDock(side) && this.inDock(jack))) continue; // the dock draws no routes inside itself
-      if (port === pd.input) add(side, jack, 'control', null, `Built in: ${port} sets ${pd.name}`, true);
+      if (port === pd.input) {
+        if (side.closest('.erow') && side.closest('.erow') === jack.closest('.erow')) continue; // on its parameter's row: the row shows the link
+        add(side, jack, 'control', null, `Built in: ${port} sets ${pd.name}`, true);
+      }
       else add(side, jack, 'control', () => this.change(() => {
         setInputRoute(m, DEFS[m.type], port, pd.name, false);
       }), `Disconnect ${DEFS[m.type].label} ${port} → ${pd.name}`, true);
@@ -2029,8 +2234,8 @@ export class Editor {
       const c = this.world.getBoundingClientRect();
       const p = { x: (ev.clientX - c.left) / this.zoom, y: (ev.clientY - c.top) / this.zoom };
       const s = this.center(start);
-      const up = this.inDock(start);
-      path.setAttribute('d', kind === 'out' ? this.curve(s, p, up) : this.curve(p, s, false, up));
+      const end = this.endOf(start);
+      path.setAttribute('d', kind === 'out' ? this.curve(s, p, end) : this.curve(p, s, 'side', end));
     };
     const cancel = (): void => {
       window.removeEventListener('pointermove', move);

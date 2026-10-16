@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 37
+#define N_TYPES 39
 enum {
     T_FM1,
     T_OSC,
@@ -42,6 +42,8 @@ enum {
     T_COMB,
     T_MODAL,
     T_SHIFT,
+    T_PART,
+    T_RANDOM,
 };
 
 /* fm1: Main */
@@ -54,25 +56,17 @@ enum {
 #define FM1_O_K3 5
 #define FM1_O_K4 6
 #define FM1_O_CLOCK 7
-#define FM1_O_SPREAD 8
-#define FM1_O_BEND 9
-#define FM1_O_MOD 10
-#define FM1_O_AT 11
-#define FM1_O_LEGATO 12
-#define FM1_O_JUMP 13
-#define FM1_O_TOL 14
-#define FM1_O_DRIFT 15
+#define FM1_O_BEND 8
+#define FM1_O_MOD 9
+#define FM1_O_AT 10
 #define FM1_P_K1 0
 #define FM1_P_K2 1
 #define FM1_P_K3 2
 #define FM1_P_K4 3
 #define FM1_P_MORPH 4
-#define FM1_P_LEGATO 5
-#define FM1_P_PRIORITY 6
-#define FM1_P_UNIT 7
 #define FM1_NIN 1
-#define FM1_NOUT 16
-#define FM1_NPAR 8
+#define FM1_NOUT 11
+#define FM1_NPAR 5
 #define FM1_CVBASE -1
 
 /* osc: Oscillator */
@@ -93,10 +87,9 @@ enum {
 #define OSC_P_DETUNE 8
 #define OSC_P_BLEND 9
 #define OSC_P_STACK 10
-#define OSC_P_DRIFT 11
 #define OSC_NIN 5
 #define OSC_NOUT 1
-#define OSC_NPAR 12
+#define OSC_NPAR 11
 #define OSC_CVBASE 3
 
 /* lfo: LFO */
@@ -627,14 +620,44 @@ enum {
 #define SHIFT_NPAR 3
 #define SHIFT_CVBASE 2
 
+/* part: Part */
+#define PART_O_PITCH 0
+#define PART_O_GATE 1
+#define PART_O_VEL 2
+#define PART_O_INDEX 3
+#define PART_O_LEGATO 4
+#define PART_O_JUMP 5
+#define PART_NIN 0
+#define PART_NOUT 6
+#define PART_NPAR 0
+#define PART_CVBASE -1
+
+/* random: Random */
+#define RANDOM_I_P1 0
+#define RANDOM_I_P2 1
+#define RANDOM_O_OUT 0
+#define RANDOM_P_MODE 0
+#define RANDOM_P_RATE 1
+#define RANDOM_NIN 2
+#define RANDOM_NOUT 1
+#define RANDOM_NPAR 2
+#define RANDOM_CVBASE 0
+
 #define DELAY_NDIV 11
 #define DELAY_CLK_PPQN 24
 static const uint8_t DELAY_DIV_NUM[DELAY_NDIV] = {1, 1, 1, 3, 1, 3, 1, 3, 2, 5, 4};
 static const uint8_t DELAY_DIV_DEN[DELAY_NDIV] = {6, 4, 3, 8, 2, 4, 1, 2, 1, 2, 1};
 static const char *const DELAY_DIV_NAME[DELAY_NDIV] = {"1/16T", "1/16", "1/8T", "1/16.", "1/8", "1/8.", "1/4", "3/8", "1/2", "5/8", "1/1"};
 
+#define POLY_MAX_GROUPS 4
+#define POLY_MAX_PARTS 8
+#define POLY_MAX_UNIT 63
+static const char *const POLY_ASSIGN_NAME[3] = {"ROTATE", "LOWEST", "REUSE"};
+static const char *const POLY_LEGATO_NAME[3] = {"AUTO", "OFF", "ON"};
+static const char *const POLY_PRIORITY_NAME[3] = {"LAST", "LOW", "HIGH"};
+
 #define MAX_IN 6
-#define MAX_OUT 16
+#define MAX_OUT 11
 #define MAX_PAR 12
 
 typedef struct {
@@ -652,27 +675,25 @@ typedef struct {
 } def_t;
 
 static const char *const FM1_INNAMES[] = {"MORPH"};
-static const int32_t FM1_MIN[] = {0, 0, 0, 0, 0, 0, 0, 0};
-static const int32_t FM1_MAX[] = {65536, 65536, 65536, 65536, 65536, 131072, 131072, 4128768};
-static const int32_t FM1_DEF[] = {32768, 32768, 32768, 32768, 0, 0, 0, 0};
-static const int32_t FM1_INC[] = {655, 655, 655, 655, 655, 65536, 65536, 65536};
-static const char *const FM1_PN[] = {"K1", "K2", "K3", "K4", "MORPH", "LEGATO", "PRIORITY", "UNIT"};
-static const uint8_t FM1_LOG[] = {0, 0, 0, 0, 0, 0, 0, 0};
-static const char *const FM1_UNIT[] = {"", "", "", "", "", "", "", ""};
-static const char *const FM1_CH5[] = {"AUTO", "OFF", "ON", 0};
-static const char *const FM1_CH6[] = {"LAST", "LOW", "HIGH", 0};
-static const char *const *const FM1_CH[] = {0, 0, 0, 0, 0, FM1_CH5, FM1_CH6, 0};
+static const int32_t FM1_MIN[] = {0, 0, 0, 0, 0};
+static const int32_t FM1_MAX[] = {65536, 65536, 65536, 65536, 65536};
+static const int32_t FM1_DEF[] = {32768, 32768, 32768, 32768, 0};
+static const int32_t FM1_INC[] = {655, 655, 655, 655, 655};
+static const char *const FM1_PN[] = {"K1", "K2", "K3", "K4", "MORPH"};
+static const uint8_t FM1_LOG[] = {0, 0, 0, 0, 0};
+static const char *const FM1_UNIT[] = {"", "", "", "", ""};
+static const char *const *const FM1_CH[] = {0, 0, 0, 0, 0};
 static const char *const OSC_INNAMES[] = {"PITCH", "PM", "SYNC", "P1", "P2"};
-static const int32_t OSC_MIN[] = {0, 3277, -3145728, -6553600, 0, 0, 0, 65536, 0, 0, 0, 0};
-static const int32_t OSC_MAX[] = {196608, 62259, 3145728, 6553600, 524288, 65536, 65536, 327680, 6553600, 65536, 262144, 3276800};
-static const int32_t OSC_DEF[] = {0, 32768, 0, 0, 0, 52429, 0, 65536, 655360, 32768, 0, 0};
-static const int32_t OSC_INC[] = {65536, 655, 65536, 131072, 5243, 655, 655, 65536, 65536, 655, 65536, 65536};
-static const char *const OSC_PN[] = {"WAVE", "PW", "COARSE", "FINE", "PM", "LEVEL", "FB", "UNISON", "DETUNE", "BLEND", "STACK", "DRIFT"};
-static const uint8_t OSC_LOG[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static const char *const OSC_UNIT[] = {"", "", "ST", "CT", "", "", "", "", "CT", "", "", "CT"};
+static const int32_t OSC_MIN[] = {0, 3277, -3145728, -6553600, 0, 0, 0, 65536, 0, 0, 0};
+static const int32_t OSC_MAX[] = {196608, 62259, 3145728, 6553600, 524288, 65536, 65536, 327680, 6553600, 65536, 262144};
+static const int32_t OSC_DEF[] = {0, 32768, 0, 0, 0, 52429, 0, 65536, 655360, 32768, 0};
+static const int32_t OSC_INC[] = {65536, 655, 65536, 131072, 5243, 655, 655, 65536, 65536, 655, 65536};
+static const char *const OSC_PN[] = {"WAVE", "PW", "COARSE", "FINE", "PM", "LEVEL", "FB", "UNISON", "DETUNE", "BLEND", "STACK"};
+static const uint8_t OSC_LOG[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const char *const OSC_UNIT[] = {"", "", "ST", "CT", "", "", "", "", "CT", "", ""};
 static const char *const OSC_CH0[] = {"SINE", "TRIANGLE", "SAW", "SQUARE", 0};
 static const char *const OSC_CH10[] = {"OFF", "+OCT", "+5TH", "+OCT+5TH", "-OCT", 0};
-static const char *const *const OSC_CH[] = {OSC_CH0, 0, 0, 0, 0, 0, 0, 0, 0, 0, OSC_CH10, 0};
+static const char *const *const OSC_CH[] = {OSC_CH0, 0, 0, 0, 0, 0, 0, 0, 0, 0, OSC_CH10};
 static const char *const LFO_INNAMES[] = {"CLK", "RESET", "P1", "P2"};
 static const int32_t LFO_MIN[] = {0, 1311, 0, 0, 0, 2621440};
 static const int32_t LFO_MAX[] = {262144, 2621440, 65536, 65536, 655360, 19660800};
@@ -1006,6 +1027,17 @@ static const char *const SHIFT_PN[] = {"SHIFT", "CVAMT", "MIX"};
 static const uint8_t SHIFT_LOG[] = {0, 0, 0};
 static const char *const SHIFT_UNIT[] = {"HZ", "HZ", ""};
 static const char *const *const SHIFT_CH[] = {0, 0, 0};
+static const char *const PART_INNAMES[] = {0};
+static const char *const RANDOM_INNAMES[] = {"P1", "P2"};
+static const int32_t RANDOM_MIN[] = {0, 3277};
+static const int32_t RANDOM_MAX[] = {65536, 1310720};
+static const int32_t RANDOM_DEF[] = {0, 98304};
+static const int32_t RANDOM_INC[] = {65536, 13074};
+static const char *const RANDOM_PN[] = {"MODE", "RATE"};
+static const uint8_t RANDOM_LOG[] = {0, 1};
+static const char *const RANDOM_UNIT[] = {"", "HZ"};
+static const char *const RANDOM_CH0[] = {"FIXED", "WALK", 0};
+static const char *const *const RANDOM_CH[] = {RANDOM_CH0, 0};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, 1, FM1_CVBASE, -1, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -1045,4 +1077,6 @@ static const def_t DEFS[N_TYPES] = {
     {COMB_NIN, COMB_NOUT, COMB_NPAR, 0, COMB_CVBASE, 0, COMB_MIN, COMB_MAX, COMB_DEF, COMB_INC, "COMB", COMB_PN, COMB_INNAMES, COMB_LOG, COMB_UNIT, COMB_CH},   /* comb */
     {MODAL_NIN, MODAL_NOUT, MODAL_NPAR, 0, MODAL_CVBASE, 0, MODAL_MIN, MODAL_MAX, MODAL_DEF, MODAL_INC, "MODAL", MODAL_PN, MODAL_INNAMES, MODAL_LOG, MODAL_UNIT, MODAL_CH},   /* modal */
     {SHIFT_NIN, SHIFT_NOUT, SHIFT_NPAR, 2, SHIFT_CVBASE, 0, SHIFT_MIN, SHIFT_MAX, SHIFT_DEF, SHIFT_INC, "FREQ SHIFT", SHIFT_PN, SHIFT_INNAMES, SHIFT_LOG, SHIFT_UNIT, SHIFT_CH},   /* shift */
+    {PART_NIN, PART_NOUT, PART_NPAR, 0, PART_CVBASE, -1, 0, 0, 0, 0, "PART", 0, PART_INNAMES, 0, 0, 0},   /* part */
+    {RANDOM_NIN, RANDOM_NOUT, RANDOM_NPAR, 0, RANDOM_CVBASE, -1, RANDOM_MIN, RANDOM_MAX, RANDOM_DEF, RANDOM_INC, "RANDOM", RANDOM_PN, RANDOM_INNAMES, RANDOM_LOG, RANDOM_UNIT, RANDOM_CH},   /* random */
 };

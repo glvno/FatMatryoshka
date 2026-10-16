@@ -9,23 +9,20 @@ export interface Voice {
   pitch: number;
   gate: number;
   velocity: number;
-  /** where this voice sits among the voices, -1 (first) .. 1 (last); 0 with one voice */
-  spread: number;
   /** a clock tick (24 per quarter note) falls in this block */
   clock: boolean;
   /** the performance controls, the same for every voice: pitch bend -1..1, mod wheel 0..1, channel aftertouch 0..1 */
   bend: number;
   mod: number;
   at: number;
-  /** the voice's number (0 first), for its tolerance */
+  /** the part's number in its poly assembly (0 first) and how many parts it has (1 for the shared keyboard) */
   index: number;
+  parts: number;
   /** 1 while the note began over a held one (a legato transition), 0 after a fresh start; kept until the next note */
   legato: number;
   /** the last pitch step of this voice in octaves, signed, kept until the next note */
   jump: number;
-  /** this voice's slow random wander, -1..1 (drift walk, Q15 like the firmware) */
-  drift: number;
-  /** the Main module's `unit` (which drifted instrument): reseeds the tolerances */
+  /** the poly assembly's `unit` (which instrument of the model): reseeds the Random modules inside it; 0 outside */
   unit: number;
 }
 
@@ -104,12 +101,10 @@ function wave(kind: number, phase: number, dt: number, pw = 0.5): number {
  * device the encoders feed the same outputs.
  */
 /**
- * Analog tolerance and drift, integer arithmetic so the firmware matches bit for bit (Q15 values -1..1).
- * hash32: a fixed random value of a key (lowbias32). A walk: every DRIFT_HOLD blocks every copy picks a new random target,
- * each block it moves 1 / 2^DRIFT_SHIFT of the way there (a slow wander of about half a hertz).
+ * The Random module's values, integer arithmetic so the firmware matches bit for bit (Q15 values -1..1).
+ * hash32: a fixed random value of a key (lowbias32). A walk: every `hold` blocks it picks a new random target, each block
+ * it moves 2 / hold of the way there (hold 256 at the default rate: a new target about every 0.7 s).
  */
-export const DRIFT_HOLD = 256;
-export const DRIFT_SHIFT = 7;
 export function hash32(x: number): number {
   x >>>= 0;
   x = Math.imul(x ^ (x >>> 16), 0x7feb352d) >>> 0;
@@ -121,36 +116,36 @@ export const q15 = (h: number): number => (h >>> 16) - 32768;
 export interface Walk {
   seed: number;
   count: number;
-  y: Int32Array;
-  t: Int32Array;
+  y: number;
+  t: number;
 }
 const lcg = (s: number): number => (Math.imul(s, 1664525) + 1013904223) >>> 0;
-export function walkInit(seed: number, n: number): Walk {
-  const w: Walk = { seed: seed >>> 0, count: DRIFT_HOLD, y: new Int32Array(n), t: new Int32Array(n) };
-  for (let j = 0; j < n; j++) {
-    w.seed = lcg(w.seed);
-    w.t[j] = w.y[j] = q15(w.seed);
-  }
+export function walkInit(seed: number): Walk {
+  const w: Walk = { seed: lcg(seed >>> 0), count: 0, y: 0, t: 0 };
+  w.t = w.y = q15(w.seed);
   return w;
 }
-/** one block of a walk */
-export function walkStep(w: Walk): void {
+/** one block of a walk that retargets every `hold` blocks (1..65535) */
+export function walkStep(w: Walk, hold: number): void {
   if (--w.count <= 0) {
-    w.count = DRIFT_HOLD;
-    for (let j = 0; j < w.t.length; j++) {
-      w.seed = lcg(w.seed);
-      w.t[j] = q15(w.seed);
-    }
+    w.count = hold;
+    w.seed = lcg(w.seed);
+    w.t = q15(w.seed);
   }
-  for (let j = 0; j < w.y.length; j++) w.y[j] += (w.t[j] - w.y[j]) >> DRIFT_SHIFT;
+  w.y += ((w.t - w.y) * Math.min(32768, Math.floor(65536 / hold))) >> 15;
 }
-/** a voice's fixed tolerance (the Main module's tol output), Q15: depends on the unit and the voice's number only */
-export const tolOf = (unit: number, v: number): number => q15(hash32(Math.imul(Math.round(unit), 64) + v + 0x1000));
-/** the seed of a module instance: module index in the patch, voice */
+/** blocks between a walk's targets at `rate` Hz (128-frame blocks; the firmware computes it the same way) */
+export const walkHold = (sr: number, rate: number): number => Math.max(1, Math.min(65535, Math.round(sr / (128 * Math.max(0.01, rate)))));
+/** the seed of a module instance: module index in the patch, part */
 export const instSeed = (mod: number, v: number): number => Math.imul(mod * 8 + v + 1, 0x9e3779b9) >>> 0;
+/** a Random module's fixed value (Q15): its instance seed and the unit of its poly assembly */
+export const randomFixed = (seed: number, unit: number): number => q15(hash32((seed + Math.imul(Math.round(unit), 0x9e3779b9)) >>> 0));
 
 export const LEGATO_MODES = ['auto', 'off', 'on'];
 export const PRIORITIES = ['last', 'low', 'high'];
+/** how a poly assembly hands notes to its parts (engine.ts allocate): the next part in turn, the lowest-numbered free
+ * part, or a free part whose last note was the key (else the one free the longest) */
+export const ASSIGN_MODES = ['rotate', 'lowest', 'reuse'];
 
 const N_KNOBS = 4;
 const knobNames = Array.from({ length: N_KNOBS }, (_, i) => `k${i + 1}`);
@@ -162,16 +157,11 @@ const fm1: ModuleImpl<null> = {
     // the one input: the morph position added to the `morph` parameter (block mean, one block late), so an LFO or a
     // sequencer can morph the patch; the engine reads it, not this module (engine.ts morphPosition)
     inputs: [control('morph')],
-    outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), gate('clock'), control('spread'), control('bend'), control('mod'), control('at'),
-      gate('legato'), control('jump'), control('tol'), control('drift')],
+    // pitch / gate / vel: the shared keyboard (one note: the last held, legato); a poly assembly's Part module plays its own
+    outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), gate('clock'), control('bend'), control('mod'), control('at')],
     params: [
       ...knobNames.map((n) => param(n, 0, 1, 0.5, { step: 0.01 })),
       param('morph', 0, 1, 0, { step: 0.01, input: 'morph', rest: (p, cv) => (p.morph ?? 0) + cv }),
-      // voicing (engine.ts noteOn / updateVoice): auto = legato in mono, retrigger when a poly note is stolen (as before)
-      param('legato', 0, 2, 0, { step: 1, choices: LEGATO_MODES }),
-      param('priority', 0, 2, 0, { step: 1, choices: PRIORITIES }),
-      // which drifted instrument: reseeds the tol output and every oscillator's fixed mistuning
-      param('unit', 0, 63, 0, { step: 1 }),
     ],
   },
   init: () => null,
@@ -179,15 +169,10 @@ const fm1: ModuleImpl<null> = {
     c.out.pitch.fill(c.voice.pitch + c.voice.bend * BEND_OCT, 0, c.n); // the bend is already in the pitch (+-2 st)
     c.out.gate.fill(c.voice.gate, 0, c.n);
     c.out.vel.fill(c.voice.velocity, 0, c.n);
-    c.out.spread.fill(c.voice.spread, 0, c.n); // -1..1 across the voices: detune or pan them with one cable
     c.out.bend.fill(c.voice.bend, 0, c.n); // the raw wheel, for other uses
     c.out.mod.fill(c.voice.mod, 0, c.n);
     c.out.at.fill(c.voice.at, 0, c.n);
     for (const n of knobNames) c.out[n].fill(c.p[n] ?? 0, 0, c.n);
-    c.out.legato.fill(c.voice.legato, 0, c.n);
-    c.out.jump.fill(c.voice.jump, 0, c.n);
-    c.out.tol.fill(tolOf(c.p.unit ?? 0, c.voice.index) / 32768, 0, c.n);
-    c.out.drift.fill(c.voice.drift / 32768, 0, c.n);
     // clock: 24 ppqn from the arpeggiator or MIDI in, a pulse of half a block per tick; nothing without a source
     const hi = c.voice.clock ? Math.ceil(c.n / 2) : 0;
     c.out.clock.fill(1, 0, hi);
@@ -214,9 +199,6 @@ interface OscState {
   ap: number[];
   /** the phases of unison voices 2..5 (voice 1 is `phase`), plain path only */
   ph: number[];
-  /** drift: the instance's seed (its fixed mistunings) and the wander of the five copies */
-  base: number;
-  walk: Walk;
 }
 
 /** unison voice j of n: its detune in octaves, spread symmetrically from -detune to +detune cents */
@@ -227,11 +209,6 @@ export const STACK_NAMES = ['off', '+oct', '+5th', '+oct+5th', '-oct'];
 export const STACKS = [[0], [0, 12], [0, 7], [0, 12, 19], [0, -12]];
 export const OSC_COPIES = 5;
 
-/** copy j's fixed mistuning (Q15): the instance seed and the Main module's unit */
-export const oscTol = (base: number, unit: number, j: number): number =>
-  q15(hash32((base + Math.imul(Math.round(unit), 0x9e3779b9) + Math.imul(j + 1, 0x85ebca6b)) >>> 0));
-/** copy j's drift in octaves: drift cents x (fixed mistuning + wander) / 2 */
-const driftOct = (s: OscState, unit: number, cents: number, j: number): number => (cents ? (cents * (oscTol(s.base, unit, j) + s.walk.y[j])) / 65536 / 1200 : 0);
 
 /**
  * the copy weights for unison with blend (b): the centre copy (the two middle ones for an even count) gets 1 - b, the
@@ -271,14 +248,9 @@ const osc: ModuleImpl<OscState> = {
       param('detune', 0, 100, 10, { step: 1, unit: 'ct' }),
       param('blend', 0, 1, 0.5, { step: 0.01 }),
       param('stack', 0, 4, 0, { step: 1, choices: STACK_NAMES }),
-      param('drift', 0, 50, 0, { step: 1, unit: 'ct' }),
     ],
   },
-  init: () => ({ phase: 0, s1: 0, y1: 0, y2: 0, pm1: 0, xb: 0, ap: [0, 0, 0, 0, 0, 0, 0, 0], ph: [0, 0, 0, 0], base: 0, walk: walkInit(0, OSC_COPIES) }),
-  seed(s, seed) {
-    s.base = seed;
-    s.walk = walkInit(hash32(seed ^ 0x2545f491), OSC_COPIES);
-  },
+  init: () => ({ phase: 0, s1: 0, y1: 0, y2: 0, pm1: 0, xb: 0, ap: [0, 0, 0, 0, 0, 0, 0, 0], ph: [0, 0, 0, 0] }),
   process(c, s) {
     const { pitch, pm, sync } = c.inp;
     const pw = Math.min(0.95, Math.max(0.05, c.p.pw ?? 0.5));
@@ -288,16 +260,13 @@ const osc: ModuleImpl<OscState> = {
     const fb = c.p.fb ?? 0;
     const lvl = c.p.level ?? 1;
     const out = c.out.out;
-    const cents = c.p.drift ?? 0;
-    const unit = c.voice.unit;
-    walkStep(s.walk); // every block, whatever the settings, so the wander does not depend on them
     if (idx <= 0 && fb <= 0) {
       // the plain oscillator: one wave per frame; unison: n detuned copies (phases s.phase, s.ph[0..n-2]) weighted by blend;
       // stack: the copies cycle through its intervals (at least one copy per interval)
       const stk = STACKS[Math.max(0, Math.min(STACKS.length - 1, Math.round(c.p.stack ?? 0)))];
       const nu = Math.min(OSC_COPIES, Math.max(stk.length, Math.max(1, Math.min(5, Math.round(c.p.unison ?? 1)))));
       const det = c.p.detune ?? 0;
-      const off = Array.from({ length: nu }, (_, j) => unisonOct(j, nu, det) + stk[j % stk.length] / 12 + driftOct(s, unit, cents, j));
+      const off = Array.from({ length: nu }, (_, j) => unisonOct(j, nu, det) + stk[j % stk.length] / 12);
       const wt = blendWeights(nu, Math.min(1, Math.max(0, c.p.blend ?? 0.5)));
       for (let i = 0; i < c.n; i++) {
         const f = C4 * Math.pow(2, pitch[i] + base);
@@ -329,12 +298,11 @@ const osc: ModuleImpl<OscState> = {
       s.ap.fill(0);
       return;
     }
-    const d0 = driftOct(s, unit, cents, 0);
     // FM mode (phase modulation or feedback): two waves per frame, pm interpolated between frames, then the half-band
     // decimator, so sidebands up to the old sample rate are filtered out instead of folding back
     const K = 1 / (2 * Math.PI);
     for (let i = 0; i < c.n; i++) {
-      const f = C4 * Math.pow(2, pitch[i] + base + d0);
+      const f = C4 * Math.pow(2, pitch[i] + base);
       const dt = Math.min(f / c.sr, 0.45) / 2;
       if (sync[i] >= 0.5 && s.s1 < 0.5) s.phase = 0;
       s.s1 = sync[i];
@@ -2105,7 +2073,67 @@ const crush: ModuleImpl<{ held: number; cnt: number } & OsState> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic, grain, comb, modal, shift];
+/**
+ * A poly assembly's own keyboard: the note its part plays (pitch with the bend, gate, velocity), the part's place among
+ * the parts (index -1 first .. 1 last, 0 with one part), whether the note began over a held one (legato) and its pitch
+ * step from the previous note in octaves (jump; the first from C4). Outside a poly assembly it is the shared keyboard.
+ */
+const part: ModuleImpl<null> = {
+  def: {
+    type: 'part',
+    label: 'Part',
+    inputs: [],
+    outputs: [control('pitch'), gate('gate'), control('vel'), control('index'), gate('legato'), control('jump')],
+    params: [],
+  },
+  init: () => null,
+  process(c) {
+    const v = c.voice;
+    c.out.pitch.fill(v.pitch + v.bend * BEND_OCT, 0, c.n);
+    c.out.gate.fill(v.gate, 0, c.n);
+    c.out.vel.fill(v.velocity, 0, c.n);
+    c.out.index.fill(v.parts > 1 ? (2 * v.index - (v.parts - 1)) / (v.parts - 1) : 0, 0, c.n);
+    c.out.legato.fill(v.legato, 0, c.n);
+    c.out.jump.fill(v.jump, 0, c.n);
+  },
+};
+
+export const RANDOM_MODES = ['fixed', 'walk'];
+interface RandomState {
+  seed: number;
+  unit: number;
+  walk: Walk;
+}
+/**
+ * A random value per copy, -1..1: `fixed` never changes (an analog part's tolerance), `walk` wanders slowly, a new target
+ * every 1 / rate seconds (drift). Each copy has its own: the seed mixes the module's place in the patch, its part and its
+ * poly assembly's unit (a different unit is a different instrument of the same model).
+ */
+const random: ModuleImpl<RandomState> = {
+  def: {
+    type: 'random',
+    label: 'Random',
+    inputs: [],
+    outputs: [control('out')],
+    params: [param('mode', 0, 1, 0, { step: 1, choices: RANDOM_MODES }), param('rate', 0.05, 20, 1.5, { unit: 'Hz', step: 0.01, log: true })],
+  },
+  init: () => ({ seed: 0, unit: 0, walk: walkInit(0) }),
+  seed(s, seed) {
+    s.seed = seed;
+    s.walk = walkInit(seed ^ 0x2545f491);
+  },
+  process(c, s) {
+    if (s.unit !== c.voice.unit) {
+      s.unit = c.voice.unit;
+      s.walk = walkInit((s.seed ^ 0x2545f491) + Math.imul(s.unit, 0x9e3779b9));
+    }
+    walkStep(s.walk, walkHold(c.sr, c.p.rate ?? 1.5)); // every block, so the wander does not depend on the mode
+    const q = Math.round(c.p.mode ?? 0) ? s.walk.y : randomFixed(s.seed, s.unit);
+    c.out.out.fill(q / 32768, 0, c.n);
+  },
+};
+
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic, grain, comb, modal, shift, part, random];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an

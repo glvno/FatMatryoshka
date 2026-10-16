@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { DEFS } from './modules';
 import { deviceBudget, DEVICE, encodePatch, MAX_CABLES, TYPE_ORDER, VERSION } from './patchbin';
 import { PRESETS } from './presets';
+import { polyGroups } from './poly';
+import { polyCfg, withParts } from './test-poly';
 
 describe('binary patch format', () => {
   it('the assembly overlay of the factory patches never reaches the binary (it is editor-only)', () => {
@@ -73,7 +75,7 @@ describe('binary patch format', () => {
       expect(b[0], name).toBe(0xa1);
       expect(b[1], name).toBe(VERSION);
       expect(b[2], name).toBe(p.modules.length);
-      expect(b[3], name).toBe(1); // voices: the factory presets are mono
+      expect(b[3], name).toBe(0); // poly groups: the factory presets have none
       expect(dv.getUint16(4, true), name).toBe(p.cables.length);
       const size = 8 + p.modules.reduce((s, m) => s + 1 + 4 * DEFS[m.type].params.length + (DEFS[m.type].paramInputs ? 20 : 0), 0) + 4 * p.cables.length;
       expect(b.length, name).toBe(size);
@@ -83,21 +85,25 @@ describe('binary patch format', () => {
 
   it('counts what a patch costs on the device: every factory preset fits, and voices multiply the per-voice part', () => {
     for (const [name, make] of Object.entries(PRESETS)) expect(deviceBudget(make()).fits, name).toBe(true);
-    const p = PRESETS['Subtractive saw']();
-    const mono = deviceBudget(p);
-    p.voices = 4;
+    const mono = deviceBudget(PRESETS['Subtractive saw']());
+    const p = withParts(PRESETS['Subtractive saw'](), 4);
     const poly = deviceBudget(p);
     expect(poly.instances).toBeGreaterThan(mono.instances);
     expect(poly.buffers).toBeGreaterThan(mono.buffers);
     expect(poly.fits).toBe(true);
-    p.voices = 8;
+    polyCfg(p).parts = 8;
     expect(deviceBudget(p).instances).toBeLessThanOrEqual(DEVICE.instances);
   });
 
-  it('writes the voice count into the header', () => {
-    const p = PRESETS['Subtractive saw']();
-    p.voices = 4;
-    expect(encodePatch(p)[3]).toBe(4);
+  it('writes the poly groups after the header: their settings, then every module\'s group', () => {
+    const p = withParts(PRESETS['Subtractive saw'](), 4, { assign: 1, legato: 2, priority: 1, unit: 9 });
+    const b = encodePatch(p);
+    expect(b[3]).toBe(1);
+    expect(Array.from(b.slice(8, 13))).toEqual([4, 1, 2, 1, 9]);
+    const members = polyGroups(p)[0].modules;
+    expect(Array.from(b.slice(13, 13 + p.modules.length))).toEqual(p.modules.map((m) => (members.has(m.id) ? 1 : 0)));
+    expect(b.slice(13, 13 + p.modules.length).some((g) => g === 0)).toBe(true); // Main and Output run once
+    expect(b[13 + p.modules.length]).toBe(TYPE_ORDER.indexOf(p.modules[0].type)); // the module records follow
   });
 
   it('writes parameters as Q16.16 and cables as indices', () => {

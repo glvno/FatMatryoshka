@@ -3,6 +3,7 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { addModule, connect, emptyPatch, type Patch } from './patch';
 import { DEFS } from './modules';
 import { PRESETS } from './presets';
+import { withParts } from './test-poly';
 import type { HostMsg } from './worklet';
 
 interface ProbeMessage { probe: string; data: Float32Array; sr: number; revision: number }
@@ -44,7 +45,7 @@ function stereoPatch(): Patch {
 
 it('traces nothing until a probe is set, then follows that output through every factory preset and a polyphonic load', () => {
   const processor = new Processor();
-  const poly = PRESETS['Subtractive saw'](); poly.voices = 4;
+  const poly = withParts(PRESETS['Subtractive saw'](), 4);
   for (const [index, patch] of [...Object.values(PRESETS).map(make => make()), poly].entries()) {
     processor.port.postMessage.mockClear();
     send(processor, { t: 'patch', patch, revision: index + 1 });

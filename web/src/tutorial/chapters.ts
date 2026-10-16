@@ -83,7 +83,7 @@ export function chapterStart(i: number, course: CourseData = COURSE): Patch {
   const ch = course.chapters[i];
   const fresh = (): Patch => newPatch(DEFS, ch.patchName);
   switch (ch.start.kind) {
-    case 'new': { const p = fresh(); if (ch.start.voices && ch.start.voices > 1) p.voices = ch.start.voices; return p; }
+    case 'new': return fresh(); // `voices` of a start rule is from before poly assemblies (an empty patch has none to set)
     case 'empty': return emptyPatch(ch.patchName);
     case 'preset': { const make = PRESETS[ch.start.name]; return make ? { ...make(), name: ch.patchName } : fresh(); }
     case 'patch': return clone(ch.start.patch);

@@ -1,0 +1,240 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "poly voice",
+  "category": "Voices",
+  "modules": [
+    {
+      "id": 1,
+      "type": "part",
+      "x": 0,
+      "y": 560,
+      "params": {}
+    },
+    {
+      "id": 2,
+      "type": "osc",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 2,
+        "pw": 0.5,
+        "coarse": 0,
+        "fine": 0,
+        "pm": 0,
+        "level": 0.8,
+        "fb": 0,
+        "unison": 1,
+        "detune": 10,
+        "blend": 0.5,
+        "stack": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "pw"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "filter",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "cutoff": 2000,
+        "res": 0.2,
+        "cvamt": 1,
+        "track": 0,
+        "morph": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "cutoff"
+        ],
+        "p2": [
+          "res"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "adsr",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "a": 0.005,
+        "d": 0.3,
+        "s": 0.6,
+        "r": 0.3
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "a"
+        ],
+        "p2": [
+          "d"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "vca",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "gain": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "pitch"
+      },
+      "to": {
+        "module": 2,
+        "port": "pitch"
+      }
+    },
+    {
+      "from": {
+        "module": 1,
+        "port": "gate"
+      },
+      "to": {
+        "module": 4,
+        "port": "gate"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "out"
+      },
+      "to": {
+        "module": 3,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "lp24"
+      },
+      "to": {
+        "module": 5,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "env"
+      },
+      "to": {
+        "module": 5,
+        "port": "cv"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 3,
+      "port": "cv",
+      "label": "cutoff cv"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 5,
+      "port": "out",
+      "label": "out"
+    }
+  ],
+  "params": [
+    {
+      "module": 2,
+      "param": "wave",
+      "label": "wave"
+    },
+    {
+      "module": 3,
+      "param": "cutoff",
+      "label": "cutoff"
+    },
+    {
+      "module": 3,
+      "param": "res",
+      "label": "res"
+    },
+    {
+      "module": 4,
+      "param": "a",
+      "label": "a"
+    },
+    {
+      "module": 4,
+      "param": "d",
+      "label": "d"
+    },
+    {
+      "module": 4,
+      "param": "s",
+      "label": "s"
+    },
+    {
+      "module": 4,
+      "param": "r",
+      "label": "r"
+    }
+  ],
+  "poly": {
+    "parts": 4,
+    "assign": 0,
+    "legato": 0,
+    "priority": 0,
+    "unit": 0
+  }
+}

@@ -8,7 +8,9 @@ import { encodePatch, toQ16 } from '../src/patchbin';
 import { DEFS } from '../src/modules';
 import { attFrame, chunkFrames, commitFrame, paramFrame, slotEraseFrame, slotFrame, slotInfoFrame } from '../src/protocol';
 import { make, PRESETS, type Build } from '../src/presets';
-import { paramUnit, setMorphTarget, type Patch } from '../src/patch';
+import { addModule, emptyPatch, paramUnit, setMorphTarget, type Patch, type PolyCfg } from '../src/patch';
+import { makeAssembly } from '../src/assembly';
+import { withParts } from '../src/test-poly';
 
 const SR = 44100;
 const OUT = new URL('../../build/golden/', import.meta.url);
@@ -46,12 +48,32 @@ const events: Record<string, Ev[]> = {};
 const ends: Record<string, number> = {};
 for (const [n, p] of Object.entries(PRESETS)) tests[n] = p();
 
+/**
+ * A kit built the way patches were before poly assemblies (`voices`, the Main module's legato / priority / unit and its
+ * spread / legato / jump / tol / drift outputs, the oscillator's drift), then loaded as the editor loads such a patch
+ * (poly.ts migrateVoicing): a poly assembly with a Part module, Random modules. The conversion is part of what is checked.
+ */
+const makeOld = (name: string, b: Build, voices: number): Patch => {
+  const p = emptyPatch(name);
+  b(
+    (type, x, y, params = {}, opts = {}) => {
+      const m = addModule(p, DEFS[type], x, y);
+      Object.assign(m.params, params);
+      if (opts.map) Object.assign(m.map!, opts.map);
+      if (opts.att) m.att = opts.att;
+      return m.id;
+    },
+    (a, ap, b, bp) => void p.cables.push({ from: { module: a, port: ap }, to: { module: b, port: bp } }),
+  );
+  return withParts(p, voices);
+};
 const kit = (name: string, b: Build, voices = 1): void => {
-  tests[name] = make(name, b);
-  if (voices > 1) {
-    tests[name].voices = voices;
-    events[name] = POLY_EVENTS;
-  }
+  tests[name] = voices > 1 ? makeOld(name, b, voices) : make(name, b);
+  if (voices > 1) events[name] = POLY_EVENTS;
+};
+/** the modules `ids` as a poly assembly with these settings (the rest of the patch plays the shared keyboard) */
+const polyAsm = (p: Patch, ids: number[], cfg: Partial<PolyCfg>): void => {
+  makeAssembly(p, ids, `poly ${ids.join(' ')}`).poly = { parts: 4, assign: 0, legato: 0, priority: 0, unit: 0, ...cfg };
 };
 kit('waves', (add, wire) => {
   const kb = add('fm1', 0, 0);
@@ -164,7 +186,7 @@ kit('unison-stack', (add, wire) => {
 });
 // mono, high priority, legato off (envelopes restart on every change of key): one glide timed by the legato output through a
 // macro range (legato-only portamento), one linear glide timed by |jump| (scaled)
-kit('legato-glide', (add, wire) => {
+tests['legato-glide'] = makeOld('legato-glide', (add, wire) => {
   const kb = add('fm1', 0, 0, { legato: 1, priority: 2 });
   const g1 = add('glide', 0, 0, { time: 0.001 }, { map: { p1: ['time'] } });
   const g2 = add('glide', 0, 0, { time: 0.02, curve: 1 }, { map: { p1: ['time'] } });
@@ -189,7 +211,7 @@ kit('legato-glide', (add, wire) => {
   wire(kb, 'gate', env, 'gate');
   wire(env, 'env', vca, 'cv');
   wire(vca, 'out', out, 'l');
-});
+}, 1);
 tests['legato-glide'].modules[1].range = { p1: { time: [0, 0.6] } }; // 166 ms
 events['legato-glide'] = [
   [0, 'on', 60],
@@ -237,6 +259,116 @@ events.drift = [
   [128 * 650, 'off', 62],
   [128 * 650, 'off', 64],
 ];
+// poly assemblies layered: three groups get every note. A: three parts, rotate, the oldest note taken over; its Part's
+// index detunes, a shared LFO (one copy, every part) moves the pulse width, a shared filter reads the sum of its parts.
+// B: two parts, reuse, low priority, legato on, FM from the sum of A's parts, its legato output opens the level. C: one
+// part, high priority, legato off, its jump sets the glide time. The shared delay hears all three.
+const layers: number[][] = [];
+kit('poly-layers', (add, wire) => {
+  add('fm1', 0, 0);
+  const lfo = add('lfo', 0, 0, { wave: 1, rate: 3, depth: 0.3 });
+  const pa = add('part', 0, 0);
+  const oa = add('osc', 0, 0, { wave: 3, level: 0.3 }, { map: { p1: ['fine'], p2: ['pw'] }, att: [0.3, 1] });
+  const ea = add('adsr', 0, 0, { a: 0.005, d: 0.2, s: 0.5, r: 0.1 });
+  const va = add('vca', 0, 0);
+  const pb = add('part', 0, 0);
+  const ob = add('osc', 0, 0, { wave: 0, coarse: 12, level: 0.3, pm: 0.4 });
+  const eb = add('adsr', 0, 0, { a: 0.04, d: 0.1, s: 0.2, r: 0.15 }); // a restart (legato not on) is loud
+  const vb = add('vca', 0, 0, { gain: 0.5 }, { map: { p1: ['gain'] }, att: [0.5, 1] });
+  const pc = add('part', 0, 0);
+  const gc = add('glide', 0, 0, { time: 0.01 }, { map: { p1: ['time'] }, att: [0.3, 1] });
+  const oc = add('osc', 0, 0, { wave: 1, coarse: -12, level: 0.4 });
+  const ec = add('adsr', 0, 0, { a: 0.005, d: 0.1, s: 0.6, r: 0.1 });
+  const vc = add('vca', 0, 0);
+  const flt = add('filter', 0, 0, { cutoff: 1500, res: 0.4 });
+  const mix = add('mixer', 0, 0, { l1: 0.5, l2: 0.5, l3: 0.5 });
+  const dly = add('delay', 0, 0, { time: 120, fb: 0.3, mix: 0.3 });
+  const out = add('output', 0, 0, { level: 0.6 });
+  wire(pa, 'pitch', oa, 'pitch');
+  wire(pa, 'index', oa, 'p1');
+  wire(lfo, 'out', oa, 'p2');
+  wire(pa, 'gate', ea, 'gate');
+  wire(oa, 'out', va, 'in');
+  wire(ea, 'env', va, 'cv');
+  wire(va, 'out', flt, 'in');
+  wire(flt, 'lp12', mix, 'in1');
+  wire(pb, 'pitch', ob, 'pitch');
+  wire(oa, 'out', ob, 'pm');
+  wire(pb, 'gate', eb, 'gate');
+  wire(pb, 'legato', vb, 'p1');
+  wire(ob, 'out', vb, 'in');
+  wire(eb, 'env', vb, 'cv');
+  wire(vb, 'out', mix, 'in2');
+  wire(pc, 'pitch', gc, 'in');
+  wire(pc, 'jump', gc, 'p1');
+  wire(gc, 'out', oc, 'pitch');
+  wire(pc, 'gate', ec, 'gate');
+  wire(oc, 'out', vc, 'in');
+  wire(ec, 'env', vc, 'cv');
+  wire(vc, 'out', mix, 'in3');
+  wire(mix, 'out', dly, 'in');
+  wire(dly, 'out', out, 'l');
+  wire(dly, 'r', out, 'r');
+  layers.push([pa, oa, ea, va], [pb, ob, eb, vb], [pc, gc, oc, ec, vc]);
+});
+polyAsm(tests['poly-layers'], layers[0], { parts: 3, assign: 0, priority: 0 });
+polyAsm(tests['poly-layers'], layers[1], { parts: 2, assign: 2, priority: 1, legato: 2 });
+polyAsm(tests['poly-layers'], layers[2], { parts: 1, priority: 2, legato: 1 });
+// single notes first (rotate moves on, lowest stays on part 0, reuse returns to a key's part), then a chord past every
+// group's part count (take-over by priority), staggered releases
+events['poly-layers'] = [
+  [0, 'on', 60],
+  [128 * 8, 'off', 60],
+  [128 * 16, 'on', 62],
+  [128 * 24, 'off', 62],
+  [128 * 32, 'on', 60],
+  [128 * 40, 'on', 64],
+  [128 * 48, 'on', 67],
+  [128 * 56, 'on', 69],
+  [128 * 64, 'on', 55],
+  [128 * 72, 'off', 64],
+  [128 * 80, 'on', 72],
+  [128 * 96, 'off', 60],
+  [128 * 100, 'off', 67],
+  [128 * 104, 'off', 69],
+  [128 * 108, 'off', 55],
+  [128 * 112, 'off', 72],
+];
+// four parts, lowest free, unit 5: a fixed Random (tolerance) on each part's cutoff, a walking one (drift, its rate swept
+// by a shared LFO) on its pitch, the Part's index on the pan; a walking Random outside (the shared keyboard's, unit 0)
+// on every part's resonance
+const randomParts: number[] = [];
+kit('part-random', (add, wire) => {
+  add('fm1', 0, 0);
+  const pt = add('part', 0, 0);
+  const rf = add('random', 0, 0, { mode: 0 });
+  const rw = add('random', 0, 0, { mode: 1, rate: 4 }, { map: { p1: ['rate'] }, att: [0.5, 1] });
+  const rs = add('random', 0, 0, { mode: 1, rate: 2 });
+  const lfo = add('lfo', 0, 0, { wave: 1, rate: 0.5, depth: 1 });
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.5 }, { map: { p1: ['fine'] }, att: [0.3, 1] });
+  const flt = add('filter', 0, 0, { cutoff: 1200, res: 0.3 }, { map: { p1: ['cutoff'], p2: ['res'] }, att: [0.3, 0.2] });
+  const env = add('adsr', 0, 0, { a: 0.005, d: 0.2, s: 0.6, r: 0.1 });
+  const vca = add('vca', 0, 0);
+  const pan = add('pan', 0, 0);
+  const out = add('output', 0, 0, { level: 0.6 });
+  wire(pt, 'pitch', osc, 'pitch');
+  wire(lfo, 'out', rw, 'p1');
+  wire(rw, 'out', osc, 'p1');
+  wire(rf, 'out', flt, 'p1');
+  wire(rs, 'out', flt, 'p2');
+  wire(osc, 'out', flt, 'in');
+  wire(flt, 'lp12', vca, 'in');
+  wire(pt, 'gate', env, 'gate');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', pan, 'in');
+  wire(pt, 'index', pan, 'pos');
+  wire(pan, 'l', out, 'l');
+  wire(pan, 'r', out, 'r');
+  randomParts.push(pt, rf, rw, osc, flt, env, vca, pan);
+});
+polyAsm(tests['part-random'], randomParts, { parts: 4, assign: 1, unit: 5 });
+events['part-random'] = POLY_EVENTS;
+ends['part-random'] = 128 * 400;
 kit('dyn', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.9 });

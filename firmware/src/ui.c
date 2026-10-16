@@ -66,6 +66,15 @@ static char *pad(char *d, const char *start, uint32_t width)
     return d;
 }
 
+/* a poly group's part count: 1 PART / 4 PARTS */
+static char *put_parts(char *d, int32_t n)
+{
+    char num[12];
+    fmt_int(num, n);
+    d = put(d, num);
+    return put(d, n == 1 ? " PART" : " PARTS");
+}
+
 /* hundredths as -0.50 / 12.5 / 1200 (fmt_fix leaves out the leading zero) */
 static char *put_hundredths(char *d, int32_t x, int decimals)
 {
@@ -160,6 +169,7 @@ static const uint16_t TYPE_COLOR[N_TYPES] = {
     [T_SEQ] = 0xF7A0, [T_CLKDIV] = 0xCE79, [T_SH] = 0xAEDF, [T_QUANT] = 0x7FF5, [T_PULSE] = 0xFEF5,
     [T_PAN] = 0xAFE5, [T_XFADE] = 0xC618, [T_VOWEL] = 0xF5B6, [T_PHASER] = 0x8C7F, [T_CRUSH] = 0xBC40,
     [T_LADDER] = 0x04DF, [T_DYN] = 0xFD8F, [T_MATH] = 0xDEFB, [T_LOGIC] = 0xA7E0, [T_GRAIN] = 0xE3B9, [T_COMB] = 0x5E7F, [T_MODAL] = 0xFD55, [T_SHIFT] = 0xC7FA,
+    [T_PART] = 0x47E8, [T_RANDOM] = 0xE71C,
 };
 
 static void th_px(int32_t x, int32_t y, uint16_t c)
@@ -493,11 +503,9 @@ static void module_draw(int full)
     d = &DEFS[type];
     if (full) {
         p = put(line, d->name);
-        if (type == T_FM1 && eng_poly() > 1) {          /* the panel: the patch's polyphony after its name */
-            char num[8];
-            fmt_int(num, eng_poly());
-            p = put(p, "  POLY ");
-            p = put(p, num);
+        if (type == T_FM1 && eng_groups()) {            /* the panel: the parts of the patch's first poly group after its name */
+            p = put(p, "  ");
+            p = put_parts(p, eng_parts());
         }
         if (eng_bypass(sel))                            /* bypassed (FX button) */
             p = put(p, " OFF");
@@ -623,7 +631,7 @@ static void perf_draw(int full)
     }
     for (i = 0; i < n; i++)
         off += eng_bypass(i) ? 1u : 0u;
-    p = line;                                           /* ARP 120 1/16  POLY 4  OCT +1  2 OFF */
+    p = line;                                           /* ARP 120 1/16  4 PARTS  OCT +1  2 OFF */
     if (arp_play) {
         fmt_int(num, arp_c.bpm);
         p = put(p, "ARP ");
@@ -634,11 +642,9 @@ static void perf_draw(int full)
         p = put(p, "ARP OFF");
     *p++ = ' ';
     *p++ = ' ';
-    if (eng_poly() > 1) {
-        fmt_int(num, eng_poly());
-        p = put(p, "POLY ");
-        p = put(p, num);
-    } else
+    if (eng_groups())
+        p = put_parts(p, eng_parts());
+    else
         p = put(p, "MONO");
     *p++ = ' ';
     *p++ = ' ';

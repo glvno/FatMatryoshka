@@ -349,7 +349,7 @@ export class Tutorial {
   private auditionControls(): HTMLElement {
     const controls = el('div', { class: 'tour-actions tutorial-audition' });
     controls.setAttribute('aria-label', 'Audition');
-    // no Chord: patches are mono unless Main's voices say otherwise, so a chord would sound as one note
+    // no Chord: patches are mono unless a poly assembly says otherwise, so a chord would sound as one note
     for (const [mode, label] of [['note', 'Note'], ['riff', 'Riff']] as const) {
       const b = this.button(label, () => { if (this.auditionMode === mode) { this.audition.stop(); this.auditionMode = ''; this.render(true); } else void this.play(mode); });
       b.setAttribute('aria-pressed', String(this.auditionMode === mode)); controls.append(b);
@@ -542,6 +542,8 @@ export class Tutorial {
       // the button, else its output's jack (the output is hidden inside a closed assembly), else the card
       case 'probe': return document.querySelector(`.dot[data-mod="${t.id}"][data-port="${t.port}"][data-dir="out"]`) ?? card(t.id);
       case 'ui': return document.getElementById(t.id);
+      case 'poly': return document.querySelector(`.poly-item[data-asm="${t.id}"][data-setting="${t.setting}"]`) ?? document.querySelector(`.poly-btn[data-asm="${t.id}"]`)
+        ?? document.querySelector(`.module[data-asm="${t.id}"], .frame[data-asm="${t.id}"]`);
     }
   }
 

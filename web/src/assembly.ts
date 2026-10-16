@@ -13,6 +13,7 @@ import {
   addModule,
   defaultParams,
   fixMatrix,
+  fixPoly,
   fixInputRoutes,
   MAX_MODULES,
   removeModule,
@@ -22,8 +23,10 @@ import {
   type ModuleDef,
   type ModuleInst,
   type Patch,
+  type PolyCfg,
 } from './patch';
 import { isPin } from './parameter-routing';
+import { oscDrift, takeDrift } from './poly';
 import { longName } from './labels';
 
 export type Target = Endpoint;
@@ -83,6 +86,8 @@ export interface AssemblyInst extends AssemblyLayout {
   bypass?: boolean;
   /** with `bypass`: the members that were bypassed on their own before the group went off; they stay off when it comes back */
   kept?: number[];
+  /** a poly assembly: its members run once per part (poly.ts). Unlike the rest of the overlay, the engine reads this. */
+  poly?: PolyCfg;
 }
 
 /** a nested assembly inside a saved definition: local module ids and local assembly ids, positions relative like the modules */
@@ -98,6 +103,7 @@ export interface NestedDef extends AssemblyLayout {
   inputs: PortRef[];
   outputs: PortRef[];
   params: ParamRef[];
+  poly?: PolyCfg;
 }
 
 /** a saved assembly: the file format, the library entry and the factory set. Module ids are local (1..n), positions relative. */
@@ -118,6 +124,8 @@ export interface AssemblyDef extends AssemblyLayout {
   /** the top level's direct children (ids in `assemblies`); modules not claimed by a nested assembly are its direct members */
   children?: number[];
   assemblies?: NestedDef[];
+  /** the top level is a poly assembly */
+  poly?: PolyCfg;
 }
 
 export const ASSEMBLY_FORMAT = 'modular-1-assembly';
@@ -300,6 +308,9 @@ export function memberProblem(p: Patch, moduleId: number, a?: AssemblyInst): str
   if (EXCLUDED_TYPES.has(m.type)) return 'the Main panel and the Output cannot be part of an assembly';
   const other = assemblyOf(p, moduleId);
   if (other && other !== a) return `${describe(p, m)} is already in "${other.label}"`;
+  const poly = a && polyAt(p, a);
+  if (poly && m.type === 'part' && allModules(p, poly).some((id) => id !== moduleId && p.modules.find((x) => x.id === id)?.type === 'part'))
+    return `"${poly.label}" has its Part module already`;
   return null;
 }
 
@@ -312,7 +323,14 @@ export function childProblem(p: Patch, parent: AssemblyInst, childId: number): s
   const other = parentOf(p, c.id);
   if (other && other.id !== parent.id) return `"${c.label}" is already in "${other.label}"`;
   if (depthOf(p, parent) + heightOf(p, c) > MAX_DEPTH) return `assemblies nest at most ${MAX_DEPTH} deep`;
+  if (polyAt(p, parent) && (c.poly || descendants(p, c).some((d) => d.poly))) return 'poly assemblies do not nest in each other';
   return null;
+}
+
+/** is `a` or an assembly above it a poly assembly */
+function polyAt(p: Patch, a: AssemblyInst): AssemblyInst | undefined {
+  for (let x: AssemblyInst | undefined = a; x; x = parentOf(p, x.id)) if (x.poly) return x;
+  return undefined;
 }
 
 function describe(p: Patch, m: ModuleInst): string {
@@ -695,6 +713,7 @@ export function toDef(p: Patch, a: AssemblyInst): AssemblyDef {
     outputs: a.outputs.map(port),
     params: a.params.map(remap),
   };
+  if (a.poly) def.poly = { ...a.poly };
   if (nested.length) {
     def.children = (a.children ?? []).map((id) => localAsm.get(id)!);
     def.assemblies = nested.map((d) => {
@@ -712,6 +731,7 @@ export function toDef(p: Patch, a: AssemblyInst): AssemblyDef {
         params: d.params.map(remap),
       };
       if (d.children?.length) n.children = d.children.map((id) => localAsm.get(id)!);
+      if (d.poly) n.poly = { ...d.poly };
       return n;
     });
   }
@@ -762,6 +782,7 @@ export function insertAssembly(p: Patch, defs: Record<string, ModuleDef>, def: A
     };
     taken.push(n.label);
     if (d.children?.length) n.children = d.children.map((id) => freshAsm.get(id)!);
+    if (d.poly) n.poly = fixPoly(d.poly);
     return n;
   });
   const a: AssemblyInst = {
@@ -779,6 +800,7 @@ export function insertAssembly(p: Patch, defs: Record<string, ModuleDef>, def: A
     params: def.params.map(remap),
   };
   if (def.children?.length) a.children = def.children.map((id) => freshAsm.get(id)!);
+  if (def.poly) a.poly = fixPoly(def.poly);
   p.assemblies = [...assembliesOf(p), ...made, a];
   for (const n of [...made].reverse()) reconcile(p, n, defs);
   reconcile(p, a, defs);
@@ -805,6 +827,24 @@ export function stripPatchIO(d: AssemblyDef): number {
   return gone.size;
 }
 
+/** a definition from before poly assemblies: the oscillators' drift settings become Random modules (poly.ts oscDrift) */
+function migrateDefDrift(d: AssemblyDef, defs: Record<string, ModuleDef>): void {
+  if (!Array.isArray(d.cables)) return;
+  const ms = d.modules.filter((m) => isRec(m) && isRec(m.params));
+  const drifted = takeDrift(ms);
+  if (Array.isArray(d.params)) d.params = d.params.filter((r) => !(isRec(r) && r.param === 'drift' && ms.find((m) => m.id === r.module)?.type === 'osc'));
+  if (!drifted.size) return;
+  oscDrift(ms, d.cables, defs, drifted, [], (osc) => {
+    const at = freeSpot(d.modules.map((m) => ({ x: m.x, y: m.y, w: GRID.x, h: GRID.y })), GRID.x - 34, GRID.y - 60);
+    const r: ModuleInst = { id: d.modules.reduce((m, x) => Math.max(m, Number(x.id) || 0), 0) + 1, type: 'random', x: at.x, y: at.y, params: defaultParams(defs.random) };
+    fixMatrix(r, defs.random);
+    d.modules.push(r);
+    const host = d.assemblies?.find((n) => isRec(n) && Array.isArray(n.modules) && n.modules.includes(osc.id));
+    if (host) host.modules.push(r.id);
+    return r;
+  });
+}
+
 export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef>): AssemblyDef {
   if (!isRec(raw) || raw.format !== ASSEMBLY_FORMAT || !Array.isArray(raw.modules) || !Array.isArray(raw.cables)) throw new Error('not a Matryoshka assembly');
   const d = raw as unknown as AssemblyDef;
@@ -813,6 +853,7 @@ export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef
   Object.assign(d, layout);
   stripPatchIO(d); // a patch's own modules never belong to a building block
   if (d.modules.length > MAX_MODULES || !d.modules.length) throw new Error('an assembly holds 1 to 32 modules');
+  migrateDefDrift(d, defs);
   if (d.category !== undefined && typeof d.category !== 'string') delete d.category;
   if (d.tutorial !== undefined && typeof d.tutorial !== 'string') delete d.tutorial;
   const seen = new Set<number>();
@@ -891,6 +932,7 @@ export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef
       };
       n.inputs = pinsToParams(ports(e.inputs, 'in'), n.params, moduleOf);
       if (Array.isArray(e.children) && e.children.length) n.children = e.children.map(Number);
+      if (e.poly) n.poly = fixPoly(e.poly);
       return n;
     });
     const byId = new Map(d.assemblies.map((n) => [n.id, n]));
@@ -915,6 +957,8 @@ export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef
     delete d.assemblies;
     delete d.children;
   }
+  if (d.poly) d.poly = fixPoly(d.poly);
+  else delete d.poly;
   d.version = 1;
   d.name = String(d.name ?? 'assembly').trim() || 'assembly';
   return d;
@@ -970,6 +1014,7 @@ export function fixAssemblies(p: Patch, defs: Record<string, ModuleDef>): string
       outputs: refs(e.outputs, 'port').map((r) => ({ module: r.module, port: r.port, label: r.label })),
       params: refs(e.params, 'param') as unknown as ParamRef[],
     };
+    if (e.poly) a.poly = fixPoly(e.poly);
     for (const m of a.modules) used.add(m);
     ids.add(a.id);
     if (kids.length) wantKids.set(a.id, kids);

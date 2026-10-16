@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // What a step's parts mean: resolving a module reference, the check, the checklist line (an imperative addressed to the
 // learner, "Cable Main gate → VCA cv") and the elements the highlight points at. Pure functions of the tutorial state.
-import { DEFS } from '../modules';
+import { ASSIGN_MODES, DEFS, LEGATO_MODES, PRIORITIES } from '../modules';
 import { Engine } from '../engine';
 import { paramUnit, validatePatch, type ModuleInst, type ParamDef, type Patch } from '../patch';
 import type { AssemblyInst } from '../assembly';
@@ -9,6 +9,7 @@ import { allModules, assembliesOf } from '../assembly';
 import { asmLike, cabled, findDef, loose, member, mod, mods, savedAssembly, T, type Target, type TutorialState } from './model';
 import { CUSTOM, ROLES } from './registry';
 import { slugId, type EventName, type Part, type PartSpec, type Pointer, type Ref, type RoleDef, type SliderOp } from './course-schema';
+import { polyGroups, polyOfModule } from '../poly';
 
 type S = TutorialState;
 type M = ModuleInst | undefined;
@@ -29,7 +30,7 @@ export function resolveAll(s: S, roles: Roles, ref: Ref): ModuleInst[] {
   const p = s.patch;
   if (ref.role) {
     const code = ROLES[ref.role];
-    if (code) { const m = code.module(s); return m ? [m] : []; }
+    if (code) { if (code.modules) return code.modules(s); const m = code.module(s); return m ? [m] : []; }
     const r = roles[ref.role];
     if (r?.kind === 'member') return resolveAll(s, roles, { role: r.role, type: r.type, index: r.index });
     const a = roleAssembly(p, roles, ref.role);
@@ -112,7 +113,7 @@ const SR = 24000;
 const soundCache = new Map<string, number>();
 /** the peak of half a second of the patch, with a C held or without a key (cached per patch) */
 export function soundPeak(p: Patch, key: boolean): number {
-  const k = `${key ? 1 : 0}${JSON.stringify([p.modules, p.cables, p.voices])}`;
+  const k = `${key ? 1 : 0}${JSON.stringify([p.modules, p.cables, (p.assemblies ?? []).map((a) => a.poly ? [a.modules, a.children, a.poly] : 0)])}`;
   const hit = soundCache.get(k);
   if (hit !== undefined) return hit;
   let max = 0;
@@ -181,7 +182,7 @@ export function partSlug(spec: PartSpec): string {
     case 'att': return `${r(spec.ref)}-${spec.pin ?? spec.param}-${spec.pin ? 'att' : 'depth'}`;
     case 'macroRange': return `${r(spec.ref)}${spec.pin ? `-${spec.pin}` : ''}-${spec.param}-range`;
     case 'assembly': return [kebab(spec.role), spec.fact, spec.type && type(spec.type), spec.param ?? spec.port, spec.child && kebab(spec.child)].filter(Boolean).join('-');
-    case 'voices': return 'voices';
+    case 'poly': return `poly-${spec.setting}`;
     case 'event': return [kebab(spec.event), spec.ref && r(spec.ref), spec.port, spec.on === undefined ? '' : spec.on ? 'on' : 'off'].filter(Boolean).join('-');
     case 'sound': return `sound-${spec.mode}`;
     case 'custom': return [kebab(spec.name), ...Object.values(spec.args ?? {}).map(String)].join('-');
@@ -227,8 +228,8 @@ export function partLabel(part: PartSpec, roles: Roles): string {
         case 'exists': return `Group or insert ${a}`;
         case 'open': return `Expand ${a}`;
         case 'collapsed': return `Collapse ${a}`;
-        case 'promoted': return `Promote the ${memberOrdinal(part.index)}${typeLabel(part.type ?? '')}’s ${part.param} (click ○ beside it)`;
-        case 'exposed': return `Expose the ${memberOrdinal(part.index)}${typeLabel(part.type ?? '')}’s ${part.port} (click ○ beside it)`;
+        case 'promoted': return `Promote the ${memberOrdinal(part.index)}${typeLabel(part.type ?? '')}’s ${part.param} (card button on the frame, or Cmd / Ctrl-click it)`;
+        case 'exposed': return `Expose the ${memberOrdinal(part.index)}${typeLabel(part.type ?? '')}’s ${part.port} (card button on the frame, or Cmd / Ctrl-click it)`;
         case 'merged': return `Merge the ${part.port} inputs of ${a} (merge into…)`;
         case 'contains': return `Drag the ${roleLabel(roles, part.child ?? '')} card into the ${a} frame`;
         case 'resized': return 'Resize the frame (drag ◢)';
@@ -236,7 +237,14 @@ export function partLabel(part: PartSpec, roles: Roles): string {
       }
       break;
     }
-    case 'voices': return `Set voices to ${part.min} or more on the Main card`;
+    case 'poly': {
+      const names: Record<string, string[] | undefined> = { assign: ASSIGN_MODES, legato: LEGATO_MODES, priority: PRIORITIES };
+      const t = (v = 0) => names[part.setting]?.[v] ?? String(v);
+      if (part.setting === 'parts' && part.op === 'ge') return `Make an assembly poly with ${part.value ?? 2} parts or more`;
+      if (part.op === 'changed') return `Change the poly assembly’s ${part.setting}`;
+      const op = { le: `to ${t(part.value)} or less`, ge: `to ${t(part.value)} or more`, eq: `to ${t(part.value)}`, ne: `off ${t(part.value)}`, between: `between ${t(part.value)} and ${t(part.max)}` }[part.op];
+      return `Set the poly assembly’s ${part.setting} ${op}`;
+    }
     case 'event': {
       if (part.event === 'probe' && part.ref) return `Shift-click ${n(part.ref)}’s ${part.port ?? 'out'} jack`;
       if (part.event === 'selected' && part.types) return `Select the ${part.types.map(typeLabel).join(', ')}`;
@@ -256,11 +264,13 @@ export function partCheck(part: PartSpec, s: S, roles: Roles): boolean {
   switch (part.kind) {
     case 'module': return part.loose ? !!loose(p, part.type) : mods(p, part.type).length >= (part.count ?? 1);
     case 'cable': {
-      const from = one(part.from);
-      if (part.to.every) { const to = resolveAll(s, roles, part.to); return to.length > 0 && to.every((t) => cabled(p, from, part.fromPort, t, part.toPort)); }
-      return cabled(p, from, part.fromPort, one(part.to), part.toPort);
+      // a role with several candidates (the keyboard: Main or a Part) counts when any of them has the cable
+      const froms = resolveAll(s, roles, part.from);
+      const any = (t: M) => froms.some((f) => cabled(p, f, part.fromPort, t, part.toPort));
+      if (part.to.every) { const to = resolveAll(s, roles, part.to); return to.length > 0 && to.every(any); }
+      return any(one(part.to));
     }
-    case 'noCable': return !cabled(p, one(part.from), part.fromPort, one(part.to), part.toPort);
+    case 'noCable': { const to = one(part.to); return !resolveAll(s, roles, part.from).some((f) => cabled(p, f, part.fromPort, to, part.toPort)); }
     case 'slider': {
       const m = one(part.ref);
       if (!m) return false;
@@ -306,7 +316,10 @@ export function partCheck(part: PartSpec, s: S, roles: Roles): boolean {
       }
       return false;
     }
-    case 'voices': return (p.voices ?? 1) >= part.min;
+    case 'poly': {
+      const entry = part.op === 'changed' ? polyGroups(s.entry)[0]?.cfg[part.setting] : undefined;
+      return polyGroups(p).some((g) => compare(part.op, g.cfg[part.setting], part.value, part.max, 0, entry));
+    }
     case 'event': {
       switch (part.event) {
         case 'audio': return s.audio;
@@ -331,15 +344,22 @@ export function partCheck(part: PartSpec, s: S, roles: Roles): boolean {
 export function partTargets(part: PartSpec, s: S, roles: Roles): Target[] {
   const p = s.patch;
   const one = (r: Ref) => resolve(s, roles, r);
+  // where a cable should come from: of several candidates (the keyboard), the one in the same poly assembly as its target
+  const fromFor = (to: M): M => {
+    if (part.kind !== 'cable') return undefined;
+    const all = resolveAll(s, roles, part.from);
+    const home = to && polyOfModule(p, to.id);
+    return all.find((f) => polyOfModule(p, f.id) === home) ?? all[0];
+  };
   switch (part.kind) {
     case 'module': return T.ui('add-btn');
     case 'cable': {
       if (part.to.every) {
         const all = resolveAll(s, roles, part.to);
         const left = all.filter((t) => !cabled(p, one(part.from), part.fromPort, t, part.toPort));
-        return [...T.port(one(part.from), part.fromPort, 'out'), ...(left.length ? left : all).flatMap((t) => T.port(t, part.toPort, 'in'))];
+        return [...T.port(fromFor(all[0]), part.fromPort, 'out'), ...(left.length ? left : all).flatMap((t) => T.port(t, part.toPort, 'in'))];
       }
-      return [...T.port(one(part.from), part.fromPort, 'out'), ...T.port(one(part.to), part.toPort, 'in')];
+      return [...T.port(fromFor(one(part.to)), part.fromPort, 'out'), ...T.port(one(part.to), part.toPort, 'in')];
     }
     case 'noCable': return T.port(one(part.to), part.toPort, 'in');
     case 'slider': return T.param(one(part.ref), part.param);
@@ -362,7 +382,16 @@ export function partTargets(part: PartSpec, s: S, roles: Roles): Target[] {
         default: return asm;
       }
     }
-    case 'voices': return T.module(mod(p, 'fm1')?.id);
+    case 'poly': {
+      // the setting's picker on a poly assembly; without one, the poly buttons of the outermost assemblies
+      const g = polyGroups(p);
+      const asms = g.length ? g.map((x) => x.asm) : assembliesOf(p).filter((a) => !assembliesOf(p).some((b) => b.children?.includes(a.id)));
+      if (asms.length) return asms.map((a) => ({ kind: 'poly', id: a.id, setting: part.setting }));
+      // nothing grouped yet: the modules Main plays, the ones to group
+      const main = mod(p, 'fm1');
+      const played = new Set(p.cables.filter((c) => c.from.module === main?.id && ['pitch', 'gate', 'vel'].includes(c.from.port)).map((c) => c.to.module));
+      return [...played].flatMap((id) => T.module(id));
+    }
     case 'event': {
       switch (part.event) {
         case 'audio': return T.ui('audio-btn');

@@ -2,16 +2,28 @@
  * Copyright (C) 2026 morgulbrut */
 /* Fixed-point patch engine: the C port of web/src/engine.ts and modules.ts. Integer only (the FM-1 has no FPU).
  * Signals and parameters are Q16.16 (1.0 = 65536); the sample rate is ENG_SR. ENG_VOICES patches play at once (the
- * panel's "voices"; 1 unless the build says otherwise), each polyphonic with 1..ENG_MAX_POLY notes, as the reference. */
+ * panel's "voices"; 1 unless the build says otherwise). Polyphony is per poly group (a poly assembly of the editor): up to
+ * POLY_MAX_GROUPS per patch, each running its modules once per part (1..ENG_MAX_PARTS), as the reference. */
 #pragma once
 #include <stdint.h>
 
 #define ENG_SR 44100u
 #define ENG_BLOCK 128u
 #define ENG_ONE 65536
-#define ENG_PATCH_VERSION 19
-#define ENG_PATCH_COMPAT_VERSION 19
-#define ENG_MAX_POLY 8                /* notes a patch plays at once (its header byte 3) */
+#define ENG_PATCH_VERSION 20
+#define ENG_PATCH_COMPAT_VERSION 20
+#define ENG_MAX_PARTS 8               /* parts of a poly group (notes it plays at once) */
+
+/* where the module records of a patch binary start: after the 8 header bytes, the poly groups' settings (5 bytes each,
+ * header byte 3 = their count) and, with any group, one membership byte per module. 0 if the binary is too short. */
+static inline uint32_t eng_records_at(const uint8_t *p, uint32_t len)
+{
+    uint32_t at;
+    if (len < 8u)
+        return 0;
+    at = 8u + 5u * p[3] + (p[3] ? p[2] : 0u);
+    return at <= len ? at : 0;
+}
 
 /* Install a patch from its binary form (web/src/patchbin.ts) into the selected voice. 0 on success, negative on error
  * (the voice is then silent). Resets all module state. Never call while eng_render runs (stop the audio ISR's call first). */
@@ -47,8 +59,14 @@ int32_t eng_step_param(uint32_t module, uint32_t param, int32_t clicks, int32_t 
 int eng_param_is_log(uint32_t module, uint32_t param);
 /* index of the first module of a type (defs.h T_*), -1 if the patch has none */
 int eng_find(uint32_t type);
-/* the polyphony of the loaded patch (header byte 3 of the binary; 1 = mono, the held-note stack as before), 0 if none */
-int eng_poly(void);
+/* the parts of the patch's first poly group (1 without one: everything plays the shared keyboard), 0 if none is loaded */
+int eng_parts(void);
+int eng_groups(void);                                                /* the poly groups of the loaded patch */
+/* a setting of poly group g (0 = the first): ENG_POLY_* (assign, legato, priority 0..2, unit 0..POLY_MAX_UNIT), -1 if none.
+ * eng_poly_set changes all but the parts at once (0 = refused); the parts need a reload (the binary's group record). */
+enum { ENG_POLY_PARTS, ENG_POLY_ASSIGN, ENG_POLY_LEGATO, ENG_POLY_PRIORITY, ENG_POLY_UNIT, ENG_NPOLY };
+int eng_poly_get(uint32_t g, uint32_t field);
+int eng_poly_set(uint32_t g, uint32_t field, uint32_t v);
 void eng_note_on(uint32_t note, int32_t vel_q16);
 void eng_note_off(uint32_t note);
 void eng_all_notes_off(void);

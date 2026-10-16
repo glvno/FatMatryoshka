@@ -5,6 +5,8 @@
 import type { ModuleInst, Patch } from '../patch';
 import { asmLike, byId, cabled, feeder, loose, member, mod, mods, T, type Target, type TutorialState } from './model';
 import { hasBeat, hasPerformance } from './performance';
+import { DEFS } from '../modules';
+import { polyOfModule } from '../poly';
 
 type S = TutorialState;
 type M = ModuleInst | undefined;
@@ -26,6 +28,8 @@ export interface CodeRole {
   label: string;
   describe: string;
   module(s: S): M;
+  /** every module the role can be (a cable requirement from it holds when any of them has the cable); absent = `module` */
+  modules?(s: S): ModuleInst[];
 }
 
 const one = (type: string, i = 0) => (s: S): M => mod(s.patch, type, i);
@@ -46,6 +50,12 @@ const DRUMS = ['kick', 'snare'];
 export const ROLES: Record<string, CodeRole> = {
   carrier: { label: 'carrier', describe: 'the Oscillator whose pm input another Oscillator feeds', module: carrier },
   modulator: { label: 'modulator', describe: 'the Oscillator feeding the carrier’s pm', module: modulator },
+  keys: {
+    label: 'the keyboard',
+    describe: 'Main, or a Part module: what plays a module (inside a poly assembly its Part gives pitch, gate and vel)',
+    module: main,
+    modules: (s) => [main(s), ...mods(s.patch, 'part')].filter((m): m is ModuleInst => !!m),
+  },
 };
 
 export const CUSTOM: Record<string, CustomCheck> = {
@@ -87,6 +97,13 @@ export const CUSTOM: Record<string, CustomCheck> = {
     label: (a) => `Cable ${a.drum} out → Mixer ${a.input}`,
     check: (s, a) => { const r = outOf(s.patch, String(a.drum)); return cabled(s.patch, r && byId(s.patch, r.module), r?.port ?? 'out', mixer(s), String(a.input)); },
     targets: (s, a) => { const r = outOf(s.patch, String(a.drum)); return [...T.port(r && byId(s.patch, r.module), r?.port ?? 'out', 'out'), ...T.port(mixer(s), String(a.input), 'in')]; },
+  },
+  insidePoly: {
+    describe: 'at least `count` (default 1) modules of a type sit inside a poly assembly',
+    args: [{ name: 'type' }, { name: 'count' }],
+    label: (a) => `Drag the ${DEFS[String(a.type)]?.label ?? a.type} into the poly assembly’s frame`,
+    check: (s, a) => mods(s.patch, String(a.type)).filter((m) => polyOfModule(s.patch, m.id)).length >= Number(a.count || 1),
+    targets: (s, a) => mods(s.patch, String(a.type)).filter((m) => !polyOfModule(s.patch, m.id)).flatMap((m) => T.module(m.id)),
   },
   beat: {
     describe: 'the kick, snare and Hat each have their own drum sequencer',
