@@ -1417,7 +1417,7 @@
           "id": "body",
           "kind": "continue",
           "title": "Muted string, ringing body",
-          "text": "Use Chord with four voices. Optional: try **String** `damp` 0.8 for a muted pick, then 0.1 for a ringing string. Bypass **Modal** to hear the dry string on the left; turn it back on to hear the body on the right. Return `damp` to 0.1 before continuing.",
+          "text": "With four voices, hold a chord on the keyboard. Optional: try **String** `damp` 0.8 for a muted pick, then 0.1 for a ringing string. Bypass **Modal** to hear the dry string on the left; turn it back on to hear the body on the right. Return `damp` to 0.1 before continuing.",
           "why": "",
           "playback": true,
           "pointer": {
@@ -1608,7 +1608,7 @@
       "id": "wavetables-and-grains",
       "title": "Wavetables and grains",
       "unpublished": true,
-      "intro": "A *wavetable* oscillator holds a row of waveforms and sweeps through them: the timbre moves without a filter. A *granular* module chops audio into *grains* a few milliseconds long and scatters them in time and pitch: a cloud out of a note. This patch starts with four voices so Chord can fill the granular buffer. Both are texture tools; zoom out as the canvas grows.",
+      "intro": "A *wavetable* oscillator holds a row of waveforms and sweeps through them: the timbre moves without a filter. A *granular* module chops audio into *grains* a few milliseconds long and scatters them in time and pitch: a cloud out of a note. This patch starts with four voices so a held chord can fill the granular buffer. Both are texture tools; zoom out as the canvas grows.",
       "payoff": "You can turn a vowel into a moving, frozen cloud.",
       "challenge": "Capture a chord and find a texture that sounds nothing like its source.",
       "patchName": "Tutorial pad",
@@ -1840,7 +1840,7 @@
           "id": "freeze",
           "kind": "continue",
           "title": "Keep a moment in a cloud",
-          "text": "With **Main** `voices` at 4, play Chord for two seconds to fill the buffer, then switch **Granular** `freeze` on. Stop the notes: the captured sound remains. Optional: change `pitch` and `spray`, then turn `freeze` off before continuing. Bypass **Granular** to compare the dry pad.",
+          "text": "With **Main** `voices` at 4, hold a chord on the keyboard for two seconds to fill the buffer, then switch **Granular** `freeze` on. Let go of the keys: the captured sound remains. Optional: change `pitch` and `spray`, then turn `freeze` off before continuing. Bypass **Granular** to compare the dry pad.",
           "why": "",
           "playback": true,
           "pointer": {

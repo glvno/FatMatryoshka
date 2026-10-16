@@ -95,7 +95,7 @@ export interface StepData {
   /** a later step of the chapter undoes this one's state: not re-checked afterwards */
   superseded?: boolean;
   parts?: Part[];
-  /** a Continue step shows Note / Chord / Riff */
+  /** a Continue step shows Note / Riff */
   playback?: boolean;
   /** a Continue step's highlight */
   pointer?: Pointer;

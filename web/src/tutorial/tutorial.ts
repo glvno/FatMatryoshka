@@ -338,7 +338,7 @@ export class Tutorial {
     if (this.active) this.render(true);
   }
 
-  private async play(mode: 'note' | 'chord' | 'riff'): Promise<void> {
+  private async play(mode: 'note' | 'riff'): Promise<void> {
     this.auditionMode = mode;
     const p = this.host.editor.patch;
     if (this.chapterIndex === 9 && p.cables.some((c) => c.from.port === 'clock' && p.modules.some((m) => m.id === c.from.module && m.type === 'fm1'))) this.host.arpPlay(true);
@@ -349,7 +349,8 @@ export class Tutorial {
   private auditionControls(): HTMLElement {
     const controls = el('div', { class: 'tour-actions tutorial-audition' });
     controls.setAttribute('aria-label', 'Audition');
-    for (const [mode, label] of [['note', 'Note'], ['chord', 'Chord'], ['riff', 'Riff']] as const) {
+    // no Chord: patches are mono unless Main's voices say otherwise, so a chord would sound as one note
+    for (const [mode, label] of [['note', 'Note'], ['riff', 'Riff']] as const) {
       const b = this.button(label, () => { if (this.auditionMode === mode) { this.audition.stop(); this.auditionMode = ''; this.render(true); } else void this.play(mode); });
       b.setAttribute('aria-pressed', String(this.auditionMode === mode)); controls.append(b);
     }

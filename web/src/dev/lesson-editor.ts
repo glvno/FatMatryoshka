@@ -642,7 +642,7 @@ async function mount() {
     for (const hint of report.hints.filter((h) => h.chapter === ch.id && h.step === st.id)) fields.append(el('p', 'lesson-hint', hint.message));
     if (st.kind === 'continue') {
       const box = el('section', 'lesson-section'); box.append(el('h3', '', 'Continue step'));
-      box.append(check('Show the playback buttons (Note, Chord, Riff)', !!st.playback, (v) => { st.playback = v || undefined; edited({ fields: true }); }), pointerEditor(st));
+      box.append(check('Show the playback buttons (Note, Riff)', !!st.playback, (v) => { st.playback = v || undefined; edited({ fields: true }); }), pointerEditor(st));
       fields.append(box);
       if (st.playback) fields.append(riffEditor(st));
       return;
