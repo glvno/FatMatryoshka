@@ -239,9 +239,9 @@
     },
     {
       "id": "shaping-a-note",
-      "title": "Shaping a note",
+      "title": "Shaping sound with envelopes",
       "unpublished": true,
-      "intro": "A gate is on or off, so the note it opens is on or off too. Real notes have a shape: they start, hold and die away. The envelope generator (ADSR: attack, decay, sustain, release) draws that shape each time the gate opens, and the VCA follows it instead of the bare gate.",
+      "intro": "A `gate`, as we learned, is not very subtle. It's either on or off.[^1]\n\n[^1]: (emitting either `0V` or `5V`)\n\nMost real sounds -- a car revving its engine, a car whooshing past you, a mosquito buzzing in your ear, a slap in the ear, a fork hitting a glass of champagne, a drunk person crying -- have shape.\n\nShape, in this context, means a path, traced over time, that starts and ends with a resting value for a certain characteristic, primarily volume, pitch, and timbre.\n\nIn sound synthesis, we give sounds this kind of shape using something called an *envelope*.\n\n\n",
       "payoff": "One oscillator now speaks with two different shapes: a swelling pad and a pluck.",
       "challenge": "Make a tiny bell or a very slow sunrise; save both variations.",
       "patchName": "Tutorial voice",
@@ -250,8 +250,8 @@
         {
           "id": "adsr",
           "kind": "task",
-          "title": "Add an ADSR",
-          "text": "Add an ADSR. Its env output rises when the gate opens, falls to the sustain level, and dies away after the gate closes.",
+          "title": "Add an envelope",
+          "text": "There are many kinds of envelope. The most common, and the one we're going to use, is an `ADSR` envelope, which is named after its four parameters. An envelope module can control any other module's parameter[^1], but let's consider an example envelope that controls amplitude (volume):\n- *attack*: The time that elapses between silence and the sound's peak volume\n- *decay*: The time that elapses between peak volume and...\n- ... *sustain*: The volume that the signal settles at if the note persists longer than `(attack + decay)` milliseconds.\n- *release*: The time that elapses between the end of the note and silence.\n\n[^1]: Including another envelope module's parameters! If there's one thing you should take away from this tutorials is that if it's a parameter, it can be manipulated by control voltage.  \n\n    The possibilities are quite literally endless. A synth like the one Wendy Carlos (in-)famously used to record *Switched-On Bach* had something like 10¹³⁴ possible patch cable configurations. Most of them would have sounded like shit, but still.\n\n## Add an `ADSR` module.\n",
           "why": "",
           "parts": [
             { "kind": "module", "type": "adsr" }
@@ -260,10 +260,17 @@
         {
           "id": "env",
           "kind": "task",
-          "title": "Let the envelope drive the gain",
-          "text": "Cable Main gate → ADSR gate and ADSR env → VCA cv, then click the cable from Main’s gate to the VCA to remove it. The note now has a shape.",
+          "title": "Controlling note volume with an envelope",
+          "text": "Instead of controlling the **VCA** with a simple on/off `gate`, let's give a note's volume some shape.\n\n## First, play a few notes to get a sense of what our starting point sounds like.\n\n## Then click the cable from **Main**’s `gate` to the **VCA**'s `cv` to remove it. \n\n## Connect **Main**'s `gate` to **ADSR**'s `gate`. \n\nNow, instead of controlling note volume directly with `gate` we're using `gate` to control the envelope, which controls the volume: When voltage enters the envelope module through `gate`, volume will\n1. increase and peak (`attack`), \n2. fade until it reaches its a specific volume ('decay'),\n3. remain at that specific volume (aka the 'sustain' volume)  until the gate voltage stops, at which point\n4.  volume fades to silence ('release')\n\n\n\n## Connect *ADSR*'s `env`(elope) to  *VCA* `cv`",
           "why": "",
           "parts": [
+            {
+              "kind": "noCable",
+              "from": { "type": "fm1" },
+              "fromPort": "gate",
+              "to": { "type": "vca" },
+              "toPort": "cv"
+            },
             {
               "kind": "cable",
               "from": { "type": "fm1" },
@@ -275,13 +282,6 @@
               "kind": "cable",
               "from": { "type": "adsr" },
               "fromPort": "env",
-              "to": { "type": "vca" },
-              "toPort": "cv"
-            },
-            {
-              "kind": "noCable",
-              "from": { "type": "fm1" },
-              "fromPort": "gate",
               "to": { "type": "vca" },
               "toPort": "cv"
             }
