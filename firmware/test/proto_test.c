@@ -177,13 +177,13 @@ int main(int argc, char **argv)
         CHECK(memcmp(last_data, patch, (size_t)np) == 0 && strcmp(last_name, "303 ACID") == 0);
         printf("slot commands ok: %u acks, %u refused\n", nack_ok, nack_bad);
     }
-    /* Version 17 fixed links survive framing, load and live macro-range edits; v16 still loads. */
+    /* Legacy fixed-link masks (flag bit 2, written by format 17 editors) survive framing, load and live macro-range edits. */
     {
         uint32_t base = (uint32_t)np, count = patch[2];
         CHECK(!(patch[6] & 6u)); /* this fixture has no ranges or fixed-link masks */
         memcpy(m1_cur, patch, base);
         memset(m1_cur + base, 0, count);
-        m1_cur[1] = 17;
+        m1_cur[1] = ENG_PATCH_VERSION;
         m1_cur[6] |= 4u;
         m1_cur[base + mod] = 1u << FILTER_I_CV;
         m1_cur_len = base + count;
@@ -203,10 +203,10 @@ int main(int argc, char **argv)
         m1_cur[base + mod] = 0x80; /* not a fixed input */
         CHECK(eng_load(m1_cur, m1_cur_len) != 0);
         CHECK(eng_load(patch, base) == 0);
-        /* Version 18 retains the raw CV buffer for extra destinations when the fixed link is off. */
+        /* Additional input routes (flag bit 3) retain the raw CV buffer for extra destinations when the fixed link is off. */
         memcpy(m1_cur, patch, base);
         memset(m1_cur + base, 0, count);
-        m1_cur[1] = 18; m1_cur[6] |= 12u;
+        m1_cur[1] = ENG_PATCH_VERSION; m1_cur[6] |= 12u;
         m1_cur[base + mod] = 1u << FILTER_I_CV;
         m1_cur_len = base + count + 5u;
         m1_cur[base + count] = 1;
@@ -224,8 +224,8 @@ int main(int argc, char **argv)
         CHECK(m1_valid(m1_cur, m1_cur_len) && eng_load(m1_cur, m1_cur_len) == 0);
         m1_patch_range(mod, 0, par, 0, 0, 0);
         CHECK(m1_cur_len == base + count + 5u);
-        m1_cur[1] = 17; CHECK(!m1_valid(m1_cur, m1_cur_len));
-        CHECK(eng_load(m1_cur, m1_cur_len) != 0); m1_cur[1] = 18;
+        m1_cur[1] = ENG_PATCH_COMPAT_VERSION - 1; CHECK(!m1_valid(m1_cur, m1_cur_len));   /* records of an older format */
+        CHECK(eng_load(m1_cur, m1_cur_len) != 0); m1_cur[1] = ENG_PATCH_VERSION;
         m1_cur[base + count + 2] = FILTER_I_P1;
         CHECK(eng_load(m1_cur, m1_cur_len) != 0);
         m1_cur[base + count + 2] = FILTER_I_CV;

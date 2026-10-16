@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import { DEFS } from './modules';
-import { deviceBudget, DEVICE, encodePatch, MAX_CABLES, TYPE_ORDER } from './patchbin';
+import { deviceBudget, DEVICE, encodePatch, MAX_CABLES, TYPE_ORDER, VERSION } from './patchbin';
 import { PRESETS } from './presets';
 
 describe('binary patch format', () => {
@@ -26,7 +26,7 @@ describe('binary patch format', () => {
     filter.range = { p1: { cutoff: [.2, .8] } };
     filter.map!.p1 = ['cutoff'];
     const b = encodePatch(p);
-    expect(b[1]).toBe(16);
+    expect(b[1]).toBe(VERSION);
     expect(b[6]).toBe(2);
     expect(b.length).toBe(before.length + 6);
     expect(b[before.length]).toBe(1); // macro range count
@@ -41,7 +41,7 @@ describe('binary patch format', () => {
     filter.inputMap = { cv: ['res', 'cvamt'], in: ['track'] };
     filter.range = { p1: { cutoff: [.2, .8] } }; filter.map!.p1 = ['cutoff'];
     const b = encodePatch(p);
-    expect(b[1]).toBe(18); expect(b[6]).toBe(11);
+    expect(b[1]).toBe(VERSION); expect(b[6]).toBe(11);
     expect(b.length).toBe(before.length + 9 + 6);
     expect(b[before.length]).toBe(2);
     const dv = new DataView(b.buffer);
@@ -71,7 +71,7 @@ describe('binary patch format', () => {
       const b = encodePatch(p);
       const dv = new DataView(b.buffer);
       expect(b[0], name).toBe(0xa1);
-      expect(b[1], name).toBe(16);
+      expect(b[1], name).toBe(VERSION);
       expect(b[2], name).toBe(p.modules.length);
       expect(b[3], name).toBe(1); // voices: the factory presets are mono
       expect(dv.getUint16(4, true), name).toBe(p.cables.length);

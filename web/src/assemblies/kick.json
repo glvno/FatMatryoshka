@@ -18,7 +18,10 @@
         "level": 1,
         "fb": 0,
         "unison": 1,
-        "detune": 10
+        "detune": 10,
+        "blend": 0.5,
+        "stack": 0,
+        "drift": 0
       },
       "att": [
         1,

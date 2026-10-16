@@ -507,6 +507,79 @@ asm('stack voice', 'Voices', (b) => {
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
 });
 
+// voicing (issue #22): a mono lead whose portamento only acts on legato playing. Patch Main legato into "glide on legato"
+// (it lengthens the glide by `porta range` of the time range while a note overlaps the one before), Main pitch / gate in
+asm('mono lead', 'Voices', (b) => {
+  const gl = b.add('glide', 0, 0, { time: 0.001 }, { p1: 'time', att: [0.6, 1] });
+  const osc = b.add('osc', 1, 0, { wave: 2, level: 0.8, unison: 2, detune: 6 });
+  const flt = b.add('ladder', 2, 0, { cutoff: 1800, res: 0.35 });
+  const env = b.add('adsr', 1, 1, { a: 0.005, d: 0.25, s: 0.6, r: 0.2 });
+  const vca = b.add('vca', 2, 1);
+  b.wire(gl, 'out', osc, 'pitch');
+  b.wire(osc, 'out', flt, 'in');
+  b.wire(flt, 'lp24', vca, 'in');
+  b.wire(env, 'env', vca, 'cv');
+  b.input('pitch', gl, 'in');
+  b.input('gate', env, 'gate');
+  b.input('glide on legato', gl, 'p1');
+  b.input('cutoff cv', flt, 'cv');
+  b.output('out', vca, 'out');
+  b.param('porta', gl, 'time');
+  b.param('curve', gl, 'curve');
+  b.param('cutoff', flt, 'cutoff');
+  b.param('res', flt, 'res');
+  for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
+});
+
+// voicing (issue #22): a supersaw. Five detuned copies with the centre one held back (blend), an octave stacked on top,
+// a pan whose position input takes Main spread for width across the notes
+asm('supersaw stack', 'Voices', (b) => {
+  const osc = b.add('osc', 0, 0, { wave: 2, level: 0.9, unison: 5, detune: 22, blend: 0.65, stack: 1 });
+  const flt = b.add('filter', 1, 0, { cutoff: 3500, res: 0.15 });
+  const env = b.add('adsr', 0, 1, { a: 0.02, d: 0.4, s: 0.75, r: 0.5 });
+  const vca = b.add('vca', 1, 1);
+  const pan = b.add('pan', 2, 0, { pan: 0 });
+  b.wire(osc, 'out', flt, 'in');
+  b.wire(flt, 'lp12', vca, 'in');
+  b.wire(env, 'env', vca, 'cv');
+  b.wire(vca, 'out', pan, 'in');
+  b.input('pitch', osc, 'pitch');
+  b.input('gate', env, 'gate');
+  b.input('width', pan, 'pos');
+  b.output('l', pan, 'l');
+  b.output('r', pan, 'r');
+  for (const q of ['unison', 'detune', 'blend', 'stack']) b.param(q, osc, q);
+  b.param('cutoff', flt, 'cutoff');
+  for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
+});
+
+// analog drift (issue #22): a two-oscillator voice that has drifted out of spec. Each oscillator wanders by its drift
+// cents; patch Main tol into "tolerance" (each note's own cutoff and envelope offset) and Main drift into "wander" (a slow
+// shared pitch walk per note on the second oscillator). Unit on the Main module picks another set of tolerances.
+asm('analog voice', 'Voices', (b) => {
+  const o1 = b.add('osc', 0, 0, { wave: 2, level: 0.7, drift: 6 });
+  const o2 = b.add('osc', 0, 1, { wave: 3, pw: 0.45, level: 0.6, fine: 4, drift: 9 }, { p1: 'fine', att: [0.25, 1] });
+  const mix = b.add('mixer', 1, 0, { l1: 0.7, l2: 0.6, l3: 0, l4: 0 });
+  const flt = b.add('filter', 2, 0, { cutoff: 1400, res: 0.25 }, { p1: 'cutoff', att: [0.08, 1] });
+  const env = b.add('adsr', 1, 1, { a: 0.008, d: 0.35, s: 0.55, r: 0.3 }, { p1: 'd', att: [0.06, 1] });
+  const vca = b.add('vca', 2, 1);
+  b.wire(o1, 'out', mix, 'in1');
+  b.wire(o2, 'out', mix, 'in2');
+  b.wire(mix, 'out', flt, 'in');
+  b.wire(flt, 'lp24', vca, 'in');
+  b.wire(env, 'env', vca, 'cv');
+  b.input('pitch', o1, 'pitch', [o2, 'pitch']);
+  b.input('gate', env, 'gate');
+  b.input('tolerance', flt, 'p1', [env, 'p1']);
+  b.input('wander', o2, 'p1');
+  b.output('out', vca, 'out');
+  b.param('drift 1', o1, 'drift');
+  b.param('drift 2', o2, 'drift');
+  b.param('cutoff', flt, 'cutoff');
+  b.param('res', flt, 'res');
+  for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
+});
+
 // an LFO through a Scale: vibrato (into a pitch input), tremolo (into a VCA's cv with an offset), a filter sweep
 asm('vibrato', 'Utilities', (b) => {
   const lfo = b.add('lfo', 0, 0, { wave: 0, rate: 5, depth: 1 });

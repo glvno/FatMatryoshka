@@ -272,7 +272,7 @@ describe('assemblies', () => {
 
   it('ships factory assemblies that load, insert and play', () => {
     expect(FACTORY.map((d) => d.name)).toEqual([
-      'adsr operator', 'auto pan', 'barber pole', 'bowed glass', 'bowed string', 'clap', 'clock', 'cloud', 'cowbell', 'echo', 'filter voice', 'fm pair', 'gamelan', 'glass bell', 'hats', 'hihat', 'kalimba', 'kick', 'marimba', 'noise voice', 'operator', 'pluck', 'rain', 'random melody', 'resonator bank', 'reverse pad', 'rim', 'shimmer', 'sidechain pump', 'slicer', 'snare', 'stack voice', 'step sequencer', 'stutter', 'sub bass', 'tabla', 'talking filter', 'time smear', 'tom', 'vibrato', 'voice', 'vowel voice', 'wavetable pad',
+      'adsr operator', 'analog voice', 'auto pan', 'barber pole', 'bowed glass', 'bowed string', 'clap', 'clock', 'cloud', 'cowbell', 'echo', 'filter voice', 'fm pair', 'gamelan', 'glass bell', 'hats', 'hihat', 'kalimba', 'kick', 'marimba', 'mono lead', 'noise voice', 'operator', 'pluck', 'rain', 'random melody', 'resonator bank', 'reverse pad', 'rim', 'shimmer', 'sidechain pump', 'slicer', 'snare', 'stack voice', 'step sequencer', 'stutter', 'sub bass', 'supersaw stack', 'tabla', 'talking filter', 'time smear', 'tom', 'vibrato', 'voice', 'vowel voice', 'wavetable pad',
     ]);
     for (const d of FACTORY) {
       expect(d.modules.every((m) => m.map === undefined || ['k1', 'k2', 'k3', 'k4'].every((k) => m.map![k as 'k1'].length === 0)), d.name).toBe(true);

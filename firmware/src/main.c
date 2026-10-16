@@ -668,6 +668,20 @@ static void morph_turn(int32_t clicks)
     if (!ui_dirty)
         ui_dirty = 1;
 }
+
+/* the mixer page's K3 / K4: a voicing choice of the Main module (LEGATO, PRIORITY: 0..2), one step per turn */
+static void choice_turn(uint32_t par, int32_t clicks)
+{
+    int m = eng_find(T_FM1);
+    int32_t v;
+    if (m < 0)
+        return;
+    v = clampi(round_q16(eng_get_param((uint32_t)m, par)) + (clicks > 0 ? 1 : -1), 0, 2) << 16;
+    eng_set_param((uint32_t)m, par, v);
+    m1_patch_param((uint32_t)m, par, v);
+    if (!ui_dirty)
+        ui_dirty = 1;
+}
 #endif
 
 static void knobs_poll(void)
@@ -699,6 +713,10 @@ static void knobs_poll(void)
             last_ms[1] = fm1_ms;
             morph_turn(st[3] * (fast ? 5 : 1));
         }
+        if (st[4])                                  /* K3 / K4: the patch's LEGATO / PRIORITY */
+            choice_turn(FM1_P_LEGATO, st[4]);
+        if (st[5])
+            choice_turn(FM1_P_PRIORITY, st[5]);
 #endif
         if (st[1])
             poly_set(eng_poly() + st[1]);

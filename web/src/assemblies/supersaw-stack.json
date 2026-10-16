@@ -1,0 +1,265 @@
+{
+  "format": "modular-1-assembly",
+  "version": 1,
+  "name": "supersaw stack",
+  "category": "Voices",
+  "modules": [
+    {
+      "id": 1,
+      "type": "osc",
+      "x": 0,
+      "y": 0,
+      "params": {
+        "wave": 2,
+        "pw": 0.5,
+        "coarse": 0,
+        "fine": 0,
+        "pm": 0,
+        "level": 0.9,
+        "fb": 0,
+        "unison": 5,
+        "detune": 22,
+        "blend": 0.65,
+        "stack": 1,
+        "drift": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "wave"
+        ],
+        "p2": [
+          "pw"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "filter",
+      "x": 270,
+      "y": 0,
+      "params": {
+        "cutoff": 3500,
+        "res": 0.15,
+        "cvamt": 1,
+        "track": 0,
+        "morph": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "cutoff"
+        ],
+        "p2": [
+          "res"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "adsr",
+      "x": 0,
+      "y": 560,
+      "params": {
+        "a": 0.02,
+        "d": 0.4,
+        "s": 0.75,
+        "r": 0.5
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "a"
+        ],
+        "p2": [
+          "d"
+        ],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "vca",
+      "x": 270,
+      "y": 560,
+      "params": {
+        "gain": 1
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "gain"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "pan",
+      "x": 540,
+      "y": 0,
+      "params": {
+        "pan": 0
+      },
+      "att": [
+        1,
+        1
+      ],
+      "map": {
+        "p1": [
+          "pan"
+        ],
+        "p2": [],
+        "k1": [],
+        "k2": [],
+        "k3": [],
+        "k4": []
+      }
+    }
+  ],
+  "cables": [
+    {
+      "from": {
+        "module": 1,
+        "port": "out"
+      },
+      "to": {
+        "module": 2,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 2,
+        "port": "lp12"
+      },
+      "to": {
+        "module": 4,
+        "port": "in"
+      }
+    },
+    {
+      "from": {
+        "module": 3,
+        "port": "env"
+      },
+      "to": {
+        "module": 4,
+        "port": "cv"
+      }
+    },
+    {
+      "from": {
+        "module": 4,
+        "port": "out"
+      },
+      "to": {
+        "module": 5,
+        "port": "in"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "module": 1,
+      "port": "pitch",
+      "label": "pitch"
+    },
+    {
+      "module": 3,
+      "port": "gate",
+      "label": "gate"
+    },
+    {
+      "module": 5,
+      "port": "pos",
+      "label": "width"
+    }
+  ],
+  "outputs": [
+    {
+      "module": 5,
+      "port": "l",
+      "label": "l"
+    },
+    {
+      "module": 5,
+      "port": "r",
+      "label": "r"
+    }
+  ],
+  "params": [
+    {
+      "module": 1,
+      "param": "unison",
+      "label": "unison"
+    },
+    {
+      "module": 1,
+      "param": "detune",
+      "label": "detune"
+    },
+    {
+      "module": 1,
+      "param": "blend",
+      "label": "blend"
+    },
+    {
+      "module": 1,
+      "param": "stack",
+      "label": "stack"
+    },
+    {
+      "module": 2,
+      "param": "cutoff",
+      "label": "cutoff"
+    },
+    {
+      "module": 3,
+      "param": "a",
+      "label": "a"
+    },
+    {
+      "module": 3,
+      "param": "d",
+      "label": "d"
+    },
+    {
+      "module": 3,
+      "param": "s",
+      "label": "s"
+    },
+    {
+      "module": 3,
+      "param": "r",
+      "label": "r"
+    }
+  ]
+}

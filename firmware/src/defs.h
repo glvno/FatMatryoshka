@@ -58,14 +58,21 @@ enum {
 #define FM1_O_BEND 9
 #define FM1_O_MOD 10
 #define FM1_O_AT 11
+#define FM1_O_LEGATO 12
+#define FM1_O_JUMP 13
+#define FM1_O_TOL 14
+#define FM1_O_DRIFT 15
 #define FM1_P_K1 0
 #define FM1_P_K2 1
 #define FM1_P_K3 2
 #define FM1_P_K4 3
 #define FM1_P_MORPH 4
+#define FM1_P_LEGATO 5
+#define FM1_P_PRIORITY 6
+#define FM1_P_UNIT 7
 #define FM1_NIN 1
-#define FM1_NOUT 12
-#define FM1_NPAR 5
+#define FM1_NOUT 16
+#define FM1_NPAR 8
 #define FM1_CVBASE -1
 
 /* osc: Oscillator */
@@ -84,9 +91,12 @@ enum {
 #define OSC_P_FB 6
 #define OSC_P_UNISON 7
 #define OSC_P_DETUNE 8
+#define OSC_P_BLEND 9
+#define OSC_P_STACK 10
+#define OSC_P_DRIFT 11
 #define OSC_NIN 5
 #define OSC_NOUT 1
-#define OSC_NPAR 9
+#define OSC_NPAR 12
 #define OSC_CVBASE 3
 
 /* lfo: LFO */
@@ -253,9 +263,10 @@ enum {
 #define GLIDE_I_P2 2
 #define GLIDE_O_OUT 0
 #define GLIDE_P_TIME 0
+#define GLIDE_P_CURVE 1
 #define GLIDE_NIN 3
 #define GLIDE_NOUT 1
-#define GLIDE_NPAR 1
+#define GLIDE_NPAR 2
 #define GLIDE_CVBASE 1
 
 /* shape: Shaper */
@@ -623,7 +634,7 @@ static const uint8_t DELAY_DIV_DEN[DELAY_NDIV] = {6, 4, 3, 8, 2, 4, 1, 2, 1, 2, 
 static const char *const DELAY_DIV_NAME[DELAY_NDIV] = {"1/16T", "1/16", "1/8T", "1/16.", "1/8", "1/8.", "1/4", "3/8", "1/2", "5/8", "1/1"};
 
 #define MAX_IN 6
-#define MAX_OUT 12
+#define MAX_OUT 16
 #define MAX_PAR 12
 
 typedef struct {
@@ -641,24 +652,27 @@ typedef struct {
 } def_t;
 
 static const char *const FM1_INNAMES[] = {"MORPH"};
-static const int32_t FM1_MIN[] = {0, 0, 0, 0, 0};
-static const int32_t FM1_MAX[] = {65536, 65536, 65536, 65536, 65536};
-static const int32_t FM1_DEF[] = {32768, 32768, 32768, 32768, 0};
-static const int32_t FM1_INC[] = {655, 655, 655, 655, 655};
-static const char *const FM1_PN[] = {"K1", "K2", "K3", "K4", "MORPH"};
-static const uint8_t FM1_LOG[] = {0, 0, 0, 0, 0};
-static const char *const FM1_UNIT[] = {"", "", "", "", ""};
-static const char *const *const FM1_CH[] = {0, 0, 0, 0, 0};
+static const int32_t FM1_MIN[] = {0, 0, 0, 0, 0, 0, 0, 0};
+static const int32_t FM1_MAX[] = {65536, 65536, 65536, 65536, 65536, 131072, 131072, 4128768};
+static const int32_t FM1_DEF[] = {32768, 32768, 32768, 32768, 0, 0, 0, 0};
+static const int32_t FM1_INC[] = {655, 655, 655, 655, 655, 65536, 65536, 65536};
+static const char *const FM1_PN[] = {"K1", "K2", "K3", "K4", "MORPH", "LEGATO", "PRIORITY", "UNIT"};
+static const uint8_t FM1_LOG[] = {0, 0, 0, 0, 0, 0, 0, 0};
+static const char *const FM1_UNIT[] = {"", "", "", "", "", "", "", ""};
+static const char *const FM1_CH5[] = {"AUTO", "OFF", "ON", 0};
+static const char *const FM1_CH6[] = {"LAST", "LOW", "HIGH", 0};
+static const char *const *const FM1_CH[] = {0, 0, 0, 0, 0, FM1_CH5, FM1_CH6, 0};
 static const char *const OSC_INNAMES[] = {"PITCH", "PM", "SYNC", "P1", "P2"};
-static const int32_t OSC_MIN[] = {0, 3277, -3145728, -6553600, 0, 0, 0, 65536, 0};
-static const int32_t OSC_MAX[] = {196608, 62259, 3145728, 6553600, 524288, 65536, 65536, 327680, 6553600};
-static const int32_t OSC_DEF[] = {0, 32768, 0, 0, 0, 52429, 0, 65536, 655360};
-static const int32_t OSC_INC[] = {65536, 655, 65536, 131072, 5243, 655, 655, 65536, 65536};
-static const char *const OSC_PN[] = {"WAVE", "PW", "COARSE", "FINE", "PM", "LEVEL", "FB", "UNISON", "DETUNE"};
-static const uint8_t OSC_LOG[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-static const char *const OSC_UNIT[] = {"", "", "ST", "CT", "", "", "", "", "CT"};
+static const int32_t OSC_MIN[] = {0, 3277, -3145728, -6553600, 0, 0, 0, 65536, 0, 0, 0, 0};
+static const int32_t OSC_MAX[] = {196608, 62259, 3145728, 6553600, 524288, 65536, 65536, 327680, 6553600, 65536, 262144, 3276800};
+static const int32_t OSC_DEF[] = {0, 32768, 0, 0, 0, 52429, 0, 65536, 655360, 32768, 0, 0};
+static const int32_t OSC_INC[] = {65536, 655, 65536, 131072, 5243, 655, 655, 65536, 65536, 655, 65536, 65536};
+static const char *const OSC_PN[] = {"WAVE", "PW", "COARSE", "FINE", "PM", "LEVEL", "FB", "UNISON", "DETUNE", "BLEND", "STACK", "DRIFT"};
+static const uint8_t OSC_LOG[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const char *const OSC_UNIT[] = {"", "", "ST", "CT", "", "", "", "", "CT", "", "", "CT"};
 static const char *const OSC_CH0[] = {"SINE", "TRIANGLE", "SAW", "SQUARE", 0};
-static const char *const *const OSC_CH[] = {OSC_CH0, 0, 0, 0, 0, 0, 0, 0, 0};
+static const char *const OSC_CH10[] = {"OFF", "+OCT", "+5TH", "+OCT+5TH", "-OCT", 0};
+static const char *const *const OSC_CH[] = {OSC_CH0, 0, 0, 0, 0, 0, 0, 0, 0, 0, OSC_CH10, 0};
 static const char *const LFO_INNAMES[] = {"CLK", "RESET", "P1", "P2"};
 static const int32_t LFO_MIN[] = {0, 1311, 0, 0, 0, 2621440};
 static const int32_t LFO_MAX[] = {262144, 2621440, 65536, 65536, 655360, 19660800};
@@ -765,14 +779,15 @@ static const uint8_t OUTPUT_LOG[] = {0};
 static const char *const OUTPUT_UNIT[] = {""};
 static const char *const *const OUTPUT_CH[] = {0};
 static const char *const GLIDE_INNAMES[] = {"IN", "P1", "P2"};
-static const int32_t GLIDE_MIN[] = {66};
-static const int32_t GLIDE_MAX[] = {327680};
-static const int32_t GLIDE_DEF[] = {6554};
-static const int32_t GLIDE_INC[] = {3276};
-static const char *const GLIDE_PN[] = {"TIME"};
-static const uint8_t GLIDE_LOG[] = {1};
-static const char *const GLIDE_UNIT[] = {"S"};
-static const char *const *const GLIDE_CH[] = {0};
+static const int32_t GLIDE_MIN[] = {66, 0};
+static const int32_t GLIDE_MAX[] = {327680, 65536};
+static const int32_t GLIDE_DEF[] = {6554, 0};
+static const int32_t GLIDE_INC[] = {3276, 65536};
+static const char *const GLIDE_PN[] = {"TIME", "CURVE"};
+static const uint8_t GLIDE_LOG[] = {1, 0};
+static const char *const GLIDE_UNIT[] = {"S", ""};
+static const char *const GLIDE_CH1[] = {"EXP", "LIN", 0};
+static const char *const *const GLIDE_CH[] = {0, GLIDE_CH1};
 static const char *const SHAPE_INNAMES[] = {"IN", "P1", "P2"};
 static const int32_t SHAPE_MIN[] = {65536, 0, 0, 0, -65536, 65536};
 static const int32_t SHAPE_MAX[] = {2097152, 131072, 65536, 65536, 65536, 262144};

@@ -4,7 +4,8 @@
  *
  * MIXER (GLO): K1..K4 the level of voice 1..4, the black keys F# G# A# C# (OP1..OP4) mute them (and play no notes then),
  * ALGORITHM sets the polyphony of the selected voice's patch (main.c poly_set). A build with fewer voices (engine.h
- * ENG_VOICES) has that many rows, mute keys and channel rows.
+ * ENG_VOICES) has that many rows, mute keys and channel rows; the one-voice build uses K2 for the patch's MORPH and K3 / K4
+ * for its voicing (LEGATO, PRIORITY of the Main module).
  *
  * MENU (HOME held 0.7 s, HOME again closes it): the settings, in tabs like Felucca's menu (its layout, its rows are ours).
  * ALGORITHM steps between the tabs, PRESET and SELECT between the rows, K1..K4 and OCT- / OCT+ change the value of the
@@ -118,6 +119,25 @@ static void morph_row(int32_t y)
     lcd_fill(12, (uint32_t)y + 27u, w, 4, has ? C_ACC : C_DIM);
     lcd_fill(12 + w, (uint32_t)y + 27u, 216u - w, 4, 0x2104u);
 }
+
+/* the one-voice build's third row: the patch's voicing (the Main module's LEGATO on K3, PRIORITY on K4; main.c choice_turn) */
+static void voicing_row(int32_t y)
+{
+    char line[40], *p;
+    int m = eng_find(T_FM1);
+    const def_t *d = &DEFS[T_FM1];
+    uint32_t j;
+    p = put(line, "K3  LEGATO      K4  PRIORITY");
+    pad(p, line, 28);
+    text5x7(12, (uint32_t)y, line, 1, C_DIM, C_BG);
+    for (j = 0; j < 2u; j++) {
+        uint32_t par = j ? FM1_P_PRIORITY : FM1_P_LEGATO;
+        int32_t c = m >= 0 ? clampi(round_q16(eng_get_param((uint32_t)m, par)), 0, 2) : 0;
+        p = put(line, m >= 0 ? d->pchoice[par][c] : "-");
+        pad(p, line, 9);
+        text_mid(12u + 96u * j, (uint32_t)y + 11u, line, m >= 0 ? C_FG : C_DIM, C_BG);
+    }
+}
 #endif
 
 static void mixer_draw(int full)
@@ -129,6 +149,7 @@ static void mixer_draw(int full)
         mix_row(v, 32 + 48 * (int32_t)v);
 #if ENG_VOICES == 1
     morph_row(80);
+    voicing_row(128);
 #endif
 }
 

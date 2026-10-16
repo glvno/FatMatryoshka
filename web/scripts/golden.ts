@@ -38,10 +38,12 @@ const POLY_EVENTS: Ev[] = [
   [128 * 120, 'off', 76],
   [128 * 130, 'off', 60],
 ];
-const END = 128 * 180;
+const END_DEFAULT = 128 * 180;
 
 const tests: Record<string, Patch> = {};
 const events: Record<string, Ev[]> = {};
+/** a kit's length in frames, when not END */
+const ends: Record<string, number> = {};
 for (const [n, p] of Object.entries(PRESETS)) tests[n] = p();
 
 const kit = (name: string, b: Build, voices = 1): void => {
@@ -146,6 +148,95 @@ kit('unison', (add, wire) => {
   wire(osc2, 'out', mix, 'in2');
   wire(mix, 'out', out, 'l');
 });
+// voicing (issue #22): unison with blend and stack
+kit('unison-stack', (add, wire) => {
+  const kb = add('fm1', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.8, unison: 5, detune: 30, blend: 0.2, stack: 3 });
+  const osc2 = add('osc', 0, 0, { wave: 3, level: 0.5, unison: 1, detune: 12, stack: 4, blend: 0.9 });
+  const osc3 = add('osc', 0, 0, { wave: 1, level: 0.5, unison: 4, detune: 40, blend: 0 });
+  const mix = add('mixer', 0, 0, { l1: 0.4, l2: 0.3, l3: 0.3 });
+  const out = add('output', 0, 0);
+  for (const o of [osc, osc2, osc3]) wire(kb, 'pitch', o, 'pitch');
+  wire(osc, 'out', mix, 'in1');
+  wire(osc2, 'out', mix, 'in2');
+  wire(osc3, 'out', mix, 'in3');
+  wire(mix, 'out', out, 'l');
+});
+// mono, high priority, legato off (envelopes restart on every change of key): one glide timed by the legato output through a
+// macro range (legato-only portamento), one linear glide timed by |jump| (scaled)
+kit('legato-glide', (add, wire) => {
+  const kb = add('fm1', 0, 0, { legato: 1, priority: 2 });
+  const g1 = add('glide', 0, 0, { time: 0.001 }, { map: { p1: ['time'] } });
+  const g2 = add('glide', 0, 0, { time: 0.02, curve: 1 }, { map: { p1: ['time'] } });
+  const m = add('math', 0, 0, { ka: 2 });
+  // sine and triangle: a gliding pitch leaves a small phase offset between the engines, which saw / square edges magnify
+  const o1 = add('osc', 0, 0, { wave: 0, level: 0.6 });
+  const o2 = add('osc', 0, 0, { wave: 1, level: 0.4, coarse: -12 });
+  const env = add('adsr', 0, 0, { a: 0.01, d: 0.1, s: 0.4, r: 0.1 });
+  const vca = add('vca', 0, 0);
+  const mix = add('mixer', 0, 0, { l1: 0.5, l2: 0.5 });
+  const out = add('output', 0, 0);
+  wire(kb, 'pitch', g1, 'in');
+  wire(kb, 'pitch', g2, 'in');
+  wire(kb, 'legato', g1, 'p1');
+  wire(kb, 'jump', m, 'a');
+  wire(m, 'abs', g2, 'p1');
+  wire(g1, 'out', o1, 'pitch');
+  wire(g2, 'out', o2, 'pitch');
+  wire(o1, 'out', mix, 'in1');
+  wire(o2, 'out', mix, 'in2');
+  wire(mix, 'out', vca, 'in');
+  wire(kb, 'gate', env, 'gate');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', out, 'l');
+});
+tests['legato-glide'].modules[1].range = { p1: { time: [0, 0.6] } }; // 166 ms
+events['legato-glide'] = [
+  [0, 'on', 60],
+  [128 * 30, 'on', 67],
+  [128 * 50, 'on', 55], // high priority: 67 stays
+  [128 * 70, 'off', 67], // back to 60 (the highest still held)
+  [128 * 95, 'off', 60],
+  [128 * 105, 'off', 55],
+  [128 * 120, 'on', 72], // detached
+  [128 * 150, 'off', 72],
+];
+// analog drift: drifting unison copies, the Main tol on the filter and its drift walk on a second oscillator, three
+// notes (each with its own tolerance and walk), a non-zero unit
+kit('drift', (add, wire) => {
+  const kb = add('fm1', 0, 0, { unit: 7 });
+  const o1 = add('osc', 0, 0, { wave: 2, level: 0.6, unison: 3, detune: 8, drift: 30 });
+  const o2 = add('osc', 0, 0, { wave: 3, level: 0.4, drift: 12 }, { map: { p1: ['fine'] }, att: [0.5, 1] });
+  const fm = add('osc', 0, 0, { wave: 0, level: 0.5, drift: 40, fb: 0.3 });
+  const flt = add('filter', 0, 0, { cutoff: 1200, res: 0.3 }, { map: { p1: ['cutoff'] }, att: [0.2, 1] });
+  const env = add('adsr', 0, 0, { a: 0.005, d: 0.2, s: 0.5, r: 0.1 });
+  const vca = add('vca', 0, 0);
+  const mix = add('mixer', 0, 0, { l1: 0.4, l2: 0.3, l3: 0.3 });
+  const out = add('output', 0, 0);
+  for (const o of [o1, o2, fm]) wire(kb, 'pitch', o, 'pitch');
+  wire(kb, 'drift', o2, 'p1');
+  wire(kb, 'tol', flt, 'p1');
+  wire(o1, 'out', mix, 'in1');
+  wire(o2, 'out', mix, 'in2');
+  wire(fm, 'out', mix, 'in3');
+  wire(mix, 'out', flt, 'in');
+  wire(flt, 'lp12', vca, 'in');
+  wire(kb, 'gate', env, 'gate');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', out, 'l');
+}, 3);
+// long enough for the walks to pick new targets (every 256 blocks)
+ends.drift = 128 * 700;
+events.drift = [
+  [0, 'on', 48],
+  [0, 'on', 55],
+  [128 * 20, 'on', 64],
+  [128 * 300, 'off', 55],
+  [128 * 320, 'on', 62],
+  [128 * 650, 'off', 48],
+  [128 * 650, 'off', 62],
+  [128 * 650, 'off', 64],
+];
 kit('dyn', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.9 });
@@ -902,6 +993,7 @@ const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 for (const [name, patch] of Object.entries(tests)) {
   const e = new Engine(SR);
   e.load(patch);
+  const END = ends[name] ?? END_DEFAULT;
   const l = new Float32Array(END);
   const r = new Float32Array(END);
   let pos = 0;

@@ -66,6 +66,42 @@ static inline int32_t clampi(int32_t v, int32_t lo, int32_t hi) { return v < lo 
 
 /* ------------------------------------------------------------------ number helpers */
 
+/* analog tolerance and drift (modules.ts hash32, walkInit, walkStep): integer, bit for bit the reference. A walk: every
+ * DRIFT_HOLD blocks each copy picks a new random target (Q15), each block it moves 1 / 2^DRIFT_SHIFT of the way there. */
+#define DRIFT_HOLD 256u
+#define DRIFT_SHIFT 7
+static uint32_t hash32(uint32_t x)
+{
+    x = (x ^ (x >> 16)) * 0x7feb352du;
+    x = (x ^ (x >> 15)) * 0x846ca68bu;
+    return x ^ (x >> 16);
+}
+static inline int32_t q15(uint32_t h) { return (int32_t)(h >> 16) - 32768; }
+static inline uint32_t lcg(uint32_t s) { return s * 1664525u + 1013904223u; }
+static void walk_init(uint32_t *seed, uint16_t *cnt, int16_t *y, int16_t *t, uint32_t n, uint32_t s0)
+{
+    uint32_t j;
+    *seed = s0;
+    *cnt = DRIFT_HOLD;
+    for (j = 0; j < n; j++) {
+        *seed = lcg(*seed);
+        t[j] = y[j] = (int16_t)q15(*seed);
+    }
+}
+static void walk_step(uint32_t *seed, uint16_t *cnt, int16_t *y, int16_t *t, uint32_t n)
+{
+    uint32_t j;
+    if (--*cnt == 0) {
+        *cnt = DRIFT_HOLD;
+        for (j = 0; j < n; j++) {
+            *seed = lcg(*seed);
+            t[j] = (int16_t)q15(*seed);
+        }
+    }
+    for (j = 0; j < n; j++)
+        y[j] = (int16_t)(y[j] + ((t[j] - y[j]) >> DRIFT_SHIFT));
+}
+
 /* base * 2^(x / 65536), saturating at 2^32 - 1. base: a phase increment, x: octaves Q16.16 */
 static uint32_t exp2_scale(uint32_t base, int32_t x)
 {
@@ -223,7 +259,7 @@ typedef struct {
     const esig_t *in[MAX_IN];
     esig_t *out[MAX_OUT];
     union {
-        struct { uint32_t phase; int32_t s1, y1, y2, pm1, xb, ap[8]; uint32_t ph[4]; } osc;   /* s1: last sync sample; FM mode: feedback history, pm interpolation, decimator; ph: unison voices 2..5 (plain path) */
+        struct { uint32_t phase; int32_t s1, y1, y2, pm1, xb, ap[8]; uint32_t ph[4]; uint32_t dbase, dseed; int16_t dy[5], dt[5]; uint16_t dcnt; } osc;   /* s1: last sync sample; FM mode: feedback history, pm interpolation, decimator; ph: unison voices 2..5 (plain path); dbase: the instance seed (fixed mistunings), dseed / dy / dt / dcnt: the drift walk of the five copies */
         struct { uint32_t phase, seed; int32_t held; uint32_t since; int32_t interval; uint16_t ticks; uint8_t clk_hi, rst_hi; } lfo;   /* interval: clock edge distance in samples, Q8 */
         struct { int32_t y; } gld;         /* Q24 */
         struct { uint32_t seed; int32_t y; } noise;   /* y: the colour one-pole, Q24 */
@@ -277,8 +313,13 @@ typedef struct {
  * in the panel's words is a whole patch, eng_t; the notes within it are its polyphony.) */
 typedef struct {
     int32_t pitch, gate, vel;
+    int32_t jump;                    /* the last pitch step, octaves Q16 (the Main module's jump output) */
     uint8_t note, on, retrig;        /* on: a key holds it; retrig: taken over while sounding, the next block's gate starts low */
+    uint8_t legato;                  /* the note began over a held one (the Main module's legato output) */
     uint32_t on_stamp, off_stamp;
+    uint32_t dseed;                  /* the drift walk of the Main module's drift output (modules.ts walkInit / walkStep) */
+    int16_t dy, dt;
+    uint16_t dcnt;
 } pv_t;
 
 typedef struct {
@@ -392,9 +433,13 @@ static esig_t *buf_alloc(void)
     return b;
 }
 
-static void init_state(const node_t *nd, inst_t *it)
+static void init_state(const node_t *nd, inst_t *it, uint32_t mod, uint32_t v)
 {
     switch (nd->type) {
+    case T_OSC:                          /* modules.ts osc.seed with engine.ts instSeed(module index, voice) */
+        it->s.osc.dbase = (mod * 8u + v + 1u) * 0x9e3779b9u;
+        walk_init(&it->s.osc.dseed, &it->s.osc.dcnt, it->s.osc.dy, it->s.osc.dt, 5, hash32(it->s.osc.dbase ^ 0x2545f491u));
+        break;
     case T_LFO:
         it->s.lfo.seed = 0x2545f491u;
         it->s.lfo.since = ENG_SR;
@@ -421,11 +466,12 @@ static void init_state(const node_t *nd, inst_t *it)
     }
 }
 
-/* does output port p of module m differ per note? (the panel's knobs and clock do not, its pitch / gate / vel / spread do) */
+/* does output port p of module m differ per note? (the panel's knobs, clock, bend, mod and at do not; its pitch / gate /
+ * vel / spread / legato / jump / tol / drift do) */
 static int port_poly(uint32_t m, uint32_t p)
 {
     const node_t *nd = &E.node[m];
-    return nd->ninst > 1 && !(nd->type == T_FM1 && ((p >= FM1_O_K1 && p <= FM1_O_K4) || p == FM1_O_CLOCK || p >= FM1_O_BEND));
+    return nd->ninst > 1 && !(nd->type == T_FM1 && ((p >= FM1_O_K1 && p <= FM1_O_K4) || p == FM1_O_CLOCK || p == FM1_O_BEND || p == FM1_O_MOD || p == FM1_O_AT));
 }
 
 /* the buffer of output p of module m as voice v sees it */
@@ -458,6 +504,7 @@ int eng_load(const uint8_t *p, uint32_t len)
         uint8_t *z = (uint8_t *)&E.vc[v];
         for (j = 0; j < sizeof E.vc[v]; j++)
             z[j] = 0;
+        walk_init(&E.vc[v].dseed, &E.vc[v].dcnt, &E.vc[v].dy, &E.vc[v].dt, 1, hash32(0x51ed270bu + v));   /* engine.ts voiceSeed */
     }
     pool_free(inst_own, ENG_MAX_INST);           /* what this voice's old patch held */
     pool_free(buf_own, ENG_NBUF);
@@ -625,7 +672,7 @@ int eng_load(const uint8_t *p, uint32_t len)
             uint8_t *z = (uint8_t *)it;
             for (j = 0; j < sizeof *it; j++)
                 z[j] = 0;
-            init_state(nd, it);
+            init_state(nd, it, i, k);
             if (nd->type == T_REVERB) {
                 int s = slot_take(rev_own, ENG_NREV);
                 if (s < 0)
@@ -1001,15 +1048,36 @@ static int32_t note_pitch(uint32_t note)
     return (v >= 0 ? v + 3 : v - 3) / 6;
 }
 
-/* mono: last note priority, legato (the gate stays up while any key is down) */
+/* a voicing choice of the Main module (its legato / priority parameter), 0 without one */
+static int32_t main_choice(uint32_t p)
+{
+    return E.main >= 0 ? round_q16(E.node[E.main].par[p]) : 0;
+}
+
+/* mono: the gate stays up while any key is down; the sounding key is the last, lowest or highest held (priority). A change
+ * of key while the gate is up is a legato transition: the legato output goes high and, with legato off (1), the envelopes
+ * restart (one low gate sample); auto (0) and on (2) keep them running. (engine.ts updateVoice) */
 static void update_voice(void)
 {
     pv_t *x = &E.vc[0];
     if (E.nheld) {
-        x->pitch = note_pitch(E.held[E.nheld - 1].note);
-        x->vel = E.held[E.nheld - 1].vel;
+        int32_t prio = main_choice(FM1_P_PRIORITY), p;
+        uint32_t k = E.nheld - 1u, i;
+        if (prio)
+            for (i = 0; i < E.nheld; i++)
+                if (prio == 1 ? E.held[i].note < E.held[k].note : E.held[i].note > E.held[k].note)
+                    k = i;
+        p = note_pitch(E.held[k].note);
+        if (!x->on || E.held[k].note != x->note) {
+            x->jump = p - x->pitch;
+            x->legato = x->on;
+            if (x->on && main_choice(FM1_P_LEGATO) == 1)
+                x->retrig = 1;
+        }
+        x->pitch = p;
+        x->vel = E.held[k].vel;
         x->gate = ENG_ONE;
-        x->note = E.held[E.nheld - 1].note;
+        x->note = E.held[k].note;
         x->on = 1;
     } else {
         x->gate = 0;
@@ -1043,10 +1111,14 @@ void eng_note_on(uint32_t note, int32_t vel_q16)
     if (E.nv > 1) {
         uint32_t i, stamp = ++E.stamp;
         int v = -1;
+        uint8_t over = 0;                        /* another key is down: this note overlaps it */
         pv_t *x;
-        for (i = 0; i < E.nv; i++)
+        for (i = 0; i < E.nv; i++) {
             if (E.vc[i].on && E.vc[i].note == note)
                 v = (int)i;
+            if (E.vc[i].on && E.vc[i].note != note)
+                over = 1;
+        }
         if (v < 0)
             for (i = 0; i < E.nv; i++)
                 if (!E.vc[i].on && (v < 0 || E.vc[i].off_stamp < E.vc[v].off_stamp))
@@ -1058,8 +1130,10 @@ void eng_note_on(uint32_t note, int32_t vel_q16)
                     v = (int)i;
         }
         x = &E.vc[v];
-        if (x->on)
+        if (x->on && main_choice(FM1_P_LEGATO) != 2)  /* a stolen note restarts its envelopes unless legato is on */
             x->retrig = 1;
+        x->legato = over;
+        x->jump = note_pitch(note) - x->pitch;
         x->note = (uint8_t)note;
         x->pitch = note_pitch(note);
         x->vel = vel_q16;
@@ -1068,7 +1142,13 @@ void eng_note_on(uint32_t note, int32_t vel_q16)
         x->on_stamp = stamp;
         return;
     }
-    eng_note_off(note);
+    {                                            /* the key again: to the top (no update in between, as engine.ts noteOn) */
+        uint32_t i, k = 0;
+        for (i = 0; i < E.nheld; i++)
+            if (E.held[i].note != note)
+                E.held[k++] = E.held[i];
+        E.nheld = (uint8_t)k;
+    }
     if (E.nheld == MAX_HELD) {
         uint32_t i;
         for (i = 1; i < MAX_HELD; i++)
@@ -1135,6 +1215,10 @@ static void m_fm1(const node_t *nd, inst_t *it, uint32_t n)
         for (i = 0; i < n; i++)
             ck[i] = i < E.clk_pulse ? ENG_ONE : 0;
     }
+    fill(it->out[FM1_O_LEGATO], x->legato ? ENG_ONE : 0, n);
+    fill(it->out[FM1_O_JUMP], x->jump, n);
+    fill(it->out[FM1_O_TOL], 2 * q15(hash32((uint32_t)round_q16(EF(it, FM1_P_UNIT)) * 64u + cur_v + 0x1000u)), n);   /* modules.ts tolOf */
+    fill(it->out[FM1_O_DRIFT], 2 * x->dy, n);
     fill(it->out[FM1_O_SPREAD], E.nv > 1 ? (int32_t)((((int64_t)2 * (int32_t)cur_v - ((int32_t)E.nv - 1)) << 16) / ((int32_t)E.nv - 1)) : 0, n);
 }
 
@@ -1152,6 +1236,21 @@ static inline int32_t allpass16(int32_t *s, int32_t a, int32_t x)      /* y = a 
     return y;
 }
 
+/* the stack choices (modules.ts STACKS): the intervals the copies cycle through, octaves Q16 */
+static const int32_t STACK_OCT[5][3] = {{0}, {0, 65536}, {0, 38229}, {0, 65536, 103765}, {0, -65536}};
+static const uint8_t STACK_N[5] = {1, 2, 2, 3, 2};
+static uint32_t cur_unit;            /* the Main module's unit this block (which drifted instrument) */
+
+/* copy j's drift in octaves Q16: drift cents x (its fixed mistuning + its wander) / 2 (modules.ts driftOct / oscTol) */
+static int32_t osc_drift(const inst_t *it, int32_t cents, uint32_t j)
+{
+    int32_t o;
+    if (!cents)
+        return 0;
+    o = q15(hash32(it->s.osc.dbase + cur_unit * 0x9e3779b9u + (j + 1u) * 0x85ebca6bu));
+    return (int32_t)(((int64_t)cents * (o + it->s.osc.dy[j])) / 78643200);   /* / (65536 x 1200) */
+}
+
 static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
 {
     const esig_t *pitch = it->in[OSC_I_PITCH], *pm = it->in[OSC_I_PM], *sync = it->in[OSC_I_SYNC];
@@ -1161,13 +1260,29 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
     int32_t base = EF(it, OSC_P_COARSE) / 12 + EF(it, OSC_P_FINE) / 1200;
     int32_t kind = round_q16(EF(it, OSC_P_WAVE)), lvl = EF(it, OSC_P_LEVEL), fb = EF(it, OSC_P_FB);
     int32_t idx = nd->conn & (1u << OSC_I_PM) ? EF(it, OSC_P_PM) : 0;
-    int32_t y1, y2, pm1, xb, *ap = it->s.osc.ap, s1 = it->s.osc.s1;
+    int32_t y1, y2, pm1, xb, *ap = it->s.osc.ap, s1 = it->s.osc.s1, cents = EF(it, OSC_P_DRIFT);
+    walk_step(&it->s.osc.dseed, &it->s.osc.dcnt, it->s.osc.dy, it->s.osc.dt, 5);   /* every block, whatever the settings */
     if (idx <= 0 && fb <= 0) {                                             /* the plain oscillator: one wave per frame */
-        int32_t nu = clampi(round_q16(EF(it, OSC_P_UNISON)), 1, 5), det = EF(it, OSC_P_DETUNE), doct[5], j;
+        int32_t ks = clampi(round_q16(EF(it, OSC_P_STACK)), 0, 4), nst = STACK_N[ks];
+        int32_t nu = clampi(round_q16(EF(it, OSC_P_UNISON)), 1, 5), det = EF(it, OSC_P_DETUNE), doct[5], wq[5], j;
         uint32_t *ph = it->s.osc.ph;
-        static const int32_t INV_N[6] = {0, 65536, 32768, 21845, 16384, 13107};
-        for (j = 0; j < nu; j++)                                           /* unison voice j: -detune .. +detune cents, in octaves */
-            doct[j] = nu > 1 ? (int32_t)(((int64_t)det * (2 * j - (nu - 1))) / ((int64_t)(nu - 1) * 1200)) : 0;
+        if (nu < nst)                                                      /* stack: at least one copy per interval */
+            nu = nst;
+        for (j = 0; j < nu; j++)                                           /* unison voice j: -detune .. +detune cents, in octaves, + its stack interval and drift */
+            doct[j] = (nu > 1 ? (int32_t)(((int64_t)det * (2 * j - (nu - 1))) / ((int64_t)(nu - 1) * 1200)) : 0)
+                      + STACK_OCT[ks][j % nst] + osc_drift(it, cents, (uint32_t)j);
+        if (nu <= 2) {                                                     /* blend (modules.ts blendWeights): centre 1 - b, sides b, normalised */
+            wq[0] = wq[1] = ENG_ONE / nu;
+        } else {
+            int32_t b = clampi(EF(it, OSC_P_BLEND), 0, ENG_ONE), w[5], sum = 0;
+            for (j = 0; j < nu; j++) {
+                int centre = nu & 1 ? j == (nu - 1) / 2 : (j == nu / 2 - 1 || j == nu / 2);
+                w[j] = centre ? ENG_ONE - b : b;
+                sum += w[j];
+            }
+            for (j = 0; j < nu; j++)
+                wq[j] = (int32_t)(((int64_t)w[j] << 16) / sum);
+        }
         for (i = 0; i < n; i++) {
             int rst = sync[i] >= 32768 && s1 < 32768;                      /* a rising edge on sync restarts the phases */
             uint32_t dt = exp2_scale(INC_C4, pitch[i] + base + doct[0]);
@@ -1183,6 +1298,7 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
                 out[i] = mul16(y, lvl);
                 continue;
             }
+            y = mul16(y, wq[0]);
             for (j = 1; j < nu; j++) {
                 uint32_t dtj = exp2_scale(INC_C4, pitch[i] + base + doct[j]);
                 if (dtj > DT_MAX)
@@ -1190,9 +1306,9 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
                 if (rst)
                     ph[j - 1] = 0;
                 ph[j - 1] += dtj;
-                y += wave(kind, ph[j - 1], dtj, pw);
+                y += mul16(wave(kind, ph[j - 1], dtj, pw), wq[j]);
             }
-            out[i] = mul16(mul16(y, INV_N[nu]), lvl);
+            out[i] = mul16(y, lvl);
         }
         it->s.osc.phase = phase;
         it->s.osc.s1 = s1;
@@ -1205,6 +1321,7 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
     y2 = it->s.osc.y2;
     pm1 = it->s.osc.pm1;
     xb = it->s.osc.xb;
+    base += osc_drift(it, cents, 0);
     for (i = 0; i < n; i++) {
         uint32_t dt = exp2_scale(INC_C4, pitch[i] + base), sub;
         int32_t pm_now = idx > 0 ? pm[i] : 0, pm_mid = (pm1 + pm_now) >> 1, ya = 0;
@@ -1342,6 +1459,17 @@ static void m_glide(const node_t *nd, inst_t *it, uint32_t n)
     esig_t *out = it->out[0];
     int32_t k = env_rate(EF(it, GLIDE_P_TIME)), y = it->s.gld.y;
     uint32_t i;
+    if (round_q16(EF(it, GLIDE_P_CURVE)) == 1) {   /* lin: one unit per `time`, Q24 per sample (modules.ts glide) */
+        int64_t den = (int64_t)EF(it, GLIDE_P_TIME) * ENG_SR;             /* samples, Q16 */
+        int32_t step = den > ((int64_t)1 << 16) ? (int32_t)(((int64_t)1 << 40) / den) : 1 << 24;
+        for (i = 0; i < n; i++) {
+            int32_t d = (clampi(in[i], -(1 << 23), (1 << 23) - 1) << 8) - y;
+            y += d > step ? step : d < -step ? -step : d;
+            out[i] = (y + 128) >> 8;
+        }
+        it->s.gld.y = y;
+        return;
+    }
     for (i = 0; i < n; i++) {
         y += mulq(k, (clampi(in[i], -(1 << 23), (1 << 23) - 1) << 8) - y, 30);
         out[i] = (y + 128) >> 8;
@@ -2776,6 +2904,9 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
     for (off = 0; off < total; off += ENG_BLOCK) {
         uint32_t n = total - off < ENG_BLOCK ? total - off : ENG_BLOCK;
         E.morph = E.has_b ? morph_position(n) : 0;
+        cur_unit = (uint32_t)main_choice(FM1_P_UNIT);
+        for (v = 0; v < E.nv; v++)                      /* the notes' drift walks (engine.ts render) */
+            walk_step(&E.vc[v].dseed, &E.vc[v].dcnt, &E.vc[v].dy, &E.vc[v].dt, 1);
         for (k = 0; k < E.norder; k++) {
             const node_t *nd = &E.node[E.order[k]];
             for (v = 0; v < nd->ninst; v++) {           /* every voice of a per-voice module, once for a shared one */

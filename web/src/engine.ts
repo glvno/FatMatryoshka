@@ -7,7 +7,7 @@
 // per-voice output gets the sum over the voices, a per-voice module reading a shared output gets that one buffer. The
 // FM-1 panel is shared but its pitch / gate / vel outputs are per voice. With one voice this is exactly the mono engine.
 
-import { IMPLS, type Ctx, type ModuleImpl, type Voice } from './modules';
+import { hash32, IMPLS, instSeed, walkInit, walkStep, type Ctx, type ModuleImpl, type Voice, type Walk } from './modules';
 import { defaultMap, modulate, morphValue, paramValue, processingOrder, SOURCES, VOICE_PORTS, voiceSplit, voicesOf, type Cable, type Patch, type Range, type Source, thruInput } from './patch';
 
 export const BLOCK = 128;
@@ -17,6 +17,8 @@ export type ParameterValues = { id: number; params: Record<string, number> }[];
 
 /** one running copy of a module: shared modules have one, per-voice modules one per voice */
 interface Inst {
+  /** instSeed of the module index and voice: drift's randomness, the same as the firmware's */
+  seed: number;
   state: unknown;
   /** params after modulation, what the module reads */
   eff: Record<string, number>;
@@ -61,9 +63,16 @@ interface VoiceState extends Voice {
   offStamp: number;
   /** the voice was taken over while sounding: the next block's gate starts with one low sample so envelopes restart */
   retrig: boolean;
+  /** the slow random wander of the Main module's drift output */
+  walk: Walk;
 }
 
-const newVoice = (): VoiceState => ({ pitch: 0, gate: 0, velocity: 0, spread: 0, clock: false, bend: 0, mod: 0, at: 0, note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false });
+/** the seed of voice i's drift walk (the firmware: eng_load) */
+export const voiceSeed = (i: number): number => hash32(0x51ed270b + i);
+const newVoice = (i = 0): VoiceState => ({
+  pitch: 0, gate: 0, velocity: 0, spread: 0, clock: false, bend: 0, mod: 0, at: 0, index: i, legato: 0, jump: 0, drift: 0, unit: 0,
+  note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false, walk: walkInit(voiceSeed(i), 1),
+});
 /** the panel's spread output of voice i of n: -1 .. 1 in equal steps, 0 alone */
 export const spreadOf = (i: number, n: number): number => (n > 1 ? (2 * i - (n - 1)) / (n - 1) : 0);
 
@@ -100,9 +109,12 @@ export class Engine {
     return this.voices.map((v) => ({ note: v.note, on: v.on }));
   }
 
-  private newInst(impl: ModuleImpl): Inst {
+  private newInst(impl: ModuleImpl, seed: number): Inst {
+    const state = impl.init(this.sampleRate);
+    impl.seed?.(state, seed);
     return {
-      state: impl.init(this.sampleRate),
+      seed,
+      state,
       eff: {},
       display: {},
       dspInp: {},
@@ -116,11 +128,11 @@ export class Engine {
     const nv = voicesOf(patch);
     const poly = voiceSplit(patch);
     if (nv !== this.voices.length) {
-      this.voices = Array.from({ length: nv }, (_, i) => ({ ...newVoice(), spread: spreadOf(i, nv) }));
+      this.voices = Array.from({ length: nv }, (_, i) => ({ ...newVoice(i), spread: spreadOf(i, nv) }));
       this.held = [];
     }
     const next = new Map<number, Node>();
-    for (const m of patch.modules) {
+    for (const [mi, m] of patch.modules.entries()) {
       const impl = IMPLS[m.type];
       if (!impl) throw new Error(`unknown module type "${m.type}"`);
       const isPoly = poly.has(m.id);
@@ -145,7 +157,7 @@ export class Engine {
             thru: thruInput(impl.def),
             paramsB: null,
             range: [{}, {}],
-            inst: Array.from({ length: ninst }, () => this.newInst(impl)),
+            inst: Array.from({ length: ninst }, (_, v) => this.newInst(impl, instSeed(mi, v))),
             vout: panelVoices ? Object.fromEntries([...VOICE_PORTS].map((p) => [p, Array.from({ length: panelVoices }, () => new Float32Array(BLOCK))])) : null,
           };
       node.params = { ...m.params };
@@ -263,6 +275,7 @@ export class Engine {
       for (let i = 0; i < n; i++) {
         if (Number.isFinite(o[i]) && o[i] < 1e6 && o[i] > -1e6) continue;
         inst.state = node.impl.init(this.sampleRate);
+        node.impl.seed?.(inst.state, inst.seed);
         for (const k in inst.out) inst.out[k].fill(0, 0, n);
         return;
       }
@@ -316,6 +329,12 @@ export class Engine {
     }
   }
 
+  /** the Main module's voicing choices: legato (0 auto, 1 off, 2 on) and mono priority (0 last, 1 low, 2 high) */
+  private voicing(): { legato: number; priority: number } {
+    const p = this.main?.params;
+    return { legato: Math.round(p?.legato ?? 0), priority: Math.round(p?.priority ?? 0) };
+  }
+
   noteOn(note: number, velocity = 1): void {
     if (this.voices.length === 1) {
       this.held = this.held.filter((h) => h.note !== note);
@@ -325,6 +344,7 @@ export class Engine {
     }
     const vs = this.voices;
     const stamp = ++this.stamp;
+    const over = vs.some((x) => x.on && x.note !== note); // another key is down: this note overlaps it
     // the key is already down on a voice: that voice again. Else the voice that has been free the longest. Else the oldest.
     let v = vs.findIndex((x) => x.on && x.note === note);
     if (v < 0) for (let i = 0; i < vs.length; i++) if (!vs[i].on && (v < 0 || vs[i].offStamp < vs[v].offStamp)) v = i;
@@ -333,7 +353,10 @@ export class Engine {
       for (let i = 1; i < vs.length; i++) if (vs[i].onStamp < vs[v].onStamp) v = i;
     }
     const x = vs[v];
-    if (x.on) x.retrig = true;
+    // a stolen note restarts its envelopes unless legato is on
+    if (x.on && this.voicing().legato !== 2) x.retrig = true;
+    x.legato = over ? 1 : 0;
+    x.jump = (note - 60) / 12 - x.pitch;
     x.note = note;
     x.pitch = (note - 60) / 12;
     x.velocity = velocity;
@@ -391,12 +414,24 @@ export class Engine {
     }
   }
 
-  /** mono: last note priority, legato (the gate stays up while any key is down) */
+  /**
+   * mono: the gate stays up while any key is down; the sounding key is the last, lowest or highest held (priority). A change
+   * of key while the gate is up is a legato transition: the legato output goes to 1 and, with legato off, the envelopes
+   * restart (one low gate sample); auto and on keep them running.
+   */
   private updateVoice(): void {
-    const top = this.held[this.held.length - 1];
+    const { legato, priority } = this.voicing();
+    let top = this.held[this.held.length - 1];
+    if (priority) for (const h of this.held) if (priority === 1 ? h.note < top.note : h.note > top.note) top = h;
     const x = this.voices[0];
     if (top) {
-      x.pitch = (top.note - 60) / 12;
+      const p = (top.note - 60) / 12;
+      if (!x.on || top.note !== x.note) {
+        x.jump = p - x.pitch;
+        x.legato = x.on ? 1 : 0;
+        if (x.on && legato === 1) x.retrig = true;
+      }
+      x.pitch = p;
       x.velocity = top.vel;
       x.gate = 1;
       x.note = top.note;
@@ -451,7 +486,11 @@ export class Engine {
       const clock = this.ticks > 0; // the Main module's clock output: one pulse per block that saw a tick, the same for every voice
       this.ticks = 0;
       this.morphT = this.hasB ? this.morphPosition(n) : 0;
+      const unit = Math.round(this.main?.params.unit ?? 0);
       for (const x of vs) {
+        walkStep(x.walk);
+        x.drift = x.walk.y[0];
+        x.unit = unit;
         x.clock = clock;
         x.bend = this.ctl.bend;
         x.mod = this.ctl.mod;

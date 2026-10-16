@@ -17,6 +17,16 @@ export interface Voice {
   bend: number;
   mod: number;
   at: number;
+  /** the voice's number (0 first), for its tolerance */
+  index: number;
+  /** 1 while the note began over a held one (a legato transition), 0 after a fresh start; kept until the next note */
+  legato: number;
+  /** the last pitch step of this voice in octaves, signed, kept until the next note */
+  jump: number;
+  /** this voice's slow random wander, -1..1 (drift walk, Q15 like the firmware) */
+  drift: number;
+  /** the Main module's `unit` (which drifted instrument): reseeds the tolerances */
+  unit: number;
 }
 
 /** the pitch bend range: +-2 semitones on the Main module's pitch output */
@@ -37,6 +47,8 @@ export interface Ctx {
 export interface ModuleImpl<S = any> {
   def: ModuleDef;
   init(sr: number): S;
+  /** give a new instance its own random seed (engine.ts instSeed: module index and voice), for drift */
+  seed?(st: S, seed: number): void;
   process(c: Ctx, st: S): void;
 }
 
@@ -91,6 +103,55 @@ function wave(kind: number, phase: number, dt: number, pw = 0.5): number {
  * (pitch/gate/velocity; MIDI is handled by the firmware / the browser host, not by a module) and encoders 1-4 as 0..1 values. In the browser the panel is the module's own sliders; on the
  * device the encoders feed the same outputs.
  */
+/**
+ * Analog tolerance and drift, integer arithmetic so the firmware matches bit for bit (Q15 values -1..1).
+ * hash32: a fixed random value of a key (lowbias32). A walk: every DRIFT_HOLD blocks every copy picks a new random target,
+ * each block it moves 1 / 2^DRIFT_SHIFT of the way there (a slow wander of about half a hertz).
+ */
+export const DRIFT_HOLD = 256;
+export const DRIFT_SHIFT = 7;
+export function hash32(x: number): number {
+  x >>>= 0;
+  x = Math.imul(x ^ (x >>> 16), 0x7feb352d) >>> 0;
+  x = Math.imul(x ^ (x >>> 15), 0x846ca68b) >>> 0;
+  return (x ^ (x >>> 16)) >>> 0;
+}
+/** a hash as Q15 -1..1 */
+export const q15 = (h: number): number => (h >>> 16) - 32768;
+export interface Walk {
+  seed: number;
+  count: number;
+  y: Int32Array;
+  t: Int32Array;
+}
+const lcg = (s: number): number => (Math.imul(s, 1664525) + 1013904223) >>> 0;
+export function walkInit(seed: number, n: number): Walk {
+  const w: Walk = { seed: seed >>> 0, count: DRIFT_HOLD, y: new Int32Array(n), t: new Int32Array(n) };
+  for (let j = 0; j < n; j++) {
+    w.seed = lcg(w.seed);
+    w.t[j] = w.y[j] = q15(w.seed);
+  }
+  return w;
+}
+/** one block of a walk */
+export function walkStep(w: Walk): void {
+  if (--w.count <= 0) {
+    w.count = DRIFT_HOLD;
+    for (let j = 0; j < w.t.length; j++) {
+      w.seed = lcg(w.seed);
+      w.t[j] = q15(w.seed);
+    }
+  }
+  for (let j = 0; j < w.y.length; j++) w.y[j] += (w.t[j] - w.y[j]) >> DRIFT_SHIFT;
+}
+/** a voice's fixed tolerance (the Main module's tol output), Q15: depends on the unit and the voice's number only */
+export const tolOf = (unit: number, v: number): number => q15(hash32(Math.imul(Math.round(unit), 64) + v + 0x1000));
+/** the seed of a module instance: module index in the patch, voice */
+export const instSeed = (mod: number, v: number): number => Math.imul(mod * 8 + v + 1, 0x9e3779b9) >>> 0;
+
+export const LEGATO_MODES = ['auto', 'off', 'on'];
+export const PRIORITIES = ['last', 'low', 'high'];
+
 const N_KNOBS = 4;
 const knobNames = Array.from({ length: N_KNOBS }, (_, i) => `k${i + 1}`);
 
@@ -101,8 +162,17 @@ const fm1: ModuleImpl<null> = {
     // the one input: the morph position added to the `morph` parameter (block mean, one block late), so an LFO or a
     // sequencer can morph the patch; the engine reads it, not this module (engine.ts morphPosition)
     inputs: [control('morph')],
-    outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), gate('clock'), control('spread'), control('bend'), control('mod'), control('at')],
-    params: [...knobNames.map((n) => param(n, 0, 1, 0.5, { step: 0.01 })), param('morph', 0, 1, 0, { step: 0.01, input: 'morph', rest: (p, cv) => (p.morph ?? 0) + cv })],
+    outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), gate('clock'), control('spread'), control('bend'), control('mod'), control('at'),
+      gate('legato'), control('jump'), control('tol'), control('drift')],
+    params: [
+      ...knobNames.map((n) => param(n, 0, 1, 0.5, { step: 0.01 })),
+      param('morph', 0, 1, 0, { step: 0.01, input: 'morph', rest: (p, cv) => (p.morph ?? 0) + cv }),
+      // voicing (engine.ts noteOn / updateVoice): auto = legato in mono, retrigger when a poly note is stolen (as before)
+      param('legato', 0, 2, 0, { step: 1, choices: LEGATO_MODES }),
+      param('priority', 0, 2, 0, { step: 1, choices: PRIORITIES }),
+      // which drifted instrument: reseeds the tol output and every oscillator's fixed mistuning
+      param('unit', 0, 63, 0, { step: 1 }),
+    ],
   },
   init: () => null,
   process(c) {
@@ -114,6 +184,10 @@ const fm1: ModuleImpl<null> = {
     c.out.mod.fill(c.voice.mod, 0, c.n);
     c.out.at.fill(c.voice.at, 0, c.n);
     for (const n of knobNames) c.out[n].fill(c.p[n] ?? 0, 0, c.n);
+    c.out.legato.fill(c.voice.legato, 0, c.n);
+    c.out.jump.fill(c.voice.jump, 0, c.n);
+    c.out.tol.fill(tolOf(c.p.unit ?? 0, c.voice.index) / 32768, 0, c.n);
+    c.out.drift.fill(c.voice.drift / 32768, 0, c.n);
     // clock: 24 ppqn from the arpeggiator or MIDI in, a pulse of half a block per tick; nothing without a source
     const hi = c.voice.clock ? Math.ceil(c.n / 2) : 0;
     c.out.clock.fill(1, 0, hi);
@@ -140,10 +214,36 @@ interface OscState {
   ap: number[];
   /** the phases of unison voices 2..5 (voice 1 is `phase`), plain path only */
   ph: number[];
+  /** drift: the instance's seed (its fixed mistunings) and the wander of the five copies */
+  base: number;
+  walk: Walk;
 }
 
 /** unison voice j of n: its detune in octaves, spread symmetrically from -detune to +detune cents */
 const unisonOct = (j: number, n: number, detune: number): number => (n > 1 ? (detune * ((2 * j) / (n - 1) - 1)) / 1200 : 0);
+
+/** the stack choices: the intervals (semitones) the copies cycle through, copy j at STACKS[k][j % length] */
+export const STACK_NAMES = ['off', '+oct', '+5th', '+oct+5th', '-oct'];
+export const STACKS = [[0], [0, 12], [0, 7], [0, 12, 19], [0, -12]];
+export const OSC_COPIES = 5;
+
+/** copy j's fixed mistuning (Q15): the instance seed and the Main module's unit */
+export const oscTol = (base: number, unit: number, j: number): number =>
+  q15(hash32((base + Math.imul(Math.round(unit), 0x9e3779b9) + Math.imul(j + 1, 0x85ebca6b)) >>> 0));
+/** copy j's drift in octaves: drift cents x (fixed mistuning + wander) / 2 */
+const driftOct = (s: OscState, unit: number, cents: number, j: number): number => (cents ? (cents * (oscTol(s.base, unit, j) + s.walk.y[j])) / 65536 / 1200 : 0);
+
+/**
+ * the copy weights for unison with blend (b): the centre copy (the two middle ones for an even count) gets 1 - b, the
+ * others b, normalised to a sum of 1; with one or two copies all are equal. b = 0.5 is the plain average.
+ */
+export function blendWeights(n: number, b: number): number[] {
+  if (n <= 2) return Array(n).fill(1 / n);
+  const centre = (j: number): boolean => (n % 2 ? j === (n - 1) / 2 : j === n / 2 - 1 || j === n / 2);
+  const w = Array.from({ length: n }, (_, j) => (centre(j) ? 1 - b : b));
+  const sum = w.reduce((a, x) => a + x, 0);
+  return w.map((x) => x / sum);
+}
 
 /** one first-order allpass section of the decimator: y = a (x - y1) + x1 */
 function allpass(s: number[], k: number, a: number, x: number): number {
@@ -169,9 +269,16 @@ const osc: ModuleImpl<OscState> = {
       param('fb', 0, 1, 0, { step: 0.01 }),
       param('unison', 1, 5, 1, { step: 1 }),
       param('detune', 0, 100, 10, { step: 1, unit: 'ct' }),
+      param('blend', 0, 1, 0.5, { step: 0.01 }),
+      param('stack', 0, 4, 0, { step: 1, choices: STACK_NAMES }),
+      param('drift', 0, 50, 0, { step: 1, unit: 'ct' }),
     ],
   },
-  init: () => ({ phase: 0, s1: 0, y1: 0, y2: 0, pm1: 0, xb: 0, ap: [0, 0, 0, 0, 0, 0, 0, 0], ph: [0, 0, 0, 0] }),
+  init: () => ({ phase: 0, s1: 0, y1: 0, y2: 0, pm1: 0, xb: 0, ap: [0, 0, 0, 0, 0, 0, 0, 0], ph: [0, 0, 0, 0], base: 0, walk: walkInit(0, OSC_COPIES) }),
+  seed(s, seed) {
+    s.base = seed;
+    s.walk = walkInit(hash32(seed ^ 0x2545f491), OSC_COPIES);
+  },
   process(c, s) {
     const { pitch, pm, sync } = c.inp;
     const pw = Math.min(0.95, Math.max(0.05, c.p.pw ?? 0.5));
@@ -181,46 +288,53 @@ const osc: ModuleImpl<OscState> = {
     const fb = c.p.fb ?? 0;
     const lvl = c.p.level ?? 1;
     const out = c.out.out;
+    const cents = c.p.drift ?? 0;
+    const unit = c.voice.unit;
+    walkStep(s.walk); // every block, whatever the settings, so the wander does not depend on them
     if (idx <= 0 && fb <= 0) {
-      // the plain oscillator: one wave per frame; unison: n detuned copies (phases s.phase, s.ph[0..n-2]) summed / n
-      const nu = Math.max(1, Math.min(5, Math.round(c.p.unison ?? 1)));
+      // the plain oscillator: one wave per frame; unison: n detuned copies (phases s.phase, s.ph[0..n-2]) weighted by blend;
+      // stack: the copies cycle through its intervals (at least one copy per interval)
+      const stk = STACKS[Math.max(0, Math.min(STACKS.length - 1, Math.round(c.p.stack ?? 0)))];
+      const nu = Math.min(OSC_COPIES, Math.max(stk.length, Math.max(1, Math.min(5, Math.round(c.p.unison ?? 1)))));
       const det = c.p.detune ?? 0;
-      const inv = 1 / nu;
+      const off = Array.from({ length: nu }, (_, j) => unisonOct(j, nu, det) + stk[j % stk.length] / 12 + driftOct(s, unit, cents, j));
+      const wt = blendWeights(nu, Math.min(1, Math.max(0, c.p.blend ?? 0.5)));
       for (let i = 0; i < c.n; i++) {
         const f = C4 * Math.pow(2, pitch[i] + base);
         const rst = sync[i] >= 0.5 && s.s1 < 0.5;
         s.s1 = sync[i];
         if (nu === 1) {
-          const dt = Math.min(f / c.sr, 0.45);
+          const dt = Math.min((f * Math.pow(2, off[0])) / c.sr, 0.45);
           if (rst) s.phase = 0;
           s.phase += dt;
           if (s.phase >= 1) s.phase -= 1;
           out[i] = wave(kind, s.phase, dt, pw) * lvl;
           continue;
         }
-        const dt0 = Math.min(f * Math.pow(2, unisonOct(0, nu, det)) / c.sr, 0.45);
+        const dt0 = Math.min(f * Math.pow(2, off[0]) / c.sr, 0.45);
         if (rst) s.phase = 0;
         s.phase += dt0;
         if (s.phase >= 1) s.phase -= 1;
-        let y = wave(kind, s.phase, dt0, pw);
+        let y = wave(kind, s.phase, dt0, pw) * wt[0];
         for (let j = 1; j < nu; j++) {
-          const dtj = Math.min(f * Math.pow(2, unisonOct(j, nu, det)) / c.sr, 0.45);
+          const dtj = Math.min(f * Math.pow(2, off[j]) / c.sr, 0.45);
           if (rst) s.ph[j - 1] = 0;
           s.ph[j - 1] += dtj;
           if (s.ph[j - 1] >= 1) s.ph[j - 1] -= 1;
-          y += wave(kind, s.ph[j - 1], dtj, pw);
+          y += wave(kind, s.ph[j - 1], dtj, pw) * wt[j];
         }
-        out[i] = y * inv * lvl;
+        out[i] = y * lvl;
       }
       s.y1 = s.y2 = s.pm1 = s.xb = 0;
       s.ap.fill(0);
       return;
     }
+    const d0 = driftOct(s, unit, cents, 0);
     // FM mode (phase modulation or feedback): two waves per frame, pm interpolated between frames, then the half-band
     // decimator, so sidebands up to the old sample rate are filtered out instead of folding back
     const K = 1 / (2 * Math.PI);
     for (let i = 0; i < c.n; i++) {
-      const f = C4 * Math.pow(2, pitch[i] + base);
+      const f = C4 * Math.pow(2, pitch[i] + base + d0);
       const dt = Math.min(f / c.sr, 0.45) / 2;
       if (sync[i] >= 0.5 && s.s1 < 0.5) s.phase = 0;
       s.s1 = sync[i];
@@ -1210,17 +1324,31 @@ const output: ModuleImpl<null> = {
   },
 };
 
-/** portamento, or a slew on any control: a one-pole glide that reaches 99 % of a step in `time` */
+export const GLIDE_CURVES = ['exp', 'lin'];
+
+/**
+ * portamento, or a slew on any control. exp: a one-pole glide that reaches 99 % of a step in `time`, whatever its size;
+ * lin: a constant rate of one unit (an octave of pitch) per `time`, so a bigger step takes longer
+ */
 const glide: ModuleImpl<{ y: number }> = {
   def: {
     type: 'glide',
     label: 'Glide',
     inputs: [control('in')],
     outputs: [control('out')],
-    params: [param('time', 0.001, 5, 0.1, { unit: 's', step: 0.001, log: true })],
+    params: [param('time', 0.001, 5, 0.1, { unit: 's', step: 0.001, log: true }), param('curve', 0, 1, 0, { step: 1, choices: GLIDE_CURVES })],
   },
   init: () => ({ y: 0 }),
   process(c, s) {
+    if (Math.round(c.p.curve ?? 0) === 1) {
+      const step = 1 / Math.max((c.p.time ?? 0.1) * c.sr, 1);
+      for (let i = 0; i < c.n; i++) {
+        const d = c.inp.in[i] - s.y;
+        s.y += d > step ? step : d < -step ? -step : d;
+        c.out.out[i] = s.y;
+      }
+      return;
+    }
     const k = 1 - Math.exp(-4.6 / Math.max((c.p.time ?? 0.1) * c.sr, 1));
     for (let i = 0; i < c.n; i++) {
       s.y += k * (c.inp.in[i] - s.y);
