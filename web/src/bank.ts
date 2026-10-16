@@ -271,15 +271,15 @@ export function buildBankTab(root: HTMLElement, device: DeviceLink, currentPatch
   const empty = el('button', { textContent: 'Empty the list', onclick: () => { list = []; changed(); } });
 
   root.append(
-    el('div', { class: 'card' }, el('h2', { textContent: 'Patch bank' }), el('p', { textContent: 'Choose up to 32 patches and send them to the FM-1. They are written to its flash: the PRESET knob steps through them, a program change selects one, and they stay when the power is off. Uploading replaces the whole bank.' }), el('div', { class: 'toolbar' }, connect, upload, read, clear), bar, status),
+    el('div', { class: 'card' }, el('h2', {}, el('span', { class: 'mtag util', textContent: 'FM-1' }), 'Patch bank'), el('p', { textContent: 'Choose up to 32 patches and send them to the FM-1. They are written to its flash: the PRESET knob steps through them, a program change selects one, and they stay when the power is off. Uploading replaces the whole bank.' }), el('div', { class: 'toolbar' }, connect, upload, read, clear), bar, status),
     el(
       'div',
       { class: 'bank-cols' },
-      el('div', { class: 'card' }, el('h2', { textContent: 'Factory patches' }), el('div', { class: 'toolbar' }, addCurrent), el('div', { class: 'toolbar' }, linkIn, importLink), libEl),
-      el('div', { class: 'card' }, el('h2', { textContent: 'Bank to upload ' }, countEl), el('div', { class: 'toolbar' }, reset, empty), bankEl),
+      el('div', { class: 'card' }, el('h2', {}, el('span', { class: 'mtag src', textContent: 'PATCHES' }), 'Factory patches'), el('div', { class: 'toolbar' }, addCurrent), el('div', { class: 'toolbar' }, linkIn, importLink), libEl),
+      el('div', { class: 'card' }, el('h2', {}, el('span', { class: 'mtag shp', textContent: 'BANK' }), 'Bank to upload ', countEl), el('div', { class: 'toolbar' }, reset, empty), bankEl),
     ),
-    el('div', { class: 'card' }, el('h2', { textContent: 'Over budget (browser only)' }), el('p', { class: 'muted', textContent: 'Patches too big for the FM-1. They play in the browser; they are never uploaded. One that fits again moves to the bank when you save it.' }), overEl),
-    el('div', { class: 'card' }, el('h2', { textContent: 'On the FM-1' }), onDevice),
+    el('div', { class: 'card' }, el('h2', {}, el('span', { class: 'mtag fx', textContent: 'OVER' }), 'Over budget (browser only)'), el('p', { class: 'muted', textContent: 'Patches too big for the FM-1. They play in the browser; they are never uploaded. One that fits again moves to the bank when you save it.' }), overEl),
+    el('div', { class: 'card' }, el('h2', {}, el('span', { class: 'mtag util', textContent: 'FM-1' }), 'On the FM-1'), onDevice),
   );
   refresh();
   return () => {

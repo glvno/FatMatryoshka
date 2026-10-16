@@ -807,7 +807,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
    condensed capitals, cable slack as a value bar, the examples as a picker field. Button texts stay as written (the
    tutorial's targets and prose); the capitals are CSS. ---- */
 .sidebar { font-family: 'Barlow', system-ui, sans-serif; font-weight: 500; }
-#tabs button, .sidebar button, .example-picker > span, .sbar > span, #audio-status { font: var(--cap); font-size: 13px; text-transform: uppercase; letter-spacing: .07em; }
+#tabs button, .sidebar button, .example-picker > span, #audio-status { font: var(--cap); font-size: 13px; text-transform: uppercase; letter-spacing: .07em; }
 #tabs button { font-size: 14px; }
 .spanel { border: 1px solid color-mix(in srgb, var(--muted) 45%, var(--panel)); border-radius: 8px; background: var(--panel); box-shadow: 0 2px 6px var(--shadow); }
 .shead { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 6px; border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; background: var(--surface-tint); }
@@ -819,27 +819,25 @@ input#patch-name:focus { border-color: var(--secondary); background: var(--bar);
 .sbody { display: grid; gap: 6px; padding: 8px; }
 .sidebar button { min-height: 30px; padding: 4px 8px; border-radius: 5px; white-space: nowrap; }
 /* the plain buttons in the gate colour (yellow): a grey fill read as a slider's bar */
-.sidebar button:not(.primary, .slack-jack), .sidebar #tour-btn, .sidebar #palette-btn { background: var(--gate); border-color: var(--gate); color: var(--accent-ink); }
-.sidebar button:not(.primary, .slack-jack):hover, .sidebar #tour-btn:hover, .sidebar #palette-btn:hover { border-color: var(--ink); color: var(--accent-ink); filter: brightness(1.08); }
+.sidebar button:not(.primary), .sidebar #tour-btn, .sidebar #palette-btn { background: var(--gate); border-color: var(--gate); color: var(--accent-ink); }
+.sidebar button:not(.primary):hover, .sidebar #tour-btn:hover, .sidebar #palette-btn:hover { border-color: var(--ink); color: var(--accent-ink); filter: brightness(1.08); }
 .sidebar #palette-btn kbd { color: inherit; opacity: .7; }
 #add-assembly-btn { background: var(--secondary); border-color: var(--secondary); color: var(--panel); }
 .view-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-/* a value bar like a card's slider, as tall as the buttons: name left, value right, the fill to the value, a hollow thumb as tall
-   as the bar. Its input jack at the left edge (a card row's input) takes a cable from any output: the fill then follows that
-   signal (Patch.slackFrom) */
-.slack-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px; }
-.slack-jack { box-sizing: border-box; width: 16px; min-height: 0 !important; height: 16px; padding: 0 !important; border-radius: 50% !important;
-  border: 2.5px solid var(--control) !important; background: var(--panel) !important; cursor: pointer; }
-.slack-jack.plugged { background: var(--control) !important; box-shadow: inset 0 0 0 2.5px var(--panel); }
-.sbar { --h: 30px; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; height: var(--h); border-radius: 5px; overflow: hidden;
+/* a value bar like a card's slider: small name left, value right, the fill to the value, an opaque thumb as tall as the bar.
+   The thumb is a jack (the easter egg): a cable from any output dropped on it sways the cables (Patch.slackFrom); it shows
+   plugged (filled) then, and the fill follows the signal */
+.sbar { --h: 18px; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; height: var(--h); border-radius: 5px; overflow: hidden;
   background: linear-gradient(to right, var(--bar-fill) calc(var(--v, 0) * 100%), var(--bar) 0); color: var(--ink); cursor: ew-resize; }
-.sbar > span { padding-left: 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
-.sbar > output { padding: 0 8px 0 4px; font: 500 12px/1 'Barlow', system-ui, sans-serif; color: var(--ink); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 72px; }
+.sbar > span { padding-left: 6px; font: var(--cap); font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.sbar > output { padding: 0 6px 0 4px; font: 500 11px/1 'Barlow', system-ui, sans-serif; color: var(--ink); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; }
 .sbar.modulated > output { color: var(--control); }
 .sbar > input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: transparent; appearance: none; -webkit-appearance: none; cursor: ew-resize; }
 .sbar > input::-webkit-slider-runnable-track { height: var(--h); background: transparent; }
-.sbar > input::-webkit-slider-thumb { -webkit-appearance: none; width: var(--h); height: var(--h); border-radius: 50%; box-sizing: border-box; border: 3px solid var(--secondary); background: transparent; box-shadow: inset 0 0 0 2px var(--panel); }
-.sbar > input::-moz-range-thumb { width: var(--h); height: var(--h); border-radius: 50%; box-sizing: border-box; border: 3px solid var(--secondary); background: transparent; }
+.sbar > input::-webkit-slider-thumb { -webkit-appearance: none; width: var(--h); height: var(--h); border-radius: 50%; box-sizing: border-box; border: 2.5px solid var(--control); background: var(--panel); }
+.sbar > input::-moz-range-thumb { width: var(--h); height: var(--h); border-radius: 50%; box-sizing: border-box; border: 2.5px solid var(--control); background: var(--panel); }
+.sbar.modulated > input::-webkit-slider-thumb { background: var(--control); box-shadow: inset 0 0 0 2.5px var(--panel); }
+.sbar.modulated > input::-moz-range-thumb { background: var(--control); box-shadow: inset 0 0 0 2.5px var(--panel); }
 .sbar > input:focus-visible { outline: 2px solid var(--secondary); outline-offset: -2px; border-radius: 5px; }
 .example-picker { display: grid; gap: 4px; }
 .example-picker > span { font-size: 11px; color: var(--muted); }
@@ -848,3 +846,28 @@ input#patch-name:focus { border-color: var(--secondary); background: var(--bar);
 #palette-btn { font-size: 12px; }
 #palette-btn kbd { font: 500 10px/1 'Barlow', system-ui, sans-serif; text-transform: none; letter-spacing: 0; }
 .sidebar #tour-btn { padding-inline: 8px; text-align: center; }
+
+/* ---- Library in the cards' style: each card a module-like panel with a header strip (family tag + condensed title), rows on
+   the bar shade, toolbar buttons yellow like the sidebar's, the row tools quiet ---- */
+#tab-library { font-family: 'Barlow', system-ui, sans-serif; font-weight: 500; }
+#tab-library .card { padding: 0 12px 12px; border-color: color-mix(in srgb, var(--muted) 45%, var(--panel)); box-shadow: 0 2px 6px var(--shadow); }
+#tab-library .card > h2 { display: flex; align-items: center; gap: 7px; height: 32px; margin: 0 -12px 10px; padding: 0 10px; border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0;
+  background: var(--surface-tint); font: 600 15px/1 'Barlow Condensed', 'Barlow Semi Condensed', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .07em; }
+#tab-library .card > h2 .muted { margin-left: auto; font: 500 12px/1 'Barlow', system-ui, sans-serif; text-transform: none; letter-spacing: 0; }
+#tab-library .card > p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; }
+#tab-library :is(h3, h4) { margin: 14px 0 6px; font: var(--cap); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+#tab-library .toolbar button, #tab-library .row .btn { min-height: 28px; padding: 4px 10px; border-radius: 5px; font: var(--cap); font-size: 13px; text-transform: uppercase; letter-spacing: .07em;
+  background: var(--gate); border-color: var(--gate); color: var(--accent-ink); }
+#tab-library .toolbar button.primary { background: var(--accent); border-color: var(--accent); }
+#tab-library .toolbar button:hover, #tab-library .row .btn:hover { border-color: var(--ink); filter: brightness(1.08); }
+#tab-library .toolbar input { min-height: 28px; border-radius: 5px; background: var(--bar); border-color: var(--line); font: 500 13px/1.2 'Barlow', system-ui, sans-serif; }
+#tab-library progress { width: 100%; height: 6px; margin: 2px 0 8px; }
+#tab-library .bank-list { gap: 3px; }
+#tab-library .bank-row { min-height: 26px; padding: 0 4px 0 8px; border-radius: 5px; background: var(--bar); font-size: 13px; }
+#tab-library .bank-row:hover { background: color-mix(in srgb, var(--secondary) 12%, var(--bar)); }
+#tab-library .bank-row :is(b, > span:not(.slot, .grow), > span.grow:not(:has(b))) { font: 600 13.5px/1 'Barlow Condensed', 'Barlow Semi Condensed', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .06em; }
+#tab-library .bank-row .muted { font-size: 12px; }
+#tab-library .bank-row .slot { font: var(--cap); font-size: 12px; }
+#tab-library .bank-row button { min-height: 20px; padding: 0 6px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font: var(--cap); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+#tab-library .bank-row button:hover:not(:disabled) { color: var(--secondary); background: color-mix(in srgb, var(--secondary) 14%, transparent); }
+#tab-library .bank-row button:disabled { opacity: .3; }

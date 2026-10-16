@@ -2518,7 +2518,7 @@ export class Editor {
       const dot = t?.closest('.dot') as HTMLElement | null;
       cancel();
       // an output dropped on the sidebar's cable slack bar sways the cables
-      if (kind === 'out' && t?.closest('.slack-jack, .sbar')) return this.setSlackSource({ module: Number(start.dataset.mod), port: start.dataset.port! });
+      if (kind === 'out' && t?.closest('.sbar')) return this.setSlackSource({ module: Number(start.dataset.mod), port: start.dataset.port! });
       if (dot === start) {
         this.armed = start;
         start.classList.add('armed');

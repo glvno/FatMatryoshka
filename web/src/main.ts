@@ -618,7 +618,7 @@ function setSlack(v: number): void {
 }
 slackInput.oninput = () => setSlack(Number(slackInput.value));
 // the slack's input (an easter egg): an output dropped on the bar sways the cables (Patch.slackFrom, Editor.setSlackSource);
-// the worklet sends that output's mean, the bar's fill follows it, its jack unplugs it
+// the worklet sends that output's mean, the bar's fill follows it, a right-click unplugs it
 function showSlack(): void {
   const slackInput = $<HTMLInputElement>('slack-input');
   const from = editor.patch.slackFrom;
@@ -627,8 +627,9 @@ function showSlack(): void {
   bar.style.setProperty('--v', String(Math.min(1, Math.max(0, editor.slack + (from ? slackLive : 0)))));
   bar.classList.toggle('modulated', !!m);
   $('slack-out').textContent = m ? `${moduleName(m.type, DEFS[m.type].label)} ${longName(m.type, from!.port)}` : `${Math.round(editor.slack * 100)} %`;
-  $('slack-jack').classList.toggle('plugged', !!m);
-  $('slack-jack').title = m ? `Swayed by ${moduleName(m.type, DEFS[m.type].label)} ${longName(m.type, from!.port)}: click to unplug` : 'Drag a cable from any output onto the cable slack bar: its signal sways the cables';
+  bar.title = m
+    ? `Swayed by ${moduleName(m.type, DEFS[m.type].label)} ${longName(m.type, from!.port)}. Right-click to unplug.`
+    : 'How far the cables sag. Its thumb is a jack: drop a cable from any output on it and that signal sways the cables';
 }
 function syncSlackWatch(): void {
   const from = editor.patch.slackFrom;
@@ -646,7 +647,12 @@ host.onWatch = (v) => {
   editor.modulateSlack(v);
   showSlack();
 };
-$('slack-jack').onclick = () => editor.setSlackSource(null);
+// the thumb is the jack (no cable is drawn to the sidebar): a right-click on the bar unplugs it
+$('slack-input').parentElement!.addEventListener('contextmenu', (e) => {
+  if (!editor.patch.slackFrom) return;
+  e.preventDefault();
+  editor.setSlackSource(null);
+});
 syncSlackWatch();
 try {
   const v = Number(localStorage.getItem(SLACK) ?? 0);

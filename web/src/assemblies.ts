@@ -155,7 +155,7 @@ export function buildAssembliesTab(root: HTMLElement, ev: LibraryEvents): () => 
     el(
       'div',
       { class: 'card' },
-      el('h2', { textContent: 'Assemblies' }),
+      el('h2', {}, el('span', { class: 'mtag asm', textContent: 'ASM' }), 'Assemblies'),
       el('p', { class: 'muted', textContent: 'An assembly is a building block: prewired modules that appear as one card with the ports and parameters it exposes, never the Main panel or the Output. Make one from a selection in the patch and "save" it on its card; "Insert assembly" in the toolbar puts any of these into the patch.' }),
       el('h3', { textContent: USER_SHELF }),
       userEl,
