@@ -22,14 +22,29 @@
         <button id="nav-library" role="tab" data-tab="library" aria-controls="tab-library" aria-selected="false" tabindex="-1">Library</button>
       </nav>
       <div class="patch-controls">
-        <button id="new-patch-btn">New patch</button>
-        <input id="patch-name" aria-label="Patch name" title="Rename patch" />
-        <button id="add-btn" class="primary">+ Add module</button>
-        <button id="add-assembly-btn" class="primary">+ Add assembly</button>
-        <div class="view-row"><button id="tidy-btn" title="Line the cards up in columns, keeping their order (undo with Ctrl/Cmd+Z)">TIDY</button><button id="fit-btn" title="Zoom so every card is in view">FIT</button></div>
-        <label class="slack-row" title="How far the cables sag: taut at the left, droopy at the right">Cable slack<input id="slack-input" type="range" min="0" max="1" step="0.05" value="0" aria-label="Cable slack" /></label>
-        <button id="tour-btn">Tutorial ↗</button>
-        <label class="example-picker">Examples<select id="preset" aria-label="Load an example"></select></label>
+        <!-- sidebar panels in the cards' style: a header strip with a tag and a condensed title, a body of controls -->
+        <section class="spanel" aria-label="Patch">
+          <div class="shead"><span class="mtag util">PATCH</span><input id="patch-name" aria-label="Patch name" title="Rename patch" /></div>
+          <div class="sbody">
+            <button id="new-patch-btn">New patch</button>
+            <button id="add-btn" class="primary">+ Add module</button>
+            <button id="add-assembly-btn" class="primary">+ Add assembly</button>
+          </div>
+        </section>
+        <section class="spanel" aria-label="View">
+          <div class="shead"><span class="mtag shp">VIEW</span><span class="stitle">Canvas</span></div>
+          <div class="sbody">
+            <div class="view-row"><button id="tidy-btn" title="Line the cards up in columns, keeping their order (undo with Ctrl/Cmd+Z)">TIDY</button><button id="fit-btn" title="Zoom so every card is in view">FIT</button></div>
+            <label class="sbar" title="How far the cables sag: taut at the left, droopy at the right"><span>Cable slack</span><output id="slack-out">taut</output><input id="slack-input" type="range" min="0" max="1" step="0.05" value="0" aria-label="Cable slack" /></label>
+          </div>
+        </section>
+        <section class="spanel" aria-label="Learn">
+          <div class="shead"><span class="mtag mod">LEARN</span><span class="stitle">Get started</span></div>
+          <div class="sbody">
+            <button id="tour-btn">Tutorial ↗</button>
+            <label class="example-picker"><span>Examples</span><select id="preset" aria-label="Load an example"></select></label>
+          </div>
+        </section>
       </div>
       <div class="sidebar-bottom">
         <span id="audio-status" class="muted" role="status">Audio ready · play a key</span>

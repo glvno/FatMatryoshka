@@ -67,19 +67,16 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 syste
 /* the cables' continuation from the canvas down to the docked jacks; drawn over the panel, never taking the pointer */
 .dock-cables { z-index: 3; overflow: visible; } /* visible: the wheels' jacks are left of the dock */
 .dock-cables .cable { pointer-events: none; }
-.sidebar { display: flex; flex-direction: column; gap: 24px; padding: 20px 16px 16px; min-height: 0; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); }
+.sidebar { display: flex; flex-direction: column; gap: 16px; padding: 20px 14px 14px; min-height: 0; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); }
 .brand { display: grid; justify-items: center; gap: 6px; min-width: 0; }
 .brand img { width: 100%; height: auto; min-width: 0; object-fit: contain; }
 .brand h1 { margin: 0; font-size: 17px; font-weight: 750; letter-spacing: -.045em; }
 #tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
 #tabs button { flex: 1; border: 0; border-radius: 0; padding: 10px 4px; background: transparent; color: var(--muted); }
-#tabs button[aria-selected="true"] { color: var(--secondary); box-shadow: inset 0 -2px var(--secondary); font-weight: 650; }
-.patch-controls { display: grid; gap: 10px; }
+#tabs button[aria-selected="true"] { color: var(--secondary); box-shadow: inset 0 -2px var(--secondary); }
+.patch-controls { display: grid; gap: 12px; }
 .patch-controls[hidden] { display: none; }
 .patch-controls > * { width: 100%; min-width: 0; }
-input#patch-name { padding: 6px 0; background: transparent; border-color: transparent; border-radius: 0; font-size: 18px; font-weight: 650; letter-spacing: -.025em; cursor: text; }
-input#patch-name:hover, input#patch-name:focus { border-bottom-color: var(--line); }
-.patch-controls #preset { font-size: 12px; }
 /* the FM-1 budget meter, a column of the Main dock right of the arpeggiator: memory (the fullest limit) and the estimated CPU
  * load as bars; open, a card above the deck with every limit and the costliest modules */
 .budget { margin: 0; }
@@ -110,11 +107,6 @@ input#patch-name:hover, input#patch-name:focus { border-bottom-color: var(--line
 .budget-item.pick { cursor: pointer; }
 .budget-item.pick:hover > :first-child { color: var(--ink); text-decoration: underline; }
 .budget-list p { margin: 4px 0 0; font-size: 11px; }
-.view-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.view-row button { white-space: nowrap; padding-inline: 6px; }
-.slack-row { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
-.slack-row input { width: 100%; margin: 0; accent-color: var(--secondary); }
-.sidebar button, .sidebar select { min-height: 36px; }
 .sidebar-bottom { margin-top: auto; display: grid; gap: 12px; padding-top: 24px; }
 #audio-status { font-size: 11px; overflow-wrap: anywhere; }
 #palette-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; background: transparent; }
@@ -567,8 +559,6 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .brand-mark { display: block; width: 100%; height: auto; overflow: visible; }
 #add-assembly-btn { background: var(--secondary); border-color: var(--secondary); color: var(--panel); }
 #tour-btn { color: var(--secondary); border-color: transparent; text-align: left; padding-inline: 0; background: transparent; }
-.example-picker { display: grid; gap: 5px; font-size: 11px; color: var(--muted); margin-top: 12px; }
-.example-picker select { width: 100%; }
 .tutorial { position: fixed; z-index: 11000; right: 24px; bottom: calc(var(--piano-h) + 24px); width: min(440px, calc(100vw - 40px)); max-height: calc(100dvh - 48px); overflow: auto; padding: 18px 22px 22px; background: var(--panel); border: 1px solid var(--secondary); border-radius: 12px; box-shadow: 0 8px 32px var(--shadow); }
 .tutorial[hidden] { display: none; }
 .tutorial-offer { position: fixed; z-index: 11001; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 20px 22px; background: var(--panel); border: 1px solid var(--secondary); border-radius: 12px; box-shadow: 0 8px 32px var(--shadow); }
@@ -812,3 +802,39 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .module .mbody .port, .module .mbody .port > span { pointer-events: auto; }
 /* the ▸ / ▾ of an assembly: bright enough to find */
 :is(.mhead, .fhead) button.chev { width: 18px; font-size: 13px; color: var(--ink); }
+
+/* ---- Sidebar in the cards' style: panels with a tinted header strip (family tag + condensed title), bodies of controls in
+   condensed capitals, cable slack as a value bar, the examples as a picker field. Button texts stay as written (the
+   tutorial's targets and prose); the capitals are CSS. ---- */
+.sidebar { font-family: 'Barlow', system-ui, sans-serif; font-weight: 500; }
+#tabs button, .sidebar button, .example-picker > span, .sbar > span, #audio-status { font: var(--cap); font-size: 13px; text-transform: uppercase; letter-spacing: .07em; }
+#tabs button { font-size: 14px; }
+.spanel { border: 1px solid color-mix(in srgb, var(--muted) 45%, var(--panel)); border-radius: 8px; background: var(--panel); box-shadow: 0 2px 6px var(--shadow); }
+.shead { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 6px; border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; background: var(--surface-tint); }
+.shead .stitle, input#patch-name { flex: 1; min-width: 0; font: 600 15px/1 'Barlow Condensed', 'Barlow Semi Condensed', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .07em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shead .stitle { color: var(--muted); }
+input#patch-name { height: 24px; padding: 0 4px; margin-left: -4px; background: transparent; border: 1px solid transparent; border-radius: 4px; cursor: text; }
+input#patch-name:hover { border-color: var(--line); }
+input#patch-name:focus { border-color: var(--secondary); background: var(--bar); outline: none; }
+.sbody { display: grid; gap: 6px; padding: 8px; }
+.sidebar button { min-height: 30px; padding: 4px 8px; border-radius: 5px; white-space: nowrap; }
+.sidebar button:not(.primary) { background: var(--bar); border-color: var(--bar); }
+.sidebar button:not(.primary):hover { border-color: var(--secondary); color: var(--secondary); }
+#add-assembly-btn { background: var(--secondary); border-color: var(--secondary); color: var(--panel); }
+.view-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+/* a value bar like a card's slider: name left, setting right, the fill to the value, a hollow thumb */
+.sbar { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; height: 24px; border-radius: 5px; overflow: hidden;
+  background: linear-gradient(to right, var(--bar-fill) calc(var(--v, 0) * 100%), var(--bar) 0); color: var(--ink); cursor: ew-resize; }
+.sbar > span { padding-left: 20px; font-size: 12px; pointer-events: none; }
+.sbar > output { padding-right: 20px; font: 500 12px/1 'Barlow', system-ui, sans-serif; color: var(--ink); pointer-events: none; }
+.sbar > input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: transparent; appearance: none; -webkit-appearance: none; cursor: ew-resize; }
+.sbar > input::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; box-sizing: border-box; border: 2.5px solid var(--secondary); background: var(--panel); box-shadow: 0 0 0 1.5px var(--bar); }
+.sbar > input::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; box-sizing: border-box; border: 2.5px solid var(--secondary); background: var(--panel); }
+.sbar > input:focus-visible { outline: 2px solid var(--secondary); outline-offset: -2px; border-radius: 5px; }
+.example-picker { display: grid; gap: 4px; }
+.example-picker > span { font-size: 11px; color: var(--muted); }
+.example-picker select { width: 100%; min-height: 28px; padding: 2px 6px; border-radius: 5px; border-color: var(--line); background: var(--bar); font: 500 13px/1.2 'Barlow', system-ui, sans-serif; }
+#audio-status { font-size: 11px; color: var(--muted); }
+#palette-btn { font-size: 12px; }
+#palette-btn kbd { font: 500 10px/1 'Barlow', system-ui, sans-serif; text-transform: none; letter-spacing: 0; }
+.sidebar #tour-btn { color: var(--secondary); background: var(--bar); border-color: var(--bar); padding-inline: 8px; text-align: center; }

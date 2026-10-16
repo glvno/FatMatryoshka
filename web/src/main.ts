@@ -603,6 +603,9 @@ const slackInput = $<HTMLInputElement>('slack-input');
 function setSlack(v: number): void {
   editor.setSlack(v);
   slackInput.value = String(editor.slack);
+  // the bar's fill and its name for the setting (the palette's taut / loose / droopy)
+  slackInput.parentElement!.style.setProperty('--v', String(editor.slack));
+  $('slack-out').textContent = editor.slack === 0 ? 'taut' : editor.slack < 0.75 ? 'loose' : 'droopy';
   try {
     localStorage.setItem(SLACK, String(editor.slack));
   } catch {
