@@ -422,7 +422,7 @@ export class Tutorial {
       parts.push(lessonProse(ch.intro));
       parts.push(el('p', { textContent: 'Your previous patch was saved in Tutorial → Your saved variations. Each chapter starts from a prepared patch; your own sketches remain recoverable.' }));
       parts.push(this.button(this.previewing ? 'Stop preview' : 'Preview the finished sound', () => this.preview()));
-      parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.endPreview(); this.page = 'steps'; this.enterStep(); this.saveProgress(); this.render(true); }, true), this.button('Chapters', () => this.open())));
+      parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.endPreview(); void this.host.startAudio(); this.page = 'steps'; this.enterStep(); this.saveProgress(); this.render(true); }, true), this.button('Chapters', () => this.open())));
     } else if (this.page === 'steps' && st) {
       parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? (this.hold || st.listen ? ' · ✓ ready when you are' : ' · ✓ done, moving on') : ''}` }));
       parts.push(this.checklist(lessonProse(st.text), ok ? null : st.met?.(s) ?? {}));

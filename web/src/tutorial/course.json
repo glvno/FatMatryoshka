@@ -48,16 +48,6 @@
       "start": { "kind": "empty" },
       "steps": [
         {
-          "id": "audio",
-          "kind": "task",
-          "title": "Enable audio",
-          "text": "[Click `Enable audio` in the sidebar.](req:audio)",
-          "why": "",
-          "parts": [
-            { "id": "audio", "kind": "event", "event": "audio" }
-          ]
-        },
-        {
           "id": "new",
           "kind": "task",
           "title": "The patch",
@@ -2855,7 +2845,6 @@
     }
   ],
   "references": {
-    "hello-sound/audio": {"patch":{"version":2,"name":"Tutorial voice","modules":[{"id":1,"type":"fm1","x":20,"y":20,"params":{"k1":0.5,"k2":0.5,"k3":0.5,"k4":0.5,"morph":0}},{"id":2,"type":"output","x":830,"y":20,"params":{"level":0.15}}],"cables":[]}},
     "hello-sound/new": {"patch":{"version":2,"name":"Tutorial voice","modules":[{"id":1,"type":"fm1","x":20,"y":20,"params":{"k1":0.5,"k2":0.5,"k3":0.5,"k4":0.5,"morph":0}},{"id":2,"type":"output","x":830,"y":20,"params":{"level":0.15}}],"cables":[]}},
     "hello-sound/osc": {"patch":{"version":2,"name":"Tutorial voice","modules":[{"id":1,"type":"fm1","x":20,"y":20,"params":{"k1":0.5,"k2":0.5,"k3":0.5,"k4":0.5,"morph":0}},{"id":2,"type":"output","x":830,"y":20,"params":{"level":0.15}},{"id":3,"type":"osc","x":290,"y":20,"params":{"wave":0,"pw":0.5,"coarse":0,"fine":0,"pm":0,"level":0.8,"fb":0,"unison":1,"detune":10},"att":[1,1],"map":{"p1":["wave"],"p2":["pw"],"k1":["wave"],"k2":["pw"],"k3":["coarse"],"k4":["fine"]}}],"cables":[]}},
     "hello-sound/pitch": {"patch":{"version":2,"name":"Tutorial voice","modules":[{"id":1,"type":"fm1","x":20,"y":20,"params":{"k1":0.5,"k2":0.5,"k3":0.5,"k4":0.5,"morph":0}},{"id":2,"type":"output","x":830,"y":20,"params":{"level":0.15}},{"id":3,"type":"osc","x":290,"y":20,"params":{"wave":0,"pw":0.5,"coarse":0,"fine":0,"pm":0,"level":0.8,"fb":0,"unison":1,"detune":10},"att":[1,1],"map":{"p1":["wave"],"p2":["pw"],"k1":["wave"],"k2":["pw"],"k3":["coarse"],"k4":["fine"]}}],"cables":[{"from":{"module":1,"port":"pitch"},"to":{"module":3,"port":"pitch"}},{"from":{"module":3,"port":"out"},"to":{"module":2,"port":"l"}}]}},
