@@ -10,6 +10,7 @@ import { AssemblyBrowser } from './browser';
 import { searchCommands, type Command } from './commands';
 import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi, isTextEntry } from './input';
+import { Piano } from './piano';
 import { releaseFocusAfterPointer } from './focus';
 import { DEFS } from './modules';
 import { newPatch, validatePatch, voicesOf, type Patch } from './patch';
@@ -94,11 +95,18 @@ const queueUpload = (): void => {
   clearTimeout(uploadTimer);
   uploadTimer = window.setTimeout(() => void sendPatch(), 150);
 };
+/** the on-screen keyboard plays through the sink like the letter keys; Z / X and its buttons share the octave */
+const piano = new Piano($('piano'), {
+  on: (note, vel) => sink.send({ t: 'on', note, vel }),
+  off: (note) => sink.send({ t: 'off', note }),
+  shift: (d) => noteKeys.shift(d),
+});
 /** notes go to the browser engine and, with Live on, to the FM-1 */
 const sink = {
   send(msg: HostMsg): void {
     if (msg.t === 'on') host.mute(false);
     host.send(msg);
+    piano.track(msg);
     if (msg.t === 'on') tutorial.noteOn();
     if (live()) device.note(msg as { t: string; note?: number; vel?: number });
   },
@@ -558,7 +566,7 @@ const startAudio = async (): Promise<void> => {
   }
 };
 $('audio-btn').onclick = startAudio;
-attachKeyboard(sink, () => currentTab === 'patch' && !document.querySelector('dialog[open], [popover]:popover-open'));
+const noteKeys = attachKeyboard(sink, () => currentTab === 'patch' && !document.querySelector('dialog[open], [popover]:popover-open'), (o) => piano.setOctave(o));
 // Web MIDI is only asked for on request: while a page holds MIDI access, Chromium's ALSA backend tracks every MIDI port on the
 // system and aborts the whole browser (SIGILL in midi::MidiManager::SetInputPortState) when the ports change, for example when
 // the FM-1 re-enumerates after a reset or a firmware update.

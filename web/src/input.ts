@@ -2,7 +2,10 @@
 // Computer-keyboard and Web MIDI note input.
 import type { AudioHost } from './audio';
 
-const KEYS = 'awsedftgyhujkolp';
+/** the note keys, C up to D# a bit more than an octave above; key i plays `keyBase(octave) + i` */
+export const KEYS = 'awsedftgyhujkolp';
+export const OCTAVE_MIN = -3, OCTAVE_MAX = 3;
+export const keyBase = (octave: number): number => 60 + octave * 12;
 const NON_TYPING_INPUTS = new Set(['range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'color']);
 
 /** Text editing owns letter keys; merely focusing a synth control does not. */
@@ -12,8 +15,18 @@ export function isTextEntry(target: EventTarget | null): boolean {
     (target.tagName === 'INPUT' && !NON_TYPING_INPUTS.has((target as HTMLInputElement).type));
 }
 
-export function attachKeyboard(host: Pick<AudioHost, 'send'>, isActive: () => boolean): void {
+export interface NoteKeys {
+  octave(): number;
+  /** move the note keys by `d` octaves (clamped); held notes keep sounding until their key is released */
+  shift(d: number): void;
+}
+
+export function attachKeyboard(host: Pick<AudioHost, 'send'>, isActive: () => boolean, onOctave: (octave: number) => void = () => {}): NoteKeys {
   let octave = 0;
+  const shift = (d: number): void => {
+    const o = Math.max(OCTAVE_MIN, Math.min(OCTAVE_MAX, octave + d));
+    if (o !== octave) (octave = o), onOctave(o);
+  };
   const down = new Map<string, number>();
   window.addEventListener('keydown', (e) => {
     if (!isActive() || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isTextEntry(e.target)) return;
@@ -25,10 +38,10 @@ export function attachKeyboard(host: Pick<AudioHost, 'send'>, isActive: () => bo
     // Also consume repeats: otherwise holding F starts native select typeahead.
     e.preventDefault();
     if (e.repeat) return;
-    if (k === 'z') octave = Math.max(-3, octave - 1);
-    else if (k === 'x') octave = Math.min(3, octave + 1);
+    if (k === 'z') shift(-1);
+    else if (k === 'x') shift(1);
     if (i >= 0 && !down.has(k)) {
-      const note = 60 + octave * 12 + i;
+      const note = keyBase(octave) + i;
       down.set(k, note);
       host.send({ t: 'on', note, vel: 0.8 });
     }
@@ -45,6 +58,7 @@ export function attachKeyboard(host: Pick<AudioHost, 'send'>, isActive: () => bo
     for (const note of down.values()) host.send({ t: 'off', note });
     down.clear();
   });
+  return { octave: () => octave, shift };
 }
 
 export async function attachMidi(host: Pick<AudioHost, 'send'>, status: (s: string) => void): Promise<void> {

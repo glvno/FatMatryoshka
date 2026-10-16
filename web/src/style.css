@@ -16,6 +16,13 @@
   /* The FM-1 knobs K1..K4 in Sloop's hues (blue, green, yellow, orange), darkened for paper. */
   --k1: #2d5fb5; --k2: #1f8a55; --k3: #9a7a12; --k4: #c4541c;
   --danger: var(--ref-red); --warning: var(--gate);
+  --piano-h: 96px;
+  /* The on-screen keyboard: paper and ink keys, the lettered range tinted teal, held keys in the accent. */
+  --key-white: var(--ref-white); --key-black: var(--ref-ink); --key-edge: var(--ref-sand);
+  --key-white-mapped: color-mix(in oklab, var(--ref-deep-teal) 12%, var(--ref-white));
+  --key-black-mapped: var(--ref-slate);
+  --key-white-letter: var(--ref-deep-teal); --key-black-letter: var(--ref-seafoam);
+  --key-held: var(--accent); --key-held-ink: var(--accent-ink); --key-name: var(--ref-stone);
   --shadow: color-mix(in srgb, var(--ref-ink) 16%, transparent);
   --backdrop: color-mix(in srgb, var(--ref-night) 45%, transparent);
   --surface-tint: color-mix(in oklab, var(--secondary) 5%, var(--panel));
@@ -28,6 +35,10 @@
     --accent: var(--ref-coral); --accent-ink: var(--ref-night);
     --secondary: var(--ref-seafoam); --gate: var(--ref-gold); --danger: var(--ref-red-light);
     --k1: #5b96ee; --k2: #4cc78c; --k3: #d6b63c; --k4: #f08a3a;
+    --key-white: color-mix(in oklab, var(--ref-ivory) 86%, var(--ref-night)); --key-black: var(--ref-night); --key-edge: var(--ref-night);
+    --key-white-mapped: color-mix(in oklab, var(--ref-seafoam) 30%, var(--key-white));
+    --key-black-mapped: color-mix(in oklab, var(--ref-seafoam) 22%, var(--ref-night));
+    --key-white-letter: var(--ref-deep-teal); --key-black-letter: var(--ref-seafoam);
     color-scheme: dark;
   }
 }
@@ -297,8 +308,27 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .device-controls p { margin: 4px 0 10px; font-size: 12px; }
 .device-controls form { margin-top: 20px; text-align: right; }
 #dev-status { display: block; font-size: 12px; overflow-wrap: anywhere; }
-#tab-patch { position: relative; height: 100%; isolation: isolate; background: var(--surface-tint); }
-.canvas { width: 100%; min-width: 0; min-height: 0; height: 100%; isolation: isolate; z-index: 1; }
+#tab-patch { position: relative; height: 100%; isolation: isolate; background: var(--surface-tint); display: flex; flex-direction: column; }
+#tab-patch[hidden] { display: none; }
+.canvas { width: 100%; min-width: 0; min-height: 0; flex: 1; isolation: isolate; z-index: 1; }
+/* The keyboard: 88 keys in a strip that scrolls sideways; the octave buttons stay at its left. */
+.piano { flex: none; height: var(--piano-h); display: flex; gap: 8px; padding: 6px 8px 8px; background: var(--panel); border-top: 1px solid var(--line); z-index: 2; user-select: none; }
+.piano-octave { flex: none; display: grid; grid-template-rows: 1fr auto 1fr; gap: 2px; width: 64px; }
+.piano-octave button { padding: 0 6px; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.piano-octave output { text-align: center; font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.piano-keys { flex: 1; min-width: 0; container-type: size; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; touch-action: pan-x; }
+.piano-bed { --w: max(24px, calc(100cqw / var(--whites))); position: relative; height: 100%; width: calc(var(--whites) * var(--w)); }
+.key { position: absolute; top: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 4px; font-size: 11px; line-height: 1.1; cursor: pointer; }
+.key.white { left: calc(var(--at) * var(--w)); width: var(--w); height: 100%; background: var(--key-white); border: 1px solid var(--key-edge); border-left-width: 0; border-radius: 0 0 4px 4px; color: var(--key-white-letter); z-index: 1; }
+.key.white:first-child { border-left-width: 1px; }
+.key.black { left: calc(var(--at) * var(--w) - var(--w) * .3); width: calc(var(--w) * .6); height: 60%; background: var(--key-black); border-radius: 0 0 3px 3px; color: var(--key-black-letter); z-index: 2; box-shadow: 0 1px 2px var(--shadow); }
+.key.white.mapped { background: var(--key-white-mapped); }
+.key.black.mapped { background: var(--key-black-mapped); }
+.key.held { background: var(--key-held) !important; color: var(--key-held-ink); }
+.key .letter { font-weight: 700; }
+.key .name { order: -1; font-size: 9px; color: var(--key-name); }
+.key.held .name { color: inherit; }
+#diff.panel { bottom: calc(var(--piano-h) + 16px); }
 #canvas-space { position: relative; min-width: 100%; min-height: 100%; }
 #patch-world { position: absolute; left: 0; top: 0; transform-origin: 0 0;
   background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 20px 20px; }
@@ -361,7 +391,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 #tour-btn { color: var(--secondary); border-color: transparent; text-align: left; padding-inline: 0; background: transparent; }
 .example-picker { display: grid; gap: 5px; font-size: 11px; color: var(--muted); margin-top: 12px; }
 .example-picker select { width: 100%; }
-.tutorial { position: fixed; z-index: 11000; right: 24px; bottom: 24px; width: min(440px, calc(100vw - 40px)); max-height: calc(100dvh - 48px); overflow: auto; padding: 18px 22px 22px; background: var(--panel); border: 1px solid var(--secondary); border-radius: 12px; box-shadow: 0 8px 32px var(--shadow); }
+.tutorial { position: fixed; z-index: 11000; right: 24px; bottom: calc(var(--piano-h) + 24px); width: min(440px, calc(100vw - 40px)); max-height: calc(100dvh - 48px); overflow: auto; padding: 18px 22px 22px; background: var(--panel); border: 1px solid var(--secondary); border-radius: 12px; box-shadow: 0 8px 32px var(--shadow); }
 .tutorial[hidden] { display: none; }
 .tutorial-offer { position: fixed; z-index: 11001; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 20px 22px; background: var(--panel); border: 1px solid var(--secondary); border-radius: 12px; box-shadow: 0 8px 32px var(--shadow); }
 .tutorial-offer h2 { margin: 0 0 8px; font-size: 18px; }

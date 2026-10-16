@@ -80,4 +80,19 @@ describe('computer keyboard focus', () => {
     key('keyup', new Control('INPUT', 'text'), 'f');
     expect(send.mock.calls).toEqual([[{ t: 'on', note: 77, vel: 0.8 }], [{ t: 'off', note: 77 }]]);
   });
+
+  it('shares the octave with the on-screen keyboard: buttons and Z / X move the same notes, clamped', () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal('window', (events = new EventTarget()));
+    vi.stubGlobal('HTMLElement', Control);
+    const seen: number[] = [];
+    const keys = attachKeyboard({ send }, () => true, (o) => seen.push(o));
+    keys.shift(-1);
+    key('keydown', new Control('BUTTON'), 'z');
+    for (let i = 0; i < 5; i++) keys.shift(-1);
+    expect(keys.octave()).toBe(-3);
+    expect(seen).toEqual([-1, -2, -3]);
+    key('keydown', new Control('BUTTON'), 'a');
+    expect(send).toHaveBeenLastCalledWith({ t: 'on', note: 24, vel: 0.8 });
+  });
 });
