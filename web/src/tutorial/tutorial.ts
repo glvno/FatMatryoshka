@@ -456,7 +456,7 @@ export class Tutorial {
         this.button('Close', () => this.close())));
     }
     this.panel.replaceChildren(...parts);
-    this.focus(this.targetsOf(st, s));
+    this.focus(this.targetsOf(st, s), this.wanting(st, s));
   }
 
   /** restart the previous step from the patch it began with (the learner's own, else the canned one); the current patch is
@@ -539,7 +539,8 @@ export class Tutorial {
 
   /** the editor rebuilds its cards on every change: re-apply the highlight and follow the target each tick */
   private refocus(): void {
-    this.focus(this.targetsOf(this.step, this.state()));
+    const s = this.state();
+    this.focus(this.targetsOf(this.step, s), this.wanting(this.step, s));
   }
 
   /** the text's checkboxes: ticked when their requirements are met (all of them when `met` is null: the step is done),
@@ -565,10 +566,21 @@ export class Tutorial {
     return f.length ? f : st.target?.(s) ?? [];
   }
 
-  private focus(targets: Target[]): void {
+  /** whether the current step still asks for something: a task step until its requirements are met, a Continue step's
+   * pointer always */
+  private wanting(st: Step | null, s: TutorialState): boolean {
+    const ch = this.chapter;
+    if (!ch || !st || this.page !== 'steps') return false;
+    if (st.kind === 'continue') return true;
+    const d = stepDone(ch, this.progress.step, s);
+    return !(d.met || d.moot);
+  }
+
+  /** highlight the targets (unless `highlight` is off: the step is done, the panel stays anchored beside them) */
+  private focus(targets: Target[], highlight = true): void {
     this.clearFocus();
     const els = targets.map((t) => this.resolve(t)).filter((x): x is Element => !!x);
-    for (const x of els) x.classList.add('tour-focus');
+    if (highlight) for (const x of els) x.classList.add('tour-focus');
     const outside = els.filter((x) => !this.panel.contains(x));
     const first = outside[0] ?? null;
     if (this.followTarget && first && first !== this.beside && first.closest('#canvas')) first.scrollIntoView({ block: 'nearest', inline: 'nearest' });
