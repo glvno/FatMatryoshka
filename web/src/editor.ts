@@ -168,6 +168,10 @@ export class Editor {
   private expandedOnce = new Set<number>();
   /** how far cables sag, 0 (taut, the default) .. 1: the sidebar's setting */
   slack = 0;
+  /** the sidebar's cable slack slider: its thumb is a jack (Patch.slackFrom; set by the host) */
+  slackThumb: HTMLInputElement | null = null;
+  /** the cable from the slack source to that thumb: in its own layer over the whole window, so it crosses the sidebar */
+  private slackLayer: SVGSVGElement | null = null;
   /** the patch's slack source (Patch.slackFrom) as it plays: added to `slack` */
   private slackMod = 0;
   private slackFrame = 0;
@@ -2262,7 +2266,45 @@ export class Editor {
    * its copy on the dock's overlay draws the rest (the same curve, mapped from world to overlay space), but only the
    * strip between the jack and the dock's top edge: a cable to a module below the canvas's view stays under the panel.
    */
+  /** the slack source's cable, over everything up to the sidebar's thumb; hidden while either end is not shown */
+  positionSlackCable(): void {
+    const from = this.patch.slackFrom;
+    const src = from && this.ports.get(this.key(from.module, from.port, 'out'));
+    const thumb = this.slackThumb;
+    const shown = !!src && !!thumb && src.isConnected && this.canvas.offsetParent !== null && thumb.offsetParent !== null;
+    if (!shown) {
+      this.slackLayer?.replaceChildren();
+      return;
+    }
+    if (!this.slackLayer) {
+      this.slackLayer = document.createElementNS(SVGNS, 'svg') as SVGSVGElement;
+      this.slackLayer.setAttribute('class', 'cables slack-cable');
+      this.slackLayer.setAttribute('aria-hidden', 'true');
+      document.body.append(this.slackLayer);
+    }
+    let path = this.slackLayer.querySelector('path');
+    if (!path) {
+      path = document.createElementNS(SVGNS, 'path');
+      path.addEventListener('click', () => this.setSlackSource(null));
+      this.slackLayer.append(path);
+    }
+    const m = this.patch.modules.find((x) => x.id === from!.module)!;
+    const kind = DEFS[m.type].outputs.find((o) => o.name === from!.port)?.kind ?? 'control';
+    path.setAttribute('class', `cable ${kind}${m.type === 'fm1' && isKnob(from!.port) ? ` knob-${from!.port}` : ''}`);
+    const title = 'Swaying the cables: click to unplug';
+    path.setAttribute('aria-label', title);
+    // the thumb's centre: the input's value along its track (the thumb is as wide as the bar is tall)
+    const w = this.world.getBoundingClientRect();
+    const r = thumb!.getBoundingClientRect();
+    const v = (Number(thumb!.value) - Number(thumb!.min)) / (Number(thumb!.max) - Number(thumb!.min) || 1);
+    const tx = r.left + r.height / 2 + v * (r.width - r.height), ty = r.top + r.height / 2;
+    const b = { x: (tx - w.left) / this.zoom, y: (ty - w.top) / this.zoom };
+    path.setAttribute('d', this.curve(this.center(src!), b, this.endOf(src!), 'up'));
+    path.setAttribute('transform', `translate(${w.left} ${w.top}) scale(${this.zoom})`);
+  }
+
   private positionCables(): void {
+    this.positionSlackCable();
     const w = this.world.getBoundingClientRect();
     const o = this.dockCables?.getBoundingClientRect();
     for (const { path, from, to, origin } of this.cablePaths) {
@@ -2288,6 +2330,7 @@ export class Editor {
 
   /** Outside cables end at side jacks; internal branches are editable input-to-parameter routes. */
   drawCables(): void {
+    this.positionSlackCable();
     for (const { path } of this.cablePaths) path.remove();
     this.cablePaths = [];
     this.dockCables?.replaceChildren();

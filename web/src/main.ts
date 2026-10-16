@@ -231,6 +231,7 @@ editor.wheelHost = $('wheels');
 editor.dockWheels = hands.wheels;
 editor.dockOctave = piano.octaveControls;
 editor.dockBudget = $('budget');
+editor.slackThumb = $<HTMLInputElement>('slack-input');
 editor.rebuild();
 showBudget();
 snapshotCandidates = () => editor.snapshots.B ? [{ name: 'Snapshot B', patch: { ...JSON.parse(editor.snapshots.B) as Patch, name: 'Snapshot B' } }] : [];
@@ -647,7 +648,10 @@ host.onWatch = (v) => {
   editor.modulateSlack(v);
   showSlack();
 };
-// the thumb is the jack (no cable is drawn to the sidebar): a right-click on the bar unplugs it
+// the sidebar scrolls and the window resizes under the slack cable (it is drawn over the whole window)
+$('workspace-sidebar').addEventListener('scroll', () => editor.positionSlackCable(), { passive: true });
+addEventListener('resize', () => editor.positionSlackCable());
+// the thumb is the jack: a right-click on the bar unplugs it (and a click on its cable)
 $('slack-input').parentElement!.addEventListener('contextmenu', (e) => {
   if (!editor.patch.slackFrom) return;
   e.preventDefault();
@@ -862,6 +866,7 @@ const switchTab = (name: string): void => {
   }
   for (const tab of document.querySelectorAll<HTMLElement>('.tab')) tab.hidden = tab.id !== `tab-${name}`;
   document.querySelector<HTMLElement>('.patch-controls')!.hidden = name !== 'patch';
+  editor.positionSlackCable();
   if (name === 'patch') requestAnimationFrame(() => editor.drawCables());
   if (name === 'library') refreshBank();
 };
