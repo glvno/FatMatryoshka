@@ -42,7 +42,7 @@
       "id": "hello-sound",
       "title": "How to make a noise",
       "intro": "By the end of this chapter, you will have built a machine that translates electricity into sound.\n\n",
-      "payoff": "You may have noticed a pattern:\n- A pitch is voltage (`2V` for middle C, `+/- 1V` per octave)\n- A control signal (`cv`) is voltage\n- The audio signal sent to the `Output` module is voltage\n\nSo you may be wondering, *What if I mix and match? What happens if I use an oscillator signal as a control voltage? What about as a pitch signal?*\n\nIf so, you're exactly the kind of pervert who is going to really enjoy analog synthesis.",
+      "payoff": "You may have noticed a pattern:\n- A pitch is voltage (`2V` for middle C, `+/- 1V` per octave)\n- A control signal (`cv`) is voltage\n- The audio signal sent to the **Output** module is voltage\n\nSo you may be wondering, *What if I mix and match? What happens if I use an oscillator signal as a control voltage? What about as a pitch signal?*\n\nIf so, you're exactly the kind of pervert who is going to really enjoy analog synthesis.",
       "challenge": "Find out what happens![^1]\n\n\n[^1]: Hint: add another oscillator module and use it in a dastardly manner.\n\n",
       "patchName": "Tutorial voice",
       "start": { "kind": "empty" },
@@ -61,7 +61,7 @@
           "id": "new",
           "kind": "task",
           "title": "The patch",
-          "text": "A *patch* is a catch-all term for any configuration of interconnected synth modules. The term comes from the *patch cables* we use to connect analog synth modules.[^1]\n\n# [Click `NEW PATCH` in the sidebar.](req:new-patch) \n\n[^1]: Long ago, patch cables were used to hot-swap spare equipment into vital communications systems in which something had melted, burned out, or exploded. \n\n    These days, patch cables are mostly used by recreational drug users, commodity fetishists, and the neurodivergent in order to make things go *wubwubwubwub*\n",
+          "text": "A *patch* is a catch-all term for any configuration of interconnected synth modules. The term comes from the *patch cables* we use to connect analog synth modules.[^1]\n\n[Click `NEW PATCH` in the sidebar.](req:new-patch)\n\n[^1]: Long ago, patch cables were used to hot-swap spare equipment into vital communications systems in which something had melted, burned out, or exploded.\n\n    These days, patch cables are mostly used by recreational drug users, commodity fetishists, and the neurodivergent in order to make things go *wubwubwubwub*\n",
           "why": "",
           "superseded": true,
           "parts": [
@@ -72,7 +72,7 @@
           "id": "osc",
           "kind": "task",
           "title": "Add an Oscillator",
-          "text": "`Main` here is what is going to send the information from our keyboard circulating through our patch. \n\nIts two most important functions are to send `pitch` (i.e., what note is being played) and `gate`, which answers yes or no to the question, \"Is a key being held down right now?\"[^1]\n\nThe output of `Output` is what you hear. It's can be thought of as the rectum of a patch. A synth patch poops sound into the toilet of the ear.\n\n# [Add an `Oscillator` module using the sidebar button or command palette (`Ctrl/Cmd+K` or the `/` key).](req:add-osc) \n\nAny module on the canvas can be moved around by clicking on its header and dragging it around.\n\n[^1]: The caveats, exceptions, and backpedaling that go here are on our feature roadmap and are slated to be added in Q3 of FY 2029",
+          "text": "**Main** here is what is going to send the information from our keyboard circulating through our patch.\n\nIts two most important functions are to send `pitch` (i.e., what note is being played) and `gate`, which answers yes or no to the question, \"Is a key being held down right now?\"[^1]\n\nThe output of **Output** is what you hear. It's can be thought of as the rectum of a patch. A synth patch poops sound into the toilet of the ear.\n\n[Add an **Oscillator** module using the sidebar button or command palette (`Ctrl/Cmd+K` or the `/` key).](req:add-osc)\n\nAny module on the canvas can be moved around by clicking on its header and dragging it around.\n\n[^1]: The caveats, exceptions, and backpedaling that go here are on our feature roadmap and are slated to be added in Q3 of FY 2029",
           "why": "",
           "parts": [
             { "id": "add-osc", "kind": "module", "type": "osc" }
@@ -82,7 +82,7 @@
           "id": "pitch",
           "kind": "task",
           "title": "Oscillators",
-          "text": "An *oscillator* is a machine named after what it does. It oscillates.[^1] \n\nWant it to stop oscillating? Too bad. If it stopped, that would constitute behavior that synth experts call `not oscillating`. For that you would need a completely different kind of machine.[^2]\n\n## [Connect `main`’s pitch output to the `Oscillator’s` pitch input with a patch cable (click one jack and drag to the other jack).](req:main-pitch-osc-pitch) \n\n## [Cable Oscillator out → Output l](req:osc-out-output-l)\n\nCongratulations! Your machine makes noise.  This noise is continuous.\n\n[^1]: Oscillation is any continuous fluctuation over time that is centered around some central value. Synth oscillators emit continuously fluctuating voltage -- traditionally anywhere from 5V to -5V, centered around 0V. \n\n[^2]: These machines are pricey, because they have only ever been made by one company. That company is called Teenage Engineering",
+          "text": "An *oscillator* is a machine named after what it does. It oscillates.[^1]\n\nWant it to stop oscillating? Too bad. If it stopped, that would constitute behavior that synth experts call `not oscillating`. For that you would need a completely different kind of machine.[^2]\n\n[Connect **main**’s `pitch` output to the **Oscillator’s** `pitch` input with a patch cable (click one jack and drag to the other jack).](req:main-pitch-osc-pitch)\n\n[Cable **Oscillator** `out` → **Output** `l`](req:osc-out-output-l)\n\nCongratulations! Your machine makes noise.  This noise is continuous.\n\n[^1]: *Oscillation* is any continuous fluctuation over time that is centered around some central value. Synth oscillators emit continuously fluctuating voltage -- traditionally anywhere from 5V to -5V, centered around 0V.\n\n[^2]: These machines are pricey, because they have only ever been made by one company. That company is called Teenage Engineering",
           "why": "",
           "parts": [
             {
@@ -109,7 +109,7 @@
           "id": "out",
           "kind": "task",
           "title": "Shutting up an oscillator",
-          "text": "Press some keys on the home row of your computer keyboard. You should hear your noise change pitch. \n\nYou can do this for a while, but eventually your ears and brain will start to hurt. \n\nWhen you've had enough, **[click on the patch cable between `Oscillator`'s `out` jack and `Output`'s `in` jack to remove the cable.](req:unplug-osc-out-output-l)**",
+          "text": "Press some keys on the home row of your computer keyboard. You should hear your noise change pitch.\n\nYou can do this for a while, but eventually your ears and brain will start to hurt.\n\nWhen you've had enough, [click on the patch cable between **Oscillator**'s `out` jack and **Output**'s `in` jack to remove the cable.](req:unplug-osc-out-output-l)",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -128,7 +128,7 @@
           "id": "vca",
           "kind": "task",
           "title": "Shutting up an oscillator (cont'd)",
-          "text": "Obviously, it would be impractical to unplug your oscillator every time you want a note to stop sounding. Luckily, there is a solution: the *voltage-controlled amplifier (VCA)*.\n\n## [Add a VCA module.](req:add-vca) \n\nA VCA has two important inputs: `in`, for an audio signal, and `cv`, for control voltage. Its `output` is just those two signals multiplied together. \n\nIn the next step, we're going to use a VCA to multiply `Oscillator`'s  output voltage by zero. This is how we shut up an oscillator.",
+          "text": "Obviously, it would be impractical to unplug your oscillator every time you want a note to stop sounding. Luckily, there is a solution: the *voltage-controlled amplifier (VCA)*.\n\n[Add a **VCA** module.](req:add-vca)\n\nA **VCA** has two important inputs: `in`, for an audio signal, and `cv`, for control voltage. Its `output` is just those two signals multiplied together.\n\nIn the next step, we're going to use a **VCA** to multiply **Oscillator**'s  output voltage by zero. This is how we shut up an oscillator.",
           "why": "",
           "parts": [
             { "id": "sound-silent", "kind": "sound", "mode": "silent", "hidden": true },
@@ -140,7 +140,7 @@
           "id": "vca-copy",
           "kind": "task",
           "title": "Shutting up an oscillator (cont'd) (cont'd)",
-          "text": "Let's put the VCA to work.\n\n## 1. [Drag the Oscillator’s out jack to the VCA’s in jack.](req:osc-out-vca-in) \n\n## 2. [Drag the VCA’s out jack to Output’s l jack.](req:vca-out-output-l)\n\nSilence. The Oscillator is still oscillating, but the VCA is closed: nothing is plugged into its `control voltage` jack.\n\n## 3.  [Drag `main`'s `gate` jack to VCA's `cv` jack.](req:main-gate-vca-cv)\n\n## 4. Press a key on your keyboard's home row. Play a little ditty.\n\nThis little machine is starting to resemble an instrument.",
+          "text": "Let's put the **VCA** to work.\n\n1. [Drag the **Oscillator**’s `out` jack to the **VCA**’s `in` jack.](req:osc-out-vca-in)\n\n2. [Drag the **VCA**’s `out` jack to **Output**’s `l` jack.](req:vca-out-output-l)\n\nSilence. The **Oscillator** is still oscillating, but the **VCA** is closed: nothing is plugged into its `control voltage` jack.\n\n3.  [Drag **main**'s `gate` jack to **VCA**'s `cv` jack.](req:main-gate-vca-cv)\n\n## 4. Press a key on your keyboard's home row. Play a little ditty.\n\nThis little machine is starting to resemble an instrument.",
           "why": "",
           "parts": [
             {
@@ -184,14 +184,14 @@
           "id": "gate",
           "kind": "continue",
           "title": "Gates",
-          "text": "Whenever you press a key, here's what's happening:\n\n- The sustained electrical voltage coming through `Main`'s  `pitch` jack changes to represent the pressed key's pitch. `2V` means middle C (aka `C4`). Each volt up or down from there represents an octave. [^1]\n- `Main`'s `gate` output voltage, which rests at `0V`, suddenly spikes to `5V`.\n- The output signal of `VCA`, which is using `Main`'s gate signal as its *control voltage* signal multiplier, suddenly spikes from `0V` to the oscillator's signal voltage multiplied by 5.\n\n[^1]: So the note one octave up from `C4` (aka `C5`) is represented as `3V`.  One semitone up from that (aka `C#5`) is represented as `3.083V`. Why `.083`? Because there are 12 notes in an octave, and `1V/12 = 0.083̅V`.\n\n",
+          "text": "Whenever you press a key, here's what's happening:\n\n- The sustained electrical voltage coming through **Main**'s  `pitch` jack changes to represent the pressed key's pitch. `2V` means middle C (aka `C4`). Each volt up or down from there represents an octave. [^1]\n- **Main**'s `gate` output voltage, which rests at `0V`, suddenly spikes to `5V`.\n- The output signal of **VCA**, which is using **Main**'s `gate` signal as its *control voltage* signal multiplier, suddenly spikes from `0V` to the oscillator's signal voltage multiplied by 5.\n\n[^1]: So the note one octave up from `C4` (aka `C5`) is represented as `3V`.  One semitone up from that (aka `C#5`) is represented as `3.083V`. Why `.083`? Because there are 12 notes in an octave, and `1V/12 = 0.083̅V`.\n\n",
           "why": ""
         },
         {
           "id": "scope",
           "kind": "task",
           "title": "Seeing sound",
-          "text": "To the left of the Oscillator’s `out` jack you'll find a little grey ◎ button.\n\n## [Click it.](req:probe-osc-out)\n\nThe window that just popped up is what's called an *oscilloscope*. \n\nWhat you see there is a live visualization of the oscillator's output voltage over time.  You may recognize this squiggle from high school math class as a *wave*.  \n\nConveniently, sound can also be represented as a wave.\n\n*Analog audio* gets its name from the strategy of using changes in voltage as an *analogy* for changes in air pressure.\n",
+          "text": "To the left of the **Oscillator**’s `out` jack you'll find a little grey ◎ button.\n\n[Click it.](req:probe-osc-out)\n\nThe window that just popped up is what's called an *oscilloscope*.\n\nWhat you see there is a live visualization of the oscillator's output voltage over time.  You may recognize this squiggle from high school math class as a *wave*.\n\nConveniently, sound can also be represented as a wave.\n\n*Analog audio* gets its name from the strategy of using changes in voltage as an *analogy* for changes in air pressure.\n",
           "why": "",
           "listen": true,
           "parts": [
@@ -208,7 +208,7 @@
           "id": "wave",
           "kind": "task",
           "title": "Change the wave",
-          "text": "The shape of a wave determines its timbre. \n\nRight now, our oscillator emits a `sine` wave -- reminscent of a french horn.  But there are a few other types of wave it can emit  -- [hold a note and move its `wave` slider around to hear what they sound like](req:notes).",
+          "text": "The shape of a wave determines its *timbre*.\n\nRight now, our oscillator emits a `sine` wave -- reminscent of a french horn.  But there are a few other types of wave it can emit  -- [hold a note and move its `wave` slider around to hear what they sound like](req:notes).",
           "why": "",
           "listen": true,
           "parts": [
@@ -221,7 +221,7 @@
       "id": "shaping-a-note",
       "title": "Shaping sound with envelopes",
       "unpublished": true,
-      "intro": "A `gate`, as we learned, is not very subtle. It's either on or off.[^1]\n\n[^1]: (emitting either `0V` or `5V`)\n\nMost real sounds -- a car revving its engine, a car whooshing past you, a mosquito buzzing in your ear, a slap in the ear, a fork hitting a glass of champagne, a drunk person crying -- have shape.\n\nShape, in this context, means a path, traced over time, that starts and ends with a resting value for a certain characteristic, primarily volume, pitch, and timbre.\n\nIn sound synthesis, we give sounds this kind of shape using something called an *envelope*.\n\n\n",
+      "intro": "A `gate`, as we learned, is not very subtle. It's either on or off.[^1]\n\n[^1]: (emitting either `0V` or `5V`)\n\nMost real sounds -- a car revving its engine, a car whooshing past you, a mosquito buzzing in your ear, a slap in the ear, a fork hitting a glass of champagne, a drunk person crying -- have shape.\n\n*Shape*, in this context, means a path, traced over time, that starts and ends with a resting value for a certain characteristic, primarily volume, pitch, and timbre.\n\nIn sound synthesis, we give sounds this kind of shape using something called an *envelope*.\n\n\n",
       "payoff": "One oscillator now speaks with two different shapes: a swelling pad and a pluck.",
       "challenge": "Make a tiny bell or a very slow sunrise; save both variations.",
       "patchName": "Tutorial voice",
@@ -231,7 +231,7 @@
           "id": "adsr",
           "kind": "task",
           "title": "Add an envelope",
-          "text": "There are many kinds of envelope. The most common, and the one we're going to use, is an `ADSR` envelope, which is named after its four parameters. An envelope module can control any other module's parameter[^1], but let's consider an example envelope that controls amplitude (volume):\n- *attack*: The time that elapses between silence and the sound's peak volume\n- *decay*: The time that elapses between peak volume and...\n- ... *sustain*: The volume that the signal settles at if the note persists longer than `(attack + decay)` milliseconds.\n- *release*: The time that elapses between the end of the note and silence.\n\n[^1]: Including another envelope module's parameters! If there's one thing you should take away from this tutorials is that if it's a parameter, it can be manipulated by control voltage.  \n\n    The possibilities are quite literally endless. A synth like the one Wendy Carlos (in-)famously used to record *Switched-On Bach* had something like 10¹³⁴ possible patch cable configurations. Most of them would have sounded like shit, but still.\n\n## [Add an `ADSR` module.](req:add-adsr)\n",
+          "text": "There are many kinds of envelope. The most common, and the one we're going to use, is an *ADSR* envelope, which is named after its four parameters. An envelope module can control any other module's parameter[^1], but let's consider an example envelope that controls amplitude (volume):\n- *attack*: The time that elapses between silence and the sound's peak volume\n- *decay*: The time that elapses between peak volume and...\n- ... *sustain*: The volume that the signal settles at if the note persists longer than `(attack + decay)` milliseconds.\n- *release*: The time that elapses between the end of the note and silence.\n\n[^1]: Including another envelope module's parameters! If there's one thing you should take away from this tutorials is that if it's a parameter, it can be manipulated by control voltage.\n\n    The possibilities are quite literally endless. A synth like the one Wendy Carlos (in-)famously used to record *Switched-On Bach* had something like 10¹³⁴ possible patch cable configurations. Most of them would have sounded like shit, but still.\n\n[Add an **ADSR** module.](req:add-adsr)\n",
           "why": "",
           "parts": [
             { "id": "add-adsr", "kind": "module", "type": "adsr" }
@@ -241,7 +241,7 @@
           "id": "env",
           "kind": "task",
           "title": "Controlling note volume with an envelope",
-          "text": "Instead of controlling the **VCA** with a simple on/off `gate`, let's give a note's volume some shape.\n\n## First, play a few notes to get a sense of what our starting point sounds like.\n\n## [Then click the cable from **Main**’s `gate` to the **VCA**'s `cv` to remove it.](req:unplug-main-gate-vca-cv) \n\n## [Connect **Main**'s `gate` to **ADSR**'s `gate`.](req:main-gate-adsr-gate) \n\nNow, instead of controlling note volume directly with `gate` we're using `gate` to control the envelope, which controls the volume: When voltage enters the envelope module through `gate`, volume will\n1. increase and peak (`attack`), \n2. fade until it reaches its a specific volume ('decay'),\n3. remain at that specific volume (aka the 'sustain' volume)  until the gate voltage stops, at which point\n4.  volume fades to silence ('release')\n\n\n\n## [Connect *ADSR*'s `env`(elope) to  *VCA* `cv`](req:adsr-env-vca-cv)",
+          "text": "Instead of controlling the **VCA** with a simple on/off `gate`, let's give a note's volume some shape.\n\n## First, play a few notes to get a sense of what our starting point sounds like.\n\n[Then click the cable from **Main**’s `gate` to the **VCA**'s `cv` to remove it.](req:unplug-main-gate-vca-cv)\n\n[Connect **Main**'s `gate` to **ADSR**'s `gate`.](req:main-gate-adsr-gate)\n\nNow, instead of controlling note volume directly with `gate` we're using `gate` to control the envelope, which controls the volume: When voltage enters the envelope module through `gate`, volume will\n1. increase and peak (`attack`),\n2. fade until it reaches its a specific volume ('decay'),\n3. remain at that specific volume (aka the 'sustain' volume)  until the gate voltage stops, at which point\n4.  volume fades to silence ('release')\n\n\n\n[Connect **ADSR**'s `env`(elope) to  **VCA** `cv`](req:adsr-env-vca-cv)",
           "why": "",
           "parts": [
             {
@@ -274,7 +274,7 @@
           "id": "shape",
           "kind": "task",
           "title": "Draw the shape",
-          "text": "[Drag the ADSR’s a (attack) to about 0.3 s](req:adsr-a) and [r (release) to about 1 s](req:adsr-r). Hold a note: it swells in and fades out after you let go.",
+          "text": "[Drag the **ADSR**’s `a` (attack) to about 0.3 s](req:adsr-a) and [`r` (release) to about 1 s](req:adsr-r). Hold a note: it swells in and fades out after you let go.",
           "why": "Attack and release are times, sustain is a level. Pads have long attacks and releases; the next step makes the opposite.",
           "listen": true,
           "superseded": true,
@@ -301,7 +301,7 @@
           "id": "pluck",
           "kind": "task",
           "title": "Make it percussive",
-          "text": "[Set a (attack) to 0.005 s](req:adsr-a), [s (sustain) to 0](req:adsr-s) and [d (decay) to about 0.2 s](req:adsr-d). Hold a note: it rings out and dies although the key is still down. Plucked and struck sounds have no sustain.",
+          "text": "[Set `a` (attack) to 0.005 s](req:adsr-a), [`s` (sustain) to 0](req:adsr-s) and [`d` (decay) to about 0.2 s](req:adsr-d). Hold a note: it rings out and dies although the key is still down. Plucked and struck sounds have no sustain.",
           "why": "",
           "listen": true,
           "parts": [
@@ -335,7 +335,7 @@
           "id": "compare",
           "kind": "continue",
           "title": "A pluck or a pad?",
-          "text": "Start Riff and hear the pluck die before the next note. Optional: compare attack 0.3 s, sustain 0.6, release 1 s for a swelling pad; then restore attack 0.005 s and sustain 0 to continue the pluck lesson. The contrast is time and shape, not a new oscillator.",
+          "text": "Start Riff and hear the pluck die before the next note. Optional: compare `attack` 0.3 s, `sustain` 0.6, `release` 1 s for a swelling pad; then restore `attack` 0.005 s and `sustain` 0 to continue the pluck lesson. The contrast is time and shape, not a new oscillator.",
           "why": "",
           "playback": true,
           "pointer": {
@@ -347,8 +347,8 @@
           "id": "thumb",
           "kind": "task",
           "title": "A slider thumb is a jack",
-          "text": "[Set the wave to square](req:osc-wave) (pulse width only matters for a square). Then [Alt-drag the thumb of the Oscillator’s pw slider onto the ADSR’s env jack](req:adsr-env-osc-pw) (or drag from env and drop it on the thumb). The envelope now also sweeps the pulse width.",
-          "why": "Dropping a signal on a thumb routes it through one of the module’s parameter inputs, p1 or p2. The same envelope shapes two things at once: loudness and timbre.",
+          "text": "[Set the `wave` to square](req:osc-wave) (pulse width only matters for a square). Then [Alt-drag the thumb of the **Oscillator**’s `pw` slider onto the **ADSR**’s `env` jack](req:adsr-env-osc-pw) (or drag from `env` and drop it on the thumb). The envelope now also sweeps the pulse width.",
+          "why": "Dropping a signal on a thumb routes it through one of the module’s parameter inputs, `p1` or `p2`. The same envelope shapes two things at once: loudness and timbre.",
           "parts": [
             {
               "id": "osc-wave",
@@ -393,7 +393,7 @@
       "id": "subtractive-voice",
       "title": "Subtractive voice",
       "unpublished": true,
-      "intro": "Subtractive synthesis starts with a bright wave and takes harmonics away with a filter. The cutoff says where the filter starts cutting, the resonance adds a peak there. Moving the cutoff with an envelope, an LFO or a knob is where most of the classic synth sounds come from.",
+      "intro": "*Subtractive synthesis* starts with a bright wave and takes harmonics away with a filter. The *cutoff* says where the filter starts cutting, the *resonance* adds a peak there. Moving the cutoff with an envelope, an LFO or a knob is where most of the classic synth sounds come from.",
       "payoff": "Your filter can move by itself and follow a performance knob.",
       "challenge": "Find the moment where a gentle wah becomes a rhythm.",
       "patchName": "Tutorial voice",
@@ -403,8 +403,8 @@
           "id": "filter",
           "kind": "task",
           "title": "Add a Filter",
-          "text": "[Add a Filter](req:add-filter) and put it between the Oscillator and the VCA: [Oscillator out → Filter in](req:osc-out-filter-in), [Filter lp24 → VCA in](req:filter-lp24-vca-in), and [remove the cable from the Oscillator to the VCA](req:unplug-osc-out-vca-in).",
-          "why": "VCO → VCF → VCA is the classic subtractive chain. lp24 is a 24 dB low pass: steep. lp12 is gentler, hp lets the highs through instead.",
+          "text": "[Add a **Filter**](req:add-filter) and put it between the **Oscillator** and the **VCA**: [**Oscillator** `out` → **Filter** `in`](req:osc-out-filter-in), [**Filter** `lp24` → **VCA** `in`](req:filter-lp24-vca-in), and [remove the cable from the **Oscillator** to the **VCA**](req:unplug-osc-out-vca-in).",
+          "why": "VCO → VCF → VCA is the classic subtractive chain. `lp24` is a 24 dB low pass: steep. `lp12` is gentler, `hp` lets the highs through instead.",
           "parts": [
             { "id": "add-filter", "kind": "module", "type": "filter" },
             {
@@ -437,8 +437,8 @@
           "id": "cutoff",
           "kind": "task",
           "title": "Sweep the cutoff",
-          "text": "Start Riff and [drag cutoff down from 16 kHz to about 400 Hz](req:filter-cutoff): the tone gets darker. Move slowly and hear the upper harmonics disappear. Leave cutoff below 800 Hz.",
-          "why": "The cutoff slider is logarithmic, like pitch: every octave gets the same distance. Resonance feeds a little of the output back, which makes the filter ring at its cutoff.",
+          "text": "Start Riff and [drag `cutoff` down from 16 kHz to about 400 Hz](req:filter-cutoff): the tone gets darker. Move slowly and hear the upper harmonics disappear. Leave `cutoff` below 800 Hz.",
+          "why": "The `cutoff` slider is logarithmic, like pitch: every octave gets the same distance. Resonance feeds a little of the output back, which makes the filter ring at its cutoff.",
           "listen": true,
           "parts": [
             {
@@ -455,7 +455,7 @@
           "id": "resonance",
           "kind": "task",
           "title": "Give the cutoff a voice",
-          "text": "Keep Riff playing and [raise Filter res to about 0.6](req:filter-res). A whistle appears at the cutoff. Optional: sweep cutoff to hear the peak travel, then return it below 800 Hz before continuing.",
+          "text": "Keep Riff playing and [raise **Filter** `res` to about 0.6](req:filter-res). A whistle appears at the cutoff. Optional: sweep `cutoff` to hear the peak travel, then return it below 800 Hz before continuing.",
           "why": "",
           "listen": true,
           "parts": [
@@ -473,7 +473,7 @@
           "id": "track",
           "kind": "task",
           "title": "Track the keyboard",
-          "text": "[Tick track.](req:filter-track) The cutoff now follows the note, one octave per octave, so high notes stay as bright as low ones. Play up and down.",
+          "text": "[Tick `track`.](req:filter-track) The cutoff now follows the note, one octave per octave, so high notes stay as bright as low ones. Play up and down.",
           "why": "",
           "listen": true,
           "parts": [
@@ -491,7 +491,7 @@
           "id": "lfo",
           "kind": "task",
           "title": "Add an LFO",
-          "text": "[Add an LFO](req:add-lfo) (low frequency oscillator). It is an oscillator too slow to hear, made to move other things. [Set its rate to about 0.5 Hz.](req:lfo-rate)",
+          "text": "[Add an **LFO**](req:add-lfo) (*low frequency oscillator*). It is an oscillator too slow to hear, made to move other things. [Set its `rate` to about 0.5 Hz.](req:lfo-rate)",
           "why": "",
           "parts": [
             { "id": "add-lfo", "kind": "module", "type": "lfo" },
@@ -509,8 +509,8 @@
           "id": "cv",
           "kind": "task",
           "title": "Wobble the cutoff",
-          "text": "[Drag the LFO’s out to the Filter’s cv jack.](req:lfo-out-filter-cv) The grey route shows cv is built into cutoff; cvamt sets how far it reaches: [set it to 2 oct](req:filter-cvamt). Hold a note.",
-          "why": "The cv input is additive in octaves: a signal of 1 moves the cutoff up by cvamt octaves. Pins p1 and p2 work differently: they reach any parameter you tick in its ⋯ menu.",
+          "text": "[Drag the **LFO**’s `out` to the **Filter**’s `cv` jack.](req:lfo-out-filter-cv) The grey route shows `cv` is built into `cutoff`; `cvamt` sets how far it reaches: [set it to 2 oct](req:filter-cvamt). Hold a note.",
+          "why": "The `cv` input is additive in octaves: a signal of 1 moves the cutoff up by `cvamt` octaves. Pins `p1` and `p2` work differently: they reach any parameter you tick in its ⋯ menu.",
           "listen": true,
           "parts": [
             {
@@ -535,7 +535,7 @@
           "id": "wobble",
           "kind": "continue",
           "title": "From a slow wah to a wobble",
-          "text": "Start Riff. Optional: try LFO rate 0.5 Hz, then 4 Hz. The same cutoff movement becomes a rhythm. Return to 0.5 Hz before continuing; keep notes short if the high resonance is sharp.",
+          "text": "Start Riff. Optional: try **LFO** `rate` 0.5 Hz, then 4 Hz. The same cutoff movement becomes a rhythm. Return to 0.5 Hz before continuing; keep notes short if the high resonance is sharp.",
           "why": "",
           "playback": true,
           "pointer": {
@@ -547,7 +547,7 @@
           "id": "knob",
           "kind": "task",
           "title": "One knob, two parameters",
-          "text": "[Drag Main’s blue k1 jack to the Filter’s p1.](req:main-k1-filter-p1) [Open the ⋯ menu of cutoff and tick P1](req:filter-p1-cutoff); [do the same for res](req:filter-p1-res). Main’s k1 slider stands for the first knob of the FM-1.",
+          "text": "[Drag **Main**’s blue `k1` jack to the **Filter**’s `p1`.](req:main-k1-filter-p1) [Open the ⋯ menu of `cutoff` and tick `P1`](req:filter-p1-cutoff); [do the same for `res`](req:filter-p1-res). **Main**’s `k1` slider stands for the first knob of the FM-1.",
           "why": "The matrix in the ⋯ menu decides which parameters a pin reaches. A blue tick appears on each slider the knob reaches: that is where the knob alone holds the parameter.",
           "parts": [
             {
@@ -578,7 +578,7 @@
           "id": "att",
           "kind": "task",
           "title": "Set the depth",
-          "text": "In the ⋯ menu of cutoff, [drag the p1 attenuverter to about 0.5](req:filter-p1-att): the knob now reaches half as far. A negative value turns the knob around.",
+          "text": "In the ⋯ menu of `cutoff`, [drag the `p1` attenuverter to about 0.5](req:filter-p1-att): the knob now reaches half as far. A negative value turns the knob around.",
           "why": "",
           "parts": [
             {
@@ -596,7 +596,7 @@
           "id": "live",
           "kind": "task",
           "title": "Live value and base value",
-          "text": "Hold a note and watch the cutoff slider: the thumb follows the live, wobbling value and a tick marks the base. [Now move Main’s k1 slider](req:main-k1): the blue ticks move, and so does the sound.",
+          "text": "Hold a note and watch the `cutoff` slider: the thumb follows the live, wobbling value and a tick marks the base. [Now move **Main**’s `k1` slider](req:main-k1): the blue ticks move, and so does the sound.",
           "why": "",
           "listen": true,
           "parts": [
@@ -616,7 +616,7 @@
       "id": "first-assembly",
       "title": "Your first assembly",
       "unpublished": true,
-      "intro": "An assembly packs modules into one card that shows only the ports and knobs you choose. It can be saved to your library, reused in other patches, and put inside other assemblies. The five modules you built are about to become one instrument.",
+      "intro": "An *assembly* packs modules into one card that shows only the ports and knobs you choose. It can be saved to your library, reused in other patches, and put inside other assemblies. The five modules you built are about to become one instrument.",
       "payoff": "Five modules fold into your first reusable instrument.",
       "challenge": "Give the instrument a stage name and keep a personal variation.",
       "patchName": "Tutorial voice",
@@ -626,7 +626,7 @@
           "id": "select",
           "kind": "task",
           "title": "Select the modules",
-          "text": "[Shift-click the Oscillator, Filter, ADSR, VCA and LFO, or drag a box around them on the empty canvas.](req:selected) Selected cards get a highlight. Main and Output stay outside.",
+          "text": "[Shift-click the **Oscillator**, **Filter**, **ADSR**, **VCA** and **LFO**, or drag a box around them on the empty canvas.](req:selected) Selected cards get a highlight. **Main** and **Output** stay outside.",
           "why": "",
           "parts": [
             {
@@ -641,7 +641,7 @@
           "id": "group",
           "kind": "task",
           "title": "Group them",
-          "text": "[Press Ctrl+G (Cmd+G on a Mac), or Commands → Make assembly, and name it My voice.](req:my-voice-exists) The five cards fold into one that shows the ports which had cables from outside: pitch, gate and out.",
+          "text": "[Press Ctrl+G (Cmd+G on a Mac), or Commands → Make assembly, and name it My voice.](req:my-voice-exists) The five cards fold into one that shows the ports which had cables from outside: `pitch`, `gate` and `out`.",
           "why": "Grouping changes nothing in the sound. Ports with outside cables are exposed automatically; the rest is hidden until you expose it.",
           "parts": [
             { "id": "my-voice-exists", "kind": "assembly", "role": "myVoice", "fact": "exists" }
@@ -662,7 +662,7 @@
           "id": "promote",
           "kind": "task",
           "title": "Put two knobs on the card",
-          "text": "[Click ○ next to the Filter’s cutoff](req:my-voice-promoted-filter-cutoff) and [next to the ADSR’s r](req:my-voice-promoted-adsr-r). They become sliders on the collapsed card. [Click ○ beside the LFO’s out too](req:my-voice-exposed-lfo-out): an extra output.",
+          "text": "[Click ○ next to the **Filter**’s `cutoff`](req:my-voice-promoted-filter-cutoff) and [next to the **ADSR**’s `r`](req:my-voice-promoted-adsr-r). They become sliders on the collapsed card. [Click ○ beside the **LFO**’s `out` too](req:my-voice-exposed-lfo-out): an extra output.",
           "why": "",
           "parts": [
             {
@@ -707,7 +707,7 @@
           "id": "collapse",
           "kind": "task",
           "title": "Close it",
-          "text": "[Click collapse in the frame’s header.](req:my-voice-collapsed) One card: pitch, gate, out, the LFO’s out, cutoff and r. Play it.",
+          "text": "[Click collapse in the frame’s header.](req:my-voice-collapsed) One card: `pitch`, `gate`, `out`, the **LFO**’s `out`, `cutoff` and `r`. Play it.",
           "why": "",
           "parts": [
             { "id": "my-voice-collapsed", "kind": "assembly", "role": "myVoice", "fact": "collapsed" }
@@ -717,7 +717,7 @@
           "id": "instrument",
           "kind": "continue",
           "title": "Five modules, one instrument",
-          "text": "Play your new instrument. Move the exposed cutoff and release sliders: one changes color, the other changes the tail. Optional: give the card a personal name, then use My voice for the library save so later chapters can find it.",
+          "text": "Play your new instrument. Move the exposed `cutoff` and release sliders: one changes color, the other changes the tail. Optional: give the card a personal name, then use My voice for the library save so later chapters can find it.",
           "why": "",
           "playback": true,
           "pointer": {
@@ -758,7 +758,7 @@
       "id": "effect-assembly",
       "title": "An effect assembly",
       "unpublished": true,
-      "intro": "An effect is a module with audio in and audio out. Delay repeats, reverb smears the repeats into a room, chorus thickens with detuned copies. Each has a mix slider: dry signal against wet. Chained, they become one effect you can save and reuse.",
+      "intro": "An *effect* is a module with audio in and audio out. Delay repeats, reverb smears the repeats into a room, chorus thickens with detuned copies. Each has a `mix` slider: dry signal against wet. Chained, they become one effect you can save and reuse.",
       "payoff": "Your instrument carries a room, echoes and stereo movement.",
       "challenge": "Make a small room and an impossible cavern. Compare each with bypass.",
       "patchName": "Tutorial voice",
@@ -768,7 +768,7 @@
           "id": "delay",
           "kind": "task",
           "title": "Hear one echo",
-          "text": "[Add Delay](req:add-delay). Cable [My voice out → Delay in](req:my-voice-out-out-delay-in) and [Delay out → Output l](req:delay-out-output-l). [Remove My voice out → Output l](req:unplug-my-voice-out-out-output-l). Tap Note, then Release notes: the repeats continue after the note. Try mix at 0, then 0.4.",
+          "text": "[Add **Delay**](req:add-delay). Cable [My voice `out` → **Delay** `in`](req:my-voice-out-out-delay-in) and [**Delay** `out` → **Output** `l`](req:delay-out-output-l). [Remove My voice `out` → **Output** `l`](req:unplug-my-voice-out-out-output-l). Tap Note, then Release notes: the repeats continue after the note. Try `mix` at 0, then 0.4.",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -804,7 +804,7 @@
           "id": "reverb",
           "kind": "task",
           "title": "Put the echoes in a room",
-          "text": "[Add Reverb](req:add-reverb). Cable [Delay out → Reverb in](req:delay-out-reverb-in) and [Reverb out → Output l](req:reverb-out-output-l); [remove Delay out → Output l](req:unplug-delay-out-output-l). Compare size 0.2 and 0.8: a small room versus a long wash. These are optional listening settings.",
+          "text": "[Add **Reverb**](req:add-reverb). Cable [**Delay** `out` → **Reverb** `in`](req:delay-out-reverb-in) and [**Reverb** `out` → **Output** `l`](req:reverb-out-output-l); [remove **Delay** `out` → **Output** `l`](req:unplug-delay-out-output-l). Compare `size` 0.2 and 0.8: a small room versus a long wash. These are optional listening settings.",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -840,7 +840,7 @@
           "id": "chorus",
           "kind": "task",
           "title": "Spread the sound",
-          "text": "[Add Chorus](req:add-chorus). Cable [Reverb out → Chorus in](req:reverb-out-chorus-in), [Chorus l → Output l](req:chorus-l-output-l) and [Chorus r → Output r](req:chorus-r-output-r); [remove Reverb out → Output l](req:unplug-reverb-out-output-l). Start Riff and compare Chorus mix 0 and 0.5: the sound widens. Leave the mix you like.",
+          "text": "[Add **Chorus**](req:add-chorus). Cable [**Reverb** `out` → **Chorus** `in`](req:reverb-out-chorus-in), [**Chorus** `l` → **Output** `l`](req:chorus-l-output-l) and [**Chorus** `r` → **Output** `r`](req:chorus-r-output-r); [remove **Reverb** `out` → **Output** `l`](req:unplug-reverb-out-output-l). Start Riff and compare **Chorus** `mix` 0 and 0.5: the sound widens. Leave the `mix` you like.",
           "why": "",
           "listen": true,
           "parts": [
@@ -883,8 +883,8 @@
           "id": "tune",
           "kind": "task",
           "title": "Tune the space",
-          "text": "[Set the Delay’s time to about 375 ms](req:delay-time) and [fb (feedback) to 0.5](req:delay-fb), and [the Reverb’s size to 0.7](req:reverb-size). Play a short note and listen to the tail.",
-          "why": "Feedback sends the delayed signal back into the line: each repeat is quieter than the last. Above 0.9 the repeats barely fade.",
+          "text": "[Set the **Delay**’s `time` to about 375 ms](req:delay-time) and [`fb` (feedback) to 0.5](req:delay-fb), and [the **Reverb**’s `size` to 0.7](req:reverb-size). Play a short note and listen to the tail.",
+          "why": "*Feedback* sends the delayed signal back into the line: each repeat is quieter than the last. Above 0.9 the repeats barely fade.",
           "listen": true,
           "parts": [
             {
@@ -917,7 +917,7 @@
           "id": "bypass",
           "kind": "task",
           "title": "Hear it with and without",
-          "text": "Click the Reverb card to select it and press B (or click ⏻ in its header): the module is bypassed and passes its input straight through. [Press B again to switch it back on](req:bypasses-reverb,bypassed-reverb-off).",
+          "text": "Click the **Reverb** card to select it and press B (or click ⏻ in its header): the module is *bypassed* and passes its input straight through. [Press B again to switch it back on](req:bypasses-reverb,bypassed-reverb-off).",
           "why": "",
           "listen": true,
           "parts": [
@@ -941,7 +941,7 @@
           "id": "group",
           "kind": "task",
           "title": "Group the three",
-          "text": "[Select the Delay, Reverb and Chorus and press Ctrl+G (Cmd+G)](req:my-space-exists). Name the assembly My space. Its card shows in, l and r.",
+          "text": "[Select the **Delay**, **Reverb** and **Chorus** and press Ctrl+G (Cmd+G)](req:my-space-exists). Name the assembly My space. Its card shows `in`, `l` and `r`.",
           "why": "",
           "parts": [
             { "id": "my-space-exists", "kind": "assembly", "role": "mySpace", "fact": "exists" }
@@ -951,7 +951,7 @@
           "id": "promote",
           "kind": "task",
           "title": "Choose its knobs",
-          "text": "Expand My space, [click ○ on the Delay’s time and mix](req:my-space-promoted-delay-time,my-space-promoted-delay-mix) and [on the Reverb’s mix](req:my-space-promoted-reverb-mix), [then collapse it](req:my-space-collapsed). An effect needs few knobs on the outside.",
+          "text": "Expand My space, [click ○ on the **Delay**’s `time` and `mix`](req:my-space-promoted-delay-time,my-space-promoted-delay-mix) and [on the **Reverb**’s `mix`](req:my-space-promoted-reverb-mix), [then collapse it](req:my-space-collapsed). An effect needs few knobs on the outside.",
           "why": "",
           "parts": [
             {
@@ -1004,7 +1004,7 @@
       "id": "fm",
       "title": "Second instrument: FM",
       "unpublished": true,
-      "intro": "In frequency modulation one oscillator, the modulator, wobbles the phase of another, the carrier, thousands of times a second. The wobble creates new harmonics: the ratio of the two pitches sets which ones, the depth sets how many. An envelope on the depth makes the classic bright-then-mellow electric piano.",
+      "intro": "In *frequency modulation* one oscillator, the *modulator*, wobbles the phase of another, the *carrier*, thousands of times a second. The wobble creates new harmonics: the ratio of the two pitches sets which ones, the depth sets how many. An envelope on the depth makes the classic bright-then-mellow electric piano.",
       "payoff": "Two pure tones became a playable FM instrument with its own space.",
       "challenge": "Save a mellow key and a metallic bell from the same two oscillators.",
       "patchName": "Tutorial FM",
@@ -1014,7 +1014,7 @@
           "id": "osc",
           "kind": "task",
           "title": "An oscillator, cabled to the pitch",
-          "text": "[Add an Oscillator](req:add-osc) and [cable Main pitch → Oscillator pitch](req:main-pitch-osc-pitch). Leave the wave on sine: FM wants pure tones.",
+          "text": "[Add an **Oscillator**](req:add-osc) and [cable **Main** `pitch` → **Oscillator** `pitch`](req:main-pitch-osc-pitch). Leave the `wave` on sine: FM wants pure tones.",
           "why": "",
           "parts": [
             { "id": "add-osc", "kind": "module", "type": "osc" },
@@ -1032,7 +1032,7 @@
           "id": "dry",
           "kind": "task",
           "title": "Hear the carrier first",
-          "text": "[Add a VCA](req:add-vca). Cable [the Oscillator out → VCA in](req:osc-out-vca-in), [Main gate → VCA cv](req:main-gate-vca-cv), and [VCA out → Output l](req:vca-out-output-l). Play Note: a pure sine. Stop it before adding the second oscillator.",
+          "text": "[Add a **VCA**](req:add-vca). Cable [the **Oscillator** `out` → **VCA** `in`](req:osc-out-vca-in), [**Main** `gate` → **VCA** `cv`](req:main-gate-vca-cv), and [**VCA** `out` → **Output** `l`](req:vca-out-output-l). Play Note: a pure sine. Stop it before adding the second oscillator.",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -1068,7 +1068,7 @@
           "id": "dup",
           "kind": "task",
           "title": "Duplicate it",
-          "text": "Click the Oscillator to select it and [press Ctrl+D (Cmd+D), or Commands → Duplicate selection](req:add-osc-2). The copy keeps its settings. Cables from outside the selection are not copied: [connect Main pitch to the new Oscillator’s pitch](req:main-pitch-osc-pitch).",
+          "text": "Click the **Oscillator** to select it and [press Ctrl+D (Cmd+D), or Commands → Duplicate selection](req:add-osc-2). The copy keeps its settings. Cables from outside the selection are not copied: [connect **Main** `pitch` to the new **Oscillator**’s `pitch`](req:main-pitch-osc-pitch).",
           "why": "",
           "parts": [
             { "id": "add-osc-2", "kind": "module", "type": "osc", "count": 2 },
@@ -1086,8 +1086,8 @@
           "id": "pm",
           "kind": "task",
           "title": "Modulator into carrier",
-          "text": "[Cable the second Oscillator’s out into the first one’s pm input](req:fm-carrier), and [set the first one’s pm slider (the depth) to about 2](req:carrier-pm). The first is now the carrier, the second the modulator.",
-          "why": "pm is phase modulation, what the DX7 and this engine do; it sounds like FM. The depth slider is the modulation index: 0 is a sine, 8 is a wall of harmonics.",
+          "text": "[Cable the second **Oscillator**’s `out` into the first one’s `pm` input](req:fm-carrier), and [set the first one’s `pm` slider (the depth) to about 2](req:carrier-pm). The first is now the carrier, the second the modulator.",
+          "why": "`pm` is *phase modulation*, what the DX7 and this engine do; it sounds like FM. The depth slider is the *modulation index*: 0 is a sine, 8 is a wall of harmonics.",
           "listen": true,
           "parts": [
             { "id": "fm-carrier", "kind": "custom", "name": "fmCarrier" },
@@ -1105,8 +1105,8 @@
           "id": "ratio",
           "kind": "task",
           "title": "Set the ratio",
-          "text": "[Set the modulator’s coarse to +12](req:modulator-coarse): an octave above the carrier, a 2:1 ratio, hollow like a clarinet. Try +19 (3:1) and +7 for a bell-like clang.",
-          "why": "Whole-number ratios give harmonic spectra; odd ratios like 1.41 give inharmonic, metallic ones. coarse is in semitones.",
+          "text": "[Set the modulator’s `coarse` to +12](req:modulator-coarse): an octave above the carrier, a 2:1 ratio, hollow like a clarinet. Try +19 (3:1) and +7 for a bell-like clang.",
+          "why": "Whole-number ratios give harmonic spectra; odd ratios like 1.41 give inharmonic, metallic ones. `coarse` is in semitones.",
           "listen": true,
           "parts": [
             {
@@ -1123,7 +1123,7 @@
           "id": "colors",
           "kind": "continue",
           "title": "Three colors from two sines",
-          "text": "Start Riff. Optional: compare modulator coarse +12 with pm 1 (hollow), coarse +7 with pm 4 (metallic), then coarse +12 with pm 0.3 (mellow). Return pm to 2 and coarse to +12 before continuing. Save your favorite as a named variation.",
+          "text": "Start Riff. Optional: compare modulator `coarse` +12 with `pm` 1 (hollow), `coarse` +7 with `pm` 4 (metallic), then `coarse` +12 with `pm` 0.3 (mellow). Return `pm` to 2 and `coarse` to +12 before continuing. Save your favorite as a named variation.",
           "why": "",
           "playback": true,
           "pointer": {
@@ -1135,8 +1135,8 @@
           "id": "env",
           "kind": "task",
           "title": "Loudness from a level / rate envelope",
-          "text": "[Add an Env L/R](req:add-env). [Remove Main gate → VCA cv](req:unplug-main-gate-vca-cv). Cable [carrier out → VCA in](req:carrier-out-vca-in), [Main gate → Env gate](req:main-gate-env-gate), [Env env → VCA cv](req:env-env-vca-cv), [VCA out → Output l](req:vca-out-output-l).",
-          "why": "Env L/R is the DX7 envelope: four levels and the rate to reach each one. The last level, l4, is where the note ends after the key is released.",
+          "text": "[Add an **Env L/R**](req:add-env). [Remove **Main** `gate` → **VCA** `cv`](req:unplug-main-gate-vca-cv). Cable [carrier `out` → **VCA** `in`](req:carrier-out-vca-in), [**Main** `gate` → **Env** `gate`](req:main-gate-env-gate), [**Env** `env` → **VCA** `cv`](req:env-env-vca-cv), [**VCA** `out` → **Output** `l`](req:vca-out-output-l).",
+          "why": "**Env L/R** is the DX7 envelope: four levels and the rate to reach each one. The last level, `l4`, is where the note ends after the key is released.",
           "superseded": true,
           "parts": [
             { "id": "add-vca", "kind": "module", "type": "vca", "hidden": true },
@@ -1187,7 +1187,7 @@
           "id": "index",
           "kind": "task",
           "title": "Brightness from the same envelope",
-          "text": "[Alt-drag the carrier’s pm thumb onto the Env’s env jack](req:env-env-carrier-pm). [Set the Env’s l2 and l3 to 0.3](req:env-l2,env-l3) and [r2 to 0.4 s](req:env-r2): the note starts bright and mellows while it decays.",
+          "text": "[Alt-drag the carrier’s `pm` thumb onto the **Env**’s `env` jack](req:env-env-carrier-pm). [Set the **Env**’s `l2` and `l3` to 0.3](req:env-l2,env-l3) and [`r2` to 0.4 s](req:env-r2): the note starts bright and mellows while it decays.",
           "why": "",
           "listen": true,
           "parts": [
@@ -1230,7 +1230,7 @@
           "id": "group",
           "kind": "task",
           "title": "Group it as FM keys",
-          "text": "[Select both Oscillators, the Env and the VCA and press Ctrl+G (Cmd+G)](req:fm-keys-exists). Name it FM keys. It exposes pitch (twice, one per oscillator), gate and out.",
+          "text": "[Select both **Oscillators**, the **Env** and the **VCA** and press Ctrl+G (Cmd+G)](req:fm-keys-exists). Name it FM keys. It exposes `pitch` (twice, one per oscillator), `gate` and `out`.",
           "why": "",
           "parts": [
             { "id": "fm-keys-exists", "kind": "assembly", "role": "fmKeys", "fact": "exists" }
@@ -1250,7 +1250,7 @@
           "id": "wire",
           "kind": "task",
           "title": "Put the effect behind the keys",
-          "text": "Cable [FM keys out → My space in](req:fm-out-out-space-in-in), [My space l → Output l](req:space-out-l-output-l) and [My space r → Output r](req:space-out-r-output-r). [Remove the cable from FM keys to Output](req:unplug-fm-out-out-output-l).",
+          "text": "Cable [FM keys `out` → My space `in`](req:fm-out-out-space-in-in), [My space `l` → **Output** `l`](req:space-out-l-output-l) and [My space `r` → **Output** `r`](req:space-out-r-output-r). [Remove the cable from FM keys to **Output**](req:unplug-fm-out-out-output-l).",
           "why": "",
           "parts": [
             {
@@ -1291,7 +1291,7 @@
           "id": "nest",
           "kind": "task",
           "title": "Nest the effect inside the instrument",
-          "text": "Expand FM keys and [drag the My space card into its frame by its header](req:fm-keys-contains-my-space): it becomes part of FM keys, which now exposes l and r itself. [Collapse FM keys](req:fm-keys-collapsed).",
+          "text": "Expand FM keys and [drag the My space card into its frame by its header](req:fm-keys-contains-my-space): it becomes part of FM keys, which now exposes `l` and `r` itself. [Collapse FM keys](req:fm-keys-collapsed).",
           "why": "Assemblies nest three levels deep. An instrument that carries its own effect is one card wherever you use it.",
           "parts": [
             {
@@ -1327,7 +1327,7 @@
       "id": "plucked-and-struck",
       "title": "Plucked and struck",
       "unpublished": true,
-      "intro": "Physical models start from how real instruments work: a burst of energy goes into something that resonates. String is a Karplus-Strong string, a short delay line fed back on itself. Modal is a set of tuned resonances like a bar or a bell. Comb is a resonator you can excite with anything, even noise.",
+      "intro": "*Physical models* start from how real instruments work: a burst of energy goes into something that resonates. **String** is a Karplus-Strong string, a short delay line fed back on itself. **Modal** is a set of tuned resonances like a bar or a bell. **Comb** is a resonator you can excite with anything, even noise.",
       "payoff": "You built a string, a resonating body and a breathy pipe.",
       "challenge": "Write a three-note call and answer with muted and ringing settings.",
       "patchName": "Tutorial pluck",
@@ -1337,7 +1337,7 @@
           "id": "string",
           "kind": "task",
           "title": "A string",
-          "text": "[Add a String](req:add-string). Cable [Main pitch → String pitch](req:main-pitch-string-pitch), [Main gate → String gate](req:main-gate-string-gate) and [String out → Output l](req:string-out-output-l). Each key plucks it.",
+          "text": "[Add a **String**](req:add-string). Cable [**Main** `pitch` → **String** `pitch`](req:main-pitch-string-pitch), [**Main** `gate` → **String** `gate`](req:main-gate-string-gate) and [**String** `out` → **Output** `l`](req:string-out-output-l). Each key plucks it.",
           "why": "",
           "parts": [
             { "id": "add-string", "kind": "module", "type": "string" },
@@ -1371,8 +1371,8 @@
           "id": "decay",
           "kind": "task",
           "title": "Let it ring",
-          "text": "[Set the String’s decay to about 4 s](req:string-decay) and [damp to 0.1](req:string-damp): a long, bright note. Optional: switch burst to pulse for a harder pick.",
-          "why": "The string is a delay line as long as one period, with feedback. decay sets how much is fed back, damp how fast the highs are lost on each round trip.",
+          "text": "[Set the **String**’s `decay` to about 4 s](req:string-decay) and [`damp` to 0.1](req:string-damp): a long, bright note. Optional: switch `burst` to pulse for a harder pick.",
+          "why": "The string is a delay line as long as one period, with feedback. `decay` sets how much is fed back, `damp` how fast the highs are lost on each round trip.",
           "listen": true,
           "parts": [
             {
@@ -1397,8 +1397,8 @@
           "id": "voices",
           "kind": "task",
           "title": "Play chords",
-          "text": "[On the Main card set voices to 4.](req:voices) The String card shows ×4: it runs once per voice. Hold a chord.",
-          "why": "Every module that hears pitch, gate or velocity runs once per voice; effects and the Output stay single and sum the voices.",
+          "text": "[On the **Main** card set `voices` to 4.](req:voices) The **String** card shows ×4: it runs once per voice. Hold a chord.",
+          "why": "Every module that hears `pitch`, `gate` or velocity runs once per voice; effects and the **Output** stay single and sum the voices.",
           "listen": true,
           "parts": [
             { "id": "voices", "kind": "voices", "min": 2 }
@@ -1408,7 +1408,7 @@
           "id": "modal",
           "kind": "task",
           "title": "Strike a body with it",
-          "text": "[Add a Modal](req:add-modal). Cable [String out → Modal in](req:string-out-modal-in) and [Modal out → Output r](req:modal-out-output-r). [Set struct to 0.5](req:modal-struct) and [decay to 2 s](req:modal-decay): the string now rings a bell-like body.",
+          "text": "[Add a **Modal**](req:add-modal). Cable [**String** `out` → **Modal** `in`](req:string-out-modal-in) and [**Modal** `out` → **Output** `r`](req:modal-out-output-r). [Set `struct` to 0.5](req:modal-struct) and [`decay` to 2 s](req:modal-decay): the string now rings a bell-like body.",
           "why": "",
           "listen": true,
           "parts": [
@@ -1452,7 +1452,7 @@
           "id": "body",
           "kind": "continue",
           "title": "Muted string, ringing body",
-          "text": "Use Chord with four voices. Optional: try String damp 0.8 for a muted pick, then 0.1 for a ringing string. Bypass Modal to hear the dry string on the left; turn it back on to hear the body on the right. Return damp to 0.1 before continuing.",
+          "text": "Use Chord with four voices. Optional: try **String** `damp` 0.8 for a muted pick, then 0.1 for a ringing string. Bypass **Modal** to hear the dry string on the left; turn it back on to hear the body on the right. Return `damp` to 0.1 before continuing.",
           "why": "",
           "playback": true,
           "pointer": {
@@ -1464,8 +1464,8 @@
           "id": "comb",
           "kind": "task",
           "title": "Blow noise through a comb",
-          "text": "[Add Noise, a Comb and a VCA](req:add-noise,add-comb,add-vca). Cable [Noise out → Comb in](req:noise-out-comb-in), [Main pitch → Comb pitch](req:main-pitch-comb-pitch), [Comb out → VCA in](req:comb-out-vca-in), [Main gate → VCA cv](req:main-gate-vca-cv), [VCA out → Output l](req:vca-out-output-l).",
-          "why": "A comb filter is a tuned delay line: noise through it rings at the note, like breath through a pipe. The VCA is a simple on / off here, straight from the gate.",
+          "text": "[Add **Noise**, a **Comb** and a **VCA**](req:add-noise,add-comb,add-vca). Cable [**Noise** `out` → **Comb** `in`](req:noise-out-comb-in), [**Main** `pitch` → **Comb** `pitch`](req:main-pitch-comb-pitch), [**Comb** `out` → **VCA** `in`](req:comb-out-vca-in), [**Main** `gate` → **VCA** `cv`](req:main-gate-vca-cv), [**VCA** `out` → **Output** `l`](req:vca-out-output-l).",
+          "why": "A *comb filter* is a tuned delay line: noise through it rings at the note, like breath through a pipe. The **VCA** is a simple on / off here, straight from the `gate`.",
           "superseded": true,
           "parts": [
             { "id": "add-noise", "kind": "module", "type": "noise" },
@@ -1517,7 +1517,7 @@
           "id": "fb",
           "kind": "task",
           "title": "Make it ring",
-          "text": "[Set the Comb’s fb to 0.95](req:comb-fb) and [damp to 0.1](req:comb-damp): the noise turns into a breathy, whistling tone at the note.",
+          "text": "[Set the **Comb**’s `fb` to 0.95](req:comb-fb) and [`damp` to 0.1](req:comb-damp): the noise turns into a breathy, whistling tone at the note.",
           "why": "",
           "listen": true,
           "parts": [
@@ -1543,7 +1543,7 @@
           "id": "breath",
           "kind": "continue",
           "title": "Separate the breath from the string",
-          "text": "Optional: bypass String and Modal, then play Note to hear only noise through Comb. Change Comb damp from 0.1 to 0.8: the breath loses its whistle. Switch both models back on and return damp to 0.1 when finished.",
+          "text": "Optional: bypass **String** and **Modal**, then play Note to hear only noise through **Comb**. Change **Comb** `damp` from 0.1 to 0.8: the breath loses its whistle. Switch both models back on and return `damp` to 0.1 when finished.",
           "why": "",
           "playback": true,
           "pointer": {
@@ -1555,8 +1555,8 @@
           "id": "glide",
           "kind": "task",
           "title": "Slide between notes",
-          "text": "[Add a Glide](req:add-glide). Cable [Main pitch → Glide in](req:main-pitch-glide-in) and [Glide out → Comb pitch](req:glide-out-comb-pitch), and [remove the cable from Main’s pitch to the Comb](req:unplug-main-pitch-comb-pitch). [Set time to 0.3 s](req:glide-time) and play two notes.",
-          "why": "Glide (portamento) slews a control signal: the pitch takes time to arrive. It works on any control cable, not only pitch.",
+          "text": "[Add a **Glide**](req:add-glide). Cable [**Main** `pitch` → **Glide** `in`](req:main-pitch-glide-in) and [**Glide** `out` → **Comb** `pitch`](req:glide-out-comb-pitch), and [remove the cable from **Main**’s `pitch` to the **Comb**](req:unplug-main-pitch-comb-pitch). [Set `time` to 0.3 s](req:glide-time) and play two notes.",
+          "why": "**Glide** (*portamento*) slews a control signal: the pitch takes time to arrive. It works on any control cable, not only pitch.",
           "listen": true,
           "parts": [
             { "id": "add-glide", "kind": "module", "type": "glide" },
@@ -1599,7 +1599,7 @@
           "id": "group",
           "kind": "task",
           "title": "Group the pluck",
-          "text": "[Select the String and the Modal and press Ctrl+G (Cmd+G)](req:pluck-exists). Name it Pluck. Expand it, [click ○ on the String’s decay](req:pluck-promoted-string-decay) and [the Modal’s struct](req:pluck-promoted-modal-struct), and [collapse it again](req:pluck-collapsed).",
+          "text": "[Select the **String** and the **Modal** and press Ctrl+G (Cmd+G)](req:pluck-exists). Name it Pluck. Expand it, [click ○ on the **String**’s `decay`](req:pluck-promoted-string-decay) and [the **Modal**’s `struct`](req:pluck-promoted-modal-struct), and [collapse it again](req:pluck-collapsed).",
           "why": "",
           "parts": [
             { "id": "pluck-exists", "kind": "assembly", "role": "pluck", "fact": "exists" },
@@ -1645,7 +1645,7 @@
       "id": "wavetables-and-grains",
       "title": "Wavetables and grains",
       "unpublished": true,
-      "intro": "A wavetable oscillator holds a row of waveforms and sweeps through them: the timbre moves without a filter. A granular module chops audio into grains a few milliseconds long and scatters them in time and pitch: a cloud out of a note. This patch starts with four voices so Chord can fill the granular buffer. Both are texture tools; zoom out as the canvas grows.",
+      "intro": "A *wavetable* oscillator holds a row of waveforms and sweeps through them: the timbre moves without a filter. A *granular* module chops audio into *grains* a few milliseconds long and scatters them in time and pitch: a cloud out of a note. This patch starts with four voices so Chord can fill the granular buffer. Both are texture tools; zoom out as the canvas grows.",
       "payoff": "You can turn a vowel into a moving, frozen cloud.",
       "challenge": "Capture a chord and find a texture that sounds nothing like its source.",
       "patchName": "Tutorial pad",
@@ -1655,7 +1655,7 @@
           "id": "wt",
           "kind": "task",
           "title": "A wavetable oscillator",
-          "text": "[Add a Wavetable](req:add-wavetable) and [cable Main pitch → Wavetable pitch](req:main-pitch-wavetable-pitch). [Set bank to formant](req:wavetable-bank). Next we give it a gated output, then listen to the vowels.",
+          "text": "[Add a **Wavetable**](req:add-wavetable) and [cable **Main** `pitch` → **Wavetable** `pitch`](req:main-pitch-wavetable-pitch). [Set `bank` to formant](req:wavetable-bank). Next we give it a gated output, then listen to the vowels.",
           "why": "",
           "parts": [
             { "id": "add-wavetable", "kind": "module", "type": "wavetable" },
@@ -1681,7 +1681,7 @@
           "id": "dry",
           "kind": "task",
           "title": "Hear a vowel",
-          "text": "[Add a VCA](req:add-vca). Cable [Wavetable out → VCA in](req:wavetable-out-vca-in), [Main gate → VCA cv](req:main-gate-vca-cv) and [VCA out → Output l](req:vca-out-output-l). Start Note and move Wavetable pos: the vowel changes. The VCA keeps the sound under your control.",
+          "text": "[Add a **VCA**](req:add-vca). Cable [**Wavetable** `out` → **VCA** `in`](req:wavetable-out-vca-in), [**Main** `gate` → **VCA** `cv`](req:main-gate-vca-cv) and [**VCA** `out` → **Output** `l`](req:vca-out-output-l). Start Note and move **Wavetable** `pos`: the vowel changes. The **VCA** keeps the sound under your control.",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -1717,7 +1717,7 @@
           "id": "lfo",
           "kind": "task",
           "title": "Sweep the table",
-          "text": "[Add an LFO with rate 0.2 Hz](req:add-lfo,lfo-rate). [Alt-drag the Wavetable’s pos thumb onto the LFO’s out](req:lfo-out-wavetable-pos) (or drop the LFO’s cable on the thumb). The position now sweeps on its own.",
+          "text": "[Add an **LFO** with `rate` 0.2 Hz](req:add-lfo,lfo-rate). [Alt-drag the **Wavetable**’s `pos` thumb onto the **LFO**’s `out`](req:lfo-out-wavetable-pos) (or drop the **LFO**’s cable on the thumb). The position now sweeps on its own.",
           "why": "",
           "listen": true,
           "parts": [
@@ -1744,7 +1744,7 @@
           "id": "env",
           "kind": "task",
           "title": "A slow envelope",
-          "text": "[Add an ADSR](req:add-adsr). [Remove Main gate → VCA cv](req:unplug-main-gate-vca-cv). Cable [Main gate → ADSR gate](req:main-gate-adsr-gate), [ADSR env → VCA cv](req:adsr-env-vca-cv), [Wavetable out → VCA in](req:wavetable-out-vca-in). [Set a to 1 s](req:adsr-a) and [r to 2 s](req:adsr-r): a pad.",
+          "text": "[Add an **ADSR**](req:add-adsr). [Remove **Main** `gate` → **VCA** `cv`](req:unplug-main-gate-vca-cv). Cable [**Main** `gate` → **ADSR** `gate`](req:main-gate-adsr-gate), [**ADSR** `env` → **VCA** `cv`](req:adsr-env-vca-cv), [**Wavetable** `out` → **VCA** `in`](req:wavetable-out-vca-in). [Set `a` to 1 s](req:adsr-a) and [`r` to 2 s](req:adsr-r): a pad.",
           "why": "",
           "listen": true,
           "parts": [
@@ -1804,8 +1804,8 @@
           "id": "grain",
           "kind": "task",
           "title": "Into the cloud",
-          "text": "[Add a Granular](req:add-grain). Cable [VCA out → Granular in](req:vca-out-grain-in) and [Main gate → Granular trig](req:main-gate-grain-trig). Cable [Granular out → Output l](req:grain-out-output-l) and [remove VCA out → Output l](req:unplug-vca-out-output-l). [Set size to 0.15 s](req:grain-size), [density to 40](req:grain-density), [spray to 0.5](req:grain-spray) and [pitch to +12](req:grain-pitch).",
-          "why": "The granular module records what comes in and plays tiny windows of it, spread over position, time and pitch. spray is how far the grains wander from the position.",
+          "text": "[Add a **Granular**](req:add-grain). Cable [**VCA** `out` → **Granular** `in`](req:vca-out-grain-in) and [**Main** `gate` → **Granular** `trig`](req:main-gate-grain-trig). Cable [**Granular** `out` → **Output** `l`](req:grain-out-output-l) and [remove **VCA** `out` → **Output** `l`](req:unplug-vca-out-output-l). [Set `size` to 0.15 s](req:grain-size), [`density` to 40](req:grain-density), [`spray` to 0.5](req:grain-spray) and [`pitch` to +12](req:grain-pitch).",
+          "why": "The granular module records what comes in and plays tiny windows of it, spread over position, time and pitch. `spray` is how far the grains wander from the position.",
           "listen": true,
           "superseded": true,
           "parts": [
@@ -1881,7 +1881,7 @@
           "id": "freeze",
           "kind": "continue",
           "title": "Keep a moment in a cloud",
-          "text": "With Main voices at 4, play Chord for two seconds to fill the buffer, then switch Granular freeze on. Stop the notes: the captured sound remains. Optional: change pitch and spray, then turn freeze off before continuing. Bypass Granular to compare the dry pad.",
+          "text": "With **Main** `voices` at 4, play Chord for two seconds to fill the buffer, then switch **Granular** `freeze` on. Stop the notes: the captured sound remains. Optional: change `pitch` and `spray`, then turn `freeze` off before continuing. Bypass **Granular** to compare the dry pad.",
           "why": "",
           "playback": true,
           "pointer": {
@@ -1893,7 +1893,7 @@
           "id": "pan",
           "kind": "task",
           "title": "Place it in the stereo field",
-          "text": "[Add a Pan](req:add-pan). Cable [Granular out → Pan in](req:grain-out-pan-in), [Pan l → Output l](req:pan-l-output-l), [Pan r → Output r](req:pan-r-output-r). [Remove Granular out → Output l](req:unplug-grain-out-output-l). Then [drop the LFO’s out on the pan slider’s thumb](req:lfo-out-pan-pos): pos is the Pan’s built-in input, so the cable goes there.",
+          "text": "[Add a **Pan**](req:add-pan). Cable [**Granular** `out` → **Pan** `in`](req:grain-out-pan-in), [**Pan** `l` → **Output** `l`](req:pan-l-output-l), [**Pan** `r` → **Output** `r`](req:pan-r-output-r). [Remove **Granular** `out` → **Output** `l`](req:unplug-grain-out-output-l). Then [drop the **LFO**’s `out` on the `pan` slider’s thumb](req:lfo-out-pan-pos): `pos` is the **Pan**’s built-in input, so the cable goes there.",
           "why": "",
           "superseded": true,
           "parts": [
@@ -1944,7 +1944,7 @@
           "id": "phaser",
           "kind": "task",
           "title": "A phaser on the way out",
-          "text": "[Add a Phaser between the Granular and the Pan](req:add-phaser): [Granular out → Phaser in](req:grain-out-phaser-in), [Phaser out → Pan in](req:phaser-out-pan-in), and [remove the cable from the Granular to the Pan](req:unplug-grain-out-pan-in).",
+          "text": "[Add a **Phaser** between the **Granular** and the **Pan**](req:add-phaser): [**Granular** `out` → **Phaser** `in`](req:grain-out-phaser-in), [**Phaser** `out` → **Pan** `in`](req:phaser-out-pan-in), and [remove the cable from the **Granular** to the **Pan**](req:unplug-grain-out-pan-in).",
           "why": "",
           "parts": [
             { "id": "add-phaser", "kind": "module", "type": "phaser" },
@@ -1988,7 +1988,7 @@
           "id": "spectrum",
           "kind": "task",
           "title": "Watch the cloud",
-          "text": "[Click ◎ on the Granular’s out](req:probe-grain-out) and switch the scope to Spectrum. Hold a note: the grains smear the harmonics into a band.",
+          "text": "[Click ◎ on the **Granular**’s `out`](req:probe-grain-out) and switch the scope to Spectrum. Hold a note: the grains smear the harmonics into a band.",
           "why": "",
           "listen": true,
           "parts": [
@@ -2007,7 +2007,7 @@
       "id": "two-instruments",
       "title": "Two instruments, one keyboard",
       "unpublished": true,
-      "intro": "Layering is two instruments on one keyboard. A mixer sums them, the arpeggiator plays held keys as a pattern, a macro range gives a knob a useful stretch, and the morph slider fades between two settings of the whole patch.",
+      "intro": "*Layering* is two instruments on one keyboard. A mixer sums them, the arpeggiator plays held keys as a pattern, a *macro range* gives a knob a useful stretch, and the `morph` slider fades between two settings of the whole patch.",
       "payoff": "Your two instruments play together, and a single slider moves their balance.",
       "challenge": "Find a halfway morph you prefer to either endpoint.",
       "patchName": "Tutorial duo",
@@ -2017,7 +2017,7 @@
           "id": "voice",
           "kind": "task",
           "title": "Insert My voice",
-          "text": "[Click + Add assembly and pick My voice from Your library](req:my-voice-exists). Cable [Main pitch → its pitch](req:main-pitch-my-voice-osc-pitch) and [Main gate → its gate](req:main-gate-my-voice-adsr-gate).",
+          "text": "[Click + Add assembly and pick My voice from Your library](req:my-voice-exists). Cable [**Main** `pitch` → its `pitch`](req:main-pitch-my-voice-osc-pitch) and [**Main** `gate` → its `gate`](req:main-gate-my-voice-adsr-gate).",
           "why": "",
           "parts": [
             { "id": "my-voice-exists", "kind": "assembly", "role": "myVoice", "fact": "exists" },
@@ -2043,7 +2043,7 @@
           "id": "fm",
           "kind": "task",
           "title": "Insert FM keys",
-          "text": "[Insert FM keys the same way.](req:fm-keys-exists) Its card shows two pitch inputs, one per oscillator, and a gate.",
+          "text": "[Insert FM keys the same way.](req:fm-keys-exists) Its card shows two `pitch` inputs, one per oscillator, and a `gate`.",
           "why": "",
           "parts": [
             { "id": "fm-keys-exists", "kind": "assembly", "role": "fmKeys", "fact": "exists" }
@@ -2053,8 +2053,8 @@
           "id": "merge",
           "kind": "task",
           "title": "Merge the two pitch inputs",
-          "text": "Expand FM keys. Next to one of the exposed pitch inputs [open merge into… and choose the other pitch](req:fm-keys-merged-pitch). One pitch jack now feeds both oscillators. [Collapse it.](req:fm-keys-collapsed)",
-          "why": "A merged input sends one cable to several inner inputs. Split undoes it.",
+          "text": "Expand FM keys. Next to one of the exposed `pitch` inputs [open merge into… and choose the other `pitch`](req:fm-keys-merged-pitch). One `pitch` jack now feeds both oscillators. [Collapse it.](req:fm-keys-collapsed)",
+          "why": "A *merged input* sends one cable to several inner inputs. Split undoes it.",
           "parts": [
             {
               "id": "fm-keys-merged-pitch",
@@ -2070,7 +2070,7 @@
           "id": "wire",
           "kind": "task",
           "title": "Cable the second instrument",
-          "text": "[Cable Main pitch → FM keys pitch](req:main-pitch-fm-keys-osc-pitch) and [Main gate → FM keys gate](req:main-gate-fm-env-gate). Both instruments are ready for the mixer in the next step.",
+          "text": "[Cable **Main** `pitch` → FM keys `pitch`](req:main-pitch-fm-keys-osc-pitch) and [**Main** `gate` → FM keys `gate`](req:main-gate-fm-env-gate). Both instruments are ready for the mixer in the next step.",
           "why": "",
           "parts": [
             {
@@ -2095,7 +2095,7 @@
           "id": "mixer",
           "kind": "task",
           "title": "Mix them",
-          "text": "[Add a Mixer 4](req:add-mixer). Cable [My voice out → in1](req:my-voice-out-out-mixer-in1), [FM keys l → in2](req:space-out-l-mixer-in2), [FM keys r → in3](req:space-out-r-mixer-in3), and [Mixer out → Output l and r](req:mixer-out-output-l,mixer-out-output-r). l1..l4 are the levels.",
+          "text": "[Add a **Mixer 4**](req:add-mixer). Cable [My voice `out` → `in1`](req:my-voice-out-out-mixer-in1), [FM keys `l` → `in2`](req:space-out-l-mixer-in2), [FM keys `r` → `in3`](req:space-out-r-mixer-in3), and [**Mixer** `out` → **Output** `l` and `r`](req:mixer-out-output-l,mixer-out-output-r). `l1`..`l4` are the levels.",
           "why": "",
           "parts": [
             { "id": "add-mixer", "kind": "module", "type": "mixer", "loose": true },
@@ -2145,7 +2145,7 @@
           "id": "layers",
           "kind": "continue",
           "title": "Hear what each layer contributes",
-          "text": "Start Riff. Optional: put Mixer l2 and l3 at 0 to hear My voice alone; restore them, then put l1 at 0 to hear FM keys alone. Bring l1 back up until neither layer hides the other. This balance is your choice.",
+          "text": "Start Riff. Optional: put **Mixer** `l2` and `l3` at 0 to hear My voice alone; restore them, then put `l1` at 0 to hear FM keys alone. Bring `l1` back up until neither layer hides the other. This balance is your choice.",
           "why": "",
           "playback": true,
           "pointer": {
@@ -2157,7 +2157,7 @@
           "id": "arp",
           "kind": "task",
           "title": "Let the arpeggiator play",
-          "text": "Open the arp panel on the Main card and [press Space (or Commands → arpeggiator)](req:arp-play). Hold a chord: the keys are played one after another at the rate shown.",
+          "text": "Open the arp panel on the **Main** card and [press Space (or Commands → arpeggiator)](req:arp-play). Hold a chord: the keys are played one after another at the rate shown.",
           "why": "",
           "listen": true,
           "parts": [
@@ -2168,8 +2168,8 @@
           "id": "macro",
           "kind": "task",
           "title": "A knob with a range",
-          "text": "[Cable Main k2 → My voice p1](req:main-k2-my-voice-filter-p1) (the pin of the Filter inside). Open the ⋯ menu of My voice’s cutoff, [tick P1](req:my-voice-filter-p1-cutoff) and Map between two values, then [set the ends to 150 Hz and 4000 Hz](req:my-voice-filter-p1-cutoff-range). Set the Filter’s P1 depth to 1 so the knob reaches both ends.",
-          "why": "A macro range maps the knob’s whole travel onto a slice of the parameter: the useful part of the cutoff instead of 20 Hz to 16 kHz.",
+          "text": "[Cable **Main** `k2` → My voice `p1`](req:main-k2-my-voice-filter-p1) (the pin of the **Filter** inside). Open the ⋯ menu of My voice’s `cutoff`, [tick `P1`](req:my-voice-filter-p1-cutoff) and Map between two values, then [set the ends to 150 Hz and 4000 Hz](req:my-voice-filter-p1-cutoff-range). Set the **Filter**’s `P1` depth to 1 so the knob reaches both ends.",
+          "why": "A macro range maps the knob’s whole travel onto a slice of the parameter: the useful part of the `cutoff` instead of 20 Hz to 16 kHz.",
           "listen": true,
           "parts": [
             {
@@ -2203,7 +2203,7 @@
           "id": "snapshots",
           "kind": "task",
           "title": "Compare two snapshots",
-          "text": "[Commands → Set snapshot A](req:snapshot-a). Change a few sliders (cutoff, the mixer levels), then [Commands → Set snapshot B](req:snapshot-b). [Press Alt+B to flip between them](req:flips). Listen to the change in balance: snapshots switch the whole patch instantly. The next step makes a continuous fade.",
+          "text": "[Commands → Set snapshot A](req:snapshot-a). Change a few sliders (`cutoff`, the mixer levels), then [Commands → Set snapshot B](req:snapshot-b). [Press Alt+B to flip between them](req:flips). Listen to the change in balance: *snapshots* switch the whole patch instantly. The next step makes a continuous fade.",
           "why": "",
           "listen": true,
           "parts": [
@@ -2216,8 +2216,8 @@
           "id": "morph",
           "kind": "task",
           "title": "Fade between the snapshots",
-          "text": "On Main, [open the B side picker and choose Snapshot B](req:morph-target). [Move morph from 0 to 1, then leave it halfway](req:main-morph). You now hear a continuous change in the mixer balance; Alt+B alone only switches snapshots.",
-          "why": "A morph target must have the same modules and cables. Snapshot B is a complete compatible patch; selecting it copies its parameters into the B side. Main itself is not morphed.",
+          "text": "On **Main**, [open the B side picker and choose Snapshot B](req:morph-target). [Move `morph` from 0 to 1, then leave it halfway](req:main-morph). You now hear a continuous change in the mixer balance; Alt+B alone only switches snapshots.",
+          "why": "A *morph target* must have the same modules and cables. Snapshot B is a complete compatible patch; selecting it copies its parameters into the B side. **Main** itself is not morphed.",
           "listen": true,
           "parts": [
             { "id": "morph-target", "kind": "custom", "name": "morphTarget" },
@@ -2238,7 +2238,7 @@
       "id": "random-melody-machine",
       "title": "A random melody machine",
       "unpublished": true,
-      "intro": "A sequencer is a clock and a value per step. A random one samples noise on every tick; a quantizer snaps the values to a scale so they become notes; a pulse turns each tick into a gate of a chosen length. The instruments you saved will play whatever the machine comes up with.",
+      "intro": "A *sequencer* is a clock and a value per step. A random one samples noise on every tick; a *quantizer* snaps the values to a scale so they become notes; a pulse turns each tick into a gate of a chosen length. The instruments you saved will play whatever the machine comes up with.",
       "payoff": "Chance and a written sequence now share one musical clock.",
       "challenge": "Write a four-note answer to the random machine.",
       "patchName": "Tutorial machine",
@@ -2248,7 +2248,7 @@
           "id": "clock",
           "kind": "task",
           "title": "A clock",
-          "text": "[Add an LFO](req:add-lfo), [set its wave to square](req:lfo-wave) and [its rate to 4 Hz](req:lfo-rate). A square wave is a clock: its rising edge is a tick.",
+          "text": "[Add an **LFO**](req:add-lfo), [set its `wave` to square](req:lfo-wave) and [its `rate` to 4 Hz](req:lfo-rate). A square wave is a *clock*: its rising edge is a *tick*.",
           "why": "",
           "parts": [
             { "id": "add-lfo", "kind": "module", "type": "lfo" },
@@ -2274,7 +2274,7 @@
           "id": "div",
           "kind": "task",
           "title": "Divide it",
-          "text": "[Add a Clock div](req:add-clkdiv) and [cable LFO out → Clock div clock](req:lfo-out-clkdiv-clock). Its outputs out, d2, d4 and d8 tick every div, 2, 4 and 8 ticks.",
+          "text": "[Add a **Clock div**](req:add-clkdiv) and [cable **LFO** `out` → **Clock div** `clock`](req:lfo-out-clkdiv-clock). Its outputs `out`, `d2`, `d4` and `d8` tick every `div`, 2, 4 and 8 ticks.",
           "why": "",
           "superseded": true,
           "parts": [
@@ -2293,7 +2293,7 @@
           "id": "sh",
           "kind": "task",
           "title": "A random value per tick",
-          "text": "[Add Noise](req:add-noise) and [an S&H (sample and hold)](req:add-sh). Cable [Noise out → S&H in](req:noise-out-sh-in) and [Clock div out → S&H clock](req:clkdiv-out-sh-clock). On every tick the S&H grabs the noise’s value and holds it.",
+          "text": "[Add **Noise**](req:add-noise) and [an **S&H** (*sample and hold*)](req:add-sh). Cable [**Noise** `out` → **S&H** `in`](req:noise-out-sh-in) and [**Clock div** `out` → **S&H** `clock`](req:clkdiv-out-sh-clock). On every tick the **S&H** grabs the noise’s value and holds it.",
           "why": "",
           "parts": [
             { "id": "add-noise", "kind": "module", "type": "noise" },
@@ -2320,7 +2320,7 @@
           "id": "quant",
           "kind": "task",
           "title": "Snap it to a scale",
-          "text": "[Add a Quantizer](req:add-quant), [cable S&H out → Quantizer in](req:sh-out-quant-in) and [set scale to pent min](req:quant-scale). Random voltages become notes of a pentatonic minor scale.",
+          "text": "[Add a **Quantizer**](req:add-quant), [cable **S&H** `out` → **Quantizer** `in`](req:sh-out-quant-in) and [set `scale` to pent min](req:quant-scale). Random voltages become notes of a pentatonic minor scale.",
           "why": "Pitch is a control signal: one unit per octave, a semitone is a twelfth. The quantizer rounds to the nearest note of the scale, which is why random noise sounds like a melody.",
           "superseded": true,
           "parts": [
@@ -2347,7 +2347,7 @@
           "id": "pluck",
           "kind": "task",
           "title": "Play Pluck with it",
-          "text": "[Insert Pluck from Your library](req:pluck-exists). Cable [Quantizer out → Pluck pitch](req:quant-out-pluck-string-pitch), [Clock div out → Pluck gate](req:clkdiv-out-pluck-string-gate) and [Pluck out → Output l](req:pluck-out). The machine plays on its own now.",
+          "text": "[Insert Pluck from Your library](req:pluck-exists). Cable [**Quantizer** `out` → Pluck `pitch`](req:quant-out-pluck-string-pitch), [**Clock div** `out` → Pluck `gate`](req:clkdiv-out-pluck-string-gate) and [Pluck `out` → **Output** `l`](req:pluck-out). The machine plays on its own now.",
           "why": "",
           "parts": [
             { "id": "pluck-exists", "kind": "assembly", "role": "pluck", "fact": "exists" },
@@ -2374,8 +2374,8 @@
           "id": "pulse",
           "kind": "task",
           "title": "FM keys on every second tick",
-          "text": "[Add a Pulse with time 0.05 s](req:add-pulse,pulse-time) and [cable Clock div d2 → Pulse trig](req:clkdiv-d2-pulse-trig). [Insert FM keys](req:fm-keys-exists); cable [Quantizer out → FM keys pitch](req:quant-out-fm-keys-osc-pitch), [Pulse out → FM keys gate](req:pulse-out-fm-env-gate), [FM keys l → Output r](req:space-out-l-output-r).",
-          "why": "A divider passes selected input pulses with their original width. Pulse makes a predictable 0.05 s gate regardless of the clock’s pulse width.",
+          "text": "[Add a **Pulse** with `time` 0.05 s](req:add-pulse,pulse-time) and [cable **Clock div** `d2` → **Pulse** `trig`](req:clkdiv-d2-pulse-trig). [Insert FM keys](req:fm-keys-exists); cable [**Quantizer** `out` → FM keys `pitch`](req:quant-out-fm-keys-osc-pitch), [**Pulse** `out` → FM keys `gate`](req:pulse-out-fm-env-gate), [FM keys `l` → **Output** `r`](req:space-out-l-output-r).",
+          "why": "A divider passes selected input pulses with their original width. **Pulse** makes a predictable 0.05 s gate regardless of the clock’s pulse width.",
           "superseded": true,
           "parts": [
             { "id": "add-pulse", "kind": "module", "type": "pulse" },
@@ -2426,7 +2426,7 @@
           "id": "random",
           "kind": "continue",
           "title": "Let chance write the first phrase",
-          "text": "Listen for several repeats before replacing the random source. Optional: change Quantizer scale and hear the same random movement obey another set of notes. Return to pent min; the next step lets you write a four-note reply.",
+          "text": "Listen for several repeats before replacing the random source. Optional: change **Quantizer** `scale` and hear the same random movement obey another set of notes. Return to pent min; the next step lets you write a four-note reply.",
           "why": "",
           "playback": true,
           "pointer": {
@@ -2438,8 +2438,8 @@
           "id": "seq",
           "kind": "task",
           "title": "A written melody instead",
-          "text": "[Add a Sequencer](req:add-seq), [cable Clock div out → Sequencer clock](req:clkdiv-out-seq-clock) and [Sequencer out → Quantizer in](req:seq-out-quant-in), and [remove the cable from the S&H to the Quantizer](req:unplug-sh-out-quant-in). Set s1..s4 to a few different values; [len to 4](req:seq-len).",
-          "why": "The Sequencer’s steps are the same kind of signal the S&H made, just chosen by you. Through the quantizer the steps land on scale notes whatever you set them to.",
+          "text": "[Add a **Sequencer**](req:add-seq), [cable **Clock div** `out` → **Sequencer** `clock`](req:clkdiv-out-seq-clock) and [**Sequencer** `out` → **Quantizer** `in`](req:seq-out-quant-in), and [remove the cable from the **S&H** to the **Quantizer**](req:unplug-sh-out-quant-in). Set `s1`..`s4` to a few different values; [`len` to 4](req:seq-len).",
+          "why": "The **Sequencer**’s steps are the same kind of signal the **S&H** made, just chosen by you. Through the quantizer the steps land on scale notes whatever you set them to.",
           "parts": [
             { "id": "add-seq", "kind": "module", "type": "seq" },
             {
@@ -2480,7 +2480,7 @@
           "id": "mainclock",
           "kind": "task",
           "title": "Lock to the arpeggiator’s clock",
-          "text": "[Cable Main clock → Clock div clock](req:main-clock-clkdiv-clock) and [remove the LFO’s cable to it](req:unplug-lfo-out-clkdiv-clock); [set the Clock div’s div to 6](req:clkdiv-div). [Add a second Clock div](req:add-clkdiv-2): [first out → second clock](req:clkdiv-out-clkdiv2-clock), [second d2 → Pulse trig](req:clkdiv2-d2-pulse-trig); [remove first d2 → Pulse trig](req:unplug-clkdiv-d2-pulse-trig). Press Space: Main’s clock now ticks 24 times per beat at the arp tempo, and on the FM-1 it follows MIDI clock.",
+          "text": "[Cable **Main** `clock` → **Clock div** `clock`](req:main-clock-clkdiv-clock) and [remove the **LFO**’s cable to it](req:unplug-lfo-out-clkdiv-clock); [set the **Clock div**’s `div` to 6](req:clkdiv-div). [Add a second **Clock div**](req:add-clkdiv-2): [first `out` → second `clock`](req:clkdiv-out-clkdiv2-clock), [second `d2` → **Pulse** `trig`](req:clkdiv2-d2-pulse-trig); [remove first `d2` → **Pulse** `trig`](req:unplug-clkdiv-d2-pulse-trig). Press Space: **Main**’s `clock` now ticks 24 times per beat at the arp tempo, and on the FM-1 it follows MIDI clock.",
           "why": "",
           "parts": [
             {
@@ -2538,7 +2538,7 @@
           "id": "play",
           "kind": "task",
           "title": "Hear the machine lock together",
-          "text": "[Press Space to start the arpeggiator clock.](req:arp-play) Change Main’s tempo: the written melody, Pluck and every-second-tick FM part stay together. Optional: change s1–s4 to write a four-note answer to the random melody.",
+          "text": "[Press Space to start the arpeggiator clock.](req:arp-play) Change **Main**’s tempo: the written melody, Pluck and every-second-tick FM part stay together. Optional: change `s1`–`s4` to write a four-note answer to the random melody.",
           "why": "",
           "listen": true,
           "parts": [
@@ -2561,7 +2561,7 @@
           "id": "noise",
           "kind": "task",
           "title": "Noise through a high pass",
-          "text": "[Add Noise](req:add-noise) and [a Filter](req:add-filter). [Cable Noise out → Filter in](req:noise-out-filter-in) and [set the cutoff to about 6 kHz](req:filter-cutoff): the Filter’s hp output is the hiss of a hat.",
+          "text": "[Add **Noise**](req:add-noise) and [a **Filter**](req:add-filter). [Cable **Noise** `out` → **Filter** `in`](req:noise-out-filter-in) and [set the `cutoff` to about 6 kHz](req:filter-cutoff): the **Filter**’s `hp` output is the hiss of a hat.",
           "why": "",
           "parts": [
             { "id": "add-noise", "kind": "module", "type": "noise" },
@@ -2588,7 +2588,7 @@
           "id": "env",
           "kind": "task",
           "title": "A very short envelope",
-          "text": "[Add an Env L/R](req:add-env) and [a VCA](req:add-vca). Cable [Filter hp → VCA in](req:filter-hp-vca-in), [Main gate → Env gate](req:main-gate-env-gate), [Env env → VCA cv](req:env-env-vca-cv), [VCA out → Output l](req:vca-out-output-l). [Set l1 to 1](req:env-l1), [r1 to 0.001 s](req:env-r1), [l2 to 0](req:env-l2), [r2 to 0.08 s](req:env-r2), [l3 to 0](req:env-l3) and [l4 to 0](req:env-l4). Hold a key: one crisp hiss dies away and stays silent.",
+          "text": "[Add an **Env L/R**](req:add-env) and [a **VCA**](req:add-vca). Cable [**Filter** `hp` → **VCA** `in`](req:filter-hp-vca-in), [**Main** `gate` → **Env** `gate`](req:main-gate-env-gate), [**Env** `env` → **VCA** `cv`](req:env-env-vca-cv), [**VCA** `out` → **Output** `l`](req:vca-out-output-l). [Set `l1` to 1](req:env-l1), [`r1` to 0.001 s](req:env-r1), [`l2` to 0](req:env-l2), [`r2` to 0.08 s](req:env-r2), [`l3` to 0](req:env-l3) and [`l4` to 0](req:env-l4). Hold a key: one crisp hiss dies away and stays silent.",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -2682,7 +2682,7 @@
           "id": "group",
           "kind": "task",
           "title": "Group it as Hat and save it",
-          "text": "[Select the Noise, Filter, Env and VCA, press Ctrl+G (Cmd+G) and name it Hat](req:hat-exists). [Click save on its card](req:hat-saved).",
+          "text": "[Select the **Noise**, **Filter**, **Env** and **VCA**, press Ctrl+G (Cmd+G) and name it Hat](req:hat-exists). [Click save on its card](req:hat-saved).",
           "why": "",
           "parts": [
             { "id": "hat-exists", "kind": "assembly", "role": "hat", "fact": "exists" },
@@ -2711,7 +2711,7 @@
           "id": "clock",
           "kind": "task",
           "title": "A clock and a divider",
-          "text": "[Add an LFO (square, 8 Hz)](req:add-lfo,lfo-wave,lfo-rate) and [a Clock div with div 2](req:add-clkdiv,clkdiv-div). [Cable LFO out → Clock div clock](req:lfo-out-clkdiv-clock).",
+          "text": "[Add an **LFO** (square, 8 Hz)](req:add-lfo,lfo-wave,lfo-rate) and [a **Clock div** with `div` 2](req:add-clkdiv,clkdiv-div). [Cable **LFO** `out` → **Clock div** `clock`](req:lfo-out-clkdiv-clock).",
           "why": "",
           "superseded": true,
           "parts": [
@@ -2755,7 +2755,7 @@
           "id": "pattern",
           "kind": "task",
           "title": "A pattern from the divisions",
-          "text": "Cable [LFO out → Hat gate](req:lfo-out-hat-gate-gate) (every eighth), [Clock div d2 → kick gate](req:drum-triggered-kick-d2) (every beat) and [Clock div d4 → snare gate](req:drum-triggered-snare-d4) (every second beat). [Remove the cable from Main’s gate to the Hat](req:unplug-main-gate-hat-gate-gate).",
+          "text": "Cable [**LFO** `out` → Hat `gate`](req:lfo-out-hat-gate-gate) (every eighth), [**Clock div** `d2` → kick `gate`](req:drum-triggered-kick-d2) (every beat) and [**Clock div** `d4` → snare `gate`](req:drum-triggered-snare-d4) (every second beat). [Remove the cable from **Main**’s `gate` to the Hat](req:unplug-main-gate-hat-gate-gate).",
           "why": "",
           "superseded": true,
           "parts": [
@@ -2793,7 +2793,7 @@
           "id": "mix",
           "kind": "task",
           "title": "Mix the kit",
-          "text": "[Add a Mixer 4](req:add-mixer): [kick out → in1](req:drum-out-kick-in1), [snare out → in2](req:drum-out-snare-in2), [Hat out → in3](req:hat-out-out-mixer-in3), and [Mixer out → Output l and r](req:mixer-out-output-l,mixer-out-output-r). [Remove the Hat’s own cable to Output](req:unplug-hat-out-out-output-l). [Set l1 to 0.9](req:mixer-l1) and [l3 to 0.4](req:mixer-l3).",
+          "text": "[Add a **Mixer 4**](req:add-mixer): [kick `out` → `in1`](req:drum-out-kick-in1), [snare `out` → `in2`](req:drum-out-snare-in2), [Hat `out` → `in3`](req:hat-out-out-mixer-in3), and [**Mixer** `out` → **Output** `l` and `r`](req:mixer-out-output-l,mixer-out-output-r). [Remove the Hat’s own cable to **Output**](req:unplug-hat-out-out-output-l). [Set `l1` to 0.9](req:mixer-l1) and [`l3` to 0.4](req:mixer-l3).",
           "why": "",
           "parts": [
             { "id": "add-mixer", "kind": "module", "type": "mixer", "loose": true },
@@ -2863,8 +2863,8 @@
           "id": "beats",
           "kind": "task",
           "title": "Place the backbeat",
-          "text": "[Build the beat below](req:beat): three Sequencers replace the divider gates. At 120 bpm, kick lands on beats 1 and 3, snare on 2 and 4, and hats on each beat. A step at −1 is a rest; 0 is a hit. Optional: change one rest into an extra hit and listen to the push it creates.",
-          "why": "Each Sequencer receives the same 4 Hz clock. Its gate triggers one drum. The engine advances on the first tick, so the first sounding slot is s2; s1 is the last eighth of the bar.",
+          "text": "[Build the beat below](req:beat): three **Sequencers** replace the divider gates. At 120 bpm, kick lands on beats 1 and 3, snare on 2 and 4, and hats on each beat. A step at −1 is a rest; 0 is a hit. Optional: change one rest into an extra hit and listen to the push it creates.",
+          "why": "Each **Sequencer** receives the same 4 Hz clock. Its `gate` triggers one drum. The engine advances on the first tick, so the first sounding slot is `s2`; `s1` is the last eighth of the bar.",
           "listen": true,
           "superseded": true,
           "parts": [
@@ -2875,8 +2875,8 @@
           "id": "performance",
           "kind": "task",
           "title": "An eight-bar miniature",
-          "text": "[Build the arrangement below](req:performance), adding steady eighth-note hats. Bars 1–2 establish your beat; 3–6 add your saved Pluck melody; bar 7 opens the hats for a flourish; bar 8 returns to the beat. It repeats every 16 seconds at 120 bpm. Change the kick Sequencer’s hit values to change the melody; expand Eight-bar arrangement to change the form; your patch stores the performance.",
-          "why": "One divider ticks once per bar. A slow Sequencer brings in the melody and lengthens the hat tail for a flourish. The same clock drives the notes and the form. If you skipped Pluck, the bundled instrument stands in for it.",
+          "text": "[Build the arrangement below](req:performance), adding steady eighth-note hats. Bars 1–2 establish your beat; 3–6 add your saved Pluck melody; bar 7 opens the hats for a flourish; bar 8 returns to the beat. It repeats every 16 seconds at 120 bpm. Change the kick **Sequencer**’s hit values to change the melody; expand Eight-bar arrangement to change the form; your patch stores the performance.",
+          "why": "One divider ticks once per bar. A slow **Sequencer** brings in the melody and lengthens the hat tail for a flourish. The same clock drives the notes and the form. If you skipped Pluck, the bundled instrument stands in for it.",
           "listen": true,
           "parts": [
             { "id": "performance", "kind": "custom", "name": "performance" }
