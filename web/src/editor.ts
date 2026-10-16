@@ -11,6 +11,7 @@ import type { ParameterValues } from './engine';
 import { deviceBudget, DEVICE } from './patchbin';
 import { choiceName, formatValue, longName, moduleName, moduleTag } from './labels';
 import { picker } from './picker';
+import { selector } from './selector';
 import { copiesOf, makeRoom, polyOfModule, setPoly } from './poly';
 import { ASSIGN_MODES, LEGATO_MODES, PRIORITIES } from './modules';
 import { dragControl } from './deck';
@@ -756,11 +757,12 @@ export class Editor {
     }
     const name = document.createElement('span');
     name.textContent = o.label ?? longName(def.type, pd.name);
-    // an enum parameter is a picker (◀ saw ▶) with its jack above it, the two outlined together
+    // an enum parameter is a selector (a detent rail, or a drum when the names do not fit) whose jack stands on the live choice
     const choice = !!pd.choices && !pd.toggle;
     // a switch has no thumb either: its jack stands the same way, above the check box
     const jacked = choice || !!pd.toggle;
     if (jacked) row.classList.add('choice');
+    if (choice) row.classList.add('sel');
     if (pd.toggle) row.classList.add('toggle');
     let pickBox: HTMLElement | null = null; // pick mode's check box, last in the row (the name stays its first child)
     if (o.open) {
@@ -862,9 +864,27 @@ export class Editor {
     // a slider with nothing to patch keeps the bar and a plain thumb (not a jack: no cable lands on it)
     const plain = !thumb && !pd.toggle && !choice ? sliderJack(input, () => {}) : null;
     plain?.jack.classList.replace('slider-port', 'slider-thumb');
-    // a picker's jack: the same role as a slider's thumb (routes and cables end on it), standing above the picker
-    const pickJack = canPatch && jacked ? document.createElement('span') : null;
-    row.classList.toggle('jacked', !!pickJack); // the outline ties the jack to its picker
+    // the selector: its jack is the live choice's marker (routes and cables end on it, as on a slider's thumb)
+    const sel = choice ? selector({
+      label: longName(def.type, pd.name),
+      names: pd.choices!.map((c) => choiceName(def.type, pd.name, c)),
+      get: () => Math.round(m.params[pd.name]),
+      set: (i) => {
+        input.value = String(i);
+        input.dispatchEvent(new Event('input'));
+      },
+      onPatch: canPatch ? (e, jack) => this.beginDrag(e, jack) : undefined,
+    }) : null;
+    if (sel && canPatch) {
+      sel.jack.dataset.mod = String(m.id);
+      sel.jack.dataset.param = pd.name;
+      sel.jack.dataset.dir = 'in';
+      sel.jack.title = `${def.label} ${longName(def.type, pd.name)}: drop a cable here to modulate it (depth in the ⋮ menu).`;
+      this.sliderPorts.push({ m, pd, jack: sel.jack, ticks: sel.setKnobTicks });
+    }
+    // a switch's jack: the same role as a slider's thumb (routes and cables end on it), at the bar's left end
+    const pickJack = canPatch && pd.toggle ? document.createElement('span') : null;
+    row.classList.toggle('jacked', !!pickJack); // the switch's jack stands left of the shading
     if (pickJack) {
       pickJack.className = 'dot control slider-port picker-jack';
       pickJack.dataset.mod = String(m.id);
@@ -896,6 +916,7 @@ export class Editor {
         else if (input.value !== position) input.value = position;
         thumb?.update();
         thumb?.setBase(automated ? toUnit(pd, base) : null);
+        sel?.update(Math.round(v), Math.round(base));
         input.title = automated ? `Live: ${text}. Base: ${fmt(base)}. ${gesture || 'Drag to edit the base value.'}` : gesture;
       }
       if (!editing || automated) {
@@ -904,7 +925,7 @@ export class Editor {
       }
       row.classList.toggle('automated', automated);
     } });
-    row.append(name, jacked ? (pickJack ?? document.createElement('span')) : val);
+    row.append(name, choice ? sel!.element : pd.toggle ? (pickJack ?? document.createElement('span')) : val);
     if (canPatch) {
       const key = `${m.id}:${pd.name}`;
       row.append(parameterMenu(m, def, pd, { ...this.ev, patch: () => this.patch, change: (fn) => this.change(fn) }, this.routingOpen.has(key), (on) => {
@@ -917,24 +938,13 @@ export class Editor {
         this.drawCables();
       }));
     }
-    if (choice) {
-      // the arrows move the base value through the hidden range input, so editing, undo and Live work as for a slider
-      row.append(picker({
-        label: longName(def.type, pd.name),
-        value: val,
-        count: () => pd.choices!.length,
-        get: () => Math.round(m.params[pd.name]),
-        set: (i) => {
-          input.value = String(i);
-          input.dispatchEvent(new Event('input'));
-        },
-      }));
-    } else if (pd.toggle) {
+    // a selector moves the base value through the hidden range input, so editing, undo and Live work as for a slider
+    if (pd.toggle) {
       const line = document.createElement('label');
       line.className = 'toggle-line';
       line.append(input, val);
       row.append(line);
-    } else row.append(thumb?.element ?? plain?.element ?? input);
+    } else if (!choice) row.append(thumb?.element ?? plain?.element ?? input);
     if (plain) this.parameterDisplays.push({ id: m.id, update: () => { if (!editing) plain.update(); } });
     if (pickBox) row.append(pickBox);
     return row;
@@ -981,13 +991,15 @@ export class Editor {
     row.className = 'param bar morph-row';
     const name = document.createElement('span');
     name.textContent = 'B side';
-    const val = document.createElement('output');
-    const shown = document.createElement('output');
     const cands = (this.ev.morphCandidates?.() ?? []).filter((c) => sameStructure(this.patch, c.patch));
     // index 0 = none, then the candidates; the current B side is matched by name (it is a copy of a candidate's values)
     const current = (): number => (hasMorph(this.patch) ? cands.findIndex((c) => c.name === this.patch.morphName) + 1 : 0);
-    const sel = picker({
-      label: 'B side', value: shown, count: () => cands.length + 1, get: current,
+    const names = ['none', ...cands.map((c) => c.name)];
+    // a B side that is no longer among the candidates (renamed, deleted) still shows its name
+    if (hasMorph(this.patch) && current() === 0) names[0] = this.patch.morphName ?? 'set';
+    row.classList.add('choice', 'sel');
+    const sel = selector({
+      label: 'B side', names, get: current,
       set: (i) => this.change(() => {
         if (i === 0) clearMorph(this.patch);
         else setMorphTarget(this.patch, cands[i - 1].patch, DEFS);
@@ -995,8 +1007,7 @@ export class Editor {
     });
     const show = (): void => {
       const has = hasMorph(this.patch);
-      shown.textContent = has ? (this.patch.morphName ?? 'set') : 'none';
-      val.textContent = '';
+      sel.update(current(), current());
       row.title = has
         ? `The morph slider fades every parameter from this patch (A) to "${this.patch.morphName ?? 'B'}" (B): in octaves for a logarithmic one, a choice or switch flips at 0.5. The Main module's morph input adds to the slider (an LFO morphs the patch). Choose "none" to drop the B side.`
         : cands.length
@@ -1004,7 +1015,7 @@ export class Editor {
           : 'No stored patch has the same modules and cables as this one. Save this patch under another name, change its sounds, and pick that copy here.';
     };
     show();
-    row.append(name, val, sel);
+    row.append(name, sel.element);
     return row;
   }
 
@@ -1455,9 +1466,8 @@ export class Editor {
     };
     const refresh = (): void => rows.forEach((f) => f());
     const choice = (label: string, f: keyof ArpCfg, names: string[]): void => {
-      const value = document.createElement('span');
-      const pick = picker({ label: `arpeggiator ${label}`, value, count: () => names.length, get: () => cfg()[f], set: (i) => set(f, i) });
-      row(label, 'choice', [document.createElement('span'), pick], () => (value.textContent = names[cfg()[f]] ?? ''));
+      const sel = selector({ label: `arpeggiator ${label}`, names, get: () => cfg()[f], set: (i) => set(f, i) });
+      row(label, 'choice sel', [sel.element], () => sel.update(cfg()[f], cfg()[f]));
     };
     const num = (label: string, f: keyof ArpCfg, lo: number, hi: () => number, show: (v: number) => string = String): void => {
       const input = document.createElement('input');
