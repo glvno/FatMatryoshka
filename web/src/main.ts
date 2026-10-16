@@ -545,6 +545,7 @@ $('new-patch-btn').onclick = () => { loadNamed(newPatch(DEFS)); tutorial.newPatc
 $('add-btn').onclick = () => openPalette('module');
 $('add-assembly-btn').onclick = () => openPalette('assembly');
 $('tidy-btn').onclick = () => editor.tidyUp();
+$('fit-btn').onclick = () => editor.zoomToFit();
 $('tour-btn').onclick = () => { switchTab('patch'); tutorial.open(); };
 $('mobile-commands').onclick = () => openPalette();
 $('palette-close').onclick = () => palette.close();

@@ -110,6 +110,8 @@ input#patch-name:hover, input#patch-name:focus { border-bottom-color: var(--line
 .budget-item.pick { cursor: pointer; }
 .budget-item.pick:hover > :first-child { color: var(--ink); text-decoration: underline; }
 .budget-list p { margin: 4px 0 0; font-size: 11px; }
+.view-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.view-row button { white-space: nowrap; padding-inline: 6px; }
 .slack-row { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
 .slack-row input { width: 100%; margin: 0; accent-color: var(--secondary); }
 .sidebar button, .sidebar select { min-height: 36px; }

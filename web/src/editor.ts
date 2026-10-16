@@ -1019,14 +1019,17 @@ export class Editor {
     this.positionCables();
   }
 
-  /** every card in view: the zoom that fits the whole patch into the canvas */
+  /** every card in view: the zoom that fits the cards' extent into the canvas, scrolled to its top left */
   zoomToFit(): void {
     const elements = [...this.cards.values(), ...this.containers.values(), ...this.frames.values()];
     if (!elements.length) return;
-    const w = Math.max(...elements.map((el) => el.offsetLeft + el.offsetWidth + 24));
-    const h = Math.max(...elements.map((el) => el.offsetTop + el.offsetHeight + 24));
-    this.setZoom(Math.min(1.5, (this.canvas.clientWidth - 16) / w, (this.canvas.clientHeight - 16) / h));
-    this.canvas.scrollTo(0, 0);
+    const PAD = 24;
+    const x0 = Math.max(0, Math.min(...elements.map((el) => el.offsetLeft)) - PAD);
+    const y0 = Math.max(0, Math.min(...elements.map((el) => el.offsetTop)) - PAD);
+    const w = Math.max(...elements.map((el) => el.offsetLeft + el.offsetWidth)) + PAD - x0;
+    const h = Math.max(...elements.map((el) => el.offsetTop + el.offsetHeight)) + PAD - y0;
+    this.setZoom(Math.min(1.5, this.canvas.clientWidth / w, this.canvas.clientHeight / h));
+    this.canvas.scrollTo(x0 * this.zoom, y0 * this.zoom);
   }
 
   /** pinch to zoom and one-finger pan on the empty canvas (touch), Ctrl / Cmd + wheel to zoom (trackpads) */
