@@ -882,16 +882,18 @@ export class Editor {
       sel.jack.title = `${def.label} ${longName(def.type, pd.name)}: drop a cable here to modulate it (depth in the ⋮ menu).`;
       this.sliderPorts.push({ m, pd, jack: sel.jack, ticks: sel.setKnobTicks });
     }
-    // a switch's jack: the same role as a slider's thumb (routes and cables end on it), at the bar's left end
+    // a switch's thumb is its jack: the same role as a slider's thumb (routes and cables end on it); it slides with the
+    // switch's live state. A press switches; Alt, or a cable being patched, patches
     const pickJack = canPatch && pd.toggle ? document.createElement('span') : null;
-    row.classList.toggle('jacked', !!pickJack); // the switch's jack stands left of the shading
     if (pickJack) {
-      pickJack.className = 'dot control slider-port picker-jack';
+      pickJack.className = 'dot control slider-port tog-jack';
       pickJack.dataset.mod = String(m.id);
       pickJack.dataset.param = pd.name;
       pickJack.dataset.dir = 'in';
       pickJack.title = `${def.label} ${longName(def.type, pd.name)}: drop a cable here to modulate it (depth in the ⋮ menu).`;
-      pickJack.addEventListener('pointerdown', (e) => this.beginDrag(e, pickJack));
+      pickJack.addEventListener('pointerdown', (e) => {
+        if (e.altKey || pickJack.closest('.patching')) this.beginDrag(e, pickJack);
+      });
       this.sliderPorts.push({ m, pd, jack: pickJack, ticks: () => {} });
     }
     const gesture = thumb ? 'Drag to adjust; Alt-drag to patch. Drop a cable on the thumb to connect.' : '';
@@ -925,7 +927,7 @@ export class Editor {
       }
       row.classList.toggle('automated', automated);
     } });
-    row.append(name, choice ? sel!.element : pd.toggle ? (pickJack ?? document.createElement('span')) : val);
+    row.append(name, choice ? sel!.element : pd.toggle ? document.createElement('span') : val);
     if (canPatch) {
       const key = `${m.id}:${pd.name}`;
       row.append(parameterMenu(m, def, pd, { ...this.ev, patch: () => this.patch, change: (fn) => this.change(fn) }, this.routingOpen.has(key), (on) => {
@@ -942,7 +944,10 @@ export class Editor {
     if (pd.toggle) {
       const line = document.createElement('label');
       line.className = 'toggle-line';
-      line.append(input, val);
+      const sw = document.createElement('span');
+      sw.className = 'tog-switch';
+      sw.append(input, ...(pickJack ? [pickJack] : []));
+      line.append(sw, val);
       row.append(line);
     } else if (!choice) row.append(thumb?.element ?? plain?.element ?? input);
     if (plain) this.parameterDisplays.push({ id: m.id, update: () => { if (!editing) plain.update(); } });

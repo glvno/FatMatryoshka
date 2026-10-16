@@ -433,6 +433,8 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .dock .piano-octave > button:last-child { grid-area: 1 / 2; }
 .dock .piano-octave > output { grid-area: 2 / 1 / 3 / 3; }
 .dock-body { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+/* the morph bar keeps clear of the dock's top edge above the B side groove (the dock grows to fit) */
+.dock-morph .dock-body { padding-top: 8px; gap: 4px; }
 .dock-knobs .dock-body, .dock-wheels .dock-body { flex-direction: row; justify-content: center; gap: 8px; }
 .dock-wheel { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .dock-wheel .deck-wheel { flex: 1; grid-template-rows: 1fr; }
@@ -749,10 +751,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 /* a choice or a switch: its jack at the bar's left end, the picker or switch at the right */
 .param.bar.choice, .param.bar.toggle { margin: 0; padding: 0; box-shadow: none; grid-template-columns: minmax(0, 1fr) auto; }
 .param.bar.choice > :first-child, .param.bar.toggle > :first-child { grid-area: 1 / 1; }
-/* its jack is not a thumb: it stands left of the shading, which starts after it */
-.param.bar.jacked { margin-left: 18px; }
-:is(.module, .dock) .param.bar > .picker-jack { grid-area: auto; position: absolute; left: -17px; top: 2px; width: 14px; height: 14px; border-width: 2.5px; }
-.param.bar > span:nth-child(2):not(.picker-jack):empty { display: none; }
+.param.bar > span:nth-child(2):empty { display: none; }
 .param.bar > .picker { grid-area: 1 / 2; border: 0; border-radius: 0; height: 18px; background: transparent; }
 .param.bar > .picker .pick { min-height: 18px; padding: 0 4px; font-size: 8px; background: transparent; }
 .param.bar > .picker .pick-value { padding: 0 2px; border: 0; background: transparent; font: var(--cap); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--secondary); }
@@ -762,6 +761,14 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .param.bar > .toggle-line input::before { content: ''; position: absolute; left: 2px; top: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: left .12s; }
 .param.bar > .toggle-line input:checked { background: color-mix(in srgb, var(--secondary) 45%, var(--line)); }
 .param.bar > .toggle-line input:checked::before { left: 14px; background: var(--secondary); }
+/* a patchable switch: its thumb is its jack, sliding with the live state */
+.tog-switch { position: relative; display: inline-flex; align-items: center; }
+.param.bar > .toggle-line .tog-switch:has(.tog-jack) input { width: 30px; height: 10px; }
+.param.bar > .toggle-line .tog-switch:has(.tog-jack) input::before { display: none; }
+.tog-switch .tog-jack { position: absolute; top: 50%; left: -2px; transform: translateY(-50%); width: 14px; height: 14px; border-width: 2.5px;
+  box-shadow: 0 0 0 1.5px var(--bar); cursor: pointer; transition: left .12s; }
+.tog-switch input:checked + .tog-jack { left: 18px; }
+.patching .tog-switch .tog-jack { cursor: crosshair; }
 .module .poly-set { padding: 6px 8px 0; margin: 0; font: var(--cap); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
 .module .poly-set .pick-value { font: 500 12px/1 'Barlow', system-ui, sans-serif; text-transform: none; }
 .fhead > span:not(.tools) { display: flex; align-items: center; gap: 7px; }
