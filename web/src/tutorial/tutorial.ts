@@ -318,7 +318,8 @@ export class Tutorial {
 
   private cancelAdvance(): void { clearTimeout(this.advanceTimer); this.advanceTimer = 0; }
 
-  /** Also called by the host's Panic command. */
+  /** Silence: notes, preview, arpeggiator, and the output muted. The Stop button, a chapter change, closing, leaving the
+   * window and the host's Panic command use it; moving between steps does not, so a riff keeps playing through them. */
   stop(): void {
     this.audition.stop(); this.auditionMode = '';
     clearTimeout(this.previewTimer);
@@ -419,7 +420,7 @@ export class Tutorial {
       parts.push(lessonProse(ch.intro));
       parts.push(el('p', { textContent: 'Your previous patch was saved in Tutorial → Your saved variations. Each chapter starts from a prepared patch; your own sketches remain recoverable.' }));
       parts.push(this.button(this.previewing ? 'Stop preview' : 'Preview the finished sound', () => this.preview()));
-      parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.stop(); this.page = 'steps'; this.enterStep(); this.saveProgress(); this.render(true); }, true), this.button('Chapters', () => this.open())));
+      parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.endPreview(); this.page = 'steps'; this.enterStep(); this.saveProgress(); this.render(true); }, true), this.button('Chapters', () => this.open())));
     } else if (this.page === 'steps' && st) {
       parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? (this.hold || st.listen ? ' · ✓ ready when you are' : ' · ✓ done, moving on') : ''}` }));
       parts.push(lessonProse(st.text));
@@ -463,7 +464,6 @@ export class Tutorial {
   private back(): void {
     const ch = this.chapter;
     if (!ch || this.progress.step === 0) return;
-    this.stop();
     this.cancelAdvance();
     if (!this.keepCurrent()) return;
     const k = this.progress.step - 1;
@@ -480,7 +480,6 @@ export class Tutorial {
    * editor's Undo brings the discarded work back */
   private restartStep(): void {
     if (!this.chapter || this.page !== 'steps') return;
-    this.stop();
     this.cancelAdvance();
     const start = structuredClone(this.entries.get(this.progress.step) ?? stepStart(this.chapterIndex, this.progress.step));
     const e = this.host.editor;
@@ -498,7 +497,6 @@ export class Tutorial {
     const s = this.state();
     if (!(optional && this.step?.optional) && !this.step?.check(s)) return;
     if (ch.steps.slice(0, this.progress.step).some((st) => !st.transient && !st.superseded && !st.check(s))) return;
-    this.stop();
     if (this.host.editor.patch.name === 'init') this.host.rename(ch.patchName); // the user's own New patch
     clearTimeout(this.advanceTimer); this.advanceTimer = 0;
     this.hold = false;
