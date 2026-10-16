@@ -45,7 +45,7 @@
       "payoff": "You may have noticed a pattern:\n- A pitch is voltage (`2V` for middle C, `+/- 1V` per octave)\n- A control signal (`cv`) is voltage\n- The audio signal sent to the `Output` module is voltage\n\nSo you may be wondering, *What if I mix and match? What happens if I use an oscillator signal as a control voltage? What about as a pitch signal?*\n\nIf so, you're exactly the kind of pervert who is going to really enjoy analog synthesis.",
       "challenge": "Find out what happens![^1]\n\n\n[^1]: Hint: add another oscillator module and use it in a dastardly manner.\n\n",
       "patchName": "Tutorial voice",
-      "start": { "kind": "new" },
+      "start": { "kind": "empty" },
       "steps": [
         {
           "id": "audio",

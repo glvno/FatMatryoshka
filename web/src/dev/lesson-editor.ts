@@ -640,8 +640,9 @@ async function mount() {
   function startEditor(ch: ChapterData, ci: number): HTMLElement {
     const box = el('section', 'lesson-section'); box.append(el('h3', '', 'Starts from'));
     const set = (s: StartRule) => { ch.start = s; edited({ fields: true }); };
-    box.append(select([['new', 'a new patch'], ['continue', 'the previous chapter’s end'], ['preset', 'a factory patch'], ['patch', 'a stored patch']], ch.start.kind, (v) => {
+    box.append(select([['new', 'a new patch'], ['empty', 'an empty canvas'], ['continue', 'the previous chapter’s end'], ['preset', 'a factory patch'], ['patch', 'a stored patch']], ch.start.kind, (v) => {
       if (v === 'new') set({ kind: 'new' });
+      else if (v === 'empty') set({ kind: 'empty' });
       else if (v === 'continue') set({ kind: 'continue' });
       else if (v === 'preset') set({ kind: 'preset', name: Object.keys(PRESETS)[0] });
       else if (synth) set({ kind: 'patch', patch: copy(synth.patch) });

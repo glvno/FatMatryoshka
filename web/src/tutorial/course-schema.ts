@@ -99,6 +99,8 @@ export interface StepData {
 
 export type StartRule =
   | { kind: 'new'; voices?: number }
+  /** an empty canvas: no modules, not even Main and Output */
+  | { kind: 'empty' }
   | { kind: 'continue' }
   | { kind: 'preset'; name: string }
   | { kind: 'patch'; patch: Patch };
@@ -184,7 +186,7 @@ export function validateShape(value: unknown, allowEmpty = false): asserts value
     text(ch.payoff, `${path}.payoff`, true);
     text(ch.challenge, `${path}.challenge`, true);
     text(ch.patchName, `${path}.patchName`, true);
-    if (!isObj(ch.start) || !['new', 'continue', 'preset', 'patch'].includes(String(ch.start.kind))) fail(`${path}.start`, 'expected new, continue, preset or patch');
+    if (!isObj(ch.start) || !['new', 'empty', 'continue', 'preset', 'patch'].includes(String(ch.start.kind))) fail(`${path}.start`, 'expected new, empty, continue, preset or patch');
     if (!Array.isArray(ch.steps)) fail(`${path}.steps`, 'expected a list');
     const stepIds = new Set<string>();
     (ch.steps as unknown[]).forEach((st, k) => {

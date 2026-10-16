@@ -403,7 +403,6 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .tutorial-challenge { margin: 12px 0; }
 .tutorial-challenge > strong { color: var(--secondary); font-size: 13px; }
 @media (max-width: 650px) { .tutorial-prose { font-size: 12px; } }
-.tutorial-hint { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--ink); }
 .tutorial-warn { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--ink); }
 .tutorial-why { font-size: 13px; margin: 6px 0; }
 .tutorial-todo { font-size: 12px; margin: 8px 0 2px; padding: 6px 10px; border-radius: 6px; background: var(--surface-tint); }

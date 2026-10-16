@@ -6,7 +6,7 @@
 // docs/TUTORIAL.md; the data's shape in course-schema.ts.
 import content from './course.json';
 import { DEFS } from '../modules';
-import { newPatch, type Patch } from '../patch';
+import { emptyPatch, newPatch, type Patch } from '../patch';
 import { PRESETS } from '../presets';
 import type { AssemblyDef } from '../assembly';
 import { findDef, type Chapter, type Step, type TutorialState } from './model';
@@ -69,6 +69,7 @@ export function chapterStart(i: number, course: CourseData = COURSE): Patch {
   const fresh = (): Patch => newPatch(DEFS, ch.patchName);
   switch (ch.start.kind) {
     case 'new': { const p = fresh(); if (ch.start.voices && ch.start.voices > 1) p.voices = ch.start.voices; return p; }
+    case 'empty': return emptyPatch(ch.patchName);
     case 'preset': { const make = PRESETS[ch.start.name]; return make ? { ...make(), name: ch.patchName } : fresh(); }
     case 'patch': return clone(ch.start.patch);
     case 'continue': return i > 0 ? clone(chapterEnd(i - 1, course)) : fresh();

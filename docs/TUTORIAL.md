@@ -24,7 +24,7 @@ Every chapter loads a prepared starting patch. Before replacing the open patch, 
 
 Assembly saves go to the real library. Helper saves retain a changed prior instrument under a unique “previous” name and leave one active tutorial tag; failed storage writes are reported. A fresh save check compares the definition actually saved during the step with the current assembly, including its modules, cables and exposed controls; saving an unrelated assembly does not count. Later chapters use the learner's tagged or named instrument when available, otherwise the bundled version: the definition stored with the reference patch of the step that saves it.
 
-Every task step stores a **reference patch**, the patch after doing it. A step's beginning state is the previous task step's reference (or the chapter's start: a new patch, the previous chapter's end, a factory patch, or a stored patch); a chapter's end, its intro preview and its Examples entry are its last reference.
+Every task step stores a **reference patch**, the patch after doing it. A step's beginning state is the previous task step's reference (or the chapter's start: a new patch, an empty canvas with no modules at all, the previous chapter's end, a factory patch, or a stored patch); a chapter's end, its intro preview and its Examples entry are its last reference.
 
 ## Listening and panel behavior
 
@@ -66,7 +66,7 @@ Dedicated parameter inputs remain permanently linked (`ParamDef.input`). Their r
 
 Run the usual `cd web && npm run dev`, then choose **Edit lessons** at the bottom of the synth sidebar, or open <http://localhost:5173/lesson-editor>. The existing server on 5173 serves the editor; no separate process is needed. Keep the synth open in another tab of the same server: the editor links to it.
 
-**Structure.** The course browser lists chapters and their steps; drag to reorder (steps within their chapter), or use ↑ / ↓. A chapter page edits its title, patch name, start (new patch with a voice count, previous chapter's end, factory patch, or the synth's current patch stored), introduction, payoff and challenge, and adds steps at its start. A step page adds a task or Continue step after it, duplicates or deletes it. Ids are made from the title once and never change; learners' progress follows them.
+**Structure.** The course browser lists chapters and their steps; drag to reorder (steps within their chapter), or use ↑ / ↓. A chapter page edits its title, patch name, start (new patch with a voice count, an empty canvas, previous chapter's end, factory patch, or the synth's current patch stored), introduction, payoff and challenge, and adds steps at its start. A step page adds a task or Continue step after it, duplicates or deletes it. Ids are made from the title once and never change; learners' progress follows them.
 
 **Publishing.** A chapter page has a **Published** check box (`unpublished: true` in `course.json`, right after the title; absent = published). The built site offers only published chapters: the chapter menu, the Examples picker, "Chapter n of N" and the next-chapter button count and number them alone, and saved progress in a chapter that is no longer offered falls back to the menu. The dev server lists every chapter, marked UNPUBLISHED, so it can be played before it ships. New chapters start unpublished. An unpublished chapter's data is still in the bundle (a `continue` start can depend on it); publishing hides it, it does not remove it. Only chapter 1 is published at the moment.
 

@@ -409,13 +409,12 @@ export class Tutorial {
     const done = this.page === 'steps' && st ? stepDone(ch, this.progress.step, s) : { met: false, moot: false };
     const ok = done.met || done.moot;
     const broken = this.page === 'steps' ? ch.steps.slice(0, this.progress.step).map((x, k) => (!x.transient && !x.superseded && !x.check(s) ? k : -1)).filter((k) => k >= 0) : [];
-    const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, s.audio, this.error, this.previewing, this.auditionMode, ok ? [] : st?.todo?.(s) ?? []]);
+    const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, this.error, this.previewing, this.auditionMode, ok ? [] : st?.todo?.(s) ?? []]);
     if (!force && key === this.lastRender) return;
     this.lastRender = key;
     const count = el('span', { class: 'tour-count', textContent: `Chapter ${LISTED.indexOf(i) + 1} of ${LISTED.length}${ch.published ? '' : ' (unpublished)'} · ${ch.title}` });
     const parts: (Node | string)[] = [this.head(this.page === 'steps' && st ? st.title : this.page === 'done' ? 'Chapter done' : ch.title), count];
     if (this.error) parts.push(el('p', { class: 'tutorial-warn', textContent: this.error }));
-    if (!s.audio) parts.push(el('p', { class: 'tutorial-hint', textContent: 'Sound is paused. Press a playback button, or the audio button in the sidebar, to listen.' }));
     if (this.page === 'intro') {
       parts.push(lessonProse(ch.intro));
       parts.push(el('p', { textContent: 'Your previous patch was saved in Tutorial → Your saved variations. Each chapter starts from a prepared patch; your own sketches remain recoverable.' }));
