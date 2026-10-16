@@ -42,29 +42,29 @@ export type EventName =
   | 'notes' | 'undos' | 'redos' | 'zooms' | 'flips' | 'shares' | 'bypasses' | 'news' | 'saves'
   | 'audio' | 'arpPlay' | 'snapshotA' | 'snapshotB' | 'probe' | 'selected' | 'bypassed';
 
-/** what a requirement checks. `label` replaces the generated checklist line. */
+/** what a requirement checks; its generated line (parts.ts partLabel) is the default wording the lesson editor inserts */
 export type PartSpec =
-  | { kind: 'module'; type: string; count?: number; loose?: boolean; label?: string }
-  | { kind: 'cable'; from: Ref; fromPort: string; to: Ref; toPort: string; label?: string }
-  | { kind: 'noCable'; from: Ref; fromPort: string; to: Ref; toPort: string; label?: string }
+  | { kind: 'module'; type: string; count?: number; loose?: boolean }
+  | { kind: 'cable'; from: Ref; fromPort: string; to: Ref; toPort: string }
+  | { kind: 'noCable'; from: Ref; fromPort: string; to: Ref; toPort: string }
   /** a slider in the parameter's units; `changed` compares with the value when the step was entered */
-  | { kind: 'slider'; ref: Ref; param: string; op: SliderOp; value?: number; max?: number; tolerance?: number; label?: string }
+  | { kind: 'slider'; ref: Ref; param: string; op: SliderOp; value?: number; max?: number; tolerance?: number }
   /** a signal dropped on a parameter's thumb: cabled to p1 or p2, with that pin mapped to the parameter */
-  | { kind: 'routed'; from: Ref; fromPort: string; to: Ref; param: string; label?: string }
-  | { kind: 'pinMap'; ref: Ref; pin: Pin; param: string; label?: string }
-  | { kind: 'att'; ref: Ref; pin: Pin; op: SliderOp; value: number; max?: number; tolerance?: number; label?: string }
+  | { kind: 'routed'; from: Ref; fromPort: string; to: Ref; param: string }
+  | { kind: 'pinMap'; ref: Ref; pin: Pin; param: string }
+  | { kind: 'att'; ref: Ref; pin: Pin; op: SliderOp; value: number; max?: number; tolerance?: number }
   /** a macro range of `pin` on `param`, from `min` to `max` in the parameter's units; `depth` also requires that attenuverter */
-  | { kind: 'macroRange'; ref: Ref; pin: Pin; param: string; min: number; max: number; depth?: number; label?: string }
+  | { kind: 'macroRange'; ref: Ref; pin: Pin; param: string; min: number; max: number; depth?: number }
   /** a fact about an assembly role; `type` + `param` / `port` name a member's control, `child` a nested role, `tag` + `name` a save */
   /** `type` + `index` (0-based, absent = the first) name the member module of a promoted / exposed fact */
-  | { kind: 'assembly'; role: string; fact: AssemblyFact; type?: string; index?: number; param?: string; port?: string; child?: string; tag?: string; name?: string; label?: string }
-  | { kind: 'voices'; min: number; label?: string }
+  | { kind: 'assembly'; role: string; fact: AssemblyFact; type?: string; index?: number; param?: string; port?: string; child?: string; tag?: string; name?: string }
+  | { kind: 'voices'; min: number }
   /** `count` (default 1) for counters; `ref` + `port` for a probe; `types` for a selection; `ref` + `on` for a bypass state */
-  | { kind: 'event'; event: EventName; count?: number; ref?: Ref; port?: string; types?: string[]; on?: boolean; label?: string }
+  | { kind: 'event'; event: EventName; count?: number; ref?: Ref; port?: string; types?: string[]; on?: boolean }
   /** the patch rendered offline: `held` = it sounds with a key held, `silent` = nothing without a key */
-  | { kind: 'sound'; mode: 'held' | 'silent'; threshold?: number; label?: string }
+  | { kind: 'sound'; mode: 'held' | 'silent'; threshold?: number }
   /** a check from the code registry (registry.ts) */
-  | { kind: 'custom'; name: string; args?: Record<string, string | number>; label?: string };
+  | { kind: 'custom'; name: string; args?: Record<string, string | number> };
 
 /**
  * A step's requirement: what it checks, plus a permanent `id` (the step's text places it as a checkbox with a link
@@ -215,7 +215,6 @@ export function validateShape(value: unknown, allowEmpty = false): asserts value
         if (partIds.has((p as Record<string, unknown>).id as string)) fail(`${pp}.id`, `"${(p as Record<string, unknown>).id}" is used twice in the step`);
         partIds.add((p as Record<string, unknown>).id as string);
         if ((p as Record<string, unknown>).hidden !== undefined && typeof (p as Record<string, unknown>).hidden !== 'boolean') fail(`${pp}.hidden`, 'expected true or false');
-        if ((p as Record<string, unknown>).label !== undefined) text((p as Record<string, unknown>).label, `${sp}, part ${j + 1}.label`, false);
       }
     });
   });

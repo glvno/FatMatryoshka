@@ -68,8 +68,6 @@ export interface Step {
   todo?(s: TutorialState): string[];
   /** whether each requirement is met, by id (the text's checkboxes) */
   met?(s: TutorialState): Record<string, boolean>;
-  /** the unmet requirements the text does not place and that are not hidden, as generated lines */
-  unplaced?(s: TutorialState): string[];
   /** the elements of these requirements (a checkbox the learner clicked) */
   targetsOf?(ids: string[], s: TutorialState): Target[];
   /** the elements of the first unmet part: what the highlight points at next */

@@ -121,7 +121,7 @@ export function validateCourse(course: CourseData): Report {
       if (st.kind === 'task') {
         const ids = new Set((st.parts ?? []).map((p) => p.id));
         for (const id of new Set(placed)) if (!ids.has(id)) report.errors.push({ chapter: ch.id, step: st.id, message: `The text places "${id}", which is not one of the step’s requirements` });
-        for (const p of st.parts ?? []) if (!p.hidden && !placed.includes(p.id)) report.hints.push({ chapter: ch.id, step: st.id, message: `Requirement "${p.id}" is not placed in the text: place it, or mark it hidden` });
+        for (const p of st.parts ?? []) if (!p.hidden && !placed.includes(p.id)) report.errors.push({ chapter: ch.id, step: st.id, message: `Requirement "${p.id}" is not placed in the text: place it, or mark it hidden` });
       }
       if (placedRequirements(st.why).length) report.errors.push({ chapter: ch.id, step: st.id, message: 'Why cannot hold requirements: move the req: links to the instructions' });
       for (const [i, p] of (st.parts ?? []).entries()) for (const m of partProblems(p, roles)) report.errors.push({ chapter: ch.id, step: st.id, message: `Requirement ${i + 1}: ${m}` });

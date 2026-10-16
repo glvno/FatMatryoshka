@@ -31,7 +31,7 @@ describe('manual tutorial regressions', () => {
     const copy = place(p, 'osc'); copy.params = { ...mod(p, 'osc')!.params };
     const s = headlessState(p);
     expect(step(5, 'dup').check(s)).toBe(false);
-    expect(step(5, 'dup').todo!(s)).toEqual(['Cable Main pitch → the second Oscillator’s pitch']);
+    expect(step(5, 'dup').met!(s)).toEqual({ 'add-a-second-oscillator': true, 'cable-main-pitch-every-oscillator-pitch': false });
     const done = after(5, 'dup');
     expect(mods(done, 'osc')).toHaveLength(2);
     for (const o of mods(done, 'osc')) expect(cabled(done, mod(done, 'fm1'), 'pitch', o, 'pitch')).toBe(true);

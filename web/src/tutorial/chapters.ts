@@ -24,7 +24,6 @@ export function compileStep(st: StepData, roles: Roles): Step {
   const ok = (s: TutorialState) => parts.map((p) => partCheck(p, s, roles));
   // reading order: the text's checkboxes, then unplaced requirements, then hidden ones
   const placedIds = st.kind === 'continue' ? [] : placedRequirements(st.text).flat();
-  const placed = new Set(placedIds);
   const index = (id: string) => parts.findIndex((p) => p.id === id);
   const order = [...new Set([...placedIds.map(index).filter((i) => i >= 0), ...parts.map((_, i) => i).filter((i) => !parts[i].hidden), ...parts.map((_, i) => i)])];
   return {
@@ -34,7 +33,6 @@ export function compileStep(st: StepData, roles: Roles): Step {
     check: (s) => ok(s).every(Boolean),
     todo: (s) => { const r = ok(s); return parts.filter((_, i) => !r[i]).map((p) => partLabel(p, roles)); },
     met: (s) => { const r = ok(s); return Object.fromEntries(parts.map((p, i) => [p.id, r[i]])); },
-    unplaced: (s) => { const r = ok(s); return parts.filter((p, i) => !r[i] && !p.hidden && !placed.has(p.id)).map((p) => partLabel(p, roles)); },
     targetsOf: (ids, s) => parts.filter((p) => ids.includes(p.id)).flatMap((p) => partTargets(p, s, roles)),
     // the first unmet part in reading order; a done step keeps pointing at its last part, so the panel stays anchored
     // while it says "moving on"

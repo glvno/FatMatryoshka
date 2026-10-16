@@ -427,8 +427,6 @@ export class Tutorial {
       parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? (this.hold || st.listen ? ' · ✓ ready when you are' : ' · ✓ done, moving on') : ''}` }));
       parts.push(this.checklist(lessonProse(st.text), ok ? null : st.met?.(s) ?? {}));
       if (st.why) parts.push(el('details', { class: 'tutorial-why' }, el('summary', { textContent: 'Why' }), lessonProse(st.why)));
-      const todo = ok ? [] : st.unplaced?.(s) ?? [];
-      if (todo.length) parts.push(el('div', { class: 'tutorial-todo' }, el('span', { textContent: 'Still to do' }), el('ul', {}, ...todo.map((t) => el('li', { textContent: t })))));
       if (st.playback !== false) parts.push(this.auditionControls());
       if (broken.length) {
         const k = broken[0];

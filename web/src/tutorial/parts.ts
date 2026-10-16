@@ -162,12 +162,11 @@ export function momentary(part: PartSpec): boolean {
 
 /** a requirement with a new id, made from its generated checklist line and unique among `taken` */
 export function withId(spec: PartSpec, roles: Roles, taken: Iterable<string>): Part {
-  return { ...spec, id: slugId(partLabel({ ...spec, label: undefined } as PartSpec, roles), taken) } as Part;
+  return { ...spec, id: slugId(partLabel(spec, roles), taken) } as Part;
 }
 
 /** the checklist line */
 export function partLabel(part: PartSpec, roles: Roles): string {
-  if (part.label) return part.label;
   const n = (r: Ref) => refName(roles, r);
   switch (part.kind) {
     case 'module': {

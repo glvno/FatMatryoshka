@@ -71,7 +71,6 @@
 .lesson-part-body { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
 .lesson-part select, .lesson-part input, .lesson-section select, .lesson-section input:not([type="checkbox"]), .lesson-row input:not([type="checkbox"]) { max-width: 100%; font-size: 13px; }
 .lesson-part input[type="number"] { width: 7.5em; }
-.lesson-part-override { width: 100%; font-size: 12px; }
 .lesson-ref { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .lesson-dot { display: inline-grid; place-items: center; width: 1.6em; height: 1.6em; border-radius: 50%; border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
 .lesson-dot.ok { color: var(--secondary); border-color: var(--secondary); }

@@ -430,12 +430,12 @@ async function mount() {
     const parts = st.parts!;
     const part = parts[i];
     const row = el('fieldset', 'lesson-part');
-    const set = (next: PartSpec, structural = true) => { parts[i] = { ...next, id: part.id, ...(part.hidden ? { hidden: true } : {}) } as Part; if (structural) { row.replaceWith(partEditor(st, i, onStructure)); } else gen.textContent = partLabel({ ...next, label: undefined } as PartSpec, draft.roles); edited(); };
+    const set = (next: PartSpec, structural = true) => { parts[i] = { ...next, id: part.id, ...(part.hidden ? { hidden: true } : {}) } as Part; if (structural) { row.replaceWith(partEditor(st, i, onStructure)); } else gen.textContent = partLabel(next, draft.roles); edited(); };
     const roles = draft.roles;
     const head = el('div', 'lesson-part-head');
     const dot = el('span', 'lesson-dot'); dot.dataset.part = String(i); dot.title = 'Live check against the synth';
     const kind = select(PART_KINDS.map((k) => [k, KINDS[k]]), part.kind, (v) => set(defaultPart(v as PartKind, draft)), 'Requirement kind');
-    const gen = el('span', 'lesson-part-label', partLabel({ ...part, label: undefined } as Part, roles));
+    const gen = el('span', 'lesson-part-label', partLabel(part, roles));
     const where = el('span', 'lesson-place'); where.dataset.id = part.id;
     head.append(dot, kind, gen, where,
       button('Insert in text', () => placeInText(st, part), 'sm', 'Wrap the selected instruction, or insert the generated line at the cursor, as this requirement’s checkbox'),
@@ -528,9 +528,7 @@ async function mount() {
         break;
       }
     }
-    const label = textInput(part.label ?? '', (v) => { parts[i] = { ...parts[i], label: v || undefined } as Part; edited(); }, 'Checklist line (optional)', 'Checklist line: leave empty to use the generated one');
-    label.className = 'lesson-part-override';
-    row.append(head, body, label);
+    row.append(head, body);
     queueMicrotask(() => refreshPlacement(st));
     return row;
   }
@@ -556,7 +554,7 @@ async function mount() {
     const lead = /^\s*(?:#{1,6}\s+)?(?:[-*+]\s+|\d+[.)]\s+)?/.exec(chosen)![0];
     const words = chosen.slice(lead.length).replace(/\s+$/, '');
     const tail = chosen.slice(lead.length + words.length);
-    const link = `[${words || partLabel({ ...part, label: undefined } as PartSpec, draft.roles)}](req:${part.id})`;
+    const link = `[${words || partLabel(part, draft.roles)}](req:${part.id})`;
     ta.setRangeText(lead + link + tail, a, b, 'end');
     ta.focus();
     ta.dispatchEvent(new Event('input'));

@@ -231,7 +231,7 @@
           "id": "adsr",
           "kind": "task",
           "title": "Add an envelope",
-          "text": "There are many kinds of envelope. The most common, and the one we're going to use, is an `ADSR` envelope, which is named after its four parameters. An envelope module can control any other module's parameter[^1], but let's consider an example envelope that controls amplitude (volume):\n- *attack*: The time that elapses between silence and the sound's peak volume\n- *decay*: The time that elapses between peak volume and...\n- ... *sustain*: The volume that the signal settles at if the note persists longer than `(attack + decay)` milliseconds.\n- *release*: The time that elapses between the end of the note and silence.\n\n[^1]: Including another envelope module's parameters! If there's one thing you should take away from this tutorials is that if it's a parameter, it can be manipulated by control voltage.  \n\n    The possibilities are quite literally endless. A synth like the one Wendy Carlos (in-)famously used to record *Switched-On Bach* had something like 10¹³⁴ possible patch cable configurations. Most of them would have sounded like shit, but still.\n\n## Add an `ADSR` module.\n",
+          "text": "There are many kinds of envelope. The most common, and the one we're going to use, is an `ADSR` envelope, which is named after its four parameters. An envelope module can control any other module's parameter[^1], but let's consider an example envelope that controls amplitude (volume):\n- *attack*: The time that elapses between silence and the sound's peak volume\n- *decay*: The time that elapses between peak volume and...\n- ... *sustain*: The volume that the signal settles at if the note persists longer than `(attack + decay)` milliseconds.\n- *release*: The time that elapses between the end of the note and silence.\n\n[^1]: Including another envelope module's parameters! If there's one thing you should take away from this tutorials is that if it's a parameter, it can be manipulated by control voltage.  \n\n    The possibilities are quite literally endless. A synth like the one Wendy Carlos (in-)famously used to record *Switched-On Bach* had something like 10¹³⁴ possible patch cable configurations. Most of them would have sounded like shit, but still.\n\n## [Add an `ADSR` module.](req:add-an-adsr)\n",
           "why": "",
           "parts": [
             { "id": "add-an-adsr", "kind": "module", "type": "adsr" }
@@ -241,7 +241,7 @@
           "id": "env",
           "kind": "task",
           "title": "Controlling note volume with an envelope",
-          "text": "Instead of controlling the **VCA** with a simple on/off `gate`, let's give a note's volume some shape.\n\n## First, play a few notes to get a sense of what our starting point sounds like.\n\n## Then click the cable from **Main**’s `gate` to the **VCA**'s `cv` to remove it. \n\n## Connect **Main**'s `gate` to **ADSR**'s `gate`. \n\nNow, instead of controlling note volume directly with `gate` we're using `gate` to control the envelope, which controls the volume: When voltage enters the envelope module through `gate`, volume will\n1. increase and peak (`attack`), \n2. fade until it reaches its a specific volume ('decay'),\n3. remain at that specific volume (aka the 'sustain' volume)  until the gate voltage stops, at which point\n4.  volume fades to silence ('release')\n\n\n\n## Connect *ADSR*'s `env`(elope) to  *VCA* `cv`",
+          "text": "Instead of controlling the **VCA** with a simple on/off `gate`, let's give a note's volume some shape.\n\n## First, play a few notes to get a sense of what our starting point sounds like.\n\n## [Then click the cable from **Main**’s `gate` to the **VCA**'s `cv` to remove it.](req:remove-the-old-cable-main-gate-vca-cv-cl) \n\n## [Connect **Main**'s `gate` to **ADSR**'s `gate`.](req:cable-main-gate-adsr-gate) \n\nNow, instead of controlling note volume directly with `gate` we're using `gate` to control the envelope, which controls the volume: When voltage enters the envelope module through `gate`, volume will\n1. increase and peak (`attack`), \n2. fade until it reaches its a specific volume ('decay'),\n3. remain at that specific volume (aka the 'sustain' volume)  until the gate voltage stops, at which point\n4.  volume fades to silence ('release')\n\n\n\n## [Connect *ADSR*'s `env`(elope) to  *VCA* `cv`](req:cable-adsr-env-vca-cv)",
           "why": "",
           "parts": [
             {
@@ -274,7 +274,7 @@
           "id": "shape",
           "kind": "task",
           "title": "Draw the shape",
-          "text": "Drag the ADSR’s a (attack) to about 0.3 s and r (release) to about 1 s. Hold a note: it swells in and fades out after you let go.",
+          "text": "[Drag the ADSR’s a (attack) to about 0.3 s](req:set-adsr-s-a-to-0-1-s-or-more) and [r (release) to about 1 s](req:set-adsr-s-r-to-0-5-s-or-more). Hold a note: it swells in and fades out after you let go.",
           "why": "Attack and release are times, sustain is a level. Pads have long attacks and releases; the next step makes the opposite.",
           "listen": true,
           "superseded": true,
@@ -285,8 +285,7 @@
               "ref": { "type": "adsr" },
               "param": "a",
               "op": "ge",
-              "value": 0.1,
-              "label": "Set a (attack) to 0.1 s or more"
+              "value": 0.1
             },
             {
               "id": "set-adsr-s-r-to-0-5-s-or-more",
@@ -294,8 +293,7 @@
               "ref": { "type": "adsr" },
               "param": "r",
               "op": "ge",
-              "value": 0.5,
-              "label": "Set r (release) to 0.5 s or more"
+              "value": 0.5
             }
           ]
         },
@@ -303,7 +301,7 @@
           "id": "pluck",
           "kind": "task",
           "title": "Make it percussive",
-          "text": "Set a (attack) to 0.005 s, s (sustain) to 0 and d (decay) to about 0.2 s. Hold a note: it rings out and dies although the key is still down. Plucked and struck sounds have no sustain.",
+          "text": "[Set a (attack) to 0.005 s](req:set-adsr-s-a-to-0-01-s-or-below), [s (sustain) to 0](req:set-adsr-s-s-to-0) and [d (decay) to about 0.2 s](req:set-adsr-s-d-to-0-4-s-or-below). Hold a note: it rings out and dies although the key is still down. Plucked and struck sounds have no sustain.",
           "why": "",
           "listen": true,
           "parts": [
@@ -313,8 +311,7 @@
               "ref": { "type": "adsr" },
               "param": "a",
               "op": "le",
-              "value": 0.01,
-              "label": "Set a (attack) to 0.01 s or less"
+              "value": 0.01
             },
             {
               "id": "set-adsr-s-s-to-0",
@@ -322,8 +319,7 @@
               "ref": { "type": "adsr" },
               "param": "s",
               "op": "eq",
-              "value": 0,
-              "label": "Set s (sustain) to 0"
+              "value": 0
             },
             {
               "id": "set-adsr-s-d-to-0-4-s-or-below",
@@ -331,8 +327,7 @@
               "ref": { "type": "adsr" },
               "param": "d",
               "op": "le",
-              "value": 0.4,
-              "label": "Set d (decay) to 0.4 s or less"
+              "value": 0.4
             }
           ]
         },
@@ -352,7 +347,7 @@
           "id": "thumb",
           "kind": "task",
           "title": "A slider thumb is a jack",
-          "text": "Set the wave to square (pulse width only matters for a square). Then Alt-drag the thumb of the Oscillator’s pw slider onto the ADSR’s env jack (or drag from env and drop it on the thumb). The envelope now also sweeps the pulse width.",
+          "text": "[Set the wave to square](req:set-oscillator-s-wave-to-square) (pulse width only matters for a square). Then [Alt-drag the thumb of the Oscillator’s pw slider onto the ADSR’s env jack](req:drop-adsr-s-env-on-oscillator-s-pw-thumb) (or drag from env and drop it on the thumb). The envelope now also sweeps the pulse width.",
           "why": "Dropping a signal on a thumb routes it through one of the module’s parameter inputs, p1 or p2. The same envelope shapes two things at once: loudness and timbre.",
           "parts": [
             {
@@ -361,8 +356,7 @@
               "ref": { "type": "osc" },
               "param": "wave",
               "op": "eq",
-              "value": 3,
-              "label": "Set the Oscillator’s wave to square"
+              "value": 3
             },
             {
               "id": "drop-adsr-s-env-on-oscillator-s-pw-thumb",
@@ -370,8 +364,7 @@
               "from": { "type": "adsr" },
               "fromPort": "env",
               "to": { "type": "osc" },
-              "param": "pw",
-              "label": "Drop the ADSR’s env on the pw thumb (Alt-drag the thumb to env)"
+              "param": "pw"
             }
           ]
         },
@@ -379,7 +372,7 @@
           "id": "redo",
           "kind": "task",
           "title": "Undo and redo",
-          "text": "Press Ctrl+Z (Cmd+Z on a Mac), or Commands → Undo: the route is gone. Press Shift+Ctrl+Z (Commands → Redo) and it is back. Forty steps of history are kept, cables and modules included.",
+          "text": "[Press Ctrl+Z (Cmd+Z on a Mac), or Commands → Undo](req:press-ctrl-z-to-undo): the route is gone. [Press Shift+Ctrl+Z (Commands → Redo) and it is back](req:press-shift-ctrl-z-to-redo,drop-adsr-s-env-on-oscillator-s-pw-thumb). Forty steps of history are kept, cables and modules included.",
           "why": "",
           "parts": [
             { "id": "press-ctrl-z-to-undo", "kind": "event", "event": "undos" },
@@ -390,8 +383,7 @@
               "from": { "type": "adsr" },
               "fromPort": "env",
               "to": { "type": "osc" },
-              "param": "pw",
-              "label": "Bring the env → pw route back (redo)"
+              "param": "pw"
             }
           ]
         }
@@ -411,7 +403,7 @@
           "id": "filter",
           "kind": "task",
           "title": "Add a Filter",
-          "text": "Add a Filter and put it between the Oscillator and the VCA: Oscillator out → Filter in, Filter lp24 → VCA in, and remove the cable from the Oscillator to the VCA.",
+          "text": "[Add a Filter](req:add-a-filter) and put it between the Oscillator and the VCA: [Oscillator out → Filter in](req:cable-oscillator-out-filter-in), [Filter lp24 → VCA in](req:cable-filter-lp24-vca-in), and [remove the cable from the Oscillator to the VCA](req:remove-the-old-cable-oscillator-out-vca-).",
           "why": "VCO → VCF → VCA is the classic subtractive chain. lp24 is a 24 dB low pass: steep. lp12 is gentler, hp lets the highs through instead.",
           "parts": [
             { "id": "add-a-filter", "kind": "module", "type": "filter" },
@@ -445,7 +437,7 @@
           "id": "cutoff",
           "kind": "task",
           "title": "Sweep the cutoff",
-          "text": "Start Riff and drag cutoff down from 16 kHz to about 400 Hz: the tone gets darker. Move slowly and hear the upper harmonics disappear. Leave cutoff below 800 Hz.",
+          "text": "Start Riff and [drag cutoff down from 16 kHz to about 400 Hz](req:set-filter-s-cutoff-to-800-hz-or-below): the tone gets darker. Move slowly and hear the upper harmonics disappear. Leave cutoff below 800 Hz.",
           "why": "The cutoff slider is logarithmic, like pitch: every octave gets the same distance. Resonance feeds a little of the output back, which makes the filter ring at its cutoff.",
           "listen": true,
           "parts": [
@@ -455,8 +447,7 @@
               "ref": { "type": "filter" },
               "param": "cutoff",
               "op": "le",
-              "value": 800,
-              "label": "Set cutoff to 800 Hz or below"
+              "value": 800
             }
           ]
         },
@@ -464,7 +455,7 @@
           "id": "resonance",
           "kind": "task",
           "title": "Give the cutoff a voice",
-          "text": "Keep Riff playing and raise Filter res to about 0.6. A whistle appears at the cutoff. Optional: sweep cutoff to hear the peak travel, then return it below 800 Hz before continuing.",
+          "text": "Keep Riff playing and [raise Filter res to about 0.6](req:set-filter-s-res-to-0-5-or-more). A whistle appears at the cutoff. Optional: sweep cutoff to hear the peak travel, then return it below 800 Hz before continuing.",
           "why": "",
           "listen": true,
           "parts": [
@@ -474,8 +465,7 @@
               "ref": { "type": "filter" },
               "param": "res",
               "op": "ge",
-              "value": 0.5,
-              "label": "Set res to 0.5 or more"
+              "value": 0.5
             }
           ]
         },
@@ -483,7 +473,7 @@
           "id": "track",
           "kind": "task",
           "title": "Track the keyboard",
-          "text": "Tick track. The cutoff now follows the note, one octave per octave, so high notes stay as bright as low ones. Play up and down.",
+          "text": "[Tick track.](req:set-filter-s-track-to-0-5-or-more) The cutoff now follows the note, one octave per octave, so high notes stay as bright as low ones. Play up and down.",
           "why": "",
           "listen": true,
           "parts": [
@@ -493,8 +483,7 @@
               "ref": { "type": "filter" },
               "param": "track",
               "op": "ge",
-              "value": 0.5,
-              "label": "Tick track"
+              "value": 0.5
             }
           ]
         },
@@ -502,18 +491,17 @@
           "id": "lfo",
           "kind": "task",
           "title": "Add an LFO",
-          "text": "Add an LFO (low frequency oscillator). It is an oscillator too slow to hear, made to move other things. Set its rate to about 0.5 Hz.",
+          "text": "[Add an LFO](req:add-a-lfo) (low frequency oscillator). It is an oscillator too slow to hear, made to move other things. [Set its rate to about 0.5 Hz.](req:set-lfo-s-rate-to-1-hz-or-below)",
           "why": "",
           "parts": [
-            { "id": "add-a-lfo", "kind": "module", "type": "lfo", "label": "Add an LFO" },
+            { "id": "add-a-lfo", "kind": "module", "type": "lfo" },
             {
               "id": "set-lfo-s-rate-to-1-hz-or-below",
               "kind": "slider",
               "ref": { "type": "lfo" },
               "param": "rate",
               "op": "le",
-              "value": 1,
-              "label": "Set its rate to 1 Hz or below"
+              "value": 1
             }
           ]
         },
@@ -521,7 +509,7 @@
           "id": "cv",
           "kind": "task",
           "title": "Wobble the cutoff",
-          "text": "Drag the LFO’s out to the Filter’s cv jack. The grey route shows cv is built into cutoff; cvamt sets how far it reaches: set it to 2 oct. Hold a note.",
+          "text": "[Drag the LFO’s out to the Filter’s cv jack.](req:cable-lfo-out-filter-cv) The grey route shows cv is built into cutoff; cvamt sets how far it reaches: [set it to 2 oct](req:set-filter-s-cvamt-to-1-5-oct-or-more). Hold a note.",
           "why": "The cv input is additive in octaves: a signal of 1 moves the cutoff up by cvamt octaves. Pins p1 and p2 work differently: they reach any parameter you tick in its ⋯ menu.",
           "listen": true,
           "parts": [
@@ -539,8 +527,7 @@
               "ref": { "type": "filter" },
               "param": "cvamt",
               "op": "ge",
-              "value": 1.5,
-              "label": "Set cvamt to 1.5 oct or more"
+              "value": 1.5
             }
           ]
         },
@@ -560,7 +547,7 @@
           "id": "knob",
           "kind": "task",
           "title": "One knob, two parameters",
-          "text": "Drag Main’s blue k1 jack to the Filter’s p1. Open the ⋯ menu of cutoff and tick P1; do the same for res. Main’s k1 slider stands for the first knob of the FM-1.",
+          "text": "[Drag Main’s blue k1 jack to the Filter’s p1.](req:cable-main-k1-filter-p1) [Open the ⋯ menu of cutoff and tick P1](req:tick-p1-in-the-menu-of-cutoff); [do the same for res](req:tick-p1-in-the-menu-of-res). Main’s k1 slider stands for the first knob of the FM-1.",
           "why": "The matrix in the ⋯ menu decides which parameters a pin reaches. A blue tick appears on each slider the knob reaches: that is where the knob alone holds the parameter.",
           "parts": [
             {
@@ -591,7 +578,7 @@
           "id": "att",
           "kind": "task",
           "title": "Set the depth",
-          "text": "In the ⋯ menu of cutoff, drag the p1 attenuverter to about 0.5: the knob now reaches half as far. A negative value turns the knob around.",
+          "text": "In the ⋯ menu of cutoff, [drag the p1 attenuverter to about 0.5](req:set-the-p1-attenuverter-off-1): the knob now reaches half as far. A negative value turns the knob around.",
           "why": "",
           "parts": [
             {
@@ -601,8 +588,7 @@
               "pin": "p1",
               "op": "ne",
               "value": 1,
-              "tolerance": 0.05,
-              "label": "Move the p1 attenuverter off 1 (⋯ menu of cutoff)"
+              "tolerance": 0.05
             }
           ]
         },
@@ -610,7 +596,7 @@
           "id": "live",
           "kind": "task",
           "title": "Live value and base value",
-          "text": "Hold a note and watch the cutoff slider: the thumb follows the live, wobbling value and a tick marks the base. Now move Main’s k1 slider: the blue ticks move, and so does the sound.",
+          "text": "Hold a note and watch the cutoff slider: the thumb follows the live, wobbling value and a tick marks the base. [Now move Main’s k1 slider](req:move-main-s-k1-slider): the blue ticks move, and so does the sound.",
           "why": "",
           "listen": true,
           "parts": [
@@ -640,15 +626,14 @@
           "id": "select",
           "kind": "task",
           "title": "Select the modules",
-          "text": "Shift-click the Oscillator, Filter, ADSR, VCA and LFO, or drag a box around them on the empty canvas. Selected cards get a highlight. Main and Output stay outside.",
+          "text": "[Shift-click the Oscillator, Filter, ADSR, VCA and LFO, or drag a box around them on the empty canvas.](req:select-the-oscillator-filter-adsr-vca-lf) Selected cards get a highlight. Main and Output stay outside.",
           "why": "",
           "parts": [
             {
               "id": "select-the-oscillator-filter-adsr-vca-lf",
               "kind": "event",
               "event": "selected",
-              "types": ["osc", "filter", "adsr", "vca", "lfo"],
-              "label": "Select the Oscillator, Filter, ADSR, VCA and LFO"
+              "types": ["osc", "filter", "adsr", "vca", "lfo"]
             }
           ]
         },
@@ -656,40 +641,28 @@
           "id": "group",
           "kind": "task",
           "title": "Group them",
-          "text": "Press Ctrl+G (Cmd+G on a Mac), or Commands → Make assembly, and name it My voice. The five cards fold into one that shows the ports which had cables from outside: pitch, gate and out.",
+          "text": "[Press Ctrl+G (Cmd+G on a Mac), or Commands → Make assembly, and name it My voice.](req:group-or-insert-my-voice) The five cards fold into one that shows the ports which had cables from outside: pitch, gate and out.",
           "why": "Grouping changes nothing in the sound. Ports with outside cables are exposed automatically; the rest is hidden until you expose it.",
           "parts": [
-            {
-              "id": "group-or-insert-my-voice",
-              "kind": "assembly",
-              "role": "myVoice",
-              "fact": "exists",
-              "label": "Group the Oscillator, Filter, ADSR, VCA and LFO (Ctrl+G)"
-            }
+            { "id": "group-or-insert-my-voice", "kind": "assembly", "role": "myVoice", "fact": "exists" }
           ]
         },
         {
           "id": "expand",
           "kind": "task",
           "title": "Open it up",
-          "text": "Click expand on the My voice card. A frame shows the modules inside; every port and slider has a ○ toggle.",
+          "text": "[Click expand on the My voice card.](req:expand-my-voice) A frame shows the modules inside; every port and slider has a ○ toggle.",
           "why": "",
           "superseded": true,
           "parts": [
-            {
-              "id": "expand-my-voice",
-              "kind": "assembly",
-              "role": "myVoice",
-              "fact": "open",
-              "label": "Expand the assembly"
-            }
+            { "id": "expand-my-voice", "kind": "assembly", "role": "myVoice", "fact": "open" }
           ]
         },
         {
           "id": "promote",
           "kind": "task",
           "title": "Put two knobs on the card",
-          "text": "Click ○ next to the Filter’s cutoff and next to the ADSR’s r. They become sliders on the collapsed card. Click ○ beside the LFO’s out too: an extra output.",
+          "text": "[Click ○ next to the Filter’s cutoff](req:promote-the-filter-s-cutoff-click-beside) and [next to the ADSR’s r](req:promote-the-adsr-s-r-click-beside-it). They become sliders on the collapsed card. [Click ○ beside the LFO’s out too](req:expose-the-lfo-s-out-click-beside-it): an extra output.",
           "why": "",
           "parts": [
             {
@@ -722,7 +695,7 @@
           "id": "resize",
           "kind": "task",
           "title": "Resize the frame",
-          "text": "Drag the ◢ corner of the frame to give the cards room (the arrow keys work on it too). Cards can be moved inside the frame; dragging one out takes it out of the assembly.",
+          "text": "[Drag the ◢ corner of the frame to give the cards room](req:resize-the-frame-drag) (the arrow keys work on it too). Cards can be moved inside the frame; dragging one out takes it out of the assembly.",
           "why": "",
           "listen": true,
           "optional": true,
@@ -734,16 +707,10 @@
           "id": "collapse",
           "kind": "task",
           "title": "Close it",
-          "text": "Click collapse in the frame’s header. One card: pitch, gate, out, the LFO’s out, cutoff and r. Play it.",
+          "text": "[Click collapse in the frame’s header.](req:collapse-my-voice) One card: pitch, gate, out, the LFO’s out, cutoff and r. Play it.",
           "why": "",
           "parts": [
-            {
-              "id": "collapse-my-voice",
-              "kind": "assembly",
-              "role": "myVoice",
-              "fact": "collapsed",
-              "label": "Collapse the assembly"
-            }
+            { "id": "collapse-my-voice", "kind": "assembly", "role": "myVoice", "fact": "collapsed" }
           ]
         },
         {
@@ -762,7 +729,7 @@
           "id": "save",
           "kind": "task",
           "title": "Save it to your library",
-          "text": "Click save on the card and keep the name My voice. It is now in the Library tab and in + Add assembly, under Your library, ready for any patch.",
+          "text": "[Click save on the card and keep the name My voice.](req:save-it-as-my-voice-save-on-the-card) It is now in the Library tab and in + Add assembly, under Your library, ready for any patch.",
           "why": "",
           "parts": [
             {
@@ -779,7 +746,7 @@
           "id": "fit",
           "kind": "task",
           "title": "Fit the patch to the screen",
-          "text": "Commands → Fit patch to screen scales the canvas so everything is in view. Ctrl+wheel (pinch on touch) zooms freely; Reset canvas scale goes back to 100 %.",
+          "text": "[Commands → Fit patch to screen](req:zoom-the-canvas-ctrl-wheel-or-fit-patch-) scales the canvas so everything is in view. Ctrl+wheel (pinch on touch) zooms freely; Reset canvas scale goes back to 100 %.",
           "why": "",
           "parts": [
             { "id": "zoom-the-canvas-ctrl-wheel-or-fit-patch-", "kind": "event", "event": "zooms" }
@@ -801,7 +768,7 @@
           "id": "delay",
           "kind": "task",
           "title": "Hear one echo",
-          "text": "Add Delay. Cable My voice out → Delay in and Delay out → Output l. Remove My voice out → Output l. Tap Note, then Release notes: the repeats continue after the note. Try mix at 0, then 0.4.",
+          "text": "[Add Delay](req:add-a-delay). Cable [My voice out → Delay in](req:cable-my-voice-out-out-delay-in) and [Delay out → Output l](req:cable-delay-out-output-l). [Remove My voice out → Output l](req:remove-the-old-cable-my-voice-out-out-ou). Tap Note, then Release notes: the repeats continue after the note. Try mix at 0, then 0.4.",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -813,8 +780,7 @@
               "from": { "role": "myVoiceOut" },
               "fromPort": "out",
               "to": { "type": "delay" },
-              "toPort": "in",
-              "label": "Cable My voice out → Delay in"
+              "toPort": "in"
             },
             {
               "id": "cable-delay-out-output-l",
@@ -830,8 +796,7 @@
               "from": { "role": "myVoiceOut" },
               "fromPort": "out",
               "to": { "type": "output" },
-              "toPort": "l",
-              "label": "Remove the old cable My voice out → Output l (click it)"
+              "toPort": "l"
             }
           ]
         },
@@ -839,7 +804,7 @@
           "id": "reverb",
           "kind": "task",
           "title": "Put the echoes in a room",
-          "text": "Add Reverb. Cable Delay out → Reverb in and Reverb out → Output l; remove Delay out → Output l. Compare size 0.2 and 0.8: a small room versus a long wash. These are optional listening settings.",
+          "text": "[Add Reverb](req:add-a-reverb). Cable [Delay out → Reverb in](req:cable-delay-out-reverb-in) and [Reverb out → Output l](req:cable-reverb-out-output-l); [remove Delay out → Output l](req:remove-the-old-cable-delay-out-output-l-). Compare size 0.2 and 0.8: a small room versus a long wash. These are optional listening settings.",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -875,7 +840,7 @@
           "id": "chorus",
           "kind": "task",
           "title": "Spread the sound",
-          "text": "Add Chorus. Cable Reverb out → Chorus in, Chorus l → Output l and Chorus r → Output r; remove Reverb out → Output l. Start Riff and compare Chorus mix 0 and 0.5: the sound widens. Leave the mix you like.",
+          "text": "[Add Chorus](req:add-a-chorus). Cable [Reverb out → Chorus in](req:cable-reverb-out-chorus-in), [Chorus l → Output l](req:cable-chorus-l-output-l) and [Chorus r → Output r](req:cable-chorus-r-output-r); [remove Reverb out → Output l](req:remove-the-old-cable-reverb-out-output-l). Start Riff and compare Chorus mix 0 and 0.5: the sound widens. Leave the mix you like.",
           "why": "",
           "listen": true,
           "parts": [
@@ -918,7 +883,7 @@
           "id": "tune",
           "kind": "task",
           "title": "Tune the space",
-          "text": "Set the Delay’s time to about 375 ms and fb (feedback) to 0.5, and the Reverb’s size to 0.7. Play a short note and listen to the tail.",
+          "text": "[Set the Delay’s time to about 375 ms](req:set-delay-s-time-to-300-ms-or-more) and [fb (feedback) to 0.5](req:set-delay-s-fb-to-0-4-or-more), and [the Reverb’s size to 0.7](req:set-reverb-s-size-to-0-6-or-more). Play a short note and listen to the tail.",
           "why": "Feedback sends the delayed signal back into the line: each repeat is quieter than the last. Above 0.9 the repeats barely fade.",
           "listen": true,
           "parts": [
@@ -928,8 +893,7 @@
               "ref": { "type": "delay" },
               "param": "time",
               "op": "ge",
-              "value": 300,
-              "label": "Set the Delay’s time to 300 ms or more"
+              "value": 300
             },
             {
               "id": "set-delay-s-fb-to-0-4-or-more",
@@ -937,8 +901,7 @@
               "ref": { "type": "delay" },
               "param": "fb",
               "op": "ge",
-              "value": 0.4,
-              "label": "Set the Delay’s fb to 0.4 or more"
+              "value": 0.4
             },
             {
               "id": "set-reverb-s-size-to-0-6-or-more",
@@ -946,8 +909,7 @@
               "ref": { "type": "reverb" },
               "param": "size",
               "op": "ge",
-              "value": 0.6,
-              "label": "Set the Reverb’s size to 0.6 or more"
+              "value": 0.6
             }
           ]
         },
@@ -955,7 +917,7 @@
           "id": "bypass",
           "kind": "task",
           "title": "Hear it with and without",
-          "text": "Click the Reverb card to select it and press B (or click ⏻ in its header): the module is bypassed and passes its input straight through. Press B again to switch it back on.",
+          "text": "Click the Reverb card to select it and press B (or click ⏻ in its header): the module is bypassed and passes its input straight through. [Press B again to switch it back on](req:bypass-a-module-b-2-times,switch-reverb-back-on).",
           "why": "",
           "listen": true,
           "parts": [
@@ -964,16 +926,14 @@
               "kind": "event",
               "event": "bypasses",
               "count": 2,
-              "ref": { "type": "reverb" },
-              "label": "Press B twice on the Reverb (off, then on)"
+              "ref": { "type": "reverb" }
             },
             {
               "id": "switch-reverb-back-on",
               "kind": "event",
               "event": "bypassed",
               "ref": { "type": "reverb" },
-              "on": false,
-              "label": "Switch the Reverb back on"
+              "on": false
             }
           ]
         },
@@ -981,23 +941,17 @@
           "id": "group",
           "kind": "task",
           "title": "Group the three",
-          "text": "Select the Delay, Reverb and Chorus and press Ctrl+G (Cmd+G). Name the assembly My space. Its card shows in, l and r.",
+          "text": "[Select the Delay, Reverb and Chorus and press Ctrl+G (Cmd+G)](req:group-or-insert-my-space). Name the assembly My space. Its card shows in, l and r.",
           "why": "",
           "parts": [
-            {
-              "id": "group-or-insert-my-space",
-              "kind": "assembly",
-              "role": "mySpace",
-              "fact": "exists",
-              "label": "Group the Delay, Reverb and Chorus (Ctrl+G)"
-            }
+            { "id": "group-or-insert-my-space", "kind": "assembly", "role": "mySpace", "fact": "exists" }
           ]
         },
         {
           "id": "promote",
           "kind": "task",
           "title": "Choose its knobs",
-          "text": "Expand My space, click ○ on the Delay’s time and mix and on the Reverb’s mix, then collapse it. An effect needs few knobs on the outside.",
+          "text": "Expand My space, [click ○ on the Delay’s time and mix](req:promote-the-delay-s-time-click-beside-it,promote-the-delay-s-mix-click-beside-it) and [on the Reverb’s mix](req:promote-the-reverb-s-mix-click-beside-it), [then collapse it](req:collapse-my-space). An effect needs few knobs on the outside.",
           "why": "",
           "parts": [
             {
@@ -1031,7 +985,7 @@
           "id": "save",
           "kind": "task",
           "title": "Save My space",
-          "text": "Click save on the My space card. Your library now holds an instrument and an effect; the next chapters use both.",
+          "text": "[Click save on the My space card.](req:save-it-as-my-space-save-on-the-card) Your library now holds an instrument and an effect; the next chapters use both.",
           "why": "",
           "parts": [
             {
@@ -1060,7 +1014,7 @@
           "id": "osc",
           "kind": "task",
           "title": "An oscillator, cabled to the pitch",
-          "text": "Add an Oscillator and cable Main pitch → Oscillator pitch. Leave the wave on sine: FM wants pure tones.",
+          "text": "[Add an Oscillator](req:add-an-oscillator) and [cable Main pitch → Oscillator pitch](req:cable-main-pitch-oscillator-pitch). Leave the wave on sine: FM wants pure tones.",
           "why": "",
           "parts": [
             { "id": "add-an-oscillator", "kind": "module", "type": "osc" },
@@ -1078,7 +1032,7 @@
           "id": "dry",
           "kind": "task",
           "title": "Hear the carrier first",
-          "text": "Add a VCA. Cable the Oscillator out → VCA in, Main gate → VCA cv, and VCA out → Output l. Play Note: a pure sine. Stop it before adding the second oscillator.",
+          "text": "[Add a VCA](req:add-a-vca). Cable [the Oscillator out → VCA in](req:cable-oscillator-out-vca-in), [Main gate → VCA cv](req:cable-main-gate-vca-cv), and [VCA out → Output l](req:cable-vca-out-output-l). Play Note: a pure sine. Stop it before adding the second oscillator.",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -1114,24 +1068,17 @@
           "id": "dup",
           "kind": "task",
           "title": "Duplicate it",
-          "text": "Click the Oscillator to select it and press Ctrl+D (Cmd+D), or Commands → Duplicate selection. The copy keeps its settings. Cables from outside the selection are not copied: connect Main pitch to the new Oscillator’s pitch.",
+          "text": "Click the Oscillator to select it and [press Ctrl+D (Cmd+D), or Commands → Duplicate selection](req:add-a-second-oscillator). The copy keeps its settings. Cables from outside the selection are not copied: [connect Main pitch to the new Oscillator’s pitch](req:cable-main-pitch-every-oscillator-pitch).",
           "why": "",
           "parts": [
-            {
-              "id": "add-a-second-oscillator",
-              "kind": "module",
-              "type": "osc",
-              "count": 2,
-              "label": "Duplicate the Oscillator (Ctrl+D)"
-            },
+            { "id": "add-a-second-oscillator", "kind": "module", "type": "osc", "count": 2 },
             {
               "id": "cable-main-pitch-every-oscillator-pitch",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
               "to": { "type": "osc", "every": true },
-              "toPort": "pitch",
-              "label": "Cable Main pitch → the second Oscillator’s pitch"
+              "toPort": "pitch"
             }
           ]
         },
@@ -1139,7 +1086,7 @@
           "id": "pm",
           "kind": "task",
           "title": "Modulator into carrier",
-          "text": "Cable the second Oscillator’s out into the first one’s pm input, and set the first one’s pm slider (the depth) to about 2. The first is now the carrier, the second the modulator.",
+          "text": "[Cable the second Oscillator’s out into the first one’s pm input](req:cable-the-second-oscillator-s-out-the-fi), and [set the first one’s pm slider (the depth) to about 2](req:set-carrier-s-pm-to-1-or-more). The first is now the carrier, the second the modulator.",
           "why": "pm is phase modulation, what the DX7 and this engine do; it sounds like FM. The depth slider is the modulation index: 0 is a sine, 8 is a wall of harmonics.",
           "listen": true,
           "parts": [
@@ -1150,8 +1097,7 @@
               "ref": { "role": "carrier" },
               "param": "pm",
               "op": "ge",
-              "value": 1,
-              "label": "Set the carrier’s pm slider to 1 or more"
+              "value": 1
             }
           ]
         },
@@ -1159,7 +1105,7 @@
           "id": "ratio",
           "kind": "task",
           "title": "Set the ratio",
-          "text": "Set the modulator’s coarse to +12: an octave above the carrier, a 2:1 ratio, hollow like a clarinet. Try +19 (3:1) and +7 for a bell-like clang.",
+          "text": "[Set the modulator’s coarse to +12](req:set-modulator-s-coarse-off-0-st): an octave above the carrier, a 2:1 ratio, hollow like a clarinet. Try +19 (3:1) and +7 for a bell-like clang.",
           "why": "Whole-number ratios give harmonic spectra; odd ratios like 1.41 give inharmonic, metallic ones. coarse is in semitones.",
           "listen": true,
           "parts": [
@@ -1169,8 +1115,7 @@
               "ref": { "role": "modulator" },
               "param": "coarse",
               "op": "ne",
-              "value": 0,
-              "label": "Move the modulator’s coarse off 0"
+              "value": 0
             }
           ]
         },
@@ -1190,11 +1135,11 @@
           "id": "env",
           "kind": "task",
           "title": "Loudness from a level / rate envelope",
-          "text": "Add an Env L/R. Remove Main gate → VCA cv. Cable carrier out → VCA in, Main gate → Env gate, Env env → VCA cv, VCA out → Output l.",
+          "text": "[Add an Env L/R](req:add-an-env-l-r). [Remove Main gate → VCA cv](req:remove-the-old-cable-main-gate-vca-cv-cl). Cable [carrier out → VCA in](req:cable-carrier-out-vca-in), [Main gate → Env gate](req:cable-main-gate-env-l-r-gate), [Env env → VCA cv](req:cable-env-l-r-env-vca-cv), [VCA out → Output l](req:cable-vca-out-output-l).",
           "why": "Env L/R is the DX7 envelope: four levels and the rate to reach each one. The last level, l4, is where the note ends after the key is released.",
           "superseded": true,
           "parts": [
-            { "id": "add-a-vca", "kind": "module", "type": "vca" },
+            { "id": "add-a-vca", "kind": "module", "type": "vca", "hidden": true },
             { "id": "add-an-env-l-r", "kind": "module", "type": "env" },
             {
               "id": "cable-carrier-out-vca-in",
@@ -1210,8 +1155,7 @@
               "from": { "type": "fm1" },
               "fromPort": "gate",
               "to": { "type": "env" },
-              "toPort": "gate",
-              "label": "Cable Main gate → Env gate"
+              "toPort": "gate"
             },
             {
               "id": "remove-the-old-cable-main-gate-vca-cv-cl",
@@ -1227,8 +1171,7 @@
               "from": { "type": "env" },
               "fromPort": "env",
               "to": { "type": "vca" },
-              "toPort": "cv",
-              "label": "Cable Env env → VCA cv"
+              "toPort": "cv"
             },
             {
               "id": "cable-vca-out-output-l",
@@ -1244,7 +1187,7 @@
           "id": "index",
           "kind": "task",
           "title": "Brightness from the same envelope",
-          "text": "Alt-drag the carrier’s pm thumb onto the Env’s env jack. Set the Env’s l2 and l3 to 0.3 and r2 to 0.4 s: the note starts bright and mellows while it decays.",
+          "text": "[Alt-drag the carrier’s pm thumb onto the Env’s env jack](req:drop-env-l-r-s-env-on-carrier-s-pm-thumb). [Set the Env’s l2 and l3 to 0.3](req:set-env-l-r-s-l2-to-0-3,set-env-l-r-s-l3-to-0-3) and [r2 to 0.4 s](req:set-env-l-r-s-r2-between-0-3-s-and-0-5-s): the note starts bright and mellows while it decays.",
           "why": "",
           "listen": true,
           "parts": [
@@ -1254,8 +1197,7 @@
               "from": { "type": "env" },
               "fromPort": "env",
               "to": { "role": "carrier" },
-              "param": "pm",
-              "label": "Drop the Env’s env on the carrier’s pm thumb"
+              "param": "pm"
             },
             {
               "id": "set-env-l-r-s-l2-to-0-3",
@@ -1263,8 +1205,7 @@
               "ref": { "type": "env" },
               "param": "l2",
               "op": "eq",
-              "value": 0.3,
-              "label": "Set the Env’s l2 to 0.3"
+              "value": 0.3
             },
             {
               "id": "set-env-l-r-s-l3-to-0-3",
@@ -1272,8 +1213,7 @@
               "ref": { "type": "env" },
               "param": "l3",
               "op": "eq",
-              "value": 0.3,
-              "label": "Set the Env’s l3 to 0.3"
+              "value": 0.3
             },
             {
               "id": "set-env-l-r-s-r2-between-0-3-s-and-0-5-s",
@@ -1282,8 +1222,7 @@
               "param": "r2",
               "op": "between",
               "value": 0.3,
-              "max": 0.5,
-              "label": "Set the Env’s r2 to about 0.4 s"
+              "max": 0.5
             }
           ]
         },
@@ -1291,39 +1230,27 @@
           "id": "group",
           "kind": "task",
           "title": "Group it as FM keys",
-          "text": "Select both Oscillators, the Env and the VCA and press Ctrl+G (Cmd+G). Name it FM keys. It exposes pitch (twice, one per oscillator), gate and out.",
+          "text": "[Select both Oscillators, the Env and the VCA and press Ctrl+G (Cmd+G)](req:group-or-insert-fm-keys). Name it FM keys. It exposes pitch (twice, one per oscillator), gate and out.",
           "why": "",
           "parts": [
-            {
-              "id": "group-or-insert-fm-keys",
-              "kind": "assembly",
-              "role": "fmKeys",
-              "fact": "exists",
-              "label": "Group both Oscillators, the Env and the VCA (Ctrl+G)"
-            }
+            { "id": "group-or-insert-fm-keys", "kind": "assembly", "role": "fmKeys", "fact": "exists" }
           ]
         },
         {
           "id": "insert",
           "kind": "task",
           "title": "Insert My space",
-          "text": "Click + Add assembly and pick My space under Your library (the one you saved in chapter 5). It arrives as one card.",
+          "text": "[Click + Add assembly and pick My space under Your library](req:group-or-insert-my-space) (the one you saved in chapter 5). It arrives as one card.",
           "why": "",
           "parts": [
-            {
-              "id": "group-or-insert-my-space",
-              "kind": "assembly",
-              "role": "mySpace",
-              "fact": "exists",
-              "label": "Insert My space from your library"
-            }
+            { "id": "group-or-insert-my-space", "kind": "assembly", "role": "mySpace", "fact": "exists" }
           ]
         },
         {
           "id": "wire",
           "kind": "task",
           "title": "Put the effect behind the keys",
-          "text": "Cable FM keys out → My space in, My space l → Output l and My space r → Output r. Remove the cable from FM keys to Output.",
+          "text": "Cable [FM keys out → My space in](req:cable-fm-keys-out-out-my-space-in-in), [My space l → Output l](req:cable-my-space-out-l-output-l) and [My space r → Output r](req:cable-my-space-out-r-output-r). [Remove the cable from FM keys to Output](req:remove-the-old-cable-fm-keys-out-out-out).",
           "why": "",
           "parts": [
             {
@@ -1332,8 +1259,7 @@
               "from": { "role": "fmOut" },
               "fromPort": "out",
               "to": { "role": "spaceIn" },
-              "toPort": "in",
-              "label": "Cable FM keys out → My space in"
+              "toPort": "in"
             },
             {
               "id": "cable-my-space-out-l-output-l",
@@ -1341,8 +1267,7 @@
               "from": { "role": "spaceOut" },
               "fromPort": "l",
               "to": { "type": "output" },
-              "toPort": "l",
-              "label": "Cable My space l → Output l"
+              "toPort": "l"
             },
             {
               "id": "cable-my-space-out-r-output-r",
@@ -1350,8 +1275,7 @@
               "from": { "role": "spaceOut" },
               "fromPort": "r",
               "to": { "type": "output" },
-              "toPort": "r",
-              "label": "Cable My space r → Output r"
+              "toPort": "r"
             },
             {
               "id": "remove-the-old-cable-fm-keys-out-out-out",
@@ -1359,8 +1283,7 @@
               "from": { "role": "fmOut" },
               "fromPort": "out",
               "to": { "type": "output" },
-              "toPort": "l",
-              "label": "Remove the old cable FM keys out → Output l (click it)"
+              "toPort": "l"
             }
           ]
         },
@@ -1368,7 +1291,7 @@
           "id": "nest",
           "kind": "task",
           "title": "Nest the effect inside the instrument",
-          "text": "Expand FM keys and drag the My space card into its frame by its header: it becomes part of FM keys, which now exposes l and r itself. Collapse FM keys.",
+          "text": "Expand FM keys and [drag the My space card into its frame by its header](req:drag-the-my-space-card-into-the-fm-keys-): it becomes part of FM keys, which now exposes l and r itself. [Collapse FM keys](req:collapse-fm-keys).",
           "why": "Assemblies nest three levels deep. An instrument that carries its own effect is one card wherever you use it.",
           "parts": [
             {
@@ -1385,7 +1308,7 @@
           "id": "save",
           "kind": "task",
           "title": "Save FM keys",
-          "text": "Click save on the FM keys card. My space travels inside it.",
+          "text": "[Click save on the FM keys card.](req:save-it-as-fm-keys-save-on-the-card) My space travels inside it.",
           "why": "",
           "parts": [
             {
@@ -1414,7 +1337,7 @@
           "id": "string",
           "kind": "task",
           "title": "A string",
-          "text": "Add a String. Cable Main pitch → String pitch, Main gate → String gate and String out → Output l. Each key plucks it.",
+          "text": "[Add a String](req:add-a-string). Cable [Main pitch → String pitch](req:cable-main-pitch-string-pitch), [Main gate → String gate](req:cable-main-gate-string-gate) and [String out → Output l](req:cable-string-out-output-l). Each key plucks it.",
           "why": "",
           "parts": [
             { "id": "add-a-string", "kind": "module", "type": "string" },
@@ -1448,7 +1371,7 @@
           "id": "decay",
           "kind": "task",
           "title": "Let it ring",
-          "text": "Set the String’s decay to about 4 s and damp to 0.1: a long, bright note. Optional: switch burst to pulse for a harder pick.",
+          "text": "[Set the String’s decay to about 4 s](req:set-string-s-decay-to-3-s-or-more) and [damp to 0.1](req:set-string-s-damp-to-0-15-or-less): a long, bright note. Optional: switch burst to pulse for a harder pick.",
           "why": "The string is a delay line as long as one period, with feedback. decay sets how much is fed back, damp how fast the highs are lost on each round trip.",
           "listen": true,
           "parts": [
@@ -1458,8 +1381,7 @@
               "ref": { "type": "string" },
               "param": "decay",
               "op": "ge",
-              "value": 3,
-              "label": "Set decay to 3 s or more"
+              "value": 3
             },
             {
               "id": "set-string-s-damp-to-0-15-or-less",
@@ -1467,8 +1389,7 @@
               "ref": { "type": "string" },
               "param": "damp",
               "op": "le",
-              "value": 0.15,
-              "label": "Set damp to 0.15 or less"
+              "value": 0.15
             }
           ]
         },
@@ -1476,7 +1397,7 @@
           "id": "voices",
           "kind": "task",
           "title": "Play chords",
-          "text": "On the Main card set voices to 4. The String card shows ×4: it runs once per voice. Hold a chord.",
+          "text": "[On the Main card set voices to 4.](req:set-voices-to-2-or-more-on-the-main-card) The String card shows ×4: it runs once per voice. Hold a chord.",
           "why": "Every module that hears pitch, gate or velocity runs once per voice; effects and the Output stay single and sum the voices.",
           "listen": true,
           "parts": [
@@ -1487,7 +1408,7 @@
           "id": "modal",
           "kind": "task",
           "title": "Strike a body with it",
-          "text": "Add a Modal. Cable String out → Modal in and Modal out → Output r. Set struct to 0.5 and decay to 2 s: the string now rings a bell-like body.",
+          "text": "[Add a Modal](req:add-a-modal). Cable [String out → Modal in](req:cable-string-out-modal-in) and [Modal out → Output r](req:cable-modal-out-output-r). [Set struct to 0.5](req:set-modal-s-struct-to-0-3-or-more) and [decay to 2 s](req:set-modal-s-decay-between-1-8-s-and-2-2-): the string now rings a bell-like body.",
           "why": "",
           "listen": true,
           "parts": [
@@ -1514,8 +1435,7 @@
               "ref": { "type": "modal" },
               "param": "struct",
               "op": "ge",
-              "value": 0.3,
-              "label": "Set struct to 0.3 or more"
+              "value": 0.3
             },
             {
               "id": "set-modal-s-decay-between-1-8-s-and-2-2-",
@@ -1524,8 +1444,7 @@
               "param": "decay",
               "op": "between",
               "value": 1.8,
-              "max": 2.2,
-              "label": "Set Modal decay to about 2 s"
+              "max": 2.2
             }
           ]
         },
@@ -1545,11 +1464,11 @@
           "id": "comb",
           "kind": "task",
           "title": "Blow noise through a comb",
-          "text": "Add Noise, a Comb and a VCA. Cable Noise out → Comb in, Main pitch → Comb pitch, Comb out → VCA in, Main gate → VCA cv, VCA out → Output l.",
+          "text": "[Add Noise, a Comb and a VCA](req:add-a-noise,add-a-comb,add-a-vca). Cable [Noise out → Comb in](req:cable-noise-out-comb-in), [Main pitch → Comb pitch](req:cable-main-pitch-comb-pitch), [Comb out → VCA in](req:cable-comb-out-vca-in), [Main gate → VCA cv](req:cable-main-gate-vca-cv), [VCA out → Output l](req:cable-vca-out-output-l).",
           "why": "A comb filter is a tuned delay line: noise through it rings at the note, like breath through a pipe. The VCA is a simple on / off here, straight from the gate.",
           "superseded": true,
           "parts": [
-            { "id": "add-a-noise", "kind": "module", "type": "noise", "label": "Add Noise" },
+            { "id": "add-a-noise", "kind": "module", "type": "noise" },
             { "id": "add-a-comb", "kind": "module", "type": "comb" },
             { "id": "add-a-vca", "kind": "module", "type": "vca" },
             {
@@ -1598,7 +1517,7 @@
           "id": "fb",
           "kind": "task",
           "title": "Make it ring",
-          "text": "Set the Comb’s fb to 0.95 and damp to 0.1: the noise turns into a breathy, whistling tone at the note.",
+          "text": "[Set the Comb’s fb to 0.95](req:set-comb-s-fb-to-0-9-or-more) and [damp to 0.1](req:set-comb-s-damp-to-0-1): the noise turns into a breathy, whistling tone at the note.",
           "why": "",
           "listen": true,
           "parts": [
@@ -1608,8 +1527,7 @@
               "ref": { "type": "comb" },
               "param": "fb",
               "op": "ge",
-              "value": 0.9,
-              "label": "Set the Comb’s fb to 0.9 or more"
+              "value": 0.9
             },
             {
               "id": "set-comb-s-damp-to-0-1",
@@ -1617,8 +1535,7 @@
               "ref": { "type": "comb" },
               "param": "damp",
               "op": "eq",
-              "value": 0.1,
-              "label": "Set Comb damp to 0.1"
+              "value": 0.1
             }
           ]
         },
@@ -1638,7 +1555,7 @@
           "id": "glide",
           "kind": "task",
           "title": "Slide between notes",
-          "text": "Add a Glide. Cable Main pitch → Glide in and Glide out → Comb pitch, and remove the cable from Main’s pitch to the Comb. Set time to 0.3 s and play two notes.",
+          "text": "[Add a Glide](req:add-a-glide). Cable [Main pitch → Glide in](req:cable-main-pitch-glide-in) and [Glide out → Comb pitch](req:cable-glide-out-comb-pitch), and [remove the cable from Main’s pitch to the Comb](req:remove-the-old-cable-main-pitch-comb-pit). [Set time to 0.3 s](req:set-glide-s-time-between-0-25-s-and-0-35) and play two notes.",
           "why": "Glide (portamento) slews a control signal: the pitch takes time to arrive. It works on any control cable, not only pitch.",
           "listen": true,
           "parts": [
@@ -1650,8 +1567,7 @@
               "param": "time",
               "op": "between",
               "value": 0.25,
-              "max": 0.35,
-              "label": "Set Glide time to about 0.3 s"
+              "max": 0.35
             },
             {
               "id": "cable-main-pitch-glide-in",
@@ -1683,16 +1599,10 @@
           "id": "group",
           "kind": "task",
           "title": "Group the pluck",
-          "text": "Select the String and the Modal and press Ctrl+G (Cmd+G). Name it Pluck. Expand it, click ○ on the String’s decay and the Modal’s struct, and collapse it again.",
+          "text": "[Select the String and the Modal and press Ctrl+G (Cmd+G)](req:group-or-insert-pluck). Name it Pluck. Expand it, [click ○ on the String’s decay](req:promote-the-string-s-decay-click-beside-) and [the Modal’s struct](req:promote-the-modal-s-struct-click-beside-), and [collapse it again](req:collapse-pluck).",
           "why": "",
           "parts": [
-            {
-              "id": "group-or-insert-pluck",
-              "kind": "assembly",
-              "role": "pluck",
-              "fact": "exists",
-              "label": "Group the String and the Modal (Ctrl+G)"
-            },
+            { "id": "group-or-insert-pluck", "kind": "assembly", "role": "pluck", "fact": "exists" },
             {
               "id": "promote-the-string-s-decay-click-beside-",
               "kind": "assembly",
@@ -1709,20 +1619,14 @@
               "type": "modal",
               "param": "struct"
             },
-            {
-              "id": "collapse-pluck",
-              "kind": "assembly",
-              "role": "pluck",
-              "fact": "collapsed",
-              "label": "Collapse the assembly"
-            }
+            { "id": "collapse-pluck", "kind": "assembly", "role": "pluck", "fact": "collapsed" }
           ]
         },
         {
           "id": "save",
           "kind": "task",
           "title": "Save Pluck",
-          "text": "Click save on the Pluck card. Chapter 10 plays it from a melody machine.",
+          "text": "[Click save on the Pluck card.](req:save-it-as-pluck-save-on-the-card) Chapter 10 plays it from a melody machine.",
           "why": "",
           "parts": [
             {
@@ -1751,7 +1655,7 @@
           "id": "wt",
           "kind": "task",
           "title": "A wavetable oscillator",
-          "text": "Add a Wavetable and cable Main pitch → Wavetable pitch. Set bank to formant. Next we give it a gated output, then listen to the vowels.",
+          "text": "[Add a Wavetable](req:add-a-wavetable) and [cable Main pitch → Wavetable pitch](req:cable-main-pitch-wavetable-pitch). [Set bank to formant](req:set-wavetable-s-bank-to-formant). Next we give it a gated output, then listen to the vowels.",
           "why": "",
           "parts": [
             { "id": "add-a-wavetable", "kind": "module", "type": "wavetable" },
@@ -1769,8 +1673,7 @@
               "ref": { "type": "wavetable" },
               "param": "bank",
               "op": "eq",
-              "value": 2,
-              "label": "Set bank to formant"
+              "value": 2
             }
           ]
         },
@@ -1778,7 +1681,7 @@
           "id": "dry",
           "kind": "task",
           "title": "Hear a vowel",
-          "text": "Add a VCA. Cable Wavetable out → VCA in, Main gate → VCA cv and VCA out → Output l. Start Note and move Wavetable pos: the vowel changes. The VCA keeps the sound under your control.",
+          "text": "[Add a VCA](req:add-a-vca). Cable [Wavetable out → VCA in](req:cable-wavetable-out-vca-in), [Main gate → VCA cv](req:cable-main-gate-vca-cv) and [VCA out → Output l](req:cable-vca-out-output-l). Start Note and move Wavetable pos: the vowel changes. The VCA keeps the sound under your control.",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -1814,19 +1717,18 @@
           "id": "lfo",
           "kind": "task",
           "title": "Sweep the table",
-          "text": "Add an LFO with rate 0.2 Hz. Alt-drag the Wavetable’s pos thumb onto the LFO’s out (or drop the LFO’s cable on the thumb). The position now sweeps on its own.",
+          "text": "[Add an LFO with rate 0.2 Hz](req:add-a-lfo,set-lfo-s-rate-to-0-5-hz-or-below). [Alt-drag the Wavetable’s pos thumb onto the LFO’s out](req:drop-lfo-s-out-on-wavetable-s-pos-thumb) (or drop the LFO’s cable on the thumb). The position now sweeps on its own.",
           "why": "",
           "listen": true,
           "parts": [
-            { "id": "add-a-lfo", "kind": "module", "type": "lfo", "label": "Add an LFO" },
+            { "id": "add-a-lfo", "kind": "module", "type": "lfo" },
             {
               "id": "drop-lfo-s-out-on-wavetable-s-pos-thumb",
               "kind": "routed",
               "from": { "type": "lfo" },
               "fromPort": "out",
               "to": { "type": "wavetable" },
-              "param": "pos",
-              "label": "Drop the LFO’s out on the pos thumb"
+              "param": "pos"
             },
             {
               "id": "set-lfo-s-rate-to-0-5-hz-or-below",
@@ -1834,8 +1736,7 @@
               "ref": { "type": "lfo" },
               "param": "rate",
               "op": "le",
-              "value": 0.5,
-              "label": "Set the LFO’s rate to 0.5 Hz or below"
+              "value": 0.5
             }
           ]
         },
@@ -1843,12 +1744,12 @@
           "id": "env",
           "kind": "task",
           "title": "A slow envelope",
-          "text": "Add an ADSR. Remove Main gate → VCA cv. Cable Main gate → ADSR gate, ADSR env → VCA cv, Wavetable out → VCA in. Set a to 1 s and r to 2 s: a pad.",
+          "text": "[Add an ADSR](req:add-an-adsr). [Remove Main gate → VCA cv](req:remove-the-old-cable-main-gate-vca-cv-cl). Cable [Main gate → ADSR gate](req:cable-main-gate-adsr-gate), [ADSR env → VCA cv](req:cable-adsr-env-vca-cv), [Wavetable out → VCA in](req:cable-wavetable-out-vca-in). [Set a to 1 s](req:set-adsr-s-a-to-0-5-s-or-more) and [r to 2 s](req:set-adsr-s-r-to-1-s-or-more): a pad.",
           "why": "",
           "listen": true,
           "parts": [
             { "id": "add-an-adsr", "kind": "module", "type": "adsr" },
-            { "id": "add-a-vca", "kind": "module", "type": "vca" },
+            { "id": "add-a-vca", "kind": "module", "type": "vca", "hidden": true },
             {
               "id": "cable-main-gate-adsr-gate",
               "kind": "cable",
@@ -1887,8 +1788,7 @@
               "ref": { "type": "adsr" },
               "param": "a",
               "op": "ge",
-              "value": 0.5,
-              "label": "Set a to 0.5 s or more"
+              "value": 0.5
             },
             {
               "id": "set-adsr-s-r-to-1-s-or-more",
@@ -1896,8 +1796,7 @@
               "ref": { "type": "adsr" },
               "param": "r",
               "op": "ge",
-              "value": 1,
-              "label": "Set r to 1 s or more"
+              "value": 1
             }
           ]
         },
@@ -1905,7 +1804,7 @@
           "id": "grain",
           "kind": "task",
           "title": "Into the cloud",
-          "text": "Add a Granular. Cable VCA out → Granular in and Main gate → Granular trig. Cable Granular out → Output l and remove VCA out → Output l. Set size to 0.15 s, density to 40, spray to 0.5 and pitch to +12.",
+          "text": "[Add a Granular](req:add-a-granular). Cable [VCA out → Granular in](req:cable-vca-out-granular-in) and [Main gate → Granular trig](req:cable-main-gate-granular-trig). Cable [Granular out → Output l](req:cable-granular-out-output-l) and [remove VCA out → Output l](req:remove-the-old-cable-vca-out-output-l-cl). [Set size to 0.15 s](req:set-granular-s-size-between-0-12-s-and-0), [density to 40](req:set-granular-s-density-to-40-hz), [spray to 0.5](req:set-granular-s-spray-to-0-3-or-more) and [pitch to +12](req:set-granular-s-pitch-off-0-st).",
           "why": "The granular module records what comes in and plays tiny windows of it, spread over position, time and pitch. spray is how far the grains wander from the position.",
           "listen": true,
           "superseded": true,
@@ -1934,8 +1833,7 @@
               "param": "size",
               "op": "between",
               "value": 0.12,
-              "max": 0.18,
-              "label": "Set size to about 0.15 s"
+              "max": 0.18
             },
             {
               "id": "set-granular-s-density-to-40-hz",
@@ -1943,8 +1841,7 @@
               "ref": { "type": "grain" },
               "param": "density",
               "op": "eq",
-              "value": 40,
-              "label": "Set density to 40"
+              "value": 40
             },
             {
               "id": "cable-vca-out-granular-in",
@@ -1968,8 +1865,7 @@
               "ref": { "type": "grain" },
               "param": "spray",
               "op": "ge",
-              "value": 0.3,
-              "label": "Set spray to 0.3 or more"
+              "value": 0.3
             },
             {
               "id": "set-granular-s-pitch-off-0-st",
@@ -1977,8 +1873,7 @@
               "ref": { "type": "grain" },
               "param": "pitch",
               "op": "ne",
-              "value": 0,
-              "label": "Move pitch off 0"
+              "value": 0
             }
           ]
         },
@@ -1998,7 +1893,7 @@
           "id": "pan",
           "kind": "task",
           "title": "Place it in the stereo field",
-          "text": "Add a Pan. Cable Granular out → Pan in, Pan l → Output l, Pan r → Output r. Remove Granular out → Output l. Then drop the LFO’s out on the pan slider’s thumb: pos is the Pan’s built-in input, so the cable goes there.",
+          "text": "[Add a Pan](req:add-a-pan). Cable [Granular out → Pan in](req:cable-granular-out-pan-in), [Pan l → Output l](req:cable-pan-l-output-l), [Pan r → Output r](req:cable-pan-r-output-r). [Remove Granular out → Output l](req:remove-the-old-cable-granular-out-output). Then [drop the LFO’s out on the pan slider’s thumb](req:cable-lfo-out-pan-pos): pos is the Pan’s built-in input, so the cable goes there.",
           "why": "",
           "superseded": true,
           "parts": [
@@ -2041,8 +1936,7 @@
               "from": { "type": "lfo" },
               "fromPort": "out",
               "to": { "type": "pan" },
-              "toPort": "pos",
-              "label": "Cable LFO out → Pan pos (drop it on the pan thumb)"
+              "toPort": "pos"
             }
           ]
         },
@@ -2050,7 +1944,7 @@
           "id": "phaser",
           "kind": "task",
           "title": "A phaser on the way out",
-          "text": "Add a Phaser between the Granular and the Pan: Granular out → Phaser in, Phaser out → Pan in, and remove the cable from the Granular to the Pan.",
+          "text": "[Add a Phaser between the Granular and the Pan](req:add-a-phaser): [Granular out → Phaser in](req:cable-granular-out-phaser-in), [Phaser out → Pan in](req:cable-phaser-out-pan-in), and [remove the cable from the Granular to the Pan](req:remove-the-old-cable-granular-out-pan-in).",
           "why": "",
           "parts": [
             { "id": "add-a-phaser", "kind": "module", "type": "phaser" },
@@ -2084,7 +1978,7 @@
           "id": "zoom",
           "kind": "task",
           "title": "Zoom out",
-          "text": "Nine cards no longer fit. Hold Ctrl (Cmd) and scroll to zoom, pinch on a touch screen, or use Commands → Fit patch to screen.",
+          "text": "Nine cards no longer fit. [Hold Ctrl (Cmd) and scroll to zoom, pinch on a touch screen, or use Commands → Fit patch to screen](req:zoom-the-canvas-ctrl-wheel-or-fit-patch-).",
           "why": "",
           "parts": [
             { "id": "zoom-the-canvas-ctrl-wheel-or-fit-patch-", "kind": "event", "event": "zooms" }
@@ -2094,7 +1988,7 @@
           "id": "spectrum",
           "kind": "task",
           "title": "Watch the cloud",
-          "text": "Click ◎ on the Granular’s out and switch the scope to Spectrum. Hold a note: the grains smear the harmonics into a band.",
+          "text": "[Click ◎ on the Granular’s out](req:click-beside-granular-s-out) and switch the scope to Spectrum. Hold a note: the grains smear the harmonics into a band.",
           "why": "",
           "listen": true,
           "parts": [
@@ -2103,8 +1997,7 @@
               "kind": "event",
               "event": "probe",
               "ref": { "type": "grain" },
-              "port": "out",
-              "label": "Click ◎ beside the Granular’s out"
+              "port": "out"
             }
           ]
         }
@@ -2124,24 +2017,17 @@
           "id": "voice",
           "kind": "task",
           "title": "Insert My voice",
-          "text": "Click + Add assembly and pick My voice from Your library. Cable Main pitch → its pitch and Main gate → its gate.",
+          "text": "[Click + Add assembly and pick My voice from Your library](req:group-or-insert-my-voice). Cable [Main pitch → its pitch](req:cable-main-pitch-my-voice-s-oscillator-p) and [Main gate → its gate](req:cable-main-gate-my-voice-s-adsr-gate).",
           "why": "",
           "parts": [
-            {
-              "id": "group-or-insert-my-voice",
-              "kind": "assembly",
-              "role": "myVoice",
-              "fact": "exists",
-              "label": "Insert My voice from your library"
-            },
+            { "id": "group-or-insert-my-voice", "kind": "assembly", "role": "myVoice", "fact": "exists" },
             {
               "id": "cable-main-pitch-my-voice-s-oscillator-p",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
               "to": { "role": "myVoice", "type": "osc" },
-              "toPort": "pitch",
-              "label": "Cable Main pitch → My voice pitch"
+              "toPort": "pitch"
             },
             {
               "id": "cable-main-gate-my-voice-s-adsr-gate",
@@ -2149,8 +2035,7 @@
               "from": { "type": "fm1" },
               "fromPort": "gate",
               "to": { "role": "myVoice", "type": "adsr" },
-              "toPort": "gate",
-              "label": "Cable Main gate → My voice gate"
+              "toPort": "gate"
             }
           ]
         },
@@ -2158,23 +2043,17 @@
           "id": "fm",
           "kind": "task",
           "title": "Insert FM keys",
-          "text": "Insert FM keys the same way. Its card shows two pitch inputs, one per oscillator, and a gate.",
+          "text": "[Insert FM keys the same way.](req:group-or-insert-fm-keys) Its card shows two pitch inputs, one per oscillator, and a gate.",
           "why": "",
           "parts": [
-            {
-              "id": "group-or-insert-fm-keys",
-              "kind": "assembly",
-              "role": "fmKeys",
-              "fact": "exists",
-              "label": "Insert FM keys from your library"
-            }
+            { "id": "group-or-insert-fm-keys", "kind": "assembly", "role": "fmKeys", "fact": "exists" }
           ]
         },
         {
           "id": "merge",
           "kind": "task",
           "title": "Merge the two pitch inputs",
-          "text": "Expand FM keys. Next to one of the exposed pitch inputs open merge into… and choose the other pitch. One pitch jack now feeds both oscillators. Collapse it.",
+          "text": "Expand FM keys. Next to one of the exposed pitch inputs [open merge into… and choose the other pitch](req:merge-the-pitch-inputs-of-fm-keys-merge-). One pitch jack now feeds both oscillators. [Collapse it.](req:collapse-fm-keys)",
           "why": "A merged input sends one cable to several inner inputs. Split undoes it.",
           "parts": [
             {
@@ -2182,8 +2061,7 @@
               "kind": "assembly",
               "role": "fmKeys",
               "fact": "merged",
-              "port": "pitch",
-              "label": "Merge the two pitch inputs of FM keys (merge into…)"
+              "port": "pitch"
             },
             { "id": "collapse-fm-keys", "kind": "assembly", "role": "fmKeys", "fact": "collapsed" }
           ]
@@ -2192,7 +2070,7 @@
           "id": "wire",
           "kind": "task",
           "title": "Cable the second instrument",
-          "text": "Cable Main pitch → FM keys pitch and Main gate → FM keys gate. Both instruments are ready for the mixer in the next step.",
+          "text": "[Cable Main pitch → FM keys pitch](req:cable-main-pitch-every-oscillator-in-fm-) and [Main gate → FM keys gate](req:cable-main-gate-fm-keys-gate-gate). Both instruments are ready for the mixer in the next step.",
           "why": "",
           "parts": [
             {
@@ -2201,8 +2079,7 @@
               "from": { "type": "fm1" },
               "fromPort": "pitch",
               "to": { "role": "fmKeys", "type": "osc", "every": true },
-              "toPort": "pitch",
-              "label": "Cable Main pitch → FM keys pitch"
+              "toPort": "pitch"
             },
             {
               "id": "cable-main-gate-fm-keys-gate-gate",
@@ -2210,8 +2087,7 @@
               "from": { "type": "fm1" },
               "fromPort": "gate",
               "to": { "role": "fmEnv" },
-              "toPort": "gate",
-              "label": "Cable Main gate → FM keys gate"
+              "toPort": "gate"
             }
           ]
         },
@@ -2219,7 +2095,7 @@
           "id": "mixer",
           "kind": "task",
           "title": "Mix them",
-          "text": "Add a Mixer 4. Cable My voice out → in1, FM keys l → in2, FM keys r → in3, and Mixer out → Output l and r. l1..l4 are the levels.",
+          "text": "[Add a Mixer 4](req:add-a-mixer-4-outside-the-assemblies). Cable [My voice out → in1](req:cable-my-voice-out-out-mixer-4-outside-t), [FM keys l → in2](req:cable-my-space-out-l-mixer-4-outside-the), [FM keys r → in3](req:cable-my-space-out-r-mixer-4-outside-the), and [Mixer out → Output l and r](req:cable-mixer-4-outside-the-assemblies-out,cable-mixer-4-outside-the-assemblies-out-2). l1..l4 are the levels.",
           "why": "",
           "parts": [
             { "id": "add-a-mixer-4-outside-the-assemblies", "kind": "module", "type": "mixer", "loose": true },
@@ -2229,8 +2105,7 @@
               "from": { "role": "myVoiceOut" },
               "fromPort": "out",
               "to": { "type": "mixer", "loose": true },
-              "toPort": "in1",
-              "label": "Cable My voice out → Mixer in1"
+              "toPort": "in1"
             },
             {
               "id": "cable-my-space-out-l-mixer-4-outside-the",
@@ -2238,8 +2113,7 @@
               "from": { "role": "spaceOut" },
               "fromPort": "l",
               "to": { "type": "mixer", "loose": true },
-              "toPort": "in2",
-              "label": "Cable FM keys l → Mixer in2"
+              "toPort": "in2"
             },
             {
               "id": "cable-my-space-out-r-mixer-4-outside-the",
@@ -2247,8 +2121,7 @@
               "from": { "role": "spaceOut" },
               "fromPort": "r",
               "to": { "type": "mixer", "loose": true },
-              "toPort": "in3",
-              "label": "Cable FM keys r → Mixer in3"
+              "toPort": "in3"
             },
             {
               "id": "cable-mixer-4-outside-the-assemblies-out",
@@ -2256,8 +2129,7 @@
               "from": { "type": "mixer", "loose": true },
               "fromPort": "out",
               "to": { "type": "output" },
-              "toPort": "l",
-              "label": "Cable Mixer out → Output l"
+              "toPort": "l"
             },
             {
               "id": "cable-mixer-4-outside-the-assemblies-out-2",
@@ -2265,8 +2137,7 @@
               "from": { "type": "mixer", "loose": true },
               "fromPort": "out",
               "to": { "type": "output" },
-              "toPort": "r",
-              "label": "Cable Mixer out → Output r"
+              "toPort": "r"
             }
           ]
         },
@@ -2286,23 +2157,18 @@
           "id": "arp",
           "kind": "task",
           "title": "Let the arpeggiator play",
-          "text": "Open the arp panel on the Main card and press Space (or Commands → arpeggiator). Hold a chord: the keys are played one after another at the rate shown.",
+          "text": "Open the arp panel on the Main card and [press Space (or Commands → arpeggiator)](req:start-the-arpeggiator-space). Hold a chord: the keys are played one after another at the rate shown.",
           "why": "",
           "listen": true,
           "parts": [
-            {
-              "id": "start-the-arpeggiator-space",
-              "kind": "event",
-              "event": "arpPlay",
-              "label": "Enable the arpeggiator (Space)"
-            }
+            { "id": "start-the-arpeggiator-space", "kind": "event", "event": "arpPlay" }
           ]
         },
         {
           "id": "macro",
           "kind": "task",
           "title": "A knob with a range",
-          "text": "Cable Main k2 → My voice p1 (the pin of the Filter inside). Open the ⋯ menu of My voice’s cutoff, tick P1 and Map between two values, then set the ends to 150 Hz and 4000 Hz. Set the Filter’s P1 depth to 1 so the knob reaches both ends.",
+          "text": "[Cable Main k2 → My voice p1](req:cable-main-k2-my-voice-s-filter-p1) (the pin of the Filter inside). Open the ⋯ menu of My voice’s cutoff, [tick P1](req:tick-p1-in-the-menu-of-cutoff) and Map between two values, then [set the ends to 150 Hz and 4000 Hz](req:map-cutoff-from-150-hz-to-4000-hz-with-p). Set the Filter’s P1 depth to 1 so the knob reaches both ends.",
           "why": "A macro range maps the knob’s whole travel onto a slice of the parameter: the useful part of the cutoff instead of 20 Hz to 16 kHz.",
           "listen": true,
           "parts": [
@@ -2312,8 +2178,7 @@
               "from": { "type": "fm1" },
               "fromPort": "k2",
               "to": { "role": "myVoice", "type": "filter" },
-              "toPort": "p1",
-              "label": "Cable Main k2 → My voice p1"
+              "toPort": "p1"
             },
             {
               "id": "tick-p1-in-the-menu-of-cutoff",
@@ -2338,7 +2203,7 @@
           "id": "snapshots",
           "kind": "task",
           "title": "Compare two snapshots",
-          "text": "Commands → Set snapshot A. Change a few sliders (cutoff, the mixer levels), then Commands → Set snapshot B. Press Alt+B to flip between them. Listen to the change in balance: snapshots switch the whole patch instantly. The next step makes a continuous fade.",
+          "text": "[Commands → Set snapshot A](req:set-snapshot-a-commands). Change a few sliders (cutoff, the mixer levels), then [Commands → Set snapshot B](req:set-snapshot-b-commands). [Press Alt+B to flip between them](req:press-alt-b). Listen to the change in balance: snapshots switch the whole patch instantly. The next step makes a continuous fade.",
           "why": "",
           "listen": true,
           "parts": [
@@ -2351,7 +2216,7 @@
           "id": "morph",
           "kind": "task",
           "title": "Fade between the snapshots",
-          "text": "On Main, open the B side picker and choose Snapshot B. Move morph from 0 to 1, then leave it halfway. You now hear a continuous change in the mixer balance; Alt+B alone only switches snapshots.",
+          "text": "On Main, [open the B side picker and choose Snapshot B](req:choose-snapshot-b-in-main-s-b-side-picke). [Move morph from 0 to 1, then leave it halfway](req:set-main-s-morph-between-0-01-and-0-99). You now hear a continuous change in the mixer balance; Alt+B alone only switches snapshots.",
           "why": "A morph target must have the same modules and cables. Snapshot B is a complete compatible patch; selecting it copies its parameters into the B side. Main itself is not morphed.",
           "listen": true,
           "parts": [
@@ -2363,8 +2228,7 @@
               "param": "morph",
               "op": "between",
               "value": 0.01,
-              "max": 0.99,
-              "label": "Set Main morph between 0 and 1"
+              "max": 0.99
             }
           ]
         }
@@ -2384,18 +2248,17 @@
           "id": "clock",
           "kind": "task",
           "title": "A clock",
-          "text": "Add an LFO, set its wave to square and its rate to 4 Hz. A square wave is a clock: its rising edge is a tick.",
+          "text": "[Add an LFO](req:add-a-lfo), [set its wave to square](req:set-lfo-s-wave-to-square) and [its rate to 4 Hz](req:set-lfo-s-rate-to-2-hz-or-more). A square wave is a clock: its rising edge is a tick.",
           "why": "",
           "parts": [
-            { "id": "add-a-lfo", "kind": "module", "type": "lfo", "label": "Add an LFO" },
+            { "id": "add-a-lfo", "kind": "module", "type": "lfo" },
             {
               "id": "set-lfo-s-wave-to-square",
               "kind": "slider",
               "ref": { "type": "lfo" },
               "param": "wave",
               "op": "eq",
-              "value": 3,
-              "label": "Set its wave to square"
+              "value": 3
             },
             {
               "id": "set-lfo-s-rate-to-2-hz-or-more",
@@ -2403,8 +2266,7 @@
               "ref": { "type": "lfo" },
               "param": "rate",
               "op": "ge",
-              "value": 2,
-              "label": "Set its rate to 2 Hz or more"
+              "value": 2
             }
           ]
         },
@@ -2412,7 +2274,7 @@
           "id": "div",
           "kind": "task",
           "title": "Divide it",
-          "text": "Add a Clock div and cable LFO out → Clock div clock. Its outputs out, d2, d4 and d8 tick every div, 2, 4 and 8 ticks.",
+          "text": "[Add a Clock div](req:add-a-clock-div) and [cable LFO out → Clock div clock](req:cable-lfo-out-clock-div-clock). Its outputs out, d2, d4 and d8 tick every div, 2, 4 and 8 ticks.",
           "why": "",
           "superseded": true,
           "parts": [
@@ -2431,11 +2293,11 @@
           "id": "sh",
           "kind": "task",
           "title": "A random value per tick",
-          "text": "Add Noise and an S&H (sample and hold). Cable Noise out → S&H in and Clock div out → S&H clock. On every tick the S&H grabs the noise’s value and holds it.",
+          "text": "[Add Noise](req:add-a-noise) and [an S&H (sample and hold)](req:add-a-s-h). Cable [Noise out → S&H in](req:cable-noise-out-s-h-in) and [Clock div out → S&H clock](req:cable-clock-div-out-s-h-clock). On every tick the S&H grabs the noise’s value and holds it.",
           "why": "",
           "parts": [
-            { "id": "add-a-noise", "kind": "module", "type": "noise", "label": "Add Noise" },
-            { "id": "add-a-s-h", "kind": "module", "type": "sh", "label": "Add an S&H" },
+            { "id": "add-a-noise", "kind": "module", "type": "noise" },
+            { "id": "add-a-s-h", "kind": "module", "type": "sh" },
             {
               "id": "cable-noise-out-s-h-in",
               "kind": "cable",
@@ -2458,7 +2320,7 @@
           "id": "quant",
           "kind": "task",
           "title": "Snap it to a scale",
-          "text": "Add a Quantizer, cable S&H out → Quantizer in and set scale to pent min. Random voltages become notes of a pentatonic minor scale.",
+          "text": "[Add a Quantizer](req:add-a-quantizer), [cable S&H out → Quantizer in](req:cable-s-h-out-quantizer-in) and [set scale to pent min](req:set-quantizer-s-scale-to-pent-min). Random voltages become notes of a pentatonic minor scale.",
           "why": "Pitch is a control signal: one unit per octave, a semitone is a twelfth. The quantizer rounds to the nearest note of the scale, which is why random noise sounds like a melody.",
           "superseded": true,
           "parts": [
@@ -2477,8 +2339,7 @@
               "ref": { "type": "quant" },
               "param": "scale",
               "op": "eq",
-              "value": 4,
-              "label": "Set scale to pent min"
+              "value": 4
             }
           ]
         },
@@ -2486,16 +2347,10 @@
           "id": "pluck",
           "kind": "task",
           "title": "Play Pluck with it",
-          "text": "Insert Pluck from Your library. Cable Quantizer out → Pluck pitch, Clock div out → Pluck gate and Pluck out → Output l. The machine plays on its own now.",
+          "text": "[Insert Pluck from Your library](req:group-or-insert-pluck). Cable [Quantizer out → Pluck pitch](req:cable-quantizer-out-pluck-pitch), [Clock div out → Pluck gate](req:cable-clock-div-out-pluck-gate) and [Pluck out → Output l](req:cable-pluck-out-output-l). The machine plays on its own now.",
           "why": "",
           "parts": [
-            {
-              "id": "group-or-insert-pluck",
-              "kind": "assembly",
-              "role": "pluck",
-              "fact": "exists",
-              "label": "Insert Pluck from your library"
-            },
+            { "id": "group-or-insert-pluck", "kind": "assembly", "role": "pluck", "fact": "exists" },
             {
               "id": "cable-quantizer-out-pluck-pitch",
               "kind": "cable",
@@ -2519,7 +2374,7 @@
           "id": "pulse",
           "kind": "task",
           "title": "FM keys on every second tick",
-          "text": "Add a Pulse with time 0.05 s and cable Clock div d2 → Pulse trig. Insert FM keys; cable Quantizer out → FM keys pitch, Pulse out → FM keys gate, FM keys l → Output r.",
+          "text": "[Add a Pulse with time 0.05 s](req:add-a-pulse,set-pulse-s-time-to-0-1-s-or-below) and [cable Clock div d2 → Pulse trig](req:cable-clock-div-d2-pulse-trig). [Insert FM keys](req:group-or-insert-fm-keys); cable [Quantizer out → FM keys pitch](req:cable-quantizer-out-every-oscillator-in-), [Pulse out → FM keys gate](req:cable-pulse-out-fm-keys-gate-gate), [FM keys l → Output r](req:cable-my-space-out-l-output-r).",
           "why": "A divider passes selected input pulses with their original width. Pulse makes a predictable 0.05 s gate regardless of the clock’s pulse width.",
           "superseded": true,
           "parts": [
@@ -2530,8 +2385,7 @@
               "ref": { "type": "pulse" },
               "param": "time",
               "op": "le",
-              "value": 0.1,
-              "label": "Set the Pulse’s time to 0.1 s or less"
+              "value": 0.1
             },
             {
               "id": "cable-clock-div-d2-pulse-trig",
@@ -2541,21 +2395,14 @@
               "to": { "type": "pulse" },
               "toPort": "trig"
             },
-            {
-              "id": "group-or-insert-fm-keys",
-              "kind": "assembly",
-              "role": "fmKeys",
-              "fact": "exists",
-              "label": "Insert FM keys from your library"
-            },
+            { "id": "group-or-insert-fm-keys", "kind": "assembly", "role": "fmKeys", "fact": "exists" },
             {
               "id": "cable-quantizer-out-every-oscillator-in-",
               "kind": "cable",
               "from": { "type": "quant" },
               "fromPort": "out",
               "to": { "role": "fmKeys", "type": "osc", "every": true },
-              "toPort": "pitch",
-              "label": "Cable Quantizer out → FM keys pitch"
+              "toPort": "pitch"
             },
             {
               "id": "cable-pulse-out-fm-keys-gate-gate",
@@ -2563,8 +2410,7 @@
               "from": { "type": "pulse" },
               "fromPort": "out",
               "to": { "role": "fmEnv" },
-              "toPort": "gate",
-              "label": "Cable Pulse out → FM keys gate"
+              "toPort": "gate"
             },
             {
               "id": "cable-my-space-out-l-output-r",
@@ -2572,8 +2418,7 @@
               "from": { "role": "spaceOut" },
               "fromPort": "l",
               "to": { "type": "output" },
-              "toPort": "r",
-              "label": "Cable FM keys l → Output r"
+              "toPort": "r"
             }
           ]
         },
@@ -2593,7 +2438,7 @@
           "id": "seq",
           "kind": "task",
           "title": "A written melody instead",
-          "text": "Add a Sequencer, cable Clock div out → Sequencer clock and Sequencer out → Quantizer in, and remove the cable from the S&H to the Quantizer. Set s1..s4 to a few different values; len to 4.",
+          "text": "[Add a Sequencer](req:add-a-sequencer), [cable Clock div out → Sequencer clock](req:cable-clock-div-out-sequencer-clock) and [Sequencer out → Quantizer in](req:cable-sequencer-out-quantizer-in), and [remove the cable from the S&H to the Quantizer](req:remove-the-old-cable-s-h-out-quantizer-i). Set s1..s4 to a few different values; [len to 4](req:set-sequencer-s-len-to-4-or-less).",
           "why": "The Sequencer’s steps are the same kind of signal the S&H made, just chosen by you. Through the quantizer the steps land on scale notes whatever you set them to.",
           "parts": [
             { "id": "add-a-sequencer", "kind": "module", "type": "seq" },
@@ -2627,8 +2472,7 @@
               "ref": { "type": "seq" },
               "param": "len",
               "op": "le",
-              "value": 4,
-              "label": "Set len to 4 or less"
+              "value": 4
             }
           ]
         },
@@ -2636,7 +2480,7 @@
           "id": "mainclock",
           "kind": "task",
           "title": "Lock to the arpeggiator’s clock",
-          "text": "Cable Main clock → Clock div clock and remove the LFO’s cable to it; set the Clock div’s div to 6. Add a second Clock div: first out → second clock, second d2 → Pulse trig; remove first d2 → Pulse trig. Press Space: Main’s clock now ticks 24 times per beat at the arp tempo, and on the FM-1 it follows MIDI clock.",
+          "text": "[Cable Main clock → Clock div clock](req:cable-main-clock-clock-div-clock) and [remove the LFO’s cable to it](req:remove-the-old-cable-lfo-out-clock-div-c); [set the Clock div’s div to 6](req:set-clock-div-s-div-to-6). [Add a second Clock div](req:add-a-second-clock-div): [first out → second clock](req:cable-clock-div-out-the-second-clock-div), [second d2 → Pulse trig](req:cable-the-second-clock-div-d2-pulse-trig); [remove first d2 → Pulse trig](req:remove-the-old-cable-clock-div-d2-pulse-). Press Space: Main’s clock now ticks 24 times per beat at the arp tempo, and on the FM-1 it follows MIDI clock.",
           "why": "",
           "parts": [
             {
@@ -2661,8 +2505,7 @@
               "ref": { "type": "clkdiv" },
               "param": "div",
               "op": "eq",
-              "value": 6,
-              "label": "Set the first Clock div’s div to 6"
+              "value": 6
             },
             { "id": "add-a-second-clock-div", "kind": "module", "type": "clkdiv", "count": 2 },
             {
@@ -2671,8 +2514,7 @@
               "from": { "type": "clkdiv" },
               "fromPort": "out",
               "to": { "type": "clkdiv", "index": 1 },
-              "toPort": "clock",
-              "label": "Cable first divider out → second divider clock"
+              "toPort": "clock"
             },
             {
               "id": "cable-the-second-clock-div-d2-pulse-trig",
@@ -2680,8 +2522,7 @@
               "from": { "type": "clkdiv", "index": 1 },
               "fromPort": "d2",
               "to": { "type": "pulse" },
-              "toPort": "trig",
-              "label": "Cable second divider d2 → Pulse trig"
+              "toPort": "trig"
             },
             {
               "id": "remove-the-old-cable-clock-div-d2-pulse-",
@@ -2689,8 +2530,7 @@
               "from": { "type": "clkdiv" },
               "fromPort": "d2",
               "to": { "type": "pulse" },
-              "toPort": "trig",
-              "label": "Remove the old cable first divider d2 → Pulse trig (click it)"
+              "toPort": "trig"
             }
           ]
         },
@@ -2698,16 +2538,11 @@
           "id": "play",
           "kind": "task",
           "title": "Hear the machine lock together",
-          "text": "Press Space to start the arpeggiator clock. Change Main’s tempo: the written melody, Pluck and every-second-tick FM part stay together. Optional: change s1–s4 to write a four-note answer to the random melody.",
+          "text": "[Press Space to start the arpeggiator clock.](req:start-the-arpeggiator-space) Change Main’s tempo: the written melody, Pluck and every-second-tick FM part stay together. Optional: change s1–s4 to write a four-note answer to the random melody.",
           "why": "",
           "listen": true,
           "parts": [
-            {
-              "id": "start-the-arpeggiator-space",
-              "kind": "event",
-              "event": "arpPlay",
-              "label": "Start the arpeggiator clock (Space)"
-            }
+            { "id": "start-the-arpeggiator-space", "kind": "event", "event": "arpPlay" }
           ]
         }
       ]
@@ -2726,10 +2561,10 @@
           "id": "noise",
           "kind": "task",
           "title": "Noise through a high pass",
-          "text": "Add Noise and a Filter. Cable Noise out → Filter in and set the cutoff to about 6 kHz: the Filter’s hp output is the hiss of a hat.",
+          "text": "[Add Noise](req:add-a-noise) and [a Filter](req:add-a-filter). [Cable Noise out → Filter in](req:cable-noise-out-filter-in) and [set the cutoff to about 6 kHz](req:set-filter-s-cutoff-to-4000-hz-or-more): the Filter’s hp output is the hiss of a hat.",
           "why": "",
           "parts": [
-            { "id": "add-a-noise", "kind": "module", "type": "noise", "label": "Add Noise" },
+            { "id": "add-a-noise", "kind": "module", "type": "noise" },
             { "id": "add-a-filter", "kind": "module", "type": "filter" },
             {
               "id": "cable-noise-out-filter-in",
@@ -2745,8 +2580,7 @@
               "ref": { "type": "filter" },
               "param": "cutoff",
               "op": "ge",
-              "value": 4000,
-              "label": "Set cutoff to 4 kHz or more"
+              "value": 4000
             }
           ]
         },
@@ -2754,7 +2588,7 @@
           "id": "env",
           "kind": "task",
           "title": "A very short envelope",
-          "text": "Add an Env L/R and a VCA. Cable Filter hp → VCA in, Main gate → Env gate, Env env → VCA cv, VCA out → Output l. Set l1 to 1, r1 to 0.001 s, l2 to 0, r2 to 0.08 s, l3 to 0 and l4 to 0. Hold a key: one crisp hiss dies away and stays silent.",
+          "text": "[Add an Env L/R](req:add-an-env-l-r) and [a VCA](req:add-a-vca). Cable [Filter hp → VCA in](req:cable-filter-hp-vca-in), [Main gate → Env gate](req:cable-main-gate-env-l-r-gate), [Env env → VCA cv](req:cable-env-l-r-env-vca-cv), [VCA out → Output l](req:cable-vca-out-output-l). [Set l1 to 1](req:set-env-l-r-s-l1-to-1), [r1 to 0.001 s](req:set-env-l-r-s-r1-to-0-001-s-or-below), [l2 to 0](req:set-env-l-r-s-l2-to-0), [r2 to 0.08 s](req:set-env-l-r-s-r2-between-0-06-s-and-0-1-), [l3 to 0](req:set-env-l-r-s-l3-to-0) and [l4 to 0](req:set-env-l-r-s-l4-to-0). Hold a key: one crisp hiss dies away and stays silent.",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -2775,8 +2609,7 @@
               "from": { "type": "fm1" },
               "fromPort": "gate",
               "to": { "type": "env" },
-              "toPort": "gate",
-              "label": "Cable Main gate → Env gate"
+              "toPort": "gate"
             },
             {
               "id": "cable-env-l-r-env-vca-cv",
@@ -2784,8 +2617,7 @@
               "from": { "type": "env" },
               "fromPort": "env",
               "to": { "type": "vca" },
-              "toPort": "cv",
-              "label": "Cable Env env → VCA cv"
+              "toPort": "cv"
             },
             {
               "id": "cable-vca-out-output-l",
@@ -2801,8 +2633,7 @@
               "ref": { "type": "env" },
               "param": "l1",
               "op": "eq",
-              "value": 1,
-              "label": "Set l1 to 1"
+              "value": 1
             },
             {
               "id": "set-env-l-r-s-r1-to-0-001-s-or-below",
@@ -2810,8 +2641,7 @@
               "ref": { "type": "env" },
               "param": "r1",
               "op": "le",
-              "value": 0.001,
-              "label": "Set r1 to 0.001 s"
+              "value": 0.001
             },
             {
               "id": "set-env-l-r-s-l2-to-0",
@@ -2819,8 +2649,7 @@
               "ref": { "type": "env" },
               "param": "l2",
               "op": "eq",
-              "value": 0,
-              "label": "Set l2 to 0"
+              "value": 0
             },
             {
               "id": "set-env-l-r-s-r2-between-0-06-s-and-0-1-",
@@ -2829,8 +2658,7 @@
               "param": "r2",
               "op": "between",
               "value": 0.06,
-              "max": 0.1,
-              "label": "Set r2 to about 0.08 s"
+              "max": 0.1
             },
             {
               "id": "set-env-l-r-s-l3-to-0",
@@ -2838,8 +2666,7 @@
               "ref": { "type": "env" },
               "param": "l3",
               "op": "eq",
-              "value": 0,
-              "label": "Set l3 to 0"
+              "value": 0
             },
             {
               "id": "set-env-l-r-s-l4-to-0",
@@ -2847,8 +2674,7 @@
               "ref": { "type": "env" },
               "param": "l4",
               "op": "eq",
-              "value": 0,
-              "label": "Set l4 to 0"
+              "value": 0
             }
           ]
         },
@@ -2856,16 +2682,10 @@
           "id": "group",
           "kind": "task",
           "title": "Group it as Hat and save it",
-          "text": "Select the Noise, Filter, Env and VCA, press Ctrl+G (Cmd+G) and name it Hat. Click save on its card.",
+          "text": "[Select the Noise, Filter, Env and VCA, press Ctrl+G (Cmd+G) and name it Hat](req:group-or-insert-hat). [Click save on its card](req:save-it-as-hat-save-on-the-card).",
           "why": "",
           "parts": [
-            {
-              "id": "group-or-insert-hat",
-              "kind": "assembly",
-              "role": "hat",
-              "fact": "exists",
-              "label": "Group the Noise, Filter, Env and VCA (Ctrl+G)"
-            },
+            { "id": "group-or-insert-hat", "kind": "assembly", "role": "hat", "fact": "exists" },
             {
               "id": "save-it-as-hat-save-on-the-card",
               "kind": "assembly",
@@ -2880,42 +2700,29 @@
           "id": "kit",
           "kind": "task",
           "title": "Borrow a kick and a snare",
-          "text": "Click + Add assembly and insert kick and snare from the Drums shelf. Expand one to see how it is built: a kick is a sine with a pitch envelope.",
+          "text": "Click + Add assembly and [insert kick and snare from the Drums shelf](req:group-or-insert-the-factory-kick,group-or-insert-the-factory-snare). Expand one to see how it is built: a kick is a sine with a pitch envelope.",
           "why": "",
           "parts": [
-            {
-              "id": "group-or-insert-the-factory-kick",
-              "kind": "assembly",
-              "role": "kick",
-              "fact": "exists",
-              "label": "Insert the factory kick (Drums shelf)"
-            },
-            {
-              "id": "group-or-insert-the-factory-snare",
-              "kind": "assembly",
-              "role": "snare",
-              "fact": "exists",
-              "label": "Insert the factory snare (Drums shelf)"
-            }
+            { "id": "group-or-insert-the-factory-kick", "kind": "assembly", "role": "kick", "fact": "exists" },
+            { "id": "group-or-insert-the-factory-snare", "kind": "assembly", "role": "snare", "fact": "exists" }
           ]
         },
         {
           "id": "clock",
           "kind": "task",
           "title": "A clock and a divider",
-          "text": "Add an LFO (square, 8 Hz) and a Clock div with div 2. Cable LFO out → Clock div clock.",
+          "text": "[Add an LFO (square, 8 Hz)](req:add-a-lfo,set-lfo-s-wave-to-square,set-lfo-s-rate-to-6-hz-or-more) and [a Clock div with div 2](req:add-a-clock-div,set-clock-div-s-div-to-2). [Cable LFO out → Clock div clock](req:cable-lfo-out-clock-div-clock).",
           "why": "",
           "superseded": true,
           "parts": [
-            { "id": "add-a-lfo", "kind": "module", "type": "lfo", "label": "Add an LFO" },
+            { "id": "add-a-lfo", "kind": "module", "type": "lfo" },
             {
               "id": "set-lfo-s-wave-to-square",
               "kind": "slider",
               "ref": { "type": "lfo" },
               "param": "wave",
               "op": "eq",
-              "value": 3,
-              "label": "Set the LFO’s wave to square"
+              "value": 3
             },
             {
               "id": "set-lfo-s-rate-to-6-hz-or-more",
@@ -2923,8 +2730,7 @@
               "ref": { "type": "lfo" },
               "param": "rate",
               "op": "ge",
-              "value": 6,
-              "label": "Set the LFO’s rate to 6 Hz or more"
+              "value": 6
             },
             { "id": "add-a-clock-div", "kind": "module", "type": "clkdiv" },
             {
@@ -2933,8 +2739,7 @@
               "ref": { "type": "clkdiv" },
               "param": "div",
               "op": "eq",
-              "value": 2,
-              "label": "Set the Clock div’s div to 2"
+              "value": 2
             },
             {
               "id": "cable-lfo-out-clock-div-clock",
@@ -2950,7 +2755,7 @@
           "id": "pattern",
           "kind": "task",
           "title": "A pattern from the divisions",
-          "text": "Cable LFO out → Hat gate (every eighth), Clock div d2 → kick gate (every beat) and Clock div d4 → snare gate (every second beat). Remove the cable from Main’s gate to the Hat.",
+          "text": "Cable [LFO out → Hat gate](req:cable-lfo-out-hat-gate-gate) (every eighth), [Clock div d2 → kick gate](req:cable-clock-div-d2-kick-gate) (every beat) and [Clock div d4 → snare gate](req:cable-clock-div-d4-snare-gate) (every second beat). [Remove the cable from Main’s gate to the Hat](req:remove-the-old-cable-main-gate-hat-gate-).",
           "why": "",
           "superseded": true,
           "parts": [
@@ -2960,8 +2765,7 @@
               "from": { "type": "lfo" },
               "fromPort": "out",
               "to": { "role": "hatGate" },
-              "toPort": "gate",
-              "label": "Cable LFO out → Hat gate"
+              "toPort": "gate"
             },
             {
               "id": "cable-clock-div-d2-kick-gate",
@@ -2981,8 +2785,7 @@
               "from": { "type": "fm1" },
               "fromPort": "gate",
               "to": { "role": "hatGate" },
-              "toPort": "gate",
-              "label": "Remove the old cable Main gate → Hat gate (click it)"
+              "toPort": "gate"
             }
           ]
         },
@@ -2990,7 +2793,7 @@
           "id": "mix",
           "kind": "task",
           "title": "Mix the kit",
-          "text": "Add a Mixer 4: kick out → in1, snare out → in2, Hat out → in3, and Mixer out → Output l and r. Remove the Hat’s own cable to Output. Set l1 to 0.9 and l3 to 0.4.",
+          "text": "[Add a Mixer 4](req:add-a-mixer-4-outside-the-assemblies): [kick out → in1](req:cable-kick-out-mixer-in1), [snare out → in2](req:cable-snare-out-mixer-in2), [Hat out → in3](req:cable-hat-out-out-mixer-4-outside-the-as), and [Mixer out → Output l and r](req:cable-mixer-4-outside-the-assemblies-out,cable-mixer-4-outside-the-assemblies-out-2). [Remove the Hat’s own cable to Output](req:remove-the-old-cable-hat-out-out-output-). [Set l1 to 0.9](req:set-mixer-4-outside-the-assemblies-s-l1-) and [l3 to 0.4](req:set-mixer-4-outside-the-assemblies-s-l3-).",
           "why": "",
           "parts": [
             { "id": "add-a-mixer-4-outside-the-assemblies", "kind": "module", "type": "mixer", "loose": true },
@@ -3012,8 +2815,7 @@
               "from": { "role": "hatOut" },
               "fromPort": "out",
               "to": { "type": "mixer", "loose": true },
-              "toPort": "in3",
-              "label": "Cable Hat out → Mixer in3"
+              "toPort": "in3"
             },
             {
               "id": "cable-mixer-4-outside-the-assemblies-out",
@@ -3021,8 +2823,7 @@
               "from": { "type": "mixer", "loose": true },
               "fromPort": "out",
               "to": { "type": "output" },
-              "toPort": "l",
-              "label": "Cable Mixer out → Output l"
+              "toPort": "l"
             },
             {
               "id": "cable-mixer-4-outside-the-assemblies-out-2",
@@ -3030,8 +2831,7 @@
               "from": { "type": "mixer", "loose": true },
               "fromPort": "out",
               "to": { "type": "output" },
-              "toPort": "r",
-              "label": "Cable Mixer out → Output r"
+              "toPort": "r"
             },
             {
               "id": "set-mixer-4-outside-the-assemblies-s-l1-",
@@ -3039,8 +2839,7 @@
               "ref": { "type": "mixer", "loose": true },
               "param": "l1",
               "op": "eq",
-              "value": 0.9,
-              "label": "Set Mixer l1 to 0.9"
+              "value": 0.9
             },
             {
               "id": "set-mixer-4-outside-the-assemblies-s-l3-",
@@ -3048,8 +2847,7 @@
               "ref": { "type": "mixer", "loose": true },
               "param": "l3",
               "op": "eq",
-              "value": 0.4,
-              "label": "Set Mixer l3 to 0.4"
+              "value": 0.4
             },
             {
               "id": "remove-the-old-cable-hat-out-out-output-",
@@ -3057,8 +2855,7 @@
               "from": { "role": "hatOut" },
               "fromPort": "out",
               "to": { "type": "output" },
-              "toPort": "l",
-              "label": "Remove the old cable Hat out → Output l (click it)"
+              "toPort": "l"
             }
           ]
         },
@@ -3066,7 +2863,7 @@
           "id": "beats",
           "kind": "task",
           "title": "Place the backbeat",
-          "text": "Build the beat below: three Sequencers replace the divider gates. At 120 bpm, kick lands on beats 1 and 3, snare on 2 and 4, and hats on each beat. A step at −1 is a rest; 0 is a hit. Optional: change one rest into an extra hit and listen to the push it creates.",
+          "text": "[Build the beat below](req:build-three-drum-sequencers): three Sequencers replace the divider gates. At 120 bpm, kick lands on beats 1 and 3, snare on 2 and 4, and hats on each beat. A step at −1 is a rest; 0 is a hit. Optional: change one rest into an extra hit and listen to the push it creates.",
           "why": "Each Sequencer receives the same 4 Hz clock. Its gate triggers one drum. The engine advances on the first tick, so the first sounding slot is s2; s1 is the last eighth of the bar.",
           "listen": true,
           "superseded": true,
@@ -3078,7 +2875,7 @@
           "id": "performance",
           "kind": "task",
           "title": "An eight-bar miniature",
-          "text": "Build the arrangement below, adding steady eighth-note hats. Bars 1–2 establish your beat; 3–6 add your saved Pluck melody; bar 7 opens the hats for a flourish; bar 8 returns to the beat. It repeats every 16 seconds at 120 bpm. Change the kick Sequencer’s hit values to change the melody; expand Eight-bar arrangement to change the form; your patch stores the performance.",
+          "text": "[Build the arrangement below](req:build-the-eight-bar-arrangement-with-plu), adding steady eighth-note hats. Bars 1–2 establish your beat; 3–6 add your saved Pluck melody; bar 7 opens the hats for a flourish; bar 8 returns to the beat. It repeats every 16 seconds at 120 bpm. Change the kick Sequencer’s hit values to change the melody; expand Eight-bar arrangement to change the form; your patch stores the performance.",
           "why": "One divider ticks once per bar. A slow Sequencer brings in the melody and lengthens the hat tail for a flourish. The same clock drives the notes and the form. If you skipped Pluck, the bundled instrument stands in for it.",
           "listen": true,
           "parts": [
@@ -3089,7 +2886,7 @@
           "id": "share",
           "kind": "task",
           "title": "Share it",
-          "text": "Commands → Share patch link copies a link to this patch to your clipboard. Anyone who opens it gets the beat, your Pluck instrument and the eight-bar arrangement. Name and save a personal variation at the finish.",
+          "text": "[Commands → Share patch link](req:copy-a-share-link-commands-share-patch-l) copies a link to this patch to your clipboard. Anyone who opens it gets the beat, your Pluck instrument and the eight-bar arrangement. Name and save a personal variation at the finish.",
           "why": "",
           "parts": [
             { "id": "copy-a-share-link-commands-share-patch-l", "kind": "event", "event": "shares" }

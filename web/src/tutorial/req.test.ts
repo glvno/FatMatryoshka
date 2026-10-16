@@ -34,9 +34,6 @@ describe('a step with placed requirements', () => {
     addModule(p, DEFS.lfo, 0, 0);
     expect(compiled.met!(headlessState(p))).toEqual({ lfo: true, vca: false, quiet: true, loose: false });
   });
-  it('lists only unplaced, visible, unmet requirements as leftovers', () => {
-    expect(compiled.unplaced!(headlessState(p))).toEqual(['Add an ADSR']);
-  });
   it('points at the first unmet requirement in reading order', () => {
     const fresh = newPatch(DEFS);
     expect(compiled.focus!(headlessState(fresh))).toEqual([{ kind: 'ui', id: 'add-btn' }]);
@@ -56,5 +53,12 @@ describe('the validator and req links', () => {
     expect(msgs).toMatch(/places "no-such-part"/);
     expect(msgs).toMatch(/Why cannot hold requirements/);
     expect(msgs).toMatch(/A Continue step has no requirements to place/);
+  });
+  it('requires every requirement to be placed in the text unless it is hidden', () => {
+    const c = structuredClone(COURSE);
+    const task = c.chapters[0].steps.find((s) => s.id === 'vca')!;
+    task.text = task.text.replace(/\[([^\]]*)\]\(req:add-a-vca\)/, '$1');
+    const errors = validateCourse(c).errors.filter((e) => e.step === 'vca').map((e) => e.message);
+    expect(errors).toEqual(['Requirement "add-a-vca" is not placed in the text: place it, or mark it hidden']);
   });
 });
