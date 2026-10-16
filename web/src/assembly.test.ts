@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
+import { deviceBudget } from './patchbin';
 import {
   stripPatchIO,
   bypassAssembly,
@@ -230,12 +231,12 @@ describe('assemblies', () => {
     void out;
   });
 
-  it('refuses an insert past the module cap', () => {
+  it('inserts past the FM-1 module limit (the budget meter counts it, the editor does not stop)', () => {
     const def = FACTORY.find((d) => d.name === 'voice')!;
     const p = emptyPatch();
-    for (let i = 0; i < 6; i++) insertAssembly(p, DEFS, def, 0, 0); // 30 modules
-    expect(() => insertAssembly(p, DEFS, def, 0, 0)).toThrow(/at most 32/);
-    expect(p.modules).toHaveLength(30);
+    for (let i = 0; i < 7; i++) insertAssembly(p, DEFS, def, 0, 0);
+    expect(p.modules).toHaveLength(35);
+    expect(deviceBudget(p).over.map((i) => i.key)).toContain('modules');
   });
 
   it('a new patch is Main and Output, unwired, on the grid; the model still allows a bare patch', () => {
@@ -266,7 +267,7 @@ describe('assemblies', () => {
     expect(d.inputs.map((r) => r.label)).toEqual(['gate']);
     expect(d.outputs.map((r) => r.label)).toEqual(['out']);
     expect(d.params.map((r) => r.label)).toEqual(['cut']);
-    expect(() => validateAssemblyDef({ format: 'modular-1-assembly', version: 1, name: 'io only', modules: [{ id: 1, type: 'fm1', x: 0, y: 0, params: {} }], cables: [], inputs: [], outputs: [], params: [] }, DEFS)).toThrow(/1 to 32/);
+    expect(() => validateAssemblyDef({ format: 'modular-1-assembly', version: 1, name: 'io only', modules: [{ id: 1, type: 'fm1', x: 0, y: 0, params: {} }], cables: [], inputs: [], outputs: [], params: [] }, DEFS)).toThrow(/at least one module/);
   });
 
   it('every factory assembly sits on one of the browser shelves', () => {
@@ -319,7 +320,7 @@ describe('assemblies', () => {
   it('rejects bad definitions', () => {
     expect(() => validateAssemblyDef({ format: 'x' }, DEFS)).toThrow(/not a Matryoshka assembly/);
     const base = FACTORY[0];
-    expect(() => validateAssemblyDef({ ...base, modules: [{ id: 1, type: 'fm1', x: 0, y: 0, params: {} }], cables: [] }, DEFS)).toThrow(/1 to 32/) /* the Main panel is stripped, nothing is left */;
+    expect(() => validateAssemblyDef({ ...base, modules: [{ id: 1, type: 'fm1', x: 0, y: 0, params: {} }], cables: [] }, DEFS)).toThrow(/at least one module/) /* the Main panel is stripped, nothing is left */;
     expect(() => validateAssemblyDef({ ...base, inputs: [{ module: 1, port: 'nope' }] }, DEFS)).toThrow(/does not exist/);
     expect(() => validateAssemblyDef({ ...base, params: [{ module: 1, param: 'nope' }] }, DEFS)).toThrow(/does not exist/);
   });
@@ -456,14 +457,14 @@ describe('assemblies', () => {
     outer.open = true;
     expect(hiddenModules(p)).toEqual(new Set([e1, e2]));
     expect(hiddenAssemblies(p).size).toBe(0);
-    // cycles, double parents and the depth cap are refused
+    // cycles and double parents are refused; nesting has no depth limit
     expect(childProblem(p, inner, outer.id)).toMatch(/already inside/);
     expect(childProblem(p, outer, outer.id)).toMatch(/itself/);
     const third = makeAssembly(p, [vca], 'amp');
     expect(parentOf(p, third.id)).toBe(outer);
     expect(() => makeAssembly(p, [e1], 'deep')).not.toThrow(); // level 3
-    expect(() => makeAssembly(p, [e1], 'deeper')).toThrow(/at most 3/);
-    expect(() => addChild(p, third, inner.id)).toThrow(/at most 3/); // inner spans two levels, under "amp" that would be four
+    expect(() => makeAssembly(p, [e1], 'deeper')).not.toThrow(); // level 4
+    expect(() => addChild(p, third, inner.id)).not.toThrow();
   });
 
   it('nests by addChild / removeChild, moves, saves and inserts the tree, and ungroup / delete keep the children', () => {

@@ -180,6 +180,7 @@ export function morphValue(pd: ParamDef, a: number, b: number, t: number): numbe
   return paramValue(pd, paramUnit(pd, a) + (paramUnit(pd, b) - paramUnit(pd, a)) * t);
 }
 
+/** the FM-1's module limit per patch (ENG_MAX_MODULES): the budget meter counts against it, the editor does not stop at it */
 export const MAX_MODULES = 32;
 
 /**
@@ -187,7 +188,7 @@ export const MAX_MODULES = 32;
  * own allocator hands the notes to the parts. assign / legato / priority index ASSIGN_MODES / LEGATO_MODES / PRIORITIES.
  */
 export interface PolyCfg {
-  /** 1 .. MAX_PARTS */
+  /** 1 .. EDITOR_MAX_PARTS (the FM-1 plays up to MAX_PARTS) */
   parts: number;
   /** 0 rotate, 1 lowest free, 2 reuse (a free part whose last note was the key) */
   assign: number;
@@ -198,7 +199,9 @@ export interface PolyCfg {
   /** 0 .. MAX_UNIT: which instrument of the model; reseeds the Random modules inside */
   unit: number;
 }
+/** the FM-1's part limit (POLY_MAX_PARTS in defs.h); the editor and the browser engine go up to EDITOR_MAX_PARTS */
 export const MAX_PARTS = 8;
+export const EDITOR_MAX_PARTS = 16;
 export const MAX_UNIT = 63;
 export const POLY_DEFAULT: PolyCfg = { parts: 4, assign: 0, legato: 0, priority: 0, unit: 0 };
 
@@ -209,7 +212,7 @@ export function fixPoly(raw: unknown): PolyCfg {
     const v = Math.round(Number(r[k]));
     return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : POLY_DEFAULT[k];
   };
-  return { parts: int('parts', 1, MAX_PARTS), assign: int('assign', 0, 2), legato: int('legato', 0, 2), priority: int('priority', 0, 2), unit: int('unit', 0, MAX_UNIT) };
+  return { parts: int('parts', 1, EDITOR_MAX_PARTS), assign: int('assign', 0, 2), legato: int('legato', 0, 2), priority: int('priority', 0, 2), unit: int('unit', 0, MAX_UNIT) };
 }
 
 export function emptyPatch(name = 'init'): Patch {
@@ -298,7 +301,6 @@ export function fixMatrix(m: ModuleInst, def: ModuleDef): void {
 }
 
 export function addModule(p: Patch, def: ModuleDef, x: number, y: number): ModuleInst {
-  if (p.modules.length >= MAX_MODULES) throw new Error(`a patch holds at most ${MAX_MODULES} modules`);
   const m: ModuleInst = { id: nextId(p), type: def.type, x, y, params: defaultParams(def) };
   fixMatrix(m, def);
   p.modules.push(m);
@@ -363,7 +365,6 @@ export function processingOrder(p: Patch): { order: number[]; feedback: Set<Cabl
 export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Patch {
   const p = raw as Omit<Patch, 'version'> & { version: number };
   if (!p || (p.version !== 1 && p.version !== 2) || !Array.isArray(p.modules) || !Array.isArray(p.cables)) throw new Error('not a Matryoshka patch');
-  if (p.modules.length > MAX_MODULES) throw new Error(`more than ${MAX_MODULES} modules`);
   const seen = new Set<number>();
   for (const m of p.modules) {
     if (m.type === 'midi') m.type = 'fm1'; // the MIDI module is gone: the FM-1 panel has the same pitch / gate / vel outputs

@@ -24,9 +24,11 @@
       <div class="patch-controls">
         <button id="new-patch-btn">New patch</button>
         <input id="patch-name" aria-label="Patch name" title="Rename patch" />
+        <details id="budget" class="budget"><summary title="How much of the FM-1 this patch uses"><span class="budget-name">FM-1</span><span class="budget-bar"><span></span></span><span class="budget-pct"></span></summary><div class="budget-list"></div></details>
         <button id="add-btn" class="primary">+ Add module</button>
         <button id="add-assembly-btn" class="primary">+ Add assembly</button>
         <button id="tidy-btn" title="Line the cards up in columns, keeping their order (undo with Ctrl/Cmd+Z)">Tidy up</button>
+        <label class="slack-row" title="How far the cables sag: taut at the left, droopy at the right">Cable slack<input id="slack-input" type="range" min="0" max="1" step="0.05" value="0" aria-label="Cable slack" /></label>
         <button id="tour-btn">Tutorial ↗</button>
         <label class="example-picker">Examples<select id="preset" aria-label="Load an example"></select></label>
       </div>
@@ -55,6 +57,7 @@
     <section id="tab-flash" class="tab" aria-label="Flash firmware" hidden></section>
     <section id="tab-about" class="tab" aria-label="About Matryoshka" hidden></section>
     </main>
+    <div id="wheels" class="wheels" role="group" aria-label="Wheels"></div>
     <div class="dock-wrap"><div id="dock" class="dock" role="group" aria-label="Main"></div><svg class="dock-cables cables" aria-hidden="true"></svg></div>
     <footer id="deck" class="deck" aria-label="Performance">
       <div class="deck-row">
@@ -96,10 +99,11 @@
           <tr><td>click a jack, then another</td><td>connect (Esc cancels); drag works as before</td></tr>
           <tr><td>Internal cables</td><td>your own routes (coloured): click to disconnect; drag a side input to a slider thumb to add one. Grey routes are built into the module</td></tr>
           <tr><td>Drag a slider / Alt-drag</td><td>adjust its value / patch its input; drop an output cable onto its thumb to connect</td></tr>
-          <tr><td>Delete / Backspace</td><td>remove the selected modules</td></tr>
+          <tr><td>Delete / Backspace</td><td>remove the selected modules and assemblies</td></tr>
           <tr><td>B</td><td>bypass / unbypass the selected modules</td></tr>
           <tr><td>Ctrl/Cmd+G</td><td>group the selection into an assembly</td></tr>
-          <tr><td>Ctrl/Cmd+D</td><td>duplicate the selected modules with their settings and cables</td></tr>
+          <tr><td>Ctrl/Cmd+A</td><td>select every module and assembly on the canvas</td></tr>
+          <tr><td>Ctrl/Cmd+D</td><td>duplicate the selection with its settings and the cables among it</td></tr>
           <tr><td>Arrows (Shift: ×10)</td><td>nudge the selected cards</td></tr>
           <tr><td>Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z</td><td>undo, redo</td></tr>
           <tr><td>Alt+B</td><td>flip between the A and B snapshots</td></tr>

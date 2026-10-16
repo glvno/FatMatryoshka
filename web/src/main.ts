@@ -16,7 +16,6 @@ import { DeckControls } from './deck';
 import { releaseFocusAfterPointer } from './focus';
 import { DEFS } from './modules';
 import { newPatch, validatePatch, type Patch } from './patch';
-import { polyGroups } from './poly';
 import { ARP_DEFAULT } from './arp';
 import { Scope } from './scope';
 import { diffCount, diffLines, diffPatches } from './diff';
@@ -28,7 +27,7 @@ import { Tutorial } from './tutorial/tutorial';
 import { synthLink } from './tutorial/link';
 import { CHAPTERS, LISTED, chapterEnd } from './tutorial/chapters';
 import { PRESETS } from './presets';
-import { deviceBudget, DEVICE } from './patchbin';
+import { deviceBudget } from './patchbin';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const STORE = 'modular-1.patch';
@@ -65,7 +64,9 @@ const queueSave = (p: Patch): void => {
 };
 
 const device = new DeviceLink();
-const live = (): boolean => device.connected && $<HTMLInputElement>('dev-live').checked;
+/** the patch fits the FM-1 (deviceBudget); one that does not plays only in the browser and is never sent */
+let fitsDevice = true;
+const live = (): boolean => device.connected && $<HTMLInputElement>('dev-live').checked && fitsDevice;
 let uploadTimer = 0;
 let uploading = false;
 let dirty = false;
@@ -74,10 +75,14 @@ const devStatus = (s: string): void => {
 };
 device.onStatus = devStatus;
 /** upload the current patch; changes made meanwhile cause one more upload */
-async function sendPatch(): Promise<void> {
+async function sendPatch(): Promise<boolean> {
+  if (!fitsDevice) {
+    devStatus('over the FM-1 budget: not sent (the meter under the patch name says what is over)');
+    return false;
+  }
   if (uploading) {
-    dirty = true;
-    return;
+    dirty = true; // the upload under way sends it
+    return true;
   }
   uploading = true;
   try {
@@ -90,9 +95,11 @@ async function sendPatch(): Promise<void> {
     } while (dirty);
   } catch (e) {
     devStatus(`${(e as Error).message}`);
+    return false;
   } finally {
     uploading = false;
   }
+  return true;
 }
 const queueUpload = (): void => {
   clearTimeout(uploadTimer);
@@ -146,8 +153,8 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
     scope.clearSamples();
     host.setPatch(p);
     queueSave(p);
+    showBudget();
     if (live()) queueUpload();
-    if (polyGroups(p).length) showVoices();
   },
   onAtt(id, index, value) {
     host.send({ t: 'att', id, index, value });
@@ -213,10 +220,12 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   },
   morphCandidates: patchCandidates,
 }, $('dock'));
-// the wheels live in the dock, each under its output's jack; the octave buttons under the outputs
+// the wheels stand beside the keyboard, each under its output's jack; the octave buttons under the dock's outputs
+editor.wheelHost = $('wheels');
 editor.dockWheels = hands.wheels;
 editor.dockOctave = piano.octaveControls;
 editor.rebuild();
+showBudget();
 snapshotCandidates = () => editor.snapshots.B ? [{ name: 'Snapshot B', patch: { ...JSON.parse(editor.snapshots.B) as Patch, name: 'Snapshot B' } }] : [];
 host.setPatch(editor.patch);
 const tutorial = new Tutorial({
@@ -273,11 +282,37 @@ nameInput.oninput = () => {
   editor.patch.name = nameInput.value;
   queueSave(editor.patch);
 };
-/** the voice count is set on the Main module's card (editor.ts); here only the FM-1 budget warning */
-const showVoices = (): void => {
+/** the FM-1 budget meter under the patch name: the fullest limit as a bar, every limit in the list it opens */
+function showBudget(): void {
   const b = deviceBudget(editor.patch);
-  if (!b.fits) status.textContent = `too big for the FM-1: ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} instances (fewer parts or modules)`;
-};
+  const was = fitsDevice;
+  fitsDevice = b.fits;
+  const el = $('budget');
+  el.classList.toggle('over', !b.fits);
+  el.classList.toggle('near', b.fits && b.use > 0.8);
+  const pct = Math.round(b.use * 100);
+  el.querySelector<HTMLElement>('.budget-bar > span')!.style.width = `${Math.min(100, pct)}%`;
+  el.querySelector('.budget-pct')!.textContent = b.fits ? `${pct} %` : 'over';
+  el.querySelector('summary')!.title = b.fits ? `Fits the FM-1: the fullest limit is ${pct} % used. Open for every limit.` : `Over the FM-1 budget (${b.over.map((i) => i.label).join(', ')}): it plays here in the browser, the FM-1 cannot load it.`;
+  const list = el.querySelector('.budget-list')!;
+  list.replaceChildren(...b.items.filter((i) => i.used > 0).map((i) => {
+    const row = document.createElement('div');
+    row.className = 'budget-item' + (i.used > i.max ? ' over' : '');
+    const name = document.createElement('span');
+    name.textContent = i.label;
+    const n = document.createElement('span');
+    n.textContent = `${i.used} / ${i.max}`;
+    row.append(name, n);
+    return row;
+  }));
+  if (!b.fits) {
+    const note = document.createElement('p');
+    note.className = 'muted';
+    note.textContent = 'Plays in the browser. The FM-1 cannot load it: Send, Store and Live stay off, and the Library keeps it under "Over budget".';
+    list.append(note);
+  }
+  if (was && !b.fits && device.connected) devStatus('over the FM-1 budget: Live paused until the patch fits');
+}
 const browser = new AssemblyBrowser((d) => { switchTab('patch'); editor.insert(d); });
 
 // ---- diff against the baseline (the patch as last loaded, uploaded or stored) and A / B
@@ -340,6 +375,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Redo', detail: 'Shift+Ctrl/Cmd+Z', run: inPatch(() => editor.redo()) },
     { kind: 'command', label: 'Make assembly from the selection', detail: 'Ctrl/Cmd+G', run: inPatch(() => editor.makeAssembly()) },
     { kind: 'command', label: 'Browse assembly library', run: () => browser.open() },
+    { kind: 'command', label: 'Select all', detail: 'Ctrl/Cmd+A', keywords: 'everything modules assemblies', run: inPatch(() => editor.selectAll()) },
     { kind: 'command', label: 'Duplicate selection', detail: 'Ctrl/Cmd+D', run: inPatch(() => editor.duplicateSelected()) },
     { kind: 'command', label: 'Delete selection', detail: 'Delete', run: inPatch(() => editor.removeSelected()) },
     { kind: 'command', label: 'Bypass selection', detail: 'B', run: inPatch(() => editor.bypassSelected()) },
@@ -357,6 +393,9 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Scope: waveform', keywords: 'oscilloscope time', run: inPatch(() => scope.setMode('time')) },
     { kind: 'command', label: 'Scope: spectrum', keywords: 'oscilloscope frequency fft', run: inPatch(() => scope.setMode('spectrum')) },
     { kind: 'command', label: 'Tidy up the canvas', keywords: 'clean up arrange align layout grid', run: inPatch(() => editor.tidyUp()) },
+    { kind: 'command', label: 'Cables: taut', keywords: 'slack sag tight straight', run: inPatch(() => setSlack(0)) },
+    { kind: 'command', label: 'Cables: loose', keywords: 'slack sag droop hang', run: inPatch(() => setSlack(0.5)) },
+    { kind: 'command', label: 'Cables: droopy', keywords: 'slack sag droop hang heavy', run: inPatch(() => setSlack(1)) },
     { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },
     { kind: 'command', label: 'Reset canvas scale', keywords: 'zoom 100%', run: inPatch(() => editor.setZoom(1)) },
     ...Object.values(DEFS).filter((d) => d.type !== 'fm1').map((d) => ({ kind: 'add module', tags: ['module'], label: moduleName(d.type, d.label), keywords: d.label, run: () => editor.add(d.type) })),
@@ -477,6 +516,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === '?') (help.showModal(), (done = true));
   else if (k === 'Escape') (editor.cancelArm(), editor.endPick(), (diffPanel.hidden = true), (done = true));
   else if (k === 'Delete' || k === 'Backspace') done = editor.removeSelected();
+  else if (mod && k.toLowerCase() === 'a') (editor.selectAll(), (done = true));
   else if (mod && k.toLowerCase() === 'd') done = editor.duplicateSelected();
   else if (e.altKey && k.toLowerCase() === 'b') (flipAB(), (done = true));
   else if (!mod && k.toLowerCase() === 'b') done = editor.bypassSelected();
@@ -493,6 +533,25 @@ window.addEventListener('keydown', (e) => {
     e.stopImmediatePropagation();
   }
 }, true);
+// cable slack: a sidebar slider and palette commands, remembered per browser
+const SLACK = 'matryoshka.cable-slack';
+const slackInput = $<HTMLInputElement>('slack-input');
+function setSlack(v: number): void {
+  editor.setSlack(v);
+  slackInput.value = String(editor.slack);
+  try {
+    localStorage.setItem(SLACK, String(editor.slack));
+  } catch {
+    /* storage blocked: the slack lasts until the page is reloaded */
+  }
+}
+slackInput.oninput = () => setSlack(Number(slackInput.value));
+try {
+  const v = Number(localStorage.getItem(SLACK) ?? 0);
+  if (v > 0) setSlack(v);
+} catch {
+  /* storage blocked: taut cables */
+}
 $('panic-btn').onclick = () => { tutorial.stop(); host.mute(true); sink.send({ t: 'panic' }); };
 
 // the deck's Arp button, Space and the Main card's arpeggiator box are one switch
@@ -558,7 +617,7 @@ $('dev-live').onchange = () => {
 };
 $('dev-store').onclick = async () => {
   try {
-    await sendPatch();
+    if (!(await sendPatch())) return;
     await device.store();
     setBaseline();
     devStatus('stored: the FM-1 starts with this patch');
@@ -662,10 +721,10 @@ sidebarDismiss.onclick = closeSidebar;
 compactWorkspace.addEventListener('change', closeSidebar);
 
 // tabs
-buildBankTab($('tab-library'), device, () => editor.patch, (msg) => {
+const refreshBank = buildBankTab($('tab-library'), device, () => editor.patch, (msg) => {
   devStatus(msg);
   for (const id of ['dev-live', 'dev-send', 'dev-store']) $<HTMLInputElement>(id).disabled = false;
-});
+}, (p) => loadNamed(p));
 refreshAssemblies = buildAssembliesTab($('tab-library'), {
   insert(def) {
     document.querySelector<HTMLButtonElement>('#tabs button[data-tab="patch"]')?.click();
@@ -696,6 +755,7 @@ const switchTab = (name: string): void => {
   for (const tab of document.querySelectorAll<HTMLElement>('.tab')) tab.hidden = tab.id !== `tab-${name}`;
   document.querySelector<HTMLElement>('.patch-controls')!.hidden = name !== 'patch';
   if (name === 'patch') requestAnimationFrame(() => editor.drawCables());
+  if (name === 'library') refreshBank();
 };
 for (const b of document.querySelectorAll<HTMLButtonElement>('#tabs button')) {
   b.onkeydown = (e) => {

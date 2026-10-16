@@ -5,7 +5,7 @@
 // the inner ports it exposes and the inner parameters it promotes. Cables always run between inner ports, so the engine,
 // the voice split, the binary format and the FM-1 never see assemblies; an editor that does not know the overlay loads
 // the same patch and only loses the grouping. An assembly holds plain modules and, nested, other assemblies (`children`,
-// up to MAX_DEPTH levels), never the FM-1 panel or an Output. A container input may fan out to several inner inputs
+// to any depth), never the FM-1 panel or an Output. A container input may fan out to several inner inputs
 // (`PortRef.also`: one "gate" jack for two envelopes). A saved assembly (`AssemblyDef`, one JSON file) is a small patch of
 // its own: every module inside with local ids, the cables between them, the nested assemblies, the exposed ports and
 // promoted parameters.
@@ -15,7 +15,6 @@ import {
   fixMatrix,
   fixPoly,
   fixInputRoutes,
-  MAX_MODULES,
   removeModule,
   sameEnd,
   type Cable,
@@ -131,8 +130,9 @@ export interface AssemblyDef extends AssemblyLayout {
 export const ASSEMBLY_FORMAT = 'modular-1-assembly';
 /** module types that cannot be members: the one panel and the output are the patch's own */
 export const EXCLUDED_TYPES = new Set(['fm1', 'output']);
-/** how deep assemblies nest: a top-level assembly is level 1 */
-export const MAX_DEPTH = 3;
+/** how deep assemblies nest (a top-level assembly is level 1): no limit the user meets (the FM-1 never sees assemblies);
+ * only a guard for the walks up the tree */
+export const MAX_DEPTH = 64;
 const KNOBS = ['k1', 'k2', 'k3', 'k4'] as const;
 
 export const assembliesOf = (p: Patch): AssemblyInst[] => p.assemblies ?? [];
@@ -740,7 +740,6 @@ export function toDef(p: Patch, a: AssemblyInst): AssemblyDef {
 
 /** put a saved assembly into the patch, collapsed at (x, y), with fresh module and assembly ids */
 export function insertAssembly(p: Patch, defs: Record<string, ModuleDef>, def: AssemblyDef, x: number, y: number): AssemblyInst {
-  if (p.modules.length + def.modules.length > MAX_MODULES) throw new Error(`"${def.name}" does not fit: a patch holds at most ${MAX_MODULES} modules`);
   const fresh = new Map<number, number>();
   for (const src of def.modules) {
     const m = addModule(p, defs[src.type], x + src.x, y + src.y);
@@ -852,7 +851,7 @@ export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef
   delete d.size; delete d.frameSize;
   Object.assign(d, layout);
   stripPatchIO(d); // a patch's own modules never belong to a building block
-  if (d.modules.length > MAX_MODULES || !d.modules.length) throw new Error('an assembly holds 1 to 32 modules');
+  if (!d.modules.length) throw new Error('an assembly holds at least one module');
   migrateDefDrift(d, defs);
   if (d.category !== undefined && typeof d.category !== 'string') delete d.category;
   if (d.tutorial !== undefined && typeof d.tutorial !== 'string') delete d.tutorial;

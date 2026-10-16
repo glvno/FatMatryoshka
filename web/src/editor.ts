@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Patch editor: module cards on a canvas, SVG cables, drag-to-connect, a selection, assemblies and undo.
 import { resizeHandle } from './resize-handle';
-import { tidy } from './tidy';
+import { tidy, tidyAssembly } from './tidy';
 import { DEFS } from './modules';
 import { parameterInputs, connectParameter, setInputRoute } from './parameter-routing';
 import { parameterMenu } from './parameter-menu';
@@ -30,7 +30,7 @@ import {
   type Patch,
   type PortDef,
   type ParamDef,
-  MAX_PARTS,
+  EDITOR_MAX_PARTS,
   MAX_UNIT,
   type PolyCfg,
   sameStructure,
@@ -155,6 +155,12 @@ export class Editor {
   patch: Patch;
   /** the selected modules (shift-click or a rubber band); "Make assembly" groups them, dragging one moves all */
   readonly selected = new Set<number>();
+  /** the selected assemblies (collapsed cards and expanded frames): they move, duplicate and delete with the modules */
+  readonly selectedAsm = new Set<number>();
+  /** assemblies expanded in this session: the first expansion tidies the inside (#37) */
+  private expandedOnce = new Set<number>();
+  /** how far cables sag, 0 (taut, the default) .. 1 */
+  slack = 0;
   private modulesEl: HTMLElement;
   private svg: SVGSVGElement;
   private preview: SVGSVGElement;
@@ -236,6 +242,8 @@ export class Editor {
     this.routingOpen.clear();
     this.stack = [];
     this.selected.clear();
+    this.selectedAsm.clear();
+    this.expandedOnce.clear();
     this.rebuild();
     this.ev.onStructure(p);
   }
@@ -274,15 +282,22 @@ export class Editor {
 
   /** group the selected modules into a new assembly */
   makeAssembly(): void {
-    if (!this.selected.size) return this.ev.onError('select the modules first: shift-click them, or drag a box on the canvas');
+    const set = this.dragSet();
+    if (!set.mods.length && !set.asms.length) return this.ev.onError('select the modules first: shift-click them, or drag a box on the canvas');
     // a patch's own modules never go into a building block: they stay outside, the rest is grouped
-    const ids = [...this.selected].filter((id) => !EXCLUDED_TYPES.has(this.patch.modules.find((m) => m.id === id)?.type ?? ''));
-    if (!ids.length) return this.ev.onError('the Main panel and the Output stay outside an assembly: select other modules');
+    const ids = set.mods.filter((m) => !EXCLUDED_TYPES.has(m.type)).map((m) => m.id);
+    if (!ids.length) return this.ev.onError(set.asms.length ? 'select at least one module with the assemblies: they go inside the new one' : 'the Main panel and the Output stay outside an assembly: select other modules');
     const name = window.prompt('Name of the assembly', 'assembly')?.trim();
     if (!name) return;
-    if (this.change(() => makeAssembly(this.patch, ids, name))) {
+    const kept = ids.length < set.mods.length;
+    // selected assemblies become children of the new one
+    if (this.change(() => {
+      const made = makeAssembly(this.patch, ids, name);
+      for (const a of set.asms) addChild(this.patch, made, a.id);
+    })) {
       this.selected.clear();
-      if (ids.length < this.selected.size + ids.length) this.ev.onError('Main and Output stay outside');
+      this.selectedAsm.clear();
+      if (kept) this.ev.onError('Main and Output stay outside');
     }
   }
 
@@ -312,6 +327,7 @@ export class Editor {
   /** select exactly these modules */
   selectOnly(ids: number[]): void {
     this.selected.clear();
+    this.selectedAsm.clear();
     for (const id of ids) this.selected.add(id);
     this.rebuild();
   }
@@ -319,6 +335,7 @@ export class Editor {
   private restore(s: string): void {
     this.patch = JSON.parse(s) as Patch;
     this.selected.clear();
+    this.selectedAsm.clear();
     this.rebuild();
     this.ev.onStructure(this.patch);
   }
@@ -378,10 +395,12 @@ export class Editor {
       return root ? root.poly!.parts : 0;
     };
     for (const id of this.selected) if (!this.patch.modules.some((m) => m.id === id) || hidden.has(id)) this.selected.delete(id);
+    for (const id of this.selectedAsm) if (!assembliesOf(this.patch).some((a) => a.id === id) || hiddenAsm.has(id)) this.selectedAsm.delete(id);
     // frames of the outer assemblies first: a nested frame is drawn on top of its parent's
     const visible = assembliesOf(this.patch).filter((a) => !hiddenAsm.has(a.id));
     for (const a of [...visible].sort((u, v) => depthOf(this.patch, u) - depthOf(this.patch, v))) if (a.open) this.modulesEl.append(this.frame(a, perVoice(a)));
     const docked = this.docked();
+    this.wheelHost?.replaceChildren();
     this.dock?.replaceChildren(...(docked ? [this.dockPanel(docked)] : []));
     for (const m of this.patch.modules) {
       if (hidden.has(m.id) || m === docked) continue;
@@ -474,6 +493,8 @@ export class Editor {
   private dockArpOpen = false;
   /** the deck's bend and modulation wheels, placed in the dock under Main's jacks (set by the host, then rebuild) */
   dockWheels: { bend: HTMLElement; mod: HTMLElement } | null = null;
+  /** the column beside the keyboard, as tall as the dock and the keyboard together, that holds the wheels (set by the host) */
+  wheelHost: HTMLElement | null = null;
   /** the keyboard's octave buttons, shown under Main's output strip (set by the host, then rebuild) */
   dockOctave: HTMLElement | null = null;
 
@@ -512,7 +533,7 @@ export class Editor {
     const param = (name: string): HTMLElement => this.paramRow(m, def, def.params.find((pd) => pd.name === name)!);
     // outputs with a home next to the control or setting that makes them; the rest in the strip
     const wheels = this.dockWheels;
-    const WHEELS = wheels ? ['bend', 'mod'] : [], ARP = ['clock'];
+    const WHEELS = wheels && this.wheelHost ? ['bend', 'mod'] : [], ARP = ['clock'];
     const homed = [...WHEELS, ...ARP];
     const strip = jacks(def.outputs.map((p) => p.name).filter((n) => !isKnob(n) && !homed.includes(n)));
     const knobs = document.createElement('div');
@@ -528,15 +549,15 @@ export class Editor {
     const arp = this.arpPanel();
     arp.open = this.dockArpOpen;
     arp.ontoggle = () => (this.dockArpOpen = arp.open);
-    // the bend and modulation wheels (the deck's, kept across redraws) each under its output's jack
-    const wheelCol = wheels && (['bend', 'mod'] as const).map((n) => {
-      const box = document.createElement('div');
-      box.className = 'dock-wheel';
-      box.append(jacks([n]), wheels[n]);
-      return box;
-    });
+    // the bend and modulation wheels (the deck's, kept across redraws) each under its output's jack, in the column beside the keyboard
+    if (wheels && this.wheelHost)
+      this.wheelHost.replaceChildren(...(['bend', 'mod'] as const).map((n) => {
+        const box = document.createElement('div');
+        box.className = 'dock-wheel';
+        box.append(jacks([n]), wheels[n]);
+        return box;
+      }));
     el.append(title,
-      ...(wheelCol ? [col('dock-wheels', null, ...wheelCol)] : []),
       col('dock-outputs', strip, ...(this.dockOctave ? [this.dockOctave] : [])),
       col('dock-knobs', null, knobs),
       col('dock-morph', null, morph, this.morphRow()),
@@ -560,6 +581,7 @@ export class Editor {
     if (perVoice) title.append(this.badge(perVoice));
     const tools = document.createElement('span');
     tools.className = 'tools';
+    if (open) tools.append(this.outButton(open, () => this.takeOutModule(open, m)));
     if (def.type !== 'fm1' && def.type !== 'output') tools.append(this.bypassButton(m, def, el));
     const menu = (at: Pt): void => this.contextMenu(m, def, at);
     tools.append(this.moreButton(menu));
@@ -892,7 +914,7 @@ export class Editor {
       return box;
     };
     const b = deviceBudget(this.patch);
-    const parts = item('parts', String, MAX_PARTS, 'parts', `How many copies of the modules inside run: one per note that can sound at once. ${b.fits ? `On the FM-1 this patch takes ${b.buffers} of ${DEVICE.buffers} signal buffers and ${b.instances} of ${DEVICE.instances} module instances.` : `Too big for the FM-1: ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} instances.`}`, 1);
+    const parts = item('parts', String, EDITOR_MAX_PARTS, 'parts', `How many copies of the modules inside run: one per note that can sound at once. ${b.fits ? `On the FM-1 this patch takes ${b.buffers} of ${DEVICE.buffers} signal buffers and ${b.instances} of ${DEVICE.instances} module instances.` : `Too big for the FM-1: ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} instances.`}`, 1);
     parts.querySelector('.picker')!.classList.toggle('over', !b.fits);
     el.append(
       parts,
@@ -955,14 +977,9 @@ export class Editor {
 
   /** Tidy up: line the cards up in columns, keeping their arrangement (tidy.ts); one undo step */
   tidyUp(): void {
-    const size = (el: HTMLElement | undefined): { w: number; h: number } => ({ w: el?.offsetWidth || CARD_W, h: el?.offsetHeight || CARD_H });
     const before = JSON.stringify(this.patch);
     const docked = this.docked();
-    tidy(this.patch, {
-      module: (id) => size(this.cards.get(id)),
-      container: (id) => size(this.containers.get(id)),
-      frame: (a) => ({ pad: FRAME_PAD, head: FRAME_HEAD + (a.poly ? POLY_STRIP : 0), minW: a.poly ? POLY_MIN_W : 0 }),
-    }, new Set(docked ? [docked.id] : []));
+    tidy(this.patch, this.tidySizes(), new Set(docked ? [docked.id] : []));
     if (JSON.stringify(this.patch) === before) return this.ev.onError('already tidy');
     this.history.push(before);
     if (this.history.length > HISTORY) this.history.shift();
@@ -970,6 +987,12 @@ export class Editor {
     this.rebuild();
     this.canvas.scrollTo(0, 0);
     this.ev.onLayout(this.patch);
+  }
+
+  /** how far the cables sag (0..1): redraws them */
+  setSlack(v: number): void {
+    this.slack = Math.min(1, Math.max(0, v));
+    this.positionCables();
   }
 
   /** every card in view: the zoom that fits the whole patch into the canvas */
@@ -1053,9 +1076,20 @@ export class Editor {
     ], at);
   }
 
-  /** expand or collapse an assembly */
+  /** the sizes Tidy up works with: the cards as drawn, a grid cell when one is not drawn */
+  private tidySizes(): Parameters<typeof tidy>[1] {
+    const size = (el: HTMLElement | undefined): { w: number; h: number } => ({ w: el?.offsetWidth || CARD_W, h: el?.offsetHeight || CARD_H });
+    return {
+      module: (id) => size(this.cards.get(id)),
+      container: (id) => size(this.containers.get(id)),
+      frame: (a) => ({ pad: FRAME_PAD, head: FRAME_HEAD + (a.poly ? POLY_STRIP : 0), minW: a.poly ? POLY_MIN_W : 0 }),
+    };
+  }
+
+  /** expand or collapse an assembly; its first expansion in a session tidies the inside once the cards have a size */
   private toggleOpen(a: AssemblyInst): void {
-    this.change(() => {
+    const first = !a.open && !this.expandedOnce.has(a.id);
+    const opened = this.change(() => {
       a.open = !a.open;
       if (a.open && overlapping(this.patch, a)) tileMembers(this.patch, a); // stacked cards (an old file, members added at one spot) spread out
       if (a.open && a.poly) makeRoom(this.patch, a);
@@ -1066,6 +1100,19 @@ export class Editor {
         if (Math.min(...ys) < room) moveAssembly(this.patch, a, 0, room - Math.min(...ys));
       }
     });
+    if (!opened || !a.open) return;
+    for (const x of [a, ...descendants(this.patch, a)]) this.expandedOnce.add(x.id);
+    if (!first) return;
+    // after rebuild's own frame (the cards are drawn then): part of the expansion's undo step, not one of its own
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const now = assembliesOf(this.patch).find((x) => x.id === a.id);
+      if (!now?.open) return;
+      const before = JSON.stringify(this.patch);
+      tidyAssembly(this.patch, now, this.tidySizes());
+      if (JSON.stringify(this.patch) === before) return;
+      this.rebuild();
+      this.ev.onLayout(this.patch);
+    }));
   }
 
   /** a header's ⋯: opens the card's menu under it */
@@ -1127,16 +1174,19 @@ export class Editor {
 
   /** remove the selected modules (and their cables) */
   removeSelected(): boolean {
-    const ids = [...this.selected];
-    if (!ids.length) return false;
+    const { mods, asms } = this.dragSet();
+    if (!mods.length && !asms.length) return false;
     return this.change(() => {
-      for (const id of ids) removeModule(this.patch, id);
+      for (const a of asms) deleteAssembly(this.patch, a.id);
+      for (const m of mods) if (this.patch.modules.includes(m)) removeModule(this.patch, m.id);
     });
   }
 
   /** flip the bypass of the selected modules (all on if any was off) */
   bypassSelected(): boolean {
-    const ms = this.patch.modules.filter((m) => this.selected.has(m.id) && m.type !== 'fm1' && m.type !== 'output');
+    const { mods, asms } = this.dragSet();
+    const inside = new Set(asms.flatMap((a) => allModules(this.patch, a)));
+    const ms = this.patch.modules.filter((m) => (mods.includes(m) || inside.has(m.id)) && m.type !== 'fm1' && m.type !== 'output');
     if (!ms.length) return false;
     const on = ms.some((m) => !m.bypass);
     this.history.push(JSON.stringify(this.patch));
@@ -1154,12 +1204,13 @@ export class Editor {
 
   /** move the selected cards by (dx, dy) pixels */
   nudgeSelected(dx: number, dy: number): boolean {
-    const ms = this.patch.modules.filter((m) => this.selected.has(m.id));
-    if (!ms.length) return false;
-    for (const m of ms) {
+    const set = this.dragSet();
+    if (!set.mods.length && !set.asms.length) return false;
+    for (const m of set.mods) {
       m.x = Math.max(0, m.x + dx);
       m.y = Math.max(0, m.y + dy);
     }
+    for (const a of set.asms) moveAssembly(this.patch, a, dx, dy);
     this.rebuild();
     this.ev.onLayout(this.patch);
     return true;
@@ -1167,9 +1218,15 @@ export class Editor {
 
   /** copies of the selected modules with their parameters, matrix and the cables among them, placed below the originals and selected */
   duplicateSelected(): boolean {
-    const ids = [...this.selected].filter((id) => this.patch.modules.some((m) => m.id === id && m.type !== 'fm1'));
-    if (!ids.length) return false;
+    const set = this.dragSet();
+    const ids = set.mods.filter((m) => m.type !== 'fm1').map((m) => m.id);
+    if (!ids.length && !set.asms.length) return false;
     return this.change(() => {
+      // a selected assembly is copied through its definition, collapsed, below where it is
+      const asmCopies = set.asms.map((a) => {
+        const box = a.open ? this.frameRect(a) : { x: a.x, y: a.y, h: this.containers.get(a.id)?.offsetHeight ?? CARD_H / 2 };
+        return insertAssembly(this.patch, DEFS, toDef(this.patch, a), box?.x ?? a.x, (box?.y ?? a.y) + Math.min(CARD_H / 2, (box?.h ?? 0) + 24)).id;
+      });
       const map = new Map<number, number>();
       for (const id of ids) {
         const m = this.patch.modules.find((x) => x.id === id)!;
@@ -1185,6 +1242,8 @@ export class Editor {
       for (const c of [...this.patch.cables]) if (map.has(c.from.module) && map.has(c.to.module)) connect(this.patch, DEFS, { module: map.get(c.from.module)!, port: c.from.port }, { module: map.get(c.to.module)!, port: c.to.port });
       this.selected.clear();
       for (const id of map.values()) this.selected.add(id);
+      this.selectedAsm.clear();
+      for (const id of asmCopies) this.selectedAsm.add(id);
     });
   }
 
@@ -1275,21 +1334,21 @@ export class Editor {
       refresh();
     };
     const rows: (() => void)[] = [];
-    const row = (label: string, el: HTMLElement, show: () => string): void => {
-      const r = document.createElement('label');
-      r.className = 'param';
+    // the rows look like a card's: a bar with the name at the left and the value at the right (paramRow)
+    const row = (label: string, cls: string, kids: HTMLElement[], show: () => void): void => {
+      const r = document.createElement('div');
+      r.className = `param bar ${cls}`;
       const name = document.createElement('span');
       name.textContent = label;
-      const val = document.createElement('output');
-      r.append(name, val, el);
-      rows.push(() => (val.textContent = show()));
+      r.append(name, ...kids);
+      rows.push(show);
       rowsEl.append(r);
     };
     const refresh = (): void => rows.forEach((f) => f());
     const choice = (label: string, f: keyof ArpCfg, names: string[]): void => {
       const value = document.createElement('span');
       const pick = picker({ label: `arpeggiator ${label}`, value, count: () => names.length, get: () => cfg()[f], set: (i) => set(f, i) });
-      row(label, pick, () => ((value.textContent = names[cfg()[f]] ?? ''), ''));
+      row(label, 'choice', [document.createElement('span'), pick], () => (value.textContent = names[cfg()[f]] ?? ''));
     };
     const num = (label: string, f: keyof ArpCfg, lo: number, hi: () => number, show: (v: number) => string = String): void => {
       const input = document.createElement('input');
@@ -1298,17 +1357,17 @@ export class Editor {
       input.step = '1';
       input.setAttribute('aria-label', `arpeggiator ${label}`);
       input.oninput = () => set(f, Number(input.value));
-      row(label, input, () => {
+      const bar = sliderJack(input, () => {});
+      bar.jack.classList.replace('slider-port', 'slider-thumb');
+      const val = document.createElement('output');
+      row(label, '', [val, bar.element], () => {
         input.max = String(hi());
         input.value = String(cfg()[f]);
-        return show(cfg()[f]);
+        val.textContent = show(cfg()[f]);
+        bar.update();
       });
     };
     // transport
-    const play = document.createElement('label');
-    play.className = 'param';
-    const pname = document.createElement('span');
-    pname.textContent = 'enable';
     const pbox = document.createElement('input');
     pbox.type = 'checkbox';
     pbox.checked = this.arpPlay;
@@ -1322,9 +1381,11 @@ export class Editor {
       this.ev.onArpPlay(this.arpPlay);
     };
     const pval = document.createElement('output');
-    pval.textContent = 'Hold keys to play';
-    play.append(pname, pval, pbox);
-    rowsEl.append(play);
+    pval.textContent = 'hold keys to play';
+    const line = document.createElement('label');
+    line.className = 'toggle-line';
+    line.append(pbox, pval);
+    row('enable', 'toggle', [document.createElement('span'), line], () => {});
     choice('mode', 'mode', ARP_MODES);
     num('bpm', 'bpm', 40, () => 300);
     choice('rate', 'rate', ARP_RATES);
@@ -1634,7 +1695,7 @@ export class Editor {
    */
   private container(a: AssemblyInst, perVoice: number, open?: AssemblyInst): HTMLElement {
     const el = document.createElement('div');
-    el.className = 'module assembly' + (open ? ' member' : '') + (a.bypass ? ' off' : '') + (this.picking(open) ? ' picking' : '');
+    el.className = 'module assembly' + (open ? ' member' : '') + (a.bypass ? ' off' : '') + (this.picking(open) ? ' picking' : '') + (this.selectedAsm.has(a.id) ? ' selected' : '');
     el.style.left = `${a.x}px`;
     el.style.top = `${a.y}px`;
     el.dataset.asm = String(a.id);
@@ -1643,6 +1704,7 @@ export class Editor {
     head.className = 'mhead';
     const tools = document.createElement('span');
     tools.className = 'tools';
+    if (open) tools.append(this.outButton(open, () => this.takeOutAssembly(open, a)));
     tools.append(...this.assemblyButtons(a));
     const title = this.titleOf(a, perVoice);
     title.prepend(this.tag(null));
@@ -1691,7 +1753,7 @@ export class Editor {
   /** the frame around an expanded assembly's cards, with its header; placed by layoutFrames() once the cards have a size */
   private frame(a: AssemblyInst, perVoice: number): HTMLElement {
     const el = document.createElement('div');
-    el.className = 'frame' + (a.bypass ? ' off' : '');
+    el.className = 'frame' + (a.bypass ? ' off' : '') + (this.selectedAsm.has(a.id) ? ' selected' : '');
     el.dataset.asm = String(a.id);
     const head = document.createElement('div');
     head.className = 'fhead';
@@ -1710,6 +1772,8 @@ export class Editor {
       el.append(strip);
     }
     this.frames.set(a.id, el);
+    const parent = parentOf(this.patch, a.id);
+    if (parent) tools.prepend(this.outButton(parent, () => this.takeOutAssembly(parent, a)));
     this.frameDrag(head, a);
     this.resizeAssembly(el, a);
     return el;
@@ -1819,68 +1883,125 @@ export class Editor {
     }
   }
 
-  private moduleDrag(handle: HTMLElement, m: ModuleInst): void {
-    let group: ModuleInst[] = [];
+  /**
+   * What a drag of the selection moves: the selected assemblies that are not inside another selected one (each with
+   * everything inside it) and the selected modules that none of those holds.
+   */
+  private dragSet(): { mods: ModuleInst[]; asms: AssemblyInst[] } {
+    const sel = assembliesOf(this.patch).filter((a) => this.selectedAsm.has(a.id));
+    const asms = sel.filter((a) => !sel.some((b) => b !== a && descendants(this.patch, b).some((d) => d.id === a.id)));
+    const covered = new Set(asms.flatMap((a) => allModules(this.patch, a)));
+    const mods = this.patch.modules.filter((m) => this.selected.has(m.id) && !covered.has(m.id));
+    return { mods, asms };
+  }
+
+  /** move a drag set by (dx, dy): model and elements; the frames follow (a member pushes its frame's edge out) */
+  private moveSet(set: { mods: ModuleInst[]; asms: AssemblyInst[] }, dx: number, dy: number): void {
+    for (const m of set.mods) this.place(m, dx, dy);
+    for (const a of set.asms) this.moveTree(a, dx, dy, false);
+    this.layoutFrames();
+    this.drawCables();
+  }
+
+  /** a press on a card's or frame's handle: shift toggles the item in the selection, else the drag takes the selection with it */
+  private groupDrag(handle: HTMLElement, item: { module?: ModuleInst; asm?: AssemblyInst }, drop: (set: { mods: ModuleInst[]; asms: AssemblyInst[] }) => void): void {
+    let set: { mods: ModuleInst[]; asms: AssemblyInst[] } = { mods: [], asms: [] };
     this.dragOn(
       handle,
       (e) => {
+        const on = item.module ? this.selected.has(item.module.id) : this.selectedAsm.has(item.asm!.id);
         if (e.shiftKey) {
-          this.toggleSelect(m.id);
+          if (item.module) this.toggleSelect(item.module.id);
+          else this.toggleSelectAsm(item.asm!.id);
           return false;
         }
-        if (!this.selected.has(m.id)) this.select([m.id]);
-        group = this.patch.modules.filter((x) => this.selected.has(x.id));
+        if (!on) this.select(item.module ? [item.module.id] : [], item.asm ? [item.asm.id] : []);
+        set = this.dragSet();
         return true;
       },
-      (dx, dy) => {
-        for (const x of group) this.place(x, dx, dy);
-        this.layoutFrames(new Set(group.map((x) => x.id)));
-        this.drawCables();
-      },
+      (dx, dy) => this.moveSet(set, dx, dy),
       () => {
         this.sizeCanvas();
         this.ev.onLayout(this.patch);
-        this.membership(group);
+        drop(set);
       },
     );
   }
 
-  /** after a drag: cards dropped into an expanded assembly's frame join it, members dragged out of theirs leave it */
-  private membership(moved: ModuleInst[]): void {
-    const movedIds = new Set(moved.map((m) => m.id));
-    const inside = (c: HTMLElement, r: Rect): boolean => {
-      const cx = c.offsetLeft + c.offsetWidth / 2;
-      const cy = c.offsetTop + HEAD_Y;
-      return cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
-    };
+  private moduleDrag(handle: HTMLElement, m: ModuleInst): void {
+    this.groupDrag(handle, { module: m }, (set) => this.dropped(set, true));
+  }
+
+  /**
+   * After a drag: modules and collapsed assemblies that belong to no assembly join the innermost expanded frame they are
+   * dropped into. A member never leaves its assembly by a drag (its frame grows to hold it): the ⇱ button takes it out.
+   */
+  private dropped(set: { mods: ModuleInst[]; asms: AssemblyInst[] }, nest: boolean): void {
+    const movedIds = new Set(set.mods.map((m) => m.id));
+    const moving = new Set(set.asms.flatMap((a) => [a.id, ...descendants(this.patch, a).map((d) => d.id)]));
     const ops: (() => void)[] = [];
-    for (const m of moved) {
-      const c = this.cards.get(m.id)!;
-      const mine = assemblyOf(this.patch, m.id);
-      if (mine) {
-        if (!mine.open) continue;
-        const r = this.frameRect(mine, movedIds);
-        if (r && !inside(c, r)) ops.push(() => removeMember(this.patch, mine, m.id));
-      } else {
-        let target: AssemblyInst | undefined;
-        for (const a of assembliesOf(this.patch)) {
-          if (!a.open || !this.frames.has(a.id)) continue;
-          const r = this.frameRect(a, movedIds);
-          if (r && inside(c, r) && (!target || depthOf(this.patch, a) > depthOf(this.patch, target))) target = a;
-        }
-        if (target) ops.push(() => addMember(this.patch, target!, m.id));
+    const innermost = (el: HTMLElement, skip: (b: AssemblyInst) => boolean): AssemblyInst | undefined => {
+      const cx = el.offsetLeft + el.offsetWidth / 2;
+      const cy = el.offsetTop + HEAD_Y; // where the hand is: the card's header, not its middle (cards are tall)
+      let target: AssemblyInst | undefined;
+      for (const b of assembliesOf(this.patch)) {
+        if (!b.open || skip(b) || !this.frames.has(b.id)) continue;
+        const r = this.frameRect(b, movedIds);
+        if (r && cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h && (!target || depthOf(this.patch, b) > depthOf(this.patch, target))) target = b;
       }
+      return target;
+    };
+    for (const m of set.mods) {
+      if (assemblyOf(this.patch, m.id)) continue;
+      const c = this.cards.get(m.id);
+      const target = c && innermost(c, (b) => moving.has(b.id));
+      if (target) ops.push(() => addMember(this.patch, target, m.id));
     }
+    if (nest)
+      for (const a of set.asms) {
+        const el = this.containers.get(a.id);
+        if (!el || parentOf(this.patch, a.id)) continue;
+        const target = innermost(el, (b) => moving.has(b.id));
+        if (target) ops.push(() => addChild(this.patch, target, a.id));
+      }
     if (!ops.length) {
       this.layoutFrames();
       return;
     }
-    const keep = [...this.selected];
-    if (this.change(() => ops.forEach((op) => op()))) this.select(keep);
+    const keep = [...this.selected], keepAsm = [...this.selectedAsm];
+    if (this.change(() => ops.forEach((op) => op()))) this.select(keep, keepAsm);
   }
 
-  /** move an assembly with everything inside it, model and elements */
-  private moveTree(a: AssemblyInst, dx: number, dy: number): void {
+  /** the ⇱ on a member's header: take it out of its assembly (one level up), placed beside the frame */
+  private outButton(a: AssemblyInst, run: () => void): HTMLButtonElement {
+    return this.button('⇱', `Take out of "${a.label}"`, run, 'sm out');
+  }
+
+  private takeOutModule(a: AssemblyInst, m: ModuleInst): void {
+    const r = this.frameRect(a, new Set([m.id]));
+    const up = parentOf(this.patch, a.id);
+    this.change(() => {
+      removeMember(this.patch, a, m.id);
+      if (up && assembliesOf(this.patch).includes(up)) addMember(this.patch, up, m.id);
+      if (r) { m.x = Math.max(0, r.x + r.w + 24); m.y = Math.max(0, r.y); }
+    });
+  }
+
+  private takeOutAssembly(parent: AssemblyInst, a: AssemblyInst): void {
+    const r = this.frameRect(parent, undefined, a.id);
+    const up = parentOf(this.patch, parent.id);
+    this.change(() => {
+      removeChild(this.patch, parent, a.id);
+      if (up && assembliesOf(this.patch).includes(up)) addChild(this.patch, up, a.id);
+      if (r) {
+        const box = a.open ? this.frameRect(a) : { x: a.x, y: a.y };
+        if (box) moveAssembly(this.patch, a, Math.max(0, r.x + r.w + 24) - box.x, Math.max(0, r.y) - box.y);
+      }
+    });
+  }
+
+  /** move an assembly with everything inside it, model and elements; `layout` = redraw the frames and cables too */
+  private moveTree(a: AssemblyInst, dx: number, dy: number, layout = true): void {
     moveAssembly(this.patch, a, dx, dy);
     const asms = [a, ...descendants(this.patch, a)];
     const ids = new Set(asms.flatMap((x) => x.modules));
@@ -1896,58 +2017,36 @@ export class Editor {
       el.style.left = `${x.x}px`;
       el.style.top = `${x.y}px`;
     }
-    this.layoutFrames(undefined, a.id);
+    if (!layout) return;
+    this.layoutFrames();
     this.drawCables();
   }
 
-  private assemblyDrag(el: HTMLElement, handle: HTMLElement, a: AssemblyInst): void {
-    this.dragOn(
-      handle,
-      () => true,
-      (dx, dy) => this.moveTree(a, dx, dy),
-      () => {
-        this.sizeCanvas();
-        this.ev.onLayout(this.patch);
-        this.nesting(a, el);
-      },
-    );
-  }
-
-  /** after a container drag: dropped into an expanded frame it becomes a child of that assembly; dragged out of its parent's frame it leaves */
-  private nesting(a: AssemblyInst, el: HTMLElement): void {
-    const cx = el.offsetLeft + el.offsetWidth / 2;
-    const cy = el.offsetTop + HEAD_Y; // where the hand is: the card's header, not its middle (cards are tall)
-    const inside = (r: Rect): boolean => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
-    const parent = parentOf(this.patch, a.id);
-    const below = new Set(descendants(this.patch, a).map((d) => d.id));
-    // the innermost expanded frame under the card that is not the assembly itself or one of its own
-    let target: AssemblyInst | undefined;
-    for (const b of assembliesOf(this.patch)) {
-      if (!b.open || b.id === a.id || below.has(b.id) || !this.frames.has(b.id)) continue;
-      const r = this.frameRect(b, undefined, a.id);
-      if (r && inside(r) && (!target || depthOf(this.patch, b) > depthOf(this.patch, target))) target = b;
-    }
-    if (target && target !== parent) this.change(() => addChild(this.patch, target!, a.id));
-    else if (!target && parent) this.change(() => removeChild(this.patch, parent, a.id));
-    else this.layoutFrames();
+  private assemblyDrag(_el: HTMLElement, handle: HTMLElement, a: AssemblyInst): void {
+    this.groupDrag(handle, { asm: a }, (set) => this.dropped(set, true));
   }
 
   private frameDrag(handle: HTMLElement, a: AssemblyInst): void {
-    this.dragOn(
-      handle,
-      () => true,
-      (dx, dy) => this.moveTree(a, dx, dy),
-      () => {
-        this.sizeCanvas();
-        this.ev.onLayout(this.patch);
-      },
-    );
+    this.groupDrag(handle, { asm: a }, (set) => this.dropped({ mods: set.mods, asms: [] }, false));
   }
 
-  private select(ids: number[]): void {
+  private select(ids: number[], asms: number[] = []): void {
     this.selected.clear();
+    this.selectedAsm.clear();
     for (const id of ids) this.selected.add(id);
+    for (const id of asms) this.selectedAsm.add(id);
     this.showSelection();
+  }
+
+  /** Ctrl / Cmd+A: every module and assembly at the top of the canvas (the docked Main is not a card) */
+  selectAll(): boolean {
+    const docked = this.docked();
+    const inAsm = new Set(assembliesOf(this.patch).flatMap((a) => a.modules));
+    const mods = this.patch.modules.filter((m) => m !== docked && !inAsm.has(m.id)).map((m) => m.id);
+    const asms = assembliesOf(this.patch).filter((a) => !parentOf(this.patch, a.id)).map((a) => a.id);
+    if (!mods.length && !asms.length) return false;
+    this.select(mods, asms);
+    return true;
   }
 
   private toggleSelect(id: number): void {
@@ -1956,8 +2055,15 @@ export class Editor {
     this.showSelection();
   }
 
+  private toggleSelectAsm(id: number): void {
+    if (this.selectedAsm.has(id)) this.selectedAsm.delete(id);
+    else this.selectedAsm.add(id);
+    this.showSelection();
+  }
+
   private showSelection(): void {
     for (const [id, el] of this.cards) el.classList.toggle('selected', this.selected.has(id));
+    for (const [id, el] of [...this.containers, ...this.frames]) el.classList.toggle('selected', this.selectedAsm.has(id));
   }
 
   /** a drag on empty canvas selects the cards it touches; a click on empty canvas clears the selection */
@@ -2001,14 +2107,23 @@ export class Editor {
       window.removeEventListener('pointerup', up);
       box.remove();
       const hit: number[] = [];
-      if (r.w > 4 || r.h > 4)
-        for (const [id, c] of this.cards) {
-          const cx = c.offsetLeft;
-          const cy = c.offsetTop;
-          if (cx < r.x + r.w && cx + c.offsetWidth > r.x && cy < r.y + r.h && cy + c.offsetHeight > r.y) hit.push(id);
-        }
-      if (e.shiftKey) hit.forEach((id) => this.selected.add(id));
-      else this.select(hit);
+      const hitAsm: number[] = [];
+      if (r.w > 4 || r.h > 4) {
+        const touches = (c: HTMLElement): boolean => c.offsetLeft < r.x + r.w && c.offsetLeft + c.offsetWidth > r.x && c.offsetTop < r.y + r.h && c.offsetTop + c.offsetHeight > r.y;
+        const holds = (c: HTMLElement): boolean => c.offsetLeft >= r.x && c.offsetLeft + c.offsetWidth <= r.x + r.w && c.offsetTop >= r.y && c.offsetTop + c.offsetHeight <= r.y + r.h;
+        // a frame is taken when the band holds all of it (a band inside a frame picks cards in it), a collapsed card when touched
+        for (const [id, f] of this.frames) if (holds(f)) hitAsm.push(id);
+        for (const [id, c] of this.containers) if (touches(c)) hitAsm.push(id);
+        const taken = assembliesOf(this.patch).filter((a) => hitAsm.includes(a.id));
+        const coveredMods = new Set(taken.flatMap((a) => allModules(this.patch, a)));
+        const coveredAsm = new Set(taken.flatMap((a) => descendants(this.patch, a).map((d) => d.id)));
+        for (const id of [...hitAsm]) if (coveredAsm.has(id)) hitAsm.splice(hitAsm.indexOf(id), 1);
+        for (const [id, c] of this.cards) if (!coveredMods.has(id) && touches(c)) hit.push(id);
+      }
+      if (e.shiftKey) {
+        hit.forEach((id) => this.selected.add(id));
+        hitAsm.forEach((id) => this.selectedAsm.add(id));
+      } else this.select(hit, hitAsm);
       this.showSelection();
     };
     window.addEventListener('pointermove', move);
@@ -2030,7 +2145,9 @@ export class Editor {
   private curvePts(a: Pt, b: Pt, dirA: CableEnd = 'side', dirB: CableEnd = 'side'): Pt[] {
     const dx = Math.max(40, Math.abs(b.x - a.x) / 2);
     const dy = Math.max(60, Math.abs(b.y - a.y) / 2);
-    const ctl = (p: Pt, dir: CableEnd, sx: number): Pt => (dir === 'up' ? { x: p.x, y: p.y - dy } : dir === 'down' ? { x: p.x, y: p.y + dy } : { x: p.x + sx, y: p.y });
+    // slack: both handles drop by a share of the cable's length, so a long cable droops more than a short one
+    const sag = this.slack * (0.6 * Math.hypot(b.x - a.x, b.y - a.y) + 40);
+    const ctl = (p: Pt, dir: CableEnd, sx: number): Pt => (dir === 'up' ? { x: p.x, y: p.y - dy + sag } : dir === 'down' ? { x: p.x, y: p.y + dy + sag } : { x: p.x + sx, y: p.y + sag });
     return [a, ctl(a, dirA, dx), ctl(b, dirB, -dx), b];
   }
 
@@ -2051,7 +2168,7 @@ export class Editor {
   private overPaths = new Map<SVGPathElement, { copy: SVGPathElement; clips: { rect: SVGRectElement; jack: HTMLElement }[] }>();
 
   private inDock(el: HTMLElement): boolean {
-    return !!this.dock?.contains(el);
+    return !!this.dock?.contains(el) || !!this.wheelHost?.contains(el);
   }
 
   /**

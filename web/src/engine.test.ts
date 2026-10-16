@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { BLOCK, Engine } from './engine';
 import { DEFS, DELAY_TIME_MAX, DELAY_TIME_MIN } from './modules';
-import { addModule, clearMorph, connect, disconnect, emptyPatch, fromUnit, hasMorph, modulate, morphValue, paramUnit, paramValue, processingOrder, removeModule, sameStructure, setMorphTarget, toUnit, validatePatch, POLY_DEFAULT, type Patch, type PolyCfg } from './patch';
+import { EDITOR_MAX_PARTS, addModule, clearMorph, connect, disconnect, emptyPatch, fromUnit, hasMorph, modulate, morphValue, paramUnit, paramValue, processingOrder, removeModule, sameStructure, setMorphTarget, toUnit, validatePatch, POLY_DEFAULT, type Patch, type PolyCfg } from './patch';
 import { copiesOf, polyGroups } from './poly';
 import { fixAssemblies, makeAssembly } from './assembly';
 import { polyCfg, withParts } from './test-poly';
@@ -68,10 +68,10 @@ describe('patch model', () => {
     expect(() => validatePatch(bad, DEFS)).toThrow(/no input/);
   });
 
-  it('refuses more than the module cap', () => {
+  it('holds more modules than the FM-1 (the budget meter counts them)', () => {
     const p = emptyPatch();
-    for (let i = 0; i < 32; i++) addModule(p, DEFS.const, 0, 0);
-    expect(() => addModule(p, DEFS.const, 0, 0)).toThrow();
+    for (let i = 0; i < 40; i++) addModule(p, DEFS.const, 0, 0);
+    expect(p.modules).toHaveLength(40);
   });
 });
 
@@ -1327,7 +1327,7 @@ describe('polyphony', () => {
     raw.assemblies.find((a: { poly?: unknown }) => a.poly).poly = { parts: 99, assign: 7, legato: -1, priority: 'x', unit: 64 };
     const r = validatePatch(raw, DEFS);
     fixAssemblies(r, DEFS);
-    expect(polyCfg(r)).toEqual({ parts: 8, assign: 2, legato: 0, priority: 0, unit: 63 });
+    expect(polyCfg(r)).toEqual({ parts: EDITOR_MAX_PARTS, assign: 2, legato: 0, priority: 0, unit: 63 });
   });
 
   it('two poly assemblies layer: each plays every note on its own parts; a cable out of one sums its parts', () => {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import { DEFS } from './modules';
+import { addModule } from './patch';
 import { deviceBudget, DEVICE, encodePatch, MAX_CABLES, TYPE_ORDER, VERSION } from './patchbin';
 import { PRESETS } from './presets';
 import { polyGroups } from './poly';
@@ -121,5 +122,22 @@ describe('binary patch format', () => {
     expect(Array.from(b.slice(att + 8, att + 20))).toEqual([1, 0, 2, 0, 1, 0, 2, 0, 4, 0, 8, 0]); // the default matrix, u16 LE
     const cab = b.length - 4 * p.cables.length;
     expect([b[cab], b[cab + 1], b[cab + 2], b[cab + 3]]).toEqual([0, DEFS.fm1.outputs.findIndex((o) => o.name === 'pitch'), 1, DEFS.osc.inputs.findIndex((i) => i.name === 'pitch')]);
+  });
+
+  it('lists every FM-1 limit, and a patch over one plays in the browser but is never encoded', () => {
+    const p = PRESETS['Subtractive saw']();
+    const b = deviceBudget(p);
+    expect(b.items.map((i) => i.key)).toEqual(Object.keys(DEVICE));
+    expect(b.items.find((i) => i.key === 'bytes')!.used).toBe(encodePatch(p).length);
+    expect(b.use).toBeGreaterThan(0);
+    expect(b.use).toBeLessThanOrEqual(1);
+    while (p.modules.length <= DEVICE.modules) addModule(p, DEFS.const, 0, 0);
+    const over = deviceBudget(p);
+    expect(over.fits).toBe(false);
+    expect(over.over.map((i) => i.key)).toContain('modules');
+    expect(() => encodePatch(p)).toThrow(/over the FM-1 budget: modules/);
+    const two = PRESETS['Subtractive saw']();
+    for (let i = 0; i < 2; i++) addModule(two, DEFS.reverb, 0, 0);
+    expect(deviceBudget(two).over.map((i) => i.key)).toEqual(['reverbs']);
   });
 });

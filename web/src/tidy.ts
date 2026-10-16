@@ -42,24 +42,16 @@ function arrange(items: Item[], x0: number, y0: number): void {
   }
 }
 
-/**
- * Tidy the whole canvas. `skip` = module ids that are not on the canvas (the docked Main panel). Expanded assemblies
- * lose a size the user gave their frame, so the frame fits its tidied content. Returns nothing; positions change in `p`.
- */
-export function tidy(p: Patch, sizes: TidySizes, skip: Set<number> = new Set()): void {
-  const inAsm = new Set(assembliesOf(p).flatMap((a) => a.modules));
+/** a module card or an assembly (a collapsed card, or an expanded frame whose content is tidied first) as one item */
+function itemsOf(p: Patch, sizes: TidySizes, skip: Set<number>) {
   const moduleItem = (id: number): Item | null => {
     const m = p.modules.find((x) => x.id === id);
     if (!m || skip.has(id)) return null;
     const s = sizes.module(id);
     return { r: { x: m.x, y: m.y, w: s.w, h: s.h }, move: (dx, dy) => { m.x += dx; m.y += dy; } };
   };
-  // an assembly as one item: a collapsed card, or an expanded frame whose content is tidied first
-  const asmItem = (a: AssemblyInst): Item | null => {
-    if (!a.open) {
-      const s = sizes.container(a.id);
-      return { r: { x: a.x, y: a.y, w: s.w, h: s.h }, move: (dx, dy) => moveAssembly(p, a, dx, dy) };
-    }
+  /** an expanded assembly's content, arranged from its current top left; the frame's box around it, or null when empty */
+  const inside = (a: AssemblyInst): Rect | null => {
     const inner = [...a.modules.map(moduleItem), ...childrenOf(p, a).map(asmItem)].filter((x): x is Item => !!x);
     if (!inner.length) return null;
     const { pad, head, minW } = sizes.frame(a);
@@ -69,9 +61,31 @@ export function tidy(p: Patch, sizes: TidySizes, skip: Set<number> = new Set()):
     delete a.frameSize;
     const right = Math.max(...inner.map((it) => it.r.x + it.r.w));
     const bottom = Math.max(...inner.map((it) => it.r.y + it.r.h));
-    const r = { x: left - pad, y: top - pad - head, w: Math.max(right - left + 2 * pad, minW), h: bottom - top + 2 * pad + head };
-    return { r, move: (dx, dy) => moveAssembly(p, a, dx, dy) };
+    return { x: left - pad, y: top - pad - head, w: Math.max(right - left + 2 * pad, minW), h: bottom - top + 2 * pad + head };
   };
+  const asmItem = (a: AssemblyInst): Item | null => {
+    if (!a.open) {
+      const s = sizes.container(a.id);
+      return { r: { x: a.x, y: a.y, w: s.w, h: s.h }, move: (dx, dy) => moveAssembly(p, a, dx, dy) };
+    }
+    const r = inside(a);
+    return r && { r, move: (dx, dy) => moveAssembly(p, a, dx, dy) };
+  };
+  return { moduleItem, asmItem, inside };
+}
+
+/** Tidy the inside of one expanded assembly (its first expansion in a session), keeping its top left corner */
+export function tidyAssembly(p: Patch, a: AssemblyInst, sizes: TidySizes): void {
+  if (a.open) itemsOf(p, sizes, new Set()).inside(a);
+}
+
+/**
+ * Tidy the whole canvas. `skip` = module ids that are not on the canvas (the docked Main panel). Expanded assemblies
+ * lose a size the user gave their frame, so the frame fits its tidied content. Returns nothing; positions change in `p`.
+ */
+export function tidy(p: Patch, sizes: TidySizes, skip: Set<number> = new Set()): void {
+  const inAsm = new Set(assembliesOf(p).flatMap((a) => a.modules));
+  const { moduleItem, asmItem } = itemsOf(p, sizes, skip);
   const top = [
     ...p.modules.filter((m) => !inAsm.has(m.id)).map((m) => moduleItem(m.id)),
     ...assembliesOf(p).filter((a) => !parentOf(p, a.id)).map(asmItem),

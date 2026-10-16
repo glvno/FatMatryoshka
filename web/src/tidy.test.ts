@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { makeAssembly, overlaps } from './assembly';
 import { DEFS } from './modules';
 import { addModule, emptyPatch, type Patch } from './patch';
-import { TIDY_GAP, tidy, type TidySizes } from './tidy';
+import { TIDY_GAP, tidy, tidyAssembly, type TidySizes } from './tidy';
 
 const W = 250;
 const H = 300;
@@ -50,5 +50,18 @@ describe('tidy up', () => {
     tidy(p, sizes, new Set([kb.id]));
     expect(JSON.stringify(p)).toBe(once);
     expect(at(p, kb.id)).toEqual([900, 900]);
+  });
+
+  it('tidies one assembly inside from its top left, leaving the rest of the canvas alone', () => {
+    const p = emptyPatch();
+    const x = addModule(p, DEFS.osc, 500, 500);
+    const y = addModule(p, DEFS.adsr, 500, 500); // stacked on x, as an old file leaves them
+    const free = addModule(p, DEFS.noise, 900, 40);
+    const asm = makeAssembly(p, [x.id, y.id], 'v');
+    asm.open = true;
+    tidyAssembly(p, asm, sizes);
+    expect(at(p, x.id)).toEqual([500, 500]);
+    expect(at(p, y.id)).toEqual([500, 500 + H + TIDY_GAP]);
+    expect(at(p, free.id)).toEqual([900, 40]);
   });
 });

@@ -20,8 +20,8 @@
 // Port indices are positions in ModuleDef.outputs / inputs (explicit ports first, then the `<param>_cv` inputs).
 
 import { DEFS } from './modules';
-import { hasMorph, MAX_MODULES, SOURCES, type Patch } from './patch';
-import { copiesOf, polyGroups } from './poly';
+import { hasMorph, MAX_MODULES, MAX_PARTS, SOURCES, type Patch } from './patch';
+import { copiesOf, MAX_POLY, polyGroups } from './poly';
 
 export const TYPE_ORDER: string[] = Object.keys(DEFS);
 export const MAX_CABLES = 192;
@@ -54,24 +54,39 @@ export function rangeList(p: Patch): { mod: number; pin: number; par: number; lo
 
 export const toQ16 = (v: number): number => Math.max(-0x80000000, Math.min(0x7fffffff, Math.round(v * Q)));
 
-export function encodePatch(p: Patch): Uint8Array {
-  if (p.modules.length > MAX_MODULES) throw new Error(`more than ${MAX_MODULES} modules`);
-  if (p.cables.length > MAX_CABLES) throw new Error(`more than ${MAX_CABLES} cables`);
-  const index = new Map(p.modules.map((m, i) => [m.id, i]));
-  const morph = hasMorph(p);
-  const ranges = rangeList(p);
-  const routes = p.modules.flatMap((m, mod) => DEFS[m.type].inputs.flatMap((port, input) => {
+/** the additional input routes the binary lists (flag bit 3): module index, input index, parameter mask */
+function routesOf(p: Patch): { mod: number; input: number; mask: number }[] {
+  return p.modules.flatMap((m, mod) => DEFS[m.type].inputs.flatMap((port, input) => {
     if (port.name === 'p1' || port.name === 'p2') return [];
     const mask = DEFS[m.type].params.reduce((mask, pd, i) => mask | (pd.input !== port.name && m.inputMap?.[port.name]?.includes(pd.name) ? 1 << i : 0), 0);
     return mask ? [{ mod, input, mask }] : [];
   }));
-  const groups = polyGroups(p);
-  let size = 8 + 5 * groups.length + (groups.length ? p.modules.length : 0);
+}
+
+/** bytes of the binary patch (what the FM-1 must hold, M1_PATCH_MAX) */
+export function encodedSize(p: Patch): number {
+  const groups = polyGroups(p).length;
+  const routes = routesOf(p).length;
+  const ranges = rangeList(p).length;
+  let size = 8 + 5 * groups + (groups ? p.modules.length : 0);
   for (const m of p.modules) size += recordSize(m.type);
   size += 4 * p.cables.length;
-  if (morph) for (const m of p.modules) size += 4 * DEFS[m.type].params.length;
-  if (routes.length) size += 1 + 4 * routes.length;
-  if (ranges.length) size += 1 + 5 * ranges.length;
+  if (hasMorph(p)) for (const m of p.modules) size += 4 * DEFS[m.type].params.length;
+  if (routes) size += 1 + 4 * routes;
+  if (ranges) size += 1 + 5 * ranges;
+  return size;
+}
+
+/** the binary patch; throws when the patch does not fit the FM-1 (deviceBudget): only a patch that fits is ever sent */
+export function encodePatch(p: Patch): Uint8Array {
+  const budget = deviceBudget(p);
+  if (!budget.fits) throw new Error(`over the FM-1 budget: ${budget.over.map((i) => `${i.label} ${i.used} of ${i.max}`).join(', ')}`);
+  const index = new Map(p.modules.map((m, i) => [m.id, i]));
+  const morph = hasMorph(p);
+  const ranges = rangeList(p);
+  const routes = routesOf(p);
+  const groups = polyGroups(p);
+  const size = encodedSize(p);
   const out = new Uint8Array(size);
   const dv = new DataView(out.buffer);
   out[0] = 0xa1;
@@ -134,20 +149,36 @@ export function encodePatch(p: Patch): Uint8Array {
   return out;
 }
 
-/** the FM-1's pools (firmware/src/engine.c, the one-voice build: ENG_NBUF, ENG_MAX_INST, ENG_MAX_PARTS); the four-voice
- * build (-DENG_VOICES=4) has 108 buffers and 72 instances shared by its four patches */
-export const DEVICE = { buffers: 255, instances: 128, parts: 8 } as const;
+/** the FM-1's limits (firmware/src/engine.c, the one-voice build: ENG_MAX_MODULES, ENG_MAX_CABLES, POLY_MAX_GROUPS,
+ * POLY_MAX_PARTS, ENG_MAX_INST, ENG_NBUF, ENG_NDELAY, ENG_NREV, ENG_NSTRING, ENG_NCHORUS, ENG_NGRAIN; proto.c M1_PATCH_MAX).
+ * The four-voice build (-DENG_VOICES=4) has 108 buffers and 72 instances shared by its four patches. */
+export const DEVICE = {
+  modules: MAX_MODULES, cables: MAX_CABLES, poly: MAX_POLY, parts: MAX_PARTS, instances: 128, buffers: 255,
+  delays: 1, reverbs: 1, strings: 8, chorus: 1, grains: 1, bytes: 3072,
+} as const;
+
+export type BudgetKey = keyof typeof DEVICE;
+/** one line of the budget: what the patch uses of one FM-1 limit */
+export interface BudgetItem { key: BudgetKey; label: string; used: number; max: number }
+
+const LABELS: Record<BudgetKey, string> = {
+  modules: 'modules', cables: 'cables', poly: 'poly assemblies', parts: 'parts', instances: 'module instances', buffers: 'signal buffers',
+  delays: 'delays', reverbs: 'reverbs', strings: 'string / comb lines', chorus: 'choruses', grains: 'granular lines', bytes: 'patch bytes',
+};
 
 /**
  * What a patch costs on the FM-1, counted the way eng_load allocates: one instance per copy of a module (a module in a
  * poly assembly has one per part); one signal buffer per connected output port and copy, plus one per input copy with
- * two or more sources (a module outside a poly assembly reading a per-part output has one source per part). `fits` is
- * false when the firmware would refuse the patch.
+ * two or more sources (a module outside a poly assembly reading a per-part output has one source per part); the shared
+ * lines (delay, reverb, chorus, granular) once each, a string or comb line per copy. `items` lists every limit, `over`
+ * those the patch exceeds, `use` the fullest one as a fraction (single lines count only when exceeded); `fits` is false when the firmware would refuse the patch.
+ * The editor and the browser engine have none of these limits.
  */
-export function deviceBudget(p: Patch): { buffers: number; instances: number; fits: boolean } {
+export function deviceBudget(p: Patch): { buffers: number; instances: number; fits: boolean; items: BudgetItem[]; over: BudgetItem[]; use: number } {
   const copies = copiesOf(p);
+  const groups = polyGroups(p);
   const groupOf = new Map<number, number>();
-  polyGroups(p).forEach((g, i) => g.modules.forEach((id) => groupOf.set(id, i)));
+  groups.forEach((g, i) => g.modules.forEach((id) => groupOf.set(id, i)));
   const ninst = (id: number): number => copies.get(id) ?? 1;
   let instances = 0;
   for (const m of p.modules) instances += ninst(m.id);
@@ -168,6 +199,17 @@ export function deviceBudget(p: Patch): { buffers: number; instances: number; fi
       if (sources >= 2) buffers += n;
     }
   }
-  const parts = Math.max(1, ...[...copies.values()]);
-  return { buffers, instances, fits: buffers <= DEVICE.buffers && instances <= DEVICE.instances && parts <= DEVICE.parts };
+  const count = (...types: string[]): number => p.modules.filter((m) => types.includes(m.type)).reduce((n, m) => n + ninst(m.id), 0);
+  const used: Record<BudgetKey, number> = {
+    modules: p.modules.length, cables: p.cables.length, poly: groups.length, parts: Math.max(1, ...[...copies.values()]),
+    instances, buffers, delays: count('delay'), reverbs: count('reverb'), strings: count('string', 'comb'), chorus: count('chorus'),
+    grains: count('grain'), bytes: encodedSize(p),
+  };
+  const items = (Object.keys(DEVICE) as BudgetKey[]).map((key) => ({ key, label: LABELS[key], used: used[key], max: DEVICE[key] }));
+  const over = items.filter((i) => i.used > i.max);
+  // a one-of-a-kind line (one delay, one reverb ...) is either there or not: it shows only when exceeded, so a patch with
+  // its one reverb does not read as full
+  const use = Math.max(0, ...items.filter((i) => i.max > 1 || i.used > i.max).map((i) => i.used / i.max));
+  return { buffers, instances, fits: !over.length, items, over, use };
 }
+

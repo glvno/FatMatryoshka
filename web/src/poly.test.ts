@@ -4,6 +4,7 @@ import { addChild, makeAssembly, memberProblem, toDef, insertAssembly, validateA
 import { DEFS } from './modules';
 import { addModule, connect, emptyPatch, POLY_DEFAULT, type Patch } from './patch';
 import { makeRoom, MAX_POLY, polyGroups, POLY_TOP, setPoly } from './poly';
+import { deviceBudget } from './patchbin';
 
 /** Main pitch / gate -> osc / adsr -> vca -> output, the voice grouped as an assembly */
 function rig(): { p: Patch; ids: Record<string, number> } {
@@ -57,7 +58,7 @@ describe('the Poly switch', () => {
     expect(p.modules.some((m) => m.id === part.id)).toBe(true);
   });
 
-  it('refuses nesting a poly assembly in another, a second Part, and more than MAX_POLY', () => {
+  it('refuses nesting a poly assembly in another and a second Part; more than MAX_POLY is allowed (over the FM-1 budget)', () => {
     const { p, ids } = rig();
     const inner = makeAssembly(p, [ids.osc], 'inner');
     setPoly(p, DEFS, asm(p, ids.asm), true);
@@ -70,7 +71,9 @@ describe('the Poly switch', () => {
     expect(() => addChild(p, outer, free.id)).toThrow(/do not nest/);
     for (let i = 0; i < MAX_POLY - 2; i++) setPoly(p, DEFS, makeAssembly(p, [addModule(p, DEFS.noise, 0, 0).id], `n${i}`), true);
     expect(polyGroups(p)).toHaveLength(MAX_POLY);
-    expect(() => setPoly(p, DEFS, makeAssembly(p, [addModule(p, DEFS.noise, 0, 0).id], 'one too many'), true)).toThrow(/at most/);
+    setPoly(p, DEFS, makeAssembly(p, [addModule(p, DEFS.noise, 0, 0).id], 'one more'), true);
+    expect(polyGroups(p)).toHaveLength(MAX_POLY + 1);
+    expect(deviceBudget(p).over.map((i) => i.key)).toContain('poly');
   });
 
   it('makeRoom moves a poly assembly down only when its top member is too high', () => {

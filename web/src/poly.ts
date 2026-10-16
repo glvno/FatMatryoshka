@@ -3,8 +3,8 @@
 // part (the same modules N times, each copy with its own state); its allocator hands the keyboard's notes to the parts,
 // and its Part module outputs each part's note. Everything outside a poly assembly runs once. A cable from inside a poly
 // assembly to a module outside carries the sum of its parts; a cable from outside reaches every part. SHARED_TYPES run
-// once even inside one (their inputs sum the parts). Poly assemblies do not nest in each other; a patch has at most
-// MAX_POLY of them, and each gets every note (they layer).
+// once even inside one (their inputs sum the parts). Poly assemblies do not nest in each other; a patch may have
+// any number of them (the FM-1 plays MAX_POLY), and each gets every note (they layer).
 //
 // migrateVoicing converts patches from before (Patch.voices, the Main module's legato / priority / unit and its per-note
 // outputs spread / legato / jump / tol / drift, the oscillator's drift setting) into poly assemblies, Part and Random modules.
@@ -22,6 +22,7 @@ import {
 } from './assembly';
 import { addModule, fixPoly, POLY_DEFAULT, sameEnd, SHARED_TYPES, type ModuleDef, type ModuleInst, type Patch, type PolyCfg } from './patch';
 
+/** the FM-1's poly assembly limit (POLY_MAX_GROUPS in defs.h): the budget meter counts against it, the editor does not stop at it */
 export const MAX_POLY = 4;
 
 export interface PolyGroup {
@@ -31,12 +32,12 @@ export interface PolyGroup {
   modules: Set<number>;
 }
 
-/** the poly assemblies of a patch, outermost only, in overlay order, at most MAX_POLY */
+/** the poly assemblies of a patch, outermost only, in overlay order */
 export function polyGroups(p: Patch): PolyGroup[] {
   const out: PolyGroup[] = [];
   const types = new Map(p.modules.map((m) => [m.id, m.type]));
   for (const a of assembliesOf(p)) {
-    if (!a.poly || polyAncestor(p, a) || out.length >= MAX_POLY) continue;
+    if (!a.poly || polyAncestor(p, a)) continue;
     const modules = new Set(allModules(p, a).filter((id) => !SHARED_TYPES.has(types.get(id) ?? '')));
     out.push({ asm: a, cfg: fixPoly(a.poly), modules });
   }
@@ -79,7 +80,6 @@ export function polyProblem(p: Patch, a: AssemblyInst): string | null {
   if (polyAncestor(p, a)) return `"${a.label}" is inside a poly assembly already: its modules run once per part there`;
   const inner = descendants(p, a).find((d) => d.poly);
   if (inner) return `"${inner.label}" inside it is a poly assembly: poly assemblies do not nest`;
-  if (polyGroups(p).length >= MAX_POLY) return `a patch holds at most ${MAX_POLY} poly assemblies`;
   return null;
 }
 
