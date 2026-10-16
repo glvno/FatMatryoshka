@@ -168,7 +168,7 @@ describe('course data', () => {
 
   it('catches a requirement that names a port the module does not have', () => {
     const broken = structuredClone(COURSE);
-    broken.chapters[0].steps.find((s) => s.id === 'pitch')!.parts = [{ kind: 'cable', from: { type: 'fm1' }, fromPort: 'pitch', to: { type: 'osc' }, toPort: 'nose' }];
+    broken.chapters[0].steps.find((s) => s.id === 'pitch')!.parts = [{ kind: 'cable', from: { type: 'fm1' }, fromPort: 'pitch', to: { type: 'osc' }, toPort: 'nose', id: 'nose' }];
     expect(validateCourse(broken).errors[0].message).toMatch(/Oscillator has no input "nose"/);
   });
 });

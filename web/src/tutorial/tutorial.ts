@@ -87,6 +87,8 @@ export class Tutorial {
   /** the pending auto-advance, and whether it is held off (after Back, the step is re-read until Next is pressed) */
   private advanceTimer = 0;
   private hold = false;
+  /** the requirements of the checkbox the learner clicked: the highlight points at them while they are unmet */
+  private clicked: string[] | null = null;
 
   constructor(private host: TutorialHost) {
     this.panel.setAttribute('role', 'region');
@@ -255,6 +257,7 @@ export class Tutorial {
     this.seen = noSeen();
     this.lastSaved = undefined;
     this.error = '';
+    this.clicked = null;
   }
 
   private schedule(): void {
@@ -409,7 +412,7 @@ export class Tutorial {
     const done = this.page === 'steps' && st ? stepDone(ch, this.progress.step, s) : { met: false, moot: false };
     const ok = done.met || done.moot;
     const broken = this.page === 'steps' ? ch.steps.slice(0, this.progress.step).map((x, k) => (!x.transient && !x.superseded && !x.check(s) ? k : -1)).filter((k) => k >= 0) : [];
-    const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, this.error, this.previewing, this.auditionMode, ok ? [] : st?.todo?.(s) ?? []]);
+    const key = JSON.stringify([i, this.page, this.progress.step, ok, broken, this.error, this.previewing, this.auditionMode, this.page === 'steps' ? st?.met?.(s) : null, this.clicked]);
     if (!force && key === this.lastRender) return;
     this.lastRender = key;
     const count = el('span', { class: 'tour-count', textContent: `Chapter ${LISTED.indexOf(i) + 1} of ${LISTED.length}${ch.published ? '' : ' (unpublished)'} · ${ch.title}` });
@@ -422,9 +425,9 @@ export class Tutorial {
       parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.endPreview(); this.page = 'steps'; this.enterStep(); this.saveProgress(); this.render(true); }, true), this.button('Chapters', () => this.open())));
     } else if (this.page === 'steps' && st) {
       parts.push(el('span', { class: 'tour-step', textContent: `Step ${this.progress.step + 1} of ${ch.steps.length}${ok ? (this.hold || st.listen ? ' · ✓ ready when you are' : ' · ✓ done, moving on') : ''}` }));
-      parts.push(lessonProse(st.text));
+      parts.push(this.checklist(lessonProse(st.text), ok ? null : st.met?.(s) ?? {}));
       if (st.why) parts.push(el('details', { class: 'tutorial-why' }, el('summary', { textContent: 'Why' }), lessonProse(st.why)));
-      const todo = ok ? [] : st.todo?.(s) ?? [];
+      const todo = ok ? [] : st.unplaced?.(s) ?? [];
       if (todo.length) parts.push(el('div', { class: 'tutorial-todo' }, el('span', { textContent: 'Still to do' }), el('ul', {}, ...todo.map((t) => el('li', { textContent: t })))));
       if (st.playback !== false) parts.push(this.auditionControls());
       if (broken.length) {
@@ -541,9 +544,28 @@ export class Tutorial {
     this.focus(this.targetsOf(this.step, this.state()));
   }
 
-  /** what the current step points at: the first unmet part's elements, else the step's fallback target */
+  /** the text's checkboxes: ticked when their requirements are met (all of them when `met` is null: the step is done),
+   * the first unticked one marked as next; clicking one points the highlight at its controls */
+  private checklist(prose: HTMLElement, met: Record<string, boolean> | null): HTMLElement {
+    let next = false;
+    const pick = this.clicked && met && !this.clicked.every((id) => met[id]) ? this.clicked.join() : null;
+    for (const box of prose.querySelectorAll<HTMLElement>('.req')) {
+      const ids = (box.dataset.req ?? '').split(',');
+      const done = !met || ids.every((id) => met[id]);
+      box.classList.toggle('done', done);
+      box.setAttribute('role', 'checkbox'); box.setAttribute('aria-checked', String(done));
+      if (!done && !next && (!pick || pick === box.dataset.req)) { box.classList.add('next'); next = true; }
+      box.addEventListener('click', (e) => { if ((e.target as Element).closest('a')) return; this.clicked = done ? null : ids; this.render(true); this.refocus(); });
+    }
+    return prose;
+  }
+
+  /** what the current step points at: the clicked checkbox's or else the first unmet part's elements, else the step's
+   * fallback target */
   private targetsOf(st: Step | null, s: TutorialState): Target[] {
     if (this.page !== 'steps' || !st) return [];
+    const pin = this.clicked;
+    if (pin && pin.some((id) => !st.met?.(s)[id])) { const t = st.targetsOf?.(pin, s) ?? []; if (t.length) return t; }
     const f = st.focus?.(s) ?? [];
     return f.length ? f : st.target?.(s) ?? [];
   }

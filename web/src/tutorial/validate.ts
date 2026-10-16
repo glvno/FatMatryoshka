@@ -13,7 +13,8 @@ import { completes, headlessState, type TutorialState } from './model';
 import { compileCourse, chapterEnd, chapterStart, stepStart } from './chapters';
 import { momentary, partCheck, partLabel, refType, type Roles } from './parts';
 import { CUSTOM, ROLES } from './registry';
-import { EVENT_NAMES, refKey, SLIDER_OPS, validateShape, type CourseData, type Part, type Ref } from './course-schema';
+import { placedRequirements } from './markdown';
+import { EVENT_NAMES, refKey, SLIDER_OPS, validateShape, type CourseData, type PartSpec, type Ref } from './course-schema';
 import type { AssemblyDef } from '../assembly';
 
 export interface Issue {
@@ -31,7 +32,7 @@ const ports = (type: string, dir: 'in' | 'out'): string[] => (dir === 'in' ? DEF
 const params = (type: string): string[] => DEFS[type]?.params.map((p) => p.name) ?? [];
 
 /** what is wrong with one part's names, if anything */
-export function partProblems(part: Part, roles: Roles): string[] {
+export function partProblems(part: PartSpec, roles: Roles): string[] {
   const out: string[] = [];
   const ref = (r: Ref, what: string): string | undefined => {
     if (r.role && !roles[r.role] && !ROLES[r.role]) { out.push(`${what}: there is no role "${r.role}"`); return undefined; }
@@ -109,11 +110,20 @@ export function validateCourse(course: CourseData): Report {
     if (ch.start.kind === 'continue' && ch === course.chapters[0]) report.warnings.push({ chapter: ch.id, message: 'The first chapter cannot continue from a previous one; it starts from a new patch' });
     for (const [f, label] of [['title', 'Title'], ['patchName', 'Patch name'], ['intro', 'Introduction'], ['payoff', 'Payoff'], ['challenge', 'Optional challenge']] as const) {
       if (!ch[f].trim()) report.errors.push({ chapter: ch.id, message: `${label} is empty` });
+      if (f !== 'title' && f !== 'patchName' && placedRequirements(ch[f]).length) report.errors.push({ chapter: ch.id, message: `${label} cannot hold requirements (req: links): only a task step’s instructions can` });
     }
     for (const st of ch.steps) {
       if (!st.title.trim()) report.errors.push({ chapter: ch.id, step: st.id, message: 'Title is empty' });
       if (!st.text.trim()) report.errors.push({ chapter: ch.id, step: st.id, message: 'Instructions are empty' });
       if (st.kind === 'task' && !st.parts?.length) report.errors.push({ chapter: ch.id, step: st.id, message: 'A task step needs at least one requirement (or make it a Continue step)' });
+      const placed = placedRequirements(st.text).flat();
+      if (st.kind === 'continue' && placed.length) report.errors.push({ chapter: ch.id, step: st.id, message: 'A Continue step has no requirements to place: remove the req: links from its text' });
+      if (st.kind === 'task') {
+        const ids = new Set((st.parts ?? []).map((p) => p.id));
+        for (const id of new Set(placed)) if (!ids.has(id)) report.errors.push({ chapter: ch.id, step: st.id, message: `The text places "${id}", which is not one of the step’s requirements` });
+        for (const p of st.parts ?? []) if (!p.hidden && !placed.includes(p.id)) report.hints.push({ chapter: ch.id, step: st.id, message: `Requirement "${p.id}" is not placed in the text: place it, or mark it hidden` });
+      }
+      if (placedRequirements(st.why).length) report.errors.push({ chapter: ch.id, step: st.id, message: 'Why cannot hold requirements: move the req: links to the instructions' });
       for (const [i, p] of (st.parts ?? []).entries()) for (const m of partProblems(p, roles)) report.errors.push({ chapter: ch.id, step: st.id, message: `Requirement ${i + 1}: ${m}` });
     }
   }

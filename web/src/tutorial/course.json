@@ -54,7 +54,7 @@
           "text": "Click `Enable audio` in the sidebar.",
           "why": "",
           "parts": [
-            { "kind": "event", "event": "audio" }
+            { "id": "enable-audio", "kind": "event", "event": "audio" }
           ]
         },
         {
@@ -65,7 +65,7 @@
           "why": "",
           "superseded": true,
           "parts": [
-            { "kind": "custom", "name": "newPatch" }
+            { "id": "press-new-patch", "kind": "custom", "name": "newPatch" }
           ]
         },
         {
@@ -75,7 +75,7 @@
           "text": "`Main` here is what is going to send the information from our keyboard circulating through our patch. \n\nIts two most important functions are to send `pitch` (i.e., what note is being played) and `gate`, which answers yes or no to the question, \"Is a key being held down right now?\"[^1]\n\nThe output of `Output` is what you hear. It's can be thought of as the rectum of a patch. A synth patch poops sound into the toilet of the ear.\n\n# Add an `Oscillator` module using the sidebar button or command palette (`Ctrl/Cmd+K` or the `/` key). \n\nAny module on the canvas can be moved around by clicking on its header and dragging it around.\n\n[^1]: The caveats, exceptions, and backpedaling that go here are on our feature roadmap and are slated to be added in Q3 of FY 2029",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "osc" }
+            { "id": "add-an-oscillator", "kind": "module", "type": "osc" }
           ]
         },
         {
@@ -86,6 +86,7 @@
           "why": "",
           "parts": [
             {
+              "id": "cable-main-pitch-oscillator-pitch",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -93,6 +94,7 @@
               "toPort": "pitch"
             },
             {
+              "id": "cable-oscillator-out-output-l",
               "kind": "cable",
               "from": { "type": "osc" },
               "fromPort": "out",
@@ -100,6 +102,7 @@
               "toPort": "l"
             },
             {
+              "id": "cable-main-pitch-oscillator-pitch-2",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -107,6 +110,7 @@
               "toPort": "pitch"
             },
             {
+              "id": "cable-oscillator-out-output-l-2",
               "kind": "cable",
               "from": { "type": "osc" },
               "fromPort": "out",
@@ -127,6 +131,7 @@
           "superseded": true,
           "parts": [
             {
+              "id": "remove-the-old-cable-oscillator-out-outp",
               "kind": "noCable",
               "from": { "type": "osc" },
               "fromPort": "out",
@@ -142,8 +147,8 @@
           "text": "Obviously, it would be impractical to unplug your oscillator every time you want a note to stop sounding. Luckily, there is a solution: the *voltage-controlled amplifier (VCA)*.\n\n## Add a VCA module. \n\nA VCA has two important inputs: `in`, for an audio signal, and `cv`, for control voltage. Its `output` is just those two signals multiplied together. \n\nIn the next step, we're going to use a VCA to multiply `Oscillator`'s  output voltage by zero. This is how we shut up an oscillator.",
           "why": "",
           "parts": [
-            { "kind": "sound", "mode": "silent" },
-            { "kind": "module", "type": "vca" }
+            { "id": "make-it-silent-when-no-key-is-held", "kind": "sound", "mode": "silent" },
+            { "id": "add-a-vca", "kind": "module", "type": "vca" }
           ],
           "listen": true
         },
@@ -155,6 +160,7 @@
           "why": "",
           "parts": [
             {
+              "id": "cable-oscillator-out-vca-in",
               "kind": "cable",
               "from": { "type": "osc" },
               "fromPort": "out",
@@ -162,6 +168,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-vca-out-output-l",
               "kind": "cable",
               "from": { "type": "vca" },
               "fromPort": "out",
@@ -169,14 +176,16 @@
               "toPort": "l"
             },
             {
+              "id": "remove-the-old-cable-oscillator-out-outp",
               "kind": "noCable",
               "from": { "type": "osc" },
               "fromPort": "out",
               "to": { "type": "output" },
               "toPort": "l"
             },
-            { "kind": "sound", "mode": "silent" },
+            { "id": "make-it-silent-when-no-key-is-held", "kind": "sound", "mode": "silent" },
             {
+              "id": "cable-oscillator-out-vca-in-2",
               "kind": "cable",
               "from": { "type": "osc" },
               "fromPort": "out",
@@ -184,6 +193,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-main-gate-vca-cv",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -191,6 +201,7 @@
               "toPort": "cv"
             },
             {
+              "id": "cable-vca-out-output-l-2",
               "kind": "cable",
               "from": { "type": "vca" },
               "fromPort": "out",
@@ -216,6 +227,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "click-beside-oscillator-s-out",
               "kind": "event",
               "event": "probe",
               "ref": { "type": "osc" },
@@ -232,7 +244,12 @@
           "why": "",
           "listen": true,
           "parts": [
-            { "kind": "event", "event": "notes", "label": "Listen with Note or Riff, or play your keyboard" }
+            {
+              "id": "play-a-note",
+              "kind": "event",
+              "event": "notes",
+              "label": "Listen with Note or Riff, or play your keyboard"
+            }
           ]
         }
       ]
@@ -254,7 +271,7 @@
           "text": "There are many kinds of envelope. The most common, and the one we're going to use, is an `ADSR` envelope, which is named after its four parameters. An envelope module can control any other module's parameter[^1], but let's consider an example envelope that controls amplitude (volume):\n- *attack*: The time that elapses between silence and the sound's peak volume\n- *decay*: The time that elapses between peak volume and...\n- ... *sustain*: The volume that the signal settles at if the note persists longer than `(attack + decay)` milliseconds.\n- *release*: The time that elapses between the end of the note and silence.\n\n[^1]: Including another envelope module's parameters! If there's one thing you should take away from this tutorials is that if it's a parameter, it can be manipulated by control voltage.  \n\n    The possibilities are quite literally endless. A synth like the one Wendy Carlos (in-)famously used to record *Switched-On Bach* had something like 10¹³⁴ possible patch cable configurations. Most of them would have sounded like shit, but still.\n\n## Add an `ADSR` module.\n",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "adsr" }
+            { "id": "add-an-adsr", "kind": "module", "type": "adsr" }
           ]
         },
         {
@@ -265,6 +282,7 @@
           "why": "",
           "parts": [
             {
+              "id": "remove-the-old-cable-main-gate-vca-cv-cl",
               "kind": "noCable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -272,6 +290,7 @@
               "toPort": "cv"
             },
             {
+              "id": "cable-main-gate-adsr-gate",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -279,6 +298,7 @@
               "toPort": "gate"
             },
             {
+              "id": "cable-adsr-env-vca-cv",
               "kind": "cable",
               "from": { "type": "adsr" },
               "fromPort": "env",
@@ -297,6 +317,7 @@
           "superseded": true,
           "parts": [
             {
+              "id": "set-adsr-s-a-to-0-1-s-or-more",
               "kind": "slider",
               "ref": { "type": "adsr" },
               "param": "a",
@@ -305,6 +326,7 @@
               "label": "Set a (attack) to 0.1 s or more"
             },
             {
+              "id": "set-adsr-s-r-to-0-5-s-or-more",
               "kind": "slider",
               "ref": { "type": "adsr" },
               "param": "r",
@@ -323,6 +345,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "set-adsr-s-a-to-0-01-s-or-below",
               "kind": "slider",
               "ref": { "type": "adsr" },
               "param": "a",
@@ -331,6 +354,7 @@
               "label": "Set a (attack) to 0.01 s or less"
             },
             {
+              "id": "set-adsr-s-s-to-0",
               "kind": "slider",
               "ref": { "type": "adsr" },
               "param": "s",
@@ -339,6 +363,7 @@
               "label": "Set s (sustain) to 0"
             },
             {
+              "id": "set-adsr-s-d-to-0-4-s-or-below",
               "kind": "slider",
               "ref": { "type": "adsr" },
               "param": "d",
@@ -368,6 +393,7 @@
           "why": "Dropping a signal on a thumb routes it through one of the module’s parameter inputs, p1 or p2. The same envelope shapes two things at once: loudness and timbre.",
           "parts": [
             {
+              "id": "set-oscillator-s-wave-to-square",
               "kind": "slider",
               "ref": { "type": "osc" },
               "param": "wave",
@@ -376,6 +402,7 @@
               "label": "Set the Oscillator’s wave to square"
             },
             {
+              "id": "drop-adsr-s-env-on-oscillator-s-pw-thumb",
               "kind": "routed",
               "from": { "type": "adsr" },
               "fromPort": "env",
@@ -392,9 +419,10 @@
           "text": "Press Ctrl+Z (Cmd+Z on a Mac), or Commands → Undo: the route is gone. Press Shift+Ctrl+Z (Commands → Redo) and it is back. Forty steps of history are kept, cables and modules included.",
           "why": "",
           "parts": [
-            { "kind": "event", "event": "undos" },
-            { "kind": "event", "event": "redos" },
+            { "id": "press-ctrl-z-to-undo", "kind": "event", "event": "undos" },
+            { "id": "press-shift-ctrl-z-to-redo", "kind": "event", "event": "redos" },
             {
+              "id": "drop-adsr-s-env-on-oscillator-s-pw-thumb",
               "kind": "routed",
               "from": { "type": "adsr" },
               "fromPort": "env",
@@ -423,8 +451,9 @@
           "text": "Add a Filter and put it between the Oscillator and the VCA: Oscillator out → Filter in, Filter lp24 → VCA in, and remove the cable from the Oscillator to the VCA.",
           "why": "VCO → VCF → VCA is the classic subtractive chain. lp24 is a 24 dB low pass: steep. lp12 is gentler, hp lets the highs through instead.",
           "parts": [
-            { "kind": "module", "type": "filter" },
+            { "id": "add-a-filter", "kind": "module", "type": "filter" },
             {
+              "id": "cable-oscillator-out-filter-in",
               "kind": "cable",
               "from": { "type": "osc" },
               "fromPort": "out",
@@ -432,6 +461,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-filter-lp24-vca-in",
               "kind": "cable",
               "from": { "type": "filter" },
               "fromPort": "lp24",
@@ -439,6 +469,7 @@
               "toPort": "in"
             },
             {
+              "id": "remove-the-old-cable-oscillator-out-vca-",
               "kind": "noCable",
               "from": { "type": "osc" },
               "fromPort": "out",
@@ -456,6 +487,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "set-filter-s-cutoff-to-800-hz-or-below",
               "kind": "slider",
               "ref": { "type": "filter" },
               "param": "cutoff",
@@ -474,6 +506,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "set-filter-s-res-to-0-5-or-more",
               "kind": "slider",
               "ref": { "type": "filter" },
               "param": "res",
@@ -492,6 +525,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "set-filter-s-track-to-0-5-or-more",
               "kind": "slider",
               "ref": { "type": "filter" },
               "param": "track",
@@ -508,8 +542,9 @@
           "text": "Add an LFO (low frequency oscillator). It is an oscillator too slow to hear, made to move other things. Set its rate to about 0.5 Hz.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "lfo", "label": "Add an LFO" },
+            { "id": "add-a-lfo", "kind": "module", "type": "lfo", "label": "Add an LFO" },
             {
+              "id": "set-lfo-s-rate-to-1-hz-or-below",
               "kind": "slider",
               "ref": { "type": "lfo" },
               "param": "rate",
@@ -528,6 +563,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "cable-lfo-out-filter-cv",
               "kind": "cable",
               "from": { "type": "lfo" },
               "fromPort": "out",
@@ -535,6 +571,7 @@
               "toPort": "cv"
             },
             {
+              "id": "set-filter-s-cvamt-to-1-5-oct-or-more",
               "kind": "slider",
               "ref": { "type": "filter" },
               "param": "cvamt",
@@ -564,6 +601,7 @@
           "why": "The matrix in the ⋯ menu decides which parameters a pin reaches. A blue tick appears on each slider the knob reaches: that is where the knob alone holds the parameter.",
           "parts": [
             {
+              "id": "cable-main-k1-filter-p1",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "k1",
@@ -571,12 +609,14 @@
               "toPort": "p1"
             },
             {
+              "id": "tick-p1-in-the-menu-of-cutoff",
               "kind": "pinMap",
               "ref": { "type": "filter" },
               "pin": "p1",
               "param": "cutoff"
             },
             {
+              "id": "tick-p1-in-the-menu-of-res",
               "kind": "pinMap",
               "ref": { "type": "filter" },
               "pin": "p1",
@@ -592,6 +632,7 @@
           "why": "",
           "parts": [
             {
+              "id": "set-the-p1-attenuverter-off-1",
               "kind": "att",
               "ref": { "type": "filter" },
               "pin": "p1",
@@ -611,6 +652,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "move-main-s-k1-slider",
               "kind": "slider",
               "ref": { "type": "fm1" },
               "param": "k1",
@@ -639,6 +681,7 @@
           "why": "",
           "parts": [
             {
+              "id": "select-the-oscillator-filter-adsr-vca-lf",
               "kind": "event",
               "event": "selected",
               "types": ["osc", "filter", "adsr", "vca", "lfo"],
@@ -654,6 +697,7 @@
           "why": "Grouping changes nothing in the sound. Ports with outside cables are exposed automatically; the rest is hidden until you expose it.",
           "parts": [
             {
+              "id": "group-or-insert-my-voice",
               "kind": "assembly",
               "role": "myVoice",
               "fact": "exists",
@@ -669,7 +713,13 @@
           "why": "",
           "superseded": true,
           "parts": [
-            { "kind": "assembly", "role": "myVoice", "fact": "open", "label": "Expand the assembly" }
+            {
+              "id": "expand-my-voice",
+              "kind": "assembly",
+              "role": "myVoice",
+              "fact": "open",
+              "label": "Expand the assembly"
+            }
           ]
         },
         {
@@ -679,9 +729,30 @@
           "text": "Click ○ next to the Filter’s cutoff and next to the ADSR’s r. They become sliders on the collapsed card. Click ○ beside the LFO’s out too: an extra output.",
           "why": "",
           "parts": [
-            { "kind": "assembly", "role": "myVoice", "fact": "promoted", "type": "filter", "param": "cutoff" },
-            { "kind": "assembly", "role": "myVoice", "fact": "promoted", "type": "adsr", "param": "r" },
-            { "kind": "assembly", "role": "myVoice", "fact": "exposed", "type": "lfo", "port": "out" }
+            {
+              "id": "promote-the-filter-s-cutoff-click-beside",
+              "kind": "assembly",
+              "role": "myVoice",
+              "fact": "promoted",
+              "type": "filter",
+              "param": "cutoff"
+            },
+            {
+              "id": "promote-the-adsr-s-r-click-beside-it",
+              "kind": "assembly",
+              "role": "myVoice",
+              "fact": "promoted",
+              "type": "adsr",
+              "param": "r"
+            },
+            {
+              "id": "expose-the-lfo-s-out-click-beside-it",
+              "kind": "assembly",
+              "role": "myVoice",
+              "fact": "exposed",
+              "type": "lfo",
+              "port": "out"
+            }
           ]
         },
         {
@@ -693,7 +764,7 @@
           "listen": true,
           "optional": true,
           "parts": [
-            { "kind": "assembly", "role": "myVoice", "fact": "resized" }
+            { "id": "resize-the-frame-drag", "kind": "assembly", "role": "myVoice", "fact": "resized" }
           ]
         },
         {
@@ -703,7 +774,13 @@
           "text": "Click collapse in the frame’s header. One card: pitch, gate, out, the LFO’s out, cutoff and r. Play it.",
           "why": "",
           "parts": [
-            { "kind": "assembly", "role": "myVoice", "fact": "collapsed", "label": "Collapse the assembly" }
+            {
+              "id": "collapse-my-voice",
+              "kind": "assembly",
+              "role": "myVoice",
+              "fact": "collapsed",
+              "label": "Collapse the assembly"
+            }
           ]
         },
         {
@@ -725,7 +802,14 @@
           "text": "Click save on the card and keep the name My voice. It is now in the Library tab and in + Add assembly, under Your library, ready for any patch.",
           "why": "",
           "parts": [
-            { "kind": "assembly", "role": "myVoice", "fact": "saved", "tag": "my-voice", "name": "My voice" }
+            {
+              "id": "save-it-as-my-voice-save-on-the-card",
+              "kind": "assembly",
+              "role": "myVoice",
+              "fact": "saved",
+              "tag": "my-voice",
+              "name": "My voice"
+            }
           ]
         },
         {
@@ -735,7 +819,7 @@
           "text": "Commands → Fit patch to screen scales the canvas so everything is in view. Ctrl+wheel (pinch on touch) zooms freely; Reset canvas scale goes back to 100 %.",
           "why": "",
           "parts": [
-            { "kind": "event", "event": "zooms" }
+            { "id": "zoom-the-canvas-ctrl-wheel-or-fit-patch-", "kind": "event", "event": "zooms" }
           ]
         }
       ]
@@ -759,8 +843,9 @@
           "listen": true,
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "delay" },
+            { "id": "add-a-delay", "kind": "module", "type": "delay" },
             {
+              "id": "cable-my-voice-out-out-delay-in",
               "kind": "cable",
               "from": { "role": "myVoiceOut" },
               "fromPort": "out",
@@ -769,6 +854,7 @@
               "label": "Cable My voice out → Delay in"
             },
             {
+              "id": "cable-delay-out-output-l",
               "kind": "cable",
               "from": { "type": "delay" },
               "fromPort": "out",
@@ -776,6 +862,7 @@
               "toPort": "l"
             },
             {
+              "id": "remove-the-old-cable-my-voice-out-out-ou",
               "kind": "noCable",
               "from": { "role": "myVoiceOut" },
               "fromPort": "out",
@@ -794,8 +881,9 @@
           "listen": true,
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "reverb" },
+            { "id": "add-a-reverb", "kind": "module", "type": "reverb" },
             {
+              "id": "cable-delay-out-reverb-in",
               "kind": "cable",
               "from": { "type": "delay" },
               "fromPort": "out",
@@ -803,6 +891,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-reverb-out-output-l",
               "kind": "cable",
               "from": { "type": "reverb" },
               "fromPort": "out",
@@ -810,6 +899,7 @@
               "toPort": "l"
             },
             {
+              "id": "remove-the-old-cable-delay-out-output-l-",
               "kind": "noCable",
               "from": { "type": "delay" },
               "fromPort": "out",
@@ -826,8 +916,9 @@
           "why": "",
           "listen": true,
           "parts": [
-            { "kind": "module", "type": "chorus" },
+            { "id": "add-a-chorus", "kind": "module", "type": "chorus" },
             {
+              "id": "cable-reverb-out-chorus-in",
               "kind": "cable",
               "from": { "type": "reverb" },
               "fromPort": "out",
@@ -835,6 +926,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-chorus-l-output-l",
               "kind": "cable",
               "from": { "type": "chorus" },
               "fromPort": "l",
@@ -842,6 +934,7 @@
               "toPort": "l"
             },
             {
+              "id": "cable-chorus-r-output-r",
               "kind": "cable",
               "from": { "type": "chorus" },
               "fromPort": "r",
@@ -849,6 +942,7 @@
               "toPort": "r"
             },
             {
+              "id": "remove-the-old-cable-reverb-out-output-l",
               "kind": "noCable",
               "from": { "type": "reverb" },
               "fromPort": "out",
@@ -866,6 +960,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "set-delay-s-time-to-300-ms-or-more",
               "kind": "slider",
               "ref": { "type": "delay" },
               "param": "time",
@@ -874,6 +969,7 @@
               "label": "Set the Delay’s time to 300 ms or more"
             },
             {
+              "id": "set-delay-s-fb-to-0-4-or-more",
               "kind": "slider",
               "ref": { "type": "delay" },
               "param": "fb",
@@ -882,6 +978,7 @@
               "label": "Set the Delay’s fb to 0.4 or more"
             },
             {
+              "id": "set-reverb-s-size-to-0-6-or-more",
               "kind": "slider",
               "ref": { "type": "reverb" },
               "param": "size",
@@ -900,6 +997,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "bypass-a-module-b-2-times",
               "kind": "event",
               "event": "bypasses",
               "count": 2,
@@ -907,6 +1005,7 @@
               "label": "Press B twice on the Reverb (off, then on)"
             },
             {
+              "id": "switch-reverb-back-on",
               "kind": "event",
               "event": "bypassed",
               "ref": { "type": "reverb" },
@@ -923,6 +1022,7 @@
           "why": "",
           "parts": [
             {
+              "id": "group-or-insert-my-space",
               "kind": "assembly",
               "role": "mySpace",
               "fact": "exists",
@@ -937,10 +1037,31 @@
           "text": "Expand My space, click ○ on the Delay’s time and mix and on the Reverb’s mix, then collapse it. An effect needs few knobs on the outside.",
           "why": "",
           "parts": [
-            { "kind": "assembly", "role": "mySpace", "fact": "promoted", "type": "delay", "param": "time" },
-            { "kind": "assembly", "role": "mySpace", "fact": "promoted", "type": "delay", "param": "mix" },
-            { "kind": "assembly", "role": "mySpace", "fact": "promoted", "type": "reverb", "param": "mix" },
-            { "kind": "assembly", "role": "mySpace", "fact": "collapsed" }
+            {
+              "id": "promote-the-delay-s-time-click-beside-it",
+              "kind": "assembly",
+              "role": "mySpace",
+              "fact": "promoted",
+              "type": "delay",
+              "param": "time"
+            },
+            {
+              "id": "promote-the-delay-s-mix-click-beside-it",
+              "kind": "assembly",
+              "role": "mySpace",
+              "fact": "promoted",
+              "type": "delay",
+              "param": "mix"
+            },
+            {
+              "id": "promote-the-reverb-s-mix-click-beside-it",
+              "kind": "assembly",
+              "role": "mySpace",
+              "fact": "promoted",
+              "type": "reverb",
+              "param": "mix"
+            },
+            { "id": "collapse-my-space", "kind": "assembly", "role": "mySpace", "fact": "collapsed" }
           ]
         },
         {
@@ -950,7 +1071,14 @@
           "text": "Click save on the My space card. Your library now holds an instrument and an effect; the next chapters use both.",
           "why": "",
           "parts": [
-            { "kind": "assembly", "role": "mySpace", "fact": "saved", "tag": "my-space", "name": "My space" }
+            {
+              "id": "save-it-as-my-space-save-on-the-card",
+              "kind": "assembly",
+              "role": "mySpace",
+              "fact": "saved",
+              "tag": "my-space",
+              "name": "My space"
+            }
           ]
         }
       ]
@@ -972,8 +1100,9 @@
           "text": "Add an Oscillator and cable Main pitch → Oscillator pitch. Leave the wave on sine: FM wants pure tones.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "osc" },
+            { "id": "add-an-oscillator", "kind": "module", "type": "osc" },
             {
+              "id": "cable-main-pitch-oscillator-pitch",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -991,8 +1120,9 @@
           "listen": true,
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "vca" },
+            { "id": "add-a-vca", "kind": "module", "type": "vca" },
             {
+              "id": "cable-oscillator-out-vca-in",
               "kind": "cable",
               "from": { "type": "osc" },
               "fromPort": "out",
@@ -1000,6 +1130,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-main-gate-vca-cv",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -1007,6 +1138,7 @@
               "toPort": "cv"
             },
             {
+              "id": "cable-vca-out-output-l",
               "kind": "cable",
               "from": { "type": "vca" },
               "fromPort": "out",
@@ -1022,8 +1154,15 @@
           "text": "Click the Oscillator to select it and press Ctrl+D (Cmd+D), or Commands → Duplicate selection. The copy keeps its settings. Cables from outside the selection are not copied: connect Main pitch to the new Oscillator’s pitch.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "osc", "count": 2, "label": "Duplicate the Oscillator (Ctrl+D)" },
             {
+              "id": "add-a-second-oscillator",
+              "kind": "module",
+              "type": "osc",
+              "count": 2,
+              "label": "Duplicate the Oscillator (Ctrl+D)"
+            },
+            {
+              "id": "cable-main-pitch-every-oscillator-pitch",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -1041,8 +1180,9 @@
           "why": "pm is phase modulation, what the DX7 and this engine do; it sounds like FM. The depth slider is the modulation index: 0 is a sine, 8 is a wall of harmonics.",
           "listen": true,
           "parts": [
-            { "kind": "custom", "name": "fmCarrier" },
+            { "id": "cable-the-second-oscillator-s-out-the-fi", "kind": "custom", "name": "fmCarrier" },
             {
+              "id": "set-carrier-s-pm-to-1-or-more",
               "kind": "slider",
               "ref": { "role": "carrier" },
               "param": "pm",
@@ -1061,6 +1201,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "set-modulator-s-coarse-off-0-st",
               "kind": "slider",
               "ref": { "role": "modulator" },
               "param": "coarse",
@@ -1090,9 +1231,10 @@
           "why": "Env L/R is the DX7 envelope: four levels and the rate to reach each one. The last level, l4, is where the note ends after the key is released.",
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "vca" },
-            { "kind": "module", "type": "env" },
+            { "id": "add-a-vca", "kind": "module", "type": "vca" },
+            { "id": "add-an-env-l-r", "kind": "module", "type": "env" },
             {
+              "id": "cable-carrier-out-vca-in",
               "kind": "cable",
               "from": { "role": "carrier" },
               "fromPort": "out",
@@ -1100,6 +1242,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-main-gate-env-l-r-gate",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -1108,6 +1251,7 @@
               "label": "Cable Main gate → Env gate"
             },
             {
+              "id": "remove-the-old-cable-main-gate-vca-cv-cl",
               "kind": "noCable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -1115,6 +1259,7 @@
               "toPort": "cv"
             },
             {
+              "id": "cable-env-l-r-env-vca-cv",
               "kind": "cable",
               "from": { "type": "env" },
               "fromPort": "env",
@@ -1123,6 +1268,7 @@
               "label": "Cable Env env → VCA cv"
             },
             {
+              "id": "cable-vca-out-output-l",
               "kind": "cable",
               "from": { "type": "vca" },
               "fromPort": "out",
@@ -1140,6 +1286,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "drop-env-l-r-s-env-on-carrier-s-pm-thumb",
               "kind": "routed",
               "from": { "type": "env" },
               "fromPort": "env",
@@ -1148,6 +1295,7 @@
               "label": "Drop the Env’s env on the carrier’s pm thumb"
             },
             {
+              "id": "set-env-l-r-s-l2-to-0-3",
               "kind": "slider",
               "ref": { "type": "env" },
               "param": "l2",
@@ -1156,6 +1304,7 @@
               "label": "Set the Env’s l2 to 0.3"
             },
             {
+              "id": "set-env-l-r-s-l3-to-0-3",
               "kind": "slider",
               "ref": { "type": "env" },
               "param": "l3",
@@ -1164,6 +1313,7 @@
               "label": "Set the Env’s l3 to 0.3"
             },
             {
+              "id": "set-env-l-r-s-r2-between-0-3-s-and-0-5-s",
               "kind": "slider",
               "ref": { "type": "env" },
               "param": "r2",
@@ -1182,6 +1332,7 @@
           "why": "",
           "parts": [
             {
+              "id": "group-or-insert-fm-keys",
               "kind": "assembly",
               "role": "fmKeys",
               "fact": "exists",
@@ -1197,6 +1348,7 @@
           "why": "",
           "parts": [
             {
+              "id": "group-or-insert-my-space",
               "kind": "assembly",
               "role": "mySpace",
               "fact": "exists",
@@ -1212,6 +1364,7 @@
           "why": "",
           "parts": [
             {
+              "id": "cable-fm-keys-out-out-my-space-in-in",
               "kind": "cable",
               "from": { "role": "fmOut" },
               "fromPort": "out",
@@ -1220,6 +1373,7 @@
               "label": "Cable FM keys out → My space in"
             },
             {
+              "id": "cable-my-space-out-l-output-l",
               "kind": "cable",
               "from": { "role": "spaceOut" },
               "fromPort": "l",
@@ -1228,6 +1382,7 @@
               "label": "Cable My space l → Output l"
             },
             {
+              "id": "cable-my-space-out-r-output-r",
               "kind": "cable",
               "from": { "role": "spaceOut" },
               "fromPort": "r",
@@ -1236,6 +1391,7 @@
               "label": "Cable My space r → Output r"
             },
             {
+              "id": "remove-the-old-cable-fm-keys-out-out-out",
               "kind": "noCable",
               "from": { "role": "fmOut" },
               "fromPort": "out",
@@ -1252,8 +1408,14 @@
           "text": "Expand FM keys and drag the My space card into its frame by its header: it becomes part of FM keys, which now exposes l and r itself. Collapse FM keys.",
           "why": "Assemblies nest three levels deep. An instrument that carries its own effect is one card wherever you use it.",
           "parts": [
-            { "kind": "assembly", "role": "fmKeys", "fact": "contains", "child": "mySpace" },
-            { "kind": "assembly", "role": "fmKeys", "fact": "collapsed" }
+            {
+              "id": "drag-the-my-space-card-into-the-fm-keys-",
+              "kind": "assembly",
+              "role": "fmKeys",
+              "fact": "contains",
+              "child": "mySpace"
+            },
+            { "id": "collapse-fm-keys", "kind": "assembly", "role": "fmKeys", "fact": "collapsed" }
           ]
         },
         {
@@ -1263,7 +1425,14 @@
           "text": "Click save on the FM keys card. My space travels inside it.",
           "why": "",
           "parts": [
-            { "kind": "assembly", "role": "fmKeys", "fact": "saved", "tag": "fm-keys", "name": "FM keys" }
+            {
+              "id": "save-it-as-fm-keys-save-on-the-card",
+              "kind": "assembly",
+              "role": "fmKeys",
+              "fact": "saved",
+              "tag": "fm-keys",
+              "name": "FM keys"
+            }
           ]
         }
       ]
@@ -1285,8 +1454,9 @@
           "text": "Add a String. Cable Main pitch → String pitch, Main gate → String gate and String out → Output l. Each key plucks it.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "string" },
+            { "id": "add-a-string", "kind": "module", "type": "string" },
             {
+              "id": "cable-main-pitch-string-pitch",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -1294,6 +1464,7 @@
               "toPort": "pitch"
             },
             {
+              "id": "cable-main-gate-string-gate",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -1301,6 +1472,7 @@
               "toPort": "gate"
             },
             {
+              "id": "cable-string-out-output-l",
               "kind": "cable",
               "from": { "type": "string" },
               "fromPort": "out",
@@ -1318,6 +1490,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "set-string-s-decay-to-3-s-or-more",
               "kind": "slider",
               "ref": { "type": "string" },
               "param": "decay",
@@ -1326,6 +1499,7 @@
               "label": "Set decay to 3 s or more"
             },
             {
+              "id": "set-string-s-damp-to-0-15-or-less",
               "kind": "slider",
               "ref": { "type": "string" },
               "param": "damp",
@@ -1343,7 +1517,7 @@
           "why": "Every module that hears pitch, gate or velocity runs once per voice; effects and the Output stay single and sum the voices.",
           "listen": true,
           "parts": [
-            { "kind": "voices", "min": 2 }
+            { "id": "set-voices-to-2-or-more-on-the-main-card", "kind": "voices", "min": 2 }
           ]
         },
         {
@@ -1354,8 +1528,9 @@
           "why": "",
           "listen": true,
           "parts": [
-            { "kind": "module", "type": "modal" },
+            { "id": "add-a-modal", "kind": "module", "type": "modal" },
             {
+              "id": "cable-string-out-modal-in",
               "kind": "cable",
               "from": { "type": "string" },
               "fromPort": "out",
@@ -1363,6 +1538,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-modal-out-output-r",
               "kind": "cable",
               "from": { "type": "modal" },
               "fromPort": "out",
@@ -1370,6 +1546,7 @@
               "toPort": "r"
             },
             {
+              "id": "set-modal-s-struct-to-0-3-or-more",
               "kind": "slider",
               "ref": { "type": "modal" },
               "param": "struct",
@@ -1378,6 +1555,7 @@
               "label": "Set struct to 0.3 or more"
             },
             {
+              "id": "set-modal-s-decay-between-1-8-s-and-2-2-",
               "kind": "slider",
               "ref": { "type": "modal" },
               "param": "decay",
@@ -1408,10 +1586,11 @@
           "why": "A comb filter is a tuned delay line: noise through it rings at the note, like breath through a pipe. The VCA is a simple on / off here, straight from the gate.",
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "noise", "label": "Add Noise" },
-            { "kind": "module", "type": "comb" },
-            { "kind": "module", "type": "vca" },
+            { "id": "add-a-noise", "kind": "module", "type": "noise", "label": "Add Noise" },
+            { "id": "add-a-comb", "kind": "module", "type": "comb" },
+            { "id": "add-a-vca", "kind": "module", "type": "vca" },
             {
+              "id": "cable-noise-out-comb-in",
               "kind": "cable",
               "from": { "type": "noise" },
               "fromPort": "out",
@@ -1419,6 +1598,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-main-pitch-comb-pitch",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -1426,6 +1606,7 @@
               "toPort": "pitch"
             },
             {
+              "id": "cable-comb-out-vca-in",
               "kind": "cable",
               "from": { "type": "comb" },
               "fromPort": "out",
@@ -1433,6 +1614,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-main-gate-vca-cv",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -1440,6 +1622,7 @@
               "toPort": "cv"
             },
             {
+              "id": "cable-vca-out-output-l",
               "kind": "cable",
               "from": { "type": "vca" },
               "fromPort": "out",
@@ -1457,6 +1640,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "set-comb-s-fb-to-0-9-or-more",
               "kind": "slider",
               "ref": { "type": "comb" },
               "param": "fb",
@@ -1465,6 +1649,7 @@
               "label": "Set the Comb’s fb to 0.9 or more"
             },
             {
+              "id": "set-comb-s-damp-to-0-1",
               "kind": "slider",
               "ref": { "type": "comb" },
               "param": "damp",
@@ -1494,8 +1679,9 @@
           "why": "Glide (portamento) slews a control signal: the pitch takes time to arrive. It works on any control cable, not only pitch.",
           "listen": true,
           "parts": [
-            { "kind": "module", "type": "glide" },
+            { "id": "add-a-glide", "kind": "module", "type": "glide" },
             {
+              "id": "set-glide-s-time-between-0-25-s-and-0-35",
               "kind": "slider",
               "ref": { "type": "glide" },
               "param": "time",
@@ -1505,6 +1691,7 @@
               "label": "Set Glide time to about 0.3 s"
             },
             {
+              "id": "cable-main-pitch-glide-in",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -1512,6 +1699,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-glide-out-comb-pitch",
               "kind": "cable",
               "from": { "type": "glide" },
               "fromPort": "out",
@@ -1519,6 +1707,7 @@
               "toPort": "pitch"
             },
             {
+              "id": "remove-the-old-cable-main-pitch-comb-pit",
               "kind": "noCable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -1535,14 +1724,35 @@
           "why": "",
           "parts": [
             {
+              "id": "group-or-insert-pluck",
               "kind": "assembly",
               "role": "pluck",
               "fact": "exists",
               "label": "Group the String and the Modal (Ctrl+G)"
             },
-            { "kind": "assembly", "role": "pluck", "fact": "promoted", "type": "string", "param": "decay" },
-            { "kind": "assembly", "role": "pluck", "fact": "promoted", "type": "modal", "param": "struct" },
-            { "kind": "assembly", "role": "pluck", "fact": "collapsed", "label": "Collapse the assembly" }
+            {
+              "id": "promote-the-string-s-decay-click-beside-",
+              "kind": "assembly",
+              "role": "pluck",
+              "fact": "promoted",
+              "type": "string",
+              "param": "decay"
+            },
+            {
+              "id": "promote-the-modal-s-struct-click-beside-",
+              "kind": "assembly",
+              "role": "pluck",
+              "fact": "promoted",
+              "type": "modal",
+              "param": "struct"
+            },
+            {
+              "id": "collapse-pluck",
+              "kind": "assembly",
+              "role": "pluck",
+              "fact": "collapsed",
+              "label": "Collapse the assembly"
+            }
           ]
         },
         {
@@ -1552,7 +1762,14 @@
           "text": "Click save on the Pluck card. Chapter 10 plays it from a melody machine.",
           "why": "",
           "parts": [
-            { "kind": "assembly", "role": "pluck", "fact": "saved", "tag": "pluck", "name": "Pluck" }
+            {
+              "id": "save-it-as-pluck-save-on-the-card",
+              "kind": "assembly",
+              "role": "pluck",
+              "fact": "saved",
+              "tag": "pluck",
+              "name": "Pluck"
+            }
           ]
         }
       ]
@@ -1574,8 +1791,9 @@
           "text": "Add a Wavetable and cable Main pitch → Wavetable pitch. Set bank to formant. Next we give it a gated output, then listen to the vowels.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "wavetable" },
+            { "id": "add-a-wavetable", "kind": "module", "type": "wavetable" },
             {
+              "id": "cable-main-pitch-wavetable-pitch",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -1583,6 +1801,7 @@
               "toPort": "pitch"
             },
             {
+              "id": "set-wavetable-s-bank-to-formant",
               "kind": "slider",
               "ref": { "type": "wavetable" },
               "param": "bank",
@@ -1601,8 +1820,9 @@
           "listen": true,
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "vca" },
+            { "id": "add-a-vca", "kind": "module", "type": "vca" },
             {
+              "id": "cable-wavetable-out-vca-in",
               "kind": "cable",
               "from": { "type": "wavetable" },
               "fromPort": "out",
@@ -1610,6 +1830,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-main-gate-vca-cv",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -1617,6 +1838,7 @@
               "toPort": "cv"
             },
             {
+              "id": "cable-vca-out-output-l",
               "kind": "cable",
               "from": { "type": "vca" },
               "fromPort": "out",
@@ -1633,8 +1855,9 @@
           "why": "",
           "listen": true,
           "parts": [
-            { "kind": "module", "type": "lfo", "label": "Add an LFO" },
+            { "id": "add-a-lfo", "kind": "module", "type": "lfo", "label": "Add an LFO" },
             {
+              "id": "drop-lfo-s-out-on-wavetable-s-pos-thumb",
               "kind": "routed",
               "from": { "type": "lfo" },
               "fromPort": "out",
@@ -1643,6 +1866,7 @@
               "label": "Drop the LFO’s out on the pos thumb"
             },
             {
+              "id": "set-lfo-s-rate-to-0-5-hz-or-below",
               "kind": "slider",
               "ref": { "type": "lfo" },
               "param": "rate",
@@ -1660,9 +1884,10 @@
           "why": "",
           "listen": true,
           "parts": [
-            { "kind": "module", "type": "adsr" },
-            { "kind": "module", "type": "vca" },
+            { "id": "add-an-adsr", "kind": "module", "type": "adsr" },
+            { "id": "add-a-vca", "kind": "module", "type": "vca" },
             {
+              "id": "cable-main-gate-adsr-gate",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -1670,6 +1895,7 @@
               "toPort": "gate"
             },
             {
+              "id": "cable-adsr-env-vca-cv",
               "kind": "cable",
               "from": { "type": "adsr" },
               "fromPort": "env",
@@ -1677,6 +1903,7 @@
               "toPort": "cv"
             },
             {
+              "id": "remove-the-old-cable-main-gate-vca-cv-cl",
               "kind": "noCable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -1684,6 +1911,7 @@
               "toPort": "cv"
             },
             {
+              "id": "cable-wavetable-out-vca-in",
               "kind": "cable",
               "from": { "type": "wavetable" },
               "fromPort": "out",
@@ -1691,6 +1919,7 @@
               "toPort": "in"
             },
             {
+              "id": "set-adsr-s-a-to-0-5-s-or-more",
               "kind": "slider",
               "ref": { "type": "adsr" },
               "param": "a",
@@ -1699,6 +1928,7 @@
               "label": "Set a to 0.5 s or more"
             },
             {
+              "id": "set-adsr-s-r-to-1-s-or-more",
               "kind": "slider",
               "ref": { "type": "adsr" },
               "param": "r",
@@ -1717,8 +1947,9 @@
           "listen": true,
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "grain" },
+            { "id": "add-a-granular", "kind": "module", "type": "grain" },
             {
+              "id": "cable-granular-out-output-l",
               "kind": "cable",
               "from": { "type": "grain" },
               "fromPort": "out",
@@ -1726,6 +1957,7 @@
               "toPort": "l"
             },
             {
+              "id": "remove-the-old-cable-vca-out-output-l-cl",
               "kind": "noCable",
               "from": { "type": "vca" },
               "fromPort": "out",
@@ -1733,6 +1965,7 @@
               "toPort": "l"
             },
             {
+              "id": "set-granular-s-size-between-0-12-s-and-0",
               "kind": "slider",
               "ref": { "type": "grain" },
               "param": "size",
@@ -1742,6 +1975,7 @@
               "label": "Set size to about 0.15 s"
             },
             {
+              "id": "set-granular-s-density-to-40-hz",
               "kind": "slider",
               "ref": { "type": "grain" },
               "param": "density",
@@ -1750,6 +1984,7 @@
               "label": "Set density to 40"
             },
             {
+              "id": "cable-vca-out-granular-in",
               "kind": "cable",
               "from": { "type": "vca" },
               "fromPort": "out",
@@ -1757,6 +1992,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-main-gate-granular-trig",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -1764,6 +2000,7 @@
               "toPort": "trig"
             },
             {
+              "id": "set-granular-s-spray-to-0-3-or-more",
               "kind": "slider",
               "ref": { "type": "grain" },
               "param": "spray",
@@ -1772,6 +2009,7 @@
               "label": "Set spray to 0.3 or more"
             },
             {
+              "id": "set-granular-s-pitch-off-0-st",
               "kind": "slider",
               "ref": { "type": "grain" },
               "param": "pitch",
@@ -1801,8 +2039,9 @@
           "why": "",
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "pan" },
+            { "id": "add-a-pan", "kind": "module", "type": "pan" },
             {
+              "id": "remove-the-old-cable-granular-out-output",
               "kind": "noCable",
               "from": { "type": "grain" },
               "fromPort": "out",
@@ -1810,6 +2049,7 @@
               "toPort": "l"
             },
             {
+              "id": "cable-granular-out-pan-in",
               "kind": "cable",
               "from": { "type": "grain" },
               "fromPort": "out",
@@ -1817,6 +2057,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-pan-l-output-l",
               "kind": "cable",
               "from": { "type": "pan" },
               "fromPort": "l",
@@ -1824,6 +2065,7 @@
               "toPort": "l"
             },
             {
+              "id": "cable-pan-r-output-r",
               "kind": "cable",
               "from": { "type": "pan" },
               "fromPort": "r",
@@ -1831,6 +2073,7 @@
               "toPort": "r"
             },
             {
+              "id": "cable-lfo-out-pan-pos",
               "kind": "cable",
               "from": { "type": "lfo" },
               "fromPort": "out",
@@ -1847,8 +2090,9 @@
           "text": "Add a Phaser between the Granular and the Pan: Granular out → Phaser in, Phaser out → Pan in, and remove the cable from the Granular to the Pan.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "phaser" },
+            { "id": "add-a-phaser", "kind": "module", "type": "phaser" },
             {
+              "id": "cable-granular-out-phaser-in",
               "kind": "cable",
               "from": { "type": "grain" },
               "fromPort": "out",
@@ -1856,6 +2100,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-phaser-out-pan-in",
               "kind": "cable",
               "from": { "type": "phaser" },
               "fromPort": "out",
@@ -1863,6 +2108,7 @@
               "toPort": "in"
             },
             {
+              "id": "remove-the-old-cable-granular-out-pan-in",
               "kind": "noCable",
               "from": { "type": "grain" },
               "fromPort": "out",
@@ -1878,7 +2124,7 @@
           "text": "Nine cards no longer fit. Hold Ctrl (Cmd) and scroll to zoom, pinch on a touch screen, or use Commands → Fit patch to screen.",
           "why": "",
           "parts": [
-            { "kind": "event", "event": "zooms" }
+            { "id": "zoom-the-canvas-ctrl-wheel-or-fit-patch-", "kind": "event", "event": "zooms" }
           ]
         },
         {
@@ -1890,6 +2136,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "click-beside-granular-s-out",
               "kind": "event",
               "event": "probe",
               "ref": { "type": "grain" },
@@ -1918,12 +2165,14 @@
           "why": "",
           "parts": [
             {
+              "id": "group-or-insert-my-voice",
               "kind": "assembly",
               "role": "myVoice",
               "fact": "exists",
               "label": "Insert My voice from your library"
             },
             {
+              "id": "cable-main-pitch-my-voice-s-oscillator-p",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -1932,6 +2181,7 @@
               "label": "Cable Main pitch → My voice pitch"
             },
             {
+              "id": "cable-main-gate-my-voice-s-adsr-gate",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -1949,6 +2199,7 @@
           "why": "",
           "parts": [
             {
+              "id": "group-or-insert-fm-keys",
               "kind": "assembly",
               "role": "fmKeys",
               "fact": "exists",
@@ -1964,13 +2215,14 @@
           "why": "A merged input sends one cable to several inner inputs. Split undoes it.",
           "parts": [
             {
+              "id": "merge-the-pitch-inputs-of-fm-keys-merge-",
               "kind": "assembly",
               "role": "fmKeys",
               "fact": "merged",
               "port": "pitch",
               "label": "Merge the two pitch inputs of FM keys (merge into…)"
             },
-            { "kind": "assembly", "role": "fmKeys", "fact": "collapsed" }
+            { "id": "collapse-fm-keys", "kind": "assembly", "role": "fmKeys", "fact": "collapsed" }
           ]
         },
         {
@@ -1981,6 +2233,7 @@
           "why": "",
           "parts": [
             {
+              "id": "cable-main-pitch-every-oscillator-in-fm-",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "pitch",
@@ -1989,6 +2242,7 @@
               "label": "Cable Main pitch → FM keys pitch"
             },
             {
+              "id": "cable-main-gate-fm-keys-gate-gate",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -2005,8 +2259,9 @@
           "text": "Add a Mixer 4. Cable My voice out → in1, FM keys l → in2, FM keys r → in3, and Mixer out → Output l and r. l1..l4 are the levels.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "mixer", "loose": true },
+            { "id": "add-a-mixer-4-outside-the-assemblies", "kind": "module", "type": "mixer", "loose": true },
             {
+              "id": "cable-my-voice-out-out-mixer-4-outside-t",
               "kind": "cable",
               "from": { "role": "myVoiceOut" },
               "fromPort": "out",
@@ -2015,6 +2270,7 @@
               "label": "Cable My voice out → Mixer in1"
             },
             {
+              "id": "cable-my-space-out-l-mixer-4-outside-the",
               "kind": "cable",
               "from": { "role": "spaceOut" },
               "fromPort": "l",
@@ -2023,6 +2279,7 @@
               "label": "Cable FM keys l → Mixer in2"
             },
             {
+              "id": "cable-my-space-out-r-mixer-4-outside-the",
               "kind": "cable",
               "from": { "role": "spaceOut" },
               "fromPort": "r",
@@ -2031,6 +2288,7 @@
               "label": "Cable FM keys r → Mixer in3"
             },
             {
+              "id": "cable-mixer-4-outside-the-assemblies-out",
               "kind": "cable",
               "from": { "type": "mixer", "loose": true },
               "fromPort": "out",
@@ -2039,6 +2297,7 @@
               "label": "Cable Mixer out → Output l"
             },
             {
+              "id": "cable-mixer-4-outside-the-assemblies-out-2",
               "kind": "cable",
               "from": { "type": "mixer", "loose": true },
               "fromPort": "out",
@@ -2068,7 +2327,12 @@
           "why": "",
           "listen": true,
           "parts": [
-            { "kind": "event", "event": "arpPlay", "label": "Enable the arpeggiator (Space)" }
+            {
+              "id": "start-the-arpeggiator-space",
+              "kind": "event",
+              "event": "arpPlay",
+              "label": "Enable the arpeggiator (Space)"
+            }
           ]
         },
         {
@@ -2080,6 +2344,7 @@
           "listen": true,
           "parts": [
             {
+              "id": "cable-main-k2-my-voice-s-filter-p1",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "k2",
@@ -2088,12 +2353,14 @@
               "label": "Cable Main k2 → My voice p1"
             },
             {
+              "id": "tick-p1-in-the-menu-of-cutoff",
               "kind": "pinMap",
               "ref": { "role": "myVoice", "type": "filter" },
               "pin": "p1",
               "param": "cutoff"
             },
             {
+              "id": "map-cutoff-from-150-hz-to-4000-hz-with-p",
               "kind": "macroRange",
               "ref": { "role": "myVoice", "type": "filter" },
               "pin": "p1",
@@ -2112,9 +2379,9 @@
           "why": "",
           "listen": true,
           "parts": [
-            { "kind": "event", "event": "snapshotA" },
-            { "kind": "event", "event": "snapshotB" },
-            { "kind": "event", "event": "flips" }
+            { "id": "set-snapshot-a-commands", "kind": "event", "event": "snapshotA" },
+            { "id": "set-snapshot-b-commands", "kind": "event", "event": "snapshotB" },
+            { "id": "press-alt-b", "kind": "event", "event": "flips" }
           ]
         },
         {
@@ -2125,8 +2392,9 @@
           "why": "A morph target must have the same modules and cables. Snapshot B is a complete compatible patch; selecting it copies its parameters into the B side. Main itself is not morphed.",
           "listen": true,
           "parts": [
-            { "kind": "custom", "name": "morphTarget" },
+            { "id": "choose-snapshot-b-in-main-s-b-side-picke", "kind": "custom", "name": "morphTarget" },
             {
+              "id": "set-main-s-morph-between-0-01-and-0-99",
               "kind": "slider",
               "ref": { "type": "fm1" },
               "param": "morph",
@@ -2156,8 +2424,9 @@
           "text": "Add an LFO, set its wave to square and its rate to 4 Hz. A square wave is a clock: its rising edge is a tick.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "lfo", "label": "Add an LFO" },
+            { "id": "add-a-lfo", "kind": "module", "type": "lfo", "label": "Add an LFO" },
             {
+              "id": "set-lfo-s-wave-to-square",
               "kind": "slider",
               "ref": { "type": "lfo" },
               "param": "wave",
@@ -2166,6 +2435,7 @@
               "label": "Set its wave to square"
             },
             {
+              "id": "set-lfo-s-rate-to-2-hz-or-more",
               "kind": "slider",
               "ref": { "type": "lfo" },
               "param": "rate",
@@ -2183,8 +2453,9 @@
           "why": "",
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "clkdiv" },
+            { "id": "add-a-clock-div", "kind": "module", "type": "clkdiv" },
             {
+              "id": "cable-lfo-out-clock-div-clock",
               "kind": "cable",
               "from": { "type": "lfo" },
               "fromPort": "out",
@@ -2200,9 +2471,10 @@
           "text": "Add Noise and an S&H (sample and hold). Cable Noise out → S&H in and Clock div out → S&H clock. On every tick the S&H grabs the noise’s value and holds it.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "noise", "label": "Add Noise" },
-            { "kind": "module", "type": "sh", "label": "Add an S&H" },
+            { "id": "add-a-noise", "kind": "module", "type": "noise", "label": "Add Noise" },
+            { "id": "add-a-s-h", "kind": "module", "type": "sh", "label": "Add an S&H" },
             {
+              "id": "cable-noise-out-s-h-in",
               "kind": "cable",
               "from": { "type": "noise" },
               "fromPort": "out",
@@ -2210,6 +2482,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-clock-div-out-s-h-clock",
               "kind": "cable",
               "from": { "type": "clkdiv" },
               "fromPort": "out",
@@ -2226,8 +2499,9 @@
           "why": "Pitch is a control signal: one unit per octave, a semitone is a twelfth. The quantizer rounds to the nearest note of the scale, which is why random noise sounds like a melody.",
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "quant" },
+            { "id": "add-a-quantizer", "kind": "module", "type": "quant" },
             {
+              "id": "cable-s-h-out-quantizer-in",
               "kind": "cable",
               "from": { "type": "sh" },
               "fromPort": "out",
@@ -2235,6 +2509,7 @@
               "toPort": "in"
             },
             {
+              "id": "set-quantizer-s-scale-to-pent-min",
               "kind": "slider",
               "ref": { "type": "quant" },
               "param": "scale",
@@ -2251,8 +2526,15 @@
           "text": "Insert Pluck from Your library. Cable Quantizer out → Pluck pitch, Clock div out → Pluck gate and Pluck out → Output l. The machine plays on its own now.",
           "why": "",
           "parts": [
-            { "kind": "assembly", "role": "pluck", "fact": "exists", "label": "Insert Pluck from your library" },
             {
+              "id": "group-or-insert-pluck",
+              "kind": "assembly",
+              "role": "pluck",
+              "fact": "exists",
+              "label": "Insert Pluck from your library"
+            },
+            {
+              "id": "cable-quantizer-out-pluck-pitch",
               "kind": "cable",
               "from": { "type": "quant" },
               "fromPort": "out",
@@ -2260,13 +2542,14 @@
               "toPort": "pitch"
             },
             {
+              "id": "cable-clock-div-out-pluck-gate",
               "kind": "cable",
               "from": { "type": "clkdiv" },
               "fromPort": "out",
               "to": { "role": "pluckString" },
               "toPort": "gate"
             },
-            { "kind": "custom", "name": "pluckOut" }
+            { "id": "cable-pluck-out-output-l", "kind": "custom", "name": "pluckOut" }
           ]
         },
         {
@@ -2277,8 +2560,9 @@
           "why": "A divider passes selected input pulses with their original width. Pulse makes a predictable 0.05 s gate regardless of the clock’s pulse width.",
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "pulse" },
+            { "id": "add-a-pulse", "kind": "module", "type": "pulse" },
             {
+              "id": "set-pulse-s-time-to-0-1-s-or-below",
               "kind": "slider",
               "ref": { "type": "pulse" },
               "param": "time",
@@ -2287,6 +2571,7 @@
               "label": "Set the Pulse’s time to 0.1 s or less"
             },
             {
+              "id": "cable-clock-div-d2-pulse-trig",
               "kind": "cable",
               "from": { "type": "clkdiv" },
               "fromPort": "d2",
@@ -2294,12 +2579,14 @@
               "toPort": "trig"
             },
             {
+              "id": "group-or-insert-fm-keys",
               "kind": "assembly",
               "role": "fmKeys",
               "fact": "exists",
               "label": "Insert FM keys from your library"
             },
             {
+              "id": "cable-quantizer-out-every-oscillator-in-",
               "kind": "cable",
               "from": { "type": "quant" },
               "fromPort": "out",
@@ -2308,6 +2595,7 @@
               "label": "Cable Quantizer out → FM keys pitch"
             },
             {
+              "id": "cable-pulse-out-fm-keys-gate-gate",
               "kind": "cable",
               "from": { "type": "pulse" },
               "fromPort": "out",
@@ -2316,6 +2604,7 @@
               "label": "Cable Pulse out → FM keys gate"
             },
             {
+              "id": "cable-my-space-out-l-output-r",
               "kind": "cable",
               "from": { "role": "spaceOut" },
               "fromPort": "l",
@@ -2344,8 +2633,9 @@
           "text": "Add a Sequencer, cable Clock div out → Sequencer clock and Sequencer out → Quantizer in, and remove the cable from the S&H to the Quantizer. Set s1..s4 to a few different values; len to 4.",
           "why": "The Sequencer’s steps are the same kind of signal the S&H made, just chosen by you. Through the quantizer the steps land on scale notes whatever you set them to.",
           "parts": [
-            { "kind": "module", "type": "seq" },
+            { "id": "add-a-sequencer", "kind": "module", "type": "seq" },
             {
+              "id": "cable-clock-div-out-sequencer-clock",
               "kind": "cable",
               "from": { "type": "clkdiv" },
               "fromPort": "out",
@@ -2353,6 +2643,7 @@
               "toPort": "clock"
             },
             {
+              "id": "cable-sequencer-out-quantizer-in",
               "kind": "cable",
               "from": { "type": "seq" },
               "fromPort": "out",
@@ -2360,6 +2651,7 @@
               "toPort": "in"
             },
             {
+              "id": "remove-the-old-cable-s-h-out-quantizer-i",
               "kind": "noCable",
               "from": { "type": "sh" },
               "fromPort": "out",
@@ -2367,6 +2659,7 @@
               "toPort": "in"
             },
             {
+              "id": "set-sequencer-s-len-to-4-or-less",
               "kind": "slider",
               "ref": { "type": "seq" },
               "param": "len",
@@ -2384,6 +2677,7 @@
           "why": "",
           "parts": [
             {
+              "id": "cable-main-clock-clock-div-clock",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "clock",
@@ -2391,6 +2685,7 @@
               "toPort": "clock"
             },
             {
+              "id": "remove-the-old-cable-lfo-out-clock-div-c",
               "kind": "noCable",
               "from": { "type": "lfo" },
               "fromPort": "out",
@@ -2398,6 +2693,7 @@
               "toPort": "clock"
             },
             {
+              "id": "set-clock-div-s-div-to-6",
               "kind": "slider",
               "ref": { "type": "clkdiv" },
               "param": "div",
@@ -2405,8 +2701,9 @@
               "value": 6,
               "label": "Set the first Clock div’s div to 6"
             },
-            { "kind": "module", "type": "clkdiv", "count": 2 },
+            { "id": "add-a-second-clock-div", "kind": "module", "type": "clkdiv", "count": 2 },
             {
+              "id": "cable-clock-div-out-the-second-clock-div",
               "kind": "cable",
               "from": { "type": "clkdiv" },
               "fromPort": "out",
@@ -2415,6 +2712,7 @@
               "label": "Cable first divider out → second divider clock"
             },
             {
+              "id": "cable-the-second-clock-div-d2-pulse-trig",
               "kind": "cable",
               "from": { "type": "clkdiv", "index": 1 },
               "fromPort": "d2",
@@ -2423,6 +2721,7 @@
               "label": "Cable second divider d2 → Pulse trig"
             },
             {
+              "id": "remove-the-old-cable-clock-div-d2-pulse-",
               "kind": "noCable",
               "from": { "type": "clkdiv" },
               "fromPort": "d2",
@@ -2440,7 +2739,12 @@
           "why": "",
           "listen": true,
           "parts": [
-            { "kind": "event", "event": "arpPlay", "label": "Start the arpeggiator clock (Space)" }
+            {
+              "id": "start-the-arpeggiator-space",
+              "kind": "event",
+              "event": "arpPlay",
+              "label": "Start the arpeggiator clock (Space)"
+            }
           ]
         }
       ]
@@ -2462,9 +2766,10 @@
           "text": "Add Noise and a Filter. Cable Noise out → Filter in and set the cutoff to about 6 kHz: the Filter’s hp output is the hiss of a hat.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "noise", "label": "Add Noise" },
-            { "kind": "module", "type": "filter" },
+            { "id": "add-a-noise", "kind": "module", "type": "noise", "label": "Add Noise" },
+            { "id": "add-a-filter", "kind": "module", "type": "filter" },
             {
+              "id": "cable-noise-out-filter-in",
               "kind": "cable",
               "from": { "type": "noise" },
               "fromPort": "out",
@@ -2472,6 +2777,7 @@
               "toPort": "in"
             },
             {
+              "id": "set-filter-s-cutoff-to-4000-hz-or-more",
               "kind": "slider",
               "ref": { "type": "filter" },
               "param": "cutoff",
@@ -2490,9 +2796,10 @@
           "listen": true,
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "env" },
-            { "kind": "module", "type": "vca" },
+            { "id": "add-an-env-l-r", "kind": "module", "type": "env" },
+            { "id": "add-a-vca", "kind": "module", "type": "vca" },
             {
+              "id": "cable-filter-hp-vca-in",
               "kind": "cable",
               "from": { "type": "filter" },
               "fromPort": "hp",
@@ -2500,6 +2807,7 @@
               "toPort": "in"
             },
             {
+              "id": "cable-main-gate-env-l-r-gate",
               "kind": "cable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -2508,6 +2816,7 @@
               "label": "Cable Main gate → Env gate"
             },
             {
+              "id": "cable-env-l-r-env-vca-cv",
               "kind": "cable",
               "from": { "type": "env" },
               "fromPort": "env",
@@ -2516,6 +2825,7 @@
               "label": "Cable Env env → VCA cv"
             },
             {
+              "id": "cable-vca-out-output-l",
               "kind": "cable",
               "from": { "type": "vca" },
               "fromPort": "out",
@@ -2523,6 +2833,7 @@
               "toPort": "l"
             },
             {
+              "id": "set-env-l-r-s-l1-to-1",
               "kind": "slider",
               "ref": { "type": "env" },
               "param": "l1",
@@ -2531,6 +2842,7 @@
               "label": "Set l1 to 1"
             },
             {
+              "id": "set-env-l-r-s-r1-to-0-001-s-or-below",
               "kind": "slider",
               "ref": { "type": "env" },
               "param": "r1",
@@ -2539,6 +2851,7 @@
               "label": "Set r1 to 0.001 s"
             },
             {
+              "id": "set-env-l-r-s-l2-to-0",
               "kind": "slider",
               "ref": { "type": "env" },
               "param": "l2",
@@ -2547,6 +2860,7 @@
               "label": "Set l2 to 0"
             },
             {
+              "id": "set-env-l-r-s-r2-between-0-06-s-and-0-1-",
               "kind": "slider",
               "ref": { "type": "env" },
               "param": "r2",
@@ -2556,6 +2870,7 @@
               "label": "Set r2 to about 0.08 s"
             },
             {
+              "id": "set-env-l-r-s-l3-to-0",
               "kind": "slider",
               "ref": { "type": "env" },
               "param": "l3",
@@ -2564,6 +2879,7 @@
               "label": "Set l3 to 0"
             },
             {
+              "id": "set-env-l-r-s-l4-to-0",
               "kind": "slider",
               "ref": { "type": "env" },
               "param": "l4",
@@ -2581,12 +2897,20 @@
           "why": "",
           "parts": [
             {
+              "id": "group-or-insert-hat",
               "kind": "assembly",
               "role": "hat",
               "fact": "exists",
               "label": "Group the Noise, Filter, Env and VCA (Ctrl+G)"
             },
-            { "kind": "assembly", "role": "hat", "fact": "saved", "tag": "hat", "name": "Hat" }
+            {
+              "id": "save-it-as-hat-save-on-the-card",
+              "kind": "assembly",
+              "role": "hat",
+              "fact": "saved",
+              "tag": "hat",
+              "name": "Hat"
+            }
           ]
         },
         {
@@ -2597,12 +2921,14 @@
           "why": "",
           "parts": [
             {
+              "id": "group-or-insert-the-factory-kick",
               "kind": "assembly",
               "role": "kick",
               "fact": "exists",
               "label": "Insert the factory kick (Drums shelf)"
             },
             {
+              "id": "group-or-insert-the-factory-snare",
               "kind": "assembly",
               "role": "snare",
               "fact": "exists",
@@ -2618,8 +2944,9 @@
           "why": "",
           "superseded": true,
           "parts": [
-            { "kind": "module", "type": "lfo", "label": "Add an LFO" },
+            { "id": "add-a-lfo", "kind": "module", "type": "lfo", "label": "Add an LFO" },
             {
+              "id": "set-lfo-s-wave-to-square",
               "kind": "slider",
               "ref": { "type": "lfo" },
               "param": "wave",
@@ -2628,6 +2955,7 @@
               "label": "Set the LFO’s wave to square"
             },
             {
+              "id": "set-lfo-s-rate-to-6-hz-or-more",
               "kind": "slider",
               "ref": { "type": "lfo" },
               "param": "rate",
@@ -2635,8 +2963,9 @@
               "value": 6,
               "label": "Set the LFO’s rate to 6 Hz or more"
             },
-            { "kind": "module", "type": "clkdiv" },
+            { "id": "add-a-clock-div", "kind": "module", "type": "clkdiv" },
             {
+              "id": "set-clock-div-s-div-to-2",
               "kind": "slider",
               "ref": { "type": "clkdiv" },
               "param": "div",
@@ -2645,6 +2974,7 @@
               "label": "Set the Clock div’s div to 2"
             },
             {
+              "id": "cable-lfo-out-clock-div-clock",
               "kind": "cable",
               "from": { "type": "lfo" },
               "fromPort": "out",
@@ -2662,6 +2992,7 @@
           "superseded": true,
           "parts": [
             {
+              "id": "cable-lfo-out-hat-gate-gate",
               "kind": "cable",
               "from": { "type": "lfo" },
               "fromPort": "out",
@@ -2670,16 +3001,19 @@
               "label": "Cable LFO out → Hat gate"
             },
             {
+              "id": "cable-clock-div-d2-kick-gate",
               "kind": "custom",
               "name": "drumTriggered",
               "args": { "drum": "kick", "port": "d2" }
             },
             {
+              "id": "cable-clock-div-d4-snare-gate",
               "kind": "custom",
               "name": "drumTriggered",
               "args": { "drum": "snare", "port": "d4" }
             },
             {
+              "id": "remove-the-old-cable-main-gate-hat-gate-",
               "kind": "noCable",
               "from": { "type": "fm1" },
               "fromPort": "gate",
@@ -2696,18 +3030,21 @@
           "text": "Add a Mixer 4: kick out → in1, snare out → in2, Hat out → in3, and Mixer out → Output l and r. Remove the Hat’s own cable to Output. Set l1 to 0.9 and l3 to 0.4.",
           "why": "",
           "parts": [
-            { "kind": "module", "type": "mixer", "loose": true },
+            { "id": "add-a-mixer-4-outside-the-assemblies", "kind": "module", "type": "mixer", "loose": true },
             {
+              "id": "cable-kick-out-mixer-in1",
               "kind": "custom",
               "name": "drumOut",
               "args": { "drum": "kick", "input": "in1" }
             },
             {
+              "id": "cable-snare-out-mixer-in2",
               "kind": "custom",
               "name": "drumOut",
               "args": { "drum": "snare", "input": "in2" }
             },
             {
+              "id": "cable-hat-out-out-mixer-4-outside-the-as",
               "kind": "cable",
               "from": { "role": "hatOut" },
               "fromPort": "out",
@@ -2716,6 +3053,7 @@
               "label": "Cable Hat out → Mixer in3"
             },
             {
+              "id": "cable-mixer-4-outside-the-assemblies-out",
               "kind": "cable",
               "from": { "type": "mixer", "loose": true },
               "fromPort": "out",
@@ -2724,6 +3062,7 @@
               "label": "Cable Mixer out → Output l"
             },
             {
+              "id": "cable-mixer-4-outside-the-assemblies-out-2",
               "kind": "cable",
               "from": { "type": "mixer", "loose": true },
               "fromPort": "out",
@@ -2732,6 +3071,7 @@
               "label": "Cable Mixer out → Output r"
             },
             {
+              "id": "set-mixer-4-outside-the-assemblies-s-l1-",
               "kind": "slider",
               "ref": { "type": "mixer", "loose": true },
               "param": "l1",
@@ -2740,6 +3080,7 @@
               "label": "Set Mixer l1 to 0.9"
             },
             {
+              "id": "set-mixer-4-outside-the-assemblies-s-l3-",
               "kind": "slider",
               "ref": { "type": "mixer", "loose": true },
               "param": "l3",
@@ -2748,6 +3089,7 @@
               "label": "Set Mixer l3 to 0.4"
             },
             {
+              "id": "remove-the-old-cable-hat-out-out-output-",
               "kind": "noCable",
               "from": { "role": "hatOut" },
               "fromPort": "out",
@@ -2766,7 +3108,7 @@
           "listen": true,
           "superseded": true,
           "parts": [
-            { "kind": "custom", "name": "beat" }
+            { "id": "build-three-drum-sequencers", "kind": "custom", "name": "beat" }
           ]
         },
         {
@@ -2777,7 +3119,7 @@
           "why": "One divider ticks once per bar. A slow Sequencer brings in the melody and lengthens the hat tail for a flourish. The same clock drives the notes and the form. If you skipped Pluck, the bundled instrument stands in for it.",
           "listen": true,
           "parts": [
-            { "kind": "custom", "name": "performance" }
+            { "id": "build-the-eight-bar-arrangement-with-plu", "kind": "custom", "name": "performance" }
           ]
         },
         {
@@ -2787,7 +3129,7 @@
           "text": "Commands → Share patch link copies a link to this patch to your clipboard. Anyone who opens it gets the beat, your Pluck instrument and the eight-bar arrangement. Name and save a personal variation at the finish.",
           "why": "",
           "parts": [
-            { "kind": "event", "event": "shares" }
+            { "id": "copy-a-share-link-commands-share-patch-l", "kind": "event", "event": "shares" }
           ]
         }
       ]

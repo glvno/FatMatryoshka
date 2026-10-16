@@ -8,7 +8,7 @@ import type { AssemblyInst } from '../assembly';
 import { allModules, assembliesOf } from '../assembly';
 import { asmLike, cabled, findDef, loose, member, mod, mods, savedAssembly, T, type Target, type TutorialState } from './model';
 import { CUSTOM, ROLES } from './registry';
-import type { EventName, Part, Pointer, Ref, RoleDef, SliderOp } from './course-schema';
+import { slugId, type EventName, type Part, type PartSpec, type Pointer, type Ref, type RoleDef, type SliderOp } from './course-schema';
 
 type S = TutorialState;
 type M = ModuleInst | undefined;
@@ -150,7 +150,7 @@ const EVENT_LABEL: Record<EventName, string> = {
 const COUNTERS: EventName[] = ['notes', 'undos', 'redos', 'zooms', 'flips', 'shares', 'bypasses', 'news', 'saves'];
 
 /** the part looks at something that happens during the step, so a finished patch cannot show it */
-export function momentary(part: Part): boolean {
+export function momentary(part: PartSpec): boolean {
   switch (part.kind) {
     case 'event': return true;
     case 'slider': case 'att': return part.op === 'changed';
@@ -160,8 +160,13 @@ export function momentary(part: Part): boolean {
   }
 }
 
+/** a requirement with a new id, made from its generated checklist line and unique among `taken` */
+export function withId(spec: PartSpec, roles: Roles, taken: Iterable<string>): Part {
+  return { ...spec, id: slugId(partLabel({ ...spec, label: undefined } as PartSpec, roles), taken) } as Part;
+}
+
 /** the checklist line */
-export function partLabel(part: Part, roles: Roles): string {
+export function partLabel(part: PartSpec, roles: Roles): string {
   if (part.label) return part.label;
   const n = (r: Ref) => refName(roles, r);
   switch (part.kind) {
@@ -215,7 +220,7 @@ export function partLabel(part: Part, roles: Roles): string {
   return '';
 }
 
-export function partCheck(part: Part, s: S, roles: Roles): boolean {
+export function partCheck(part: PartSpec, s: S, roles: Roles): boolean {
   const p = s.patch;
   const one = (r: Ref) => resolve(s, roles, r);
   switch (part.kind) {
@@ -287,7 +292,7 @@ export function partCheck(part: Part, s: S, roles: Roles): boolean {
 }
 
 /** the elements a part is about: what the highlight points at while it is unmet */
-export function partTargets(part: Part, s: S, roles: Roles): Target[] {
+export function partTargets(part: PartSpec, s: S, roles: Roles): Target[] {
   const p = s.patch;
   const one = (r: Ref) => resolve(s, roles, r);
   switch (part.kind) {

@@ -7,7 +7,7 @@ import { defaultMap, paramValue, sameEnd, type ModuleInst, type Patch } from '..
 import { allModules, assembliesOf, type AssemblyDef, type AssemblyInst } from '../assembly';
 import { headlessState, member, mods, type Seen } from './model';
 import { resolve, roleAssembly, type Roles } from './parts';
-import type { EventName, Part, Ref } from './course-schema';
+import type { EventName, PartSpec as Part, Ref } from './course-schema';
 
 export interface Recorded {
   /** the patch when recording started (the step's beginning state) */

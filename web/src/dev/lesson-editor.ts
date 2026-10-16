@@ -10,10 +10,10 @@ import './lesson-editor.css';
 import { DEFS } from '../modules';
 import { PRESETS } from '../presets';
 import type { Patch } from '../patch';
-import { formatCourse, refKey, slugId, validateShape, ASSEMBLY_FACTS, EVENT_NAMES, PART_KINDS, SLIDER_OPS, type AssemblyFact, type ChapterData, type CourseData, type EventName, type Part, type PartKind, type Pointer, type Ref, type RoleDef, type SliderOp, type StartRule, type StepData } from '../tutorial/course-schema';
+import { formatCourse, refKey, slugId, validateShape, ASSEMBLY_FACTS, EVENT_NAMES, PART_KINDS, SLIDER_OPS, type AssemblyFact, type ChapterData, type CourseData, type EventName, type Part, type PartKind, type PartSpec, type Pointer, type Ref, type RoleDef, type SliderOp, type StartRule, type StepData } from '../tutorial/course-schema';
 import { compileStep, stepStart } from '../tutorial/chapters';
 import { parseMidi } from '../tutorial/riff';
-import { momentary, partCheck, partLabel, refType } from '../tutorial/parts';
+import { momentary, partCheck, partLabel, refType, withId } from '../tutorial/parts';
 import { CUSTOM, ROLES } from '../tutorial/registry';
 import { validateCourse, type Issue, type Report } from '../tutorial/validate';
 import { capture, type Proposal } from '../tutorial/capture';
@@ -90,7 +90,7 @@ async function request(init?: RequestInit): Promise<Snapshot> {
   return data;
 }
 
-const defaultPart = (kind: PartKind, course: CourseData): Part => {
+const defaultPart = (kind: PartKind, course: CourseData): PartSpec => {
   const asmRole = Object.keys(course.roles).find((r) => course.roles[r].kind !== 'member') ?? '';
   switch (kind) {
     case 'module': return { kind, type: 'osc' };
@@ -428,7 +428,7 @@ async function mount() {
     const parts = st.parts!;
     const part = parts[i];
     const row = el('fieldset', 'lesson-part');
-    const set = (next: Part, structural = true) => { parts[i] = next; if (structural) { row.replaceWith(partEditor(st, i, onStructure)); } else gen.textContent = partLabel({ ...next, label: undefined } as Part, draft.roles); edited(); };
+    const set = (next: PartSpec, structural = true) => { parts[i] = { ...next, id: part.id, ...(part.hidden ? { hidden: true } : {}) } as Part; if (structural) { row.replaceWith(partEditor(st, i, onStructure)); } else gen.textContent = partLabel({ ...next, label: undefined } as PartSpec, draft.roles); edited(); };
     const roles = draft.roles;
     const head = el('div', 'lesson-part-head');
     const dot = el('span', 'lesson-dot'); dot.dataset.part = String(i); dot.title = 'Live check against the synth';
@@ -611,7 +611,7 @@ async function mount() {
     const partList = el('div', 'lesson-parts');
     const redraw = () => { partList.replaceChildren(...(st.parts ?? []).map((_, i) => partEditor(st, i, redraw))); updateLive(); };
     redraw();
-    const add = select([['', '+ Add requirement…'], ...PART_KINDS.map((k) => [k, KINDS[k]] as [string, string])], '', (v) => { if (!v) return; (st.parts ??= []).push(defaultPart(v as PartKind, draft)); edited(); redraw(); add.value = ''; }, 'Add requirement');
+    const add = select([['', '+ Add requirement…'], ...PART_KINDS.map((k) => [k, KINDS[k]] as [string, string])], '', (v) => { if (!v) return; (st.parts ??= []).push(withId(defaultPart(v as PartKind, draft), draft.roles, st.parts.map((p) => p.id))); edited(); redraw(); add.value = ''; }, 'Add requirement');
     reqs.append(partList, add);
     fields.append(flags, reqs, riffEditor(st), referenceEditor(ch, ci, st, k));
   }
@@ -822,7 +822,7 @@ async function mount() {
     const keepRef = check('Keep the synth’s patch as this step’s reference', true, () => {});
     const done = (add: boolean) => {
       if (add) {
-        if (st.kind === 'task') (st.parts ??= []).push(...proposals.filter((_, i) => ticks[i]).map((p) => p.part));
+        if (st.kind === 'task') { const parts = (st.parts ??= []); for (const p of proposals.filter((_, i) => ticks[i])) parts.push(withId(p.part, draft.roles, parts.map((x) => x.id))); }
         if ((keepRef.firstChild as HTMLInputElement).checked && st.kind === 'task') draft.references[key] = { patch: after, ...(savedDef ? { saved: savedDef } : {}) };
         if (later) tell('Later steps of this chapter were recorded on the old state: Course checks shows any that no longer hold.');
       }

@@ -21,6 +21,37 @@ markdown.renderer.rules.link_open = (tokens, index, options, _env, renderer) => 
   tokens[index].attrSet('rel', 'noopener noreferrer');
   return renderer.renderToken(tokens, index, options);
 };
+// A link to `req:id[,id…]` is a requirement placed in the text: a checkbox around the author's words, ticked by the panel.
+const REQ = /^req:([a-z0-9][a-z0-9-]*(?:,[a-z0-9][a-z0-9-]*)*)$/;
+markdown.core.ruler.push('req', (state) => {
+  for (const block of state.tokens) {
+    const open: boolean[] = [];
+    for (const t of block.children ?? []) {
+      if (t.type === 'link_open') {
+        const m = REQ.exec(String(t.attrGet('href') ?? ''));
+        open.push(!!m);
+        if (m) { t.type = 'req_open'; t.tag = 'span'; t.attrs = [['class', 'req'], ['data-req', m[1]]]; }
+      } else if (t.type === 'link_close' && open.pop()) { t.type = 'req_close'; t.tag = 'span'; }
+    }
+  }
+});
+markdown.renderer.rules.req_open = (tokens, index) =>
+  `<span class="req" data-req="${markdown.utils.escapeHtml(String(tokens[index].attrGet('data-req') ?? ''))}"><span class="req-box" aria-hidden="true"></span><span class="req-text">`;
+markdown.renderer.rules.req_close = () => '</span></span>';
+
+/** the requirement ids the text places, one list per checkbox, in reading order */
+export function placedRequirements(source: string): string[][] {
+  const out: string[][] = [];
+  const walk = (tokens: ReturnType<typeof markdown.parse>) => {
+    for (const t of tokens) {
+      if (t.type === 'req_open') out.push(String(t.attrGet('data-req') ?? '').split(','));
+      if (t.children) walk(t.children);
+    }
+  };
+  walk(markdown.parse(source, {}));
+  return out;
+}
+
 // The lesson title is h2; prose headings start below it, even when written as #.
 for (const rule of ['heading_open', 'heading_close']) {
   markdown.renderer.rules[rule] = (tokens, index, options, _env, renderer) => {

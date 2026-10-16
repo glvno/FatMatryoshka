@@ -64,8 +64,14 @@ export interface Step {
   /** a later step of the same chapter undoes this one's state (a cable replaced): not re-checked afterwards */
   superseded?: boolean;
   check(s: TutorialState): boolean;
-  /** the unmet parts of the check, as the panel lists them ("a cable Main gate → VCA cv") */
+  /** the unmet parts of the check as generated lines ("Cable Main gate → VCA cv"), for messages */
   todo?(s: TutorialState): string[];
+  /** whether each requirement is met, by id (the text's checkboxes) */
+  met?(s: TutorialState): Record<string, boolean>;
+  /** the unmet requirements the text does not place and that are not hidden, as generated lines */
+  unplaced?(s: TutorialState): string[];
+  /** the elements of these requirements (a checkbox the learner clicked) */
+  targetsOf?(ids: string[], s: TutorialState): Target[];
   /** the elements of the first unmet part: what the highlight points at next */
   focus?(s: TutorialState): Target[];
   /** a Continue step shows the playback buttons */

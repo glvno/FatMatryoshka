@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // The tutorial course, compiled from its data (course.json, written by the lesson editor): each step's check is its parts
-// (parts.ts), the panel lists the unmet ones and highlights the first, so a locked Next always says why and points where.
+// (parts.ts); the step's text places them as checkboxes (`[words](req:id)`, markdown.ts) and the panel highlights the
+// first unmet one in reading order, so a locked Next always says why and points where.
 // Canned patches come from the reference patches stored with the steps: a chapter's start is its start rule, a step's
 // beginning state is the previous task step's reference, a chapter's end is its last reference. The design is in
 // docs/TUTORIAL.md; the data's shape in course-schema.ts.
@@ -11,6 +12,7 @@ import { PRESETS } from '../presets';
 import type { AssemblyDef } from '../assembly';
 import { findDef, type Chapter, type Step, type TutorialState } from './model';
 import { momentary, partCheck, partLabel, partTargets, pointerTargets, type Roles } from './parts';
+import { placedRequirements } from './markdown';
 import { refKey, type ChapterData, type CourseData, type StepData } from './course-schema';
 
 export const COURSE = content as unknown as CourseData;
@@ -20,18 +22,27 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 export function compileStep(st: StepData, roles: Roles): Step {
   const parts = st.kind === 'continue' ? [] : st.parts ?? [];
   const ok = (s: TutorialState) => parts.map((p) => partCheck(p, s, roles));
+  // reading order: the text's checkboxes, then unplaced requirements, then hidden ones
+  const placedIds = st.kind === 'continue' ? [] : placedRequirements(st.text).flat();
+  const placed = new Set(placedIds);
+  const index = (id: string) => parts.findIndex((p) => p.id === id);
+  const order = [...new Set([...placedIds.map(index).filter((i) => i >= 0), ...parts.map((_, i) => i).filter((i) => !parts[i].hidden), ...parts.map((_, i) => i)])];
   return {
     id: st.id, kind: st.kind, title: st.title, text: st.text, why: st.why || undefined,
     listen: st.kind === 'continue' || !!st.listen, optional: !!st.optional, superseded: !!st.superseded,
     transient: st.kind === 'continue' || parts.some(momentary), playback: st.kind === 'continue' ? !!st.playback : true, riff: st.riff,
     check: (s) => ok(s).every(Boolean),
     todo: (s) => { const r = ok(s); return parts.filter((_, i) => !r[i]).map((p) => partLabel(p, roles)); },
-    // a done step keeps pointing at its last part, so the panel stays anchored while it says "moving on"
+    met: (s) => { const r = ok(s); return Object.fromEntries(parts.map((p, i) => [p.id, r[i]])); },
+    unplaced: (s) => { const r = ok(s); return parts.filter((p, i) => !r[i] && !p.hidden && !placed.has(p.id)).map((p) => partLabel(p, roles)); },
+    targetsOf: (ids, s) => parts.filter((p) => ids.includes(p.id)).flatMap((p) => partTargets(p, s, roles)),
+    // the first unmet part in reading order; a done step keeps pointing at its last part, so the panel stays anchored
+    // while it says "moving on"
     focus: (s) => {
       if (st.kind === 'continue') return pointerTargets(st.pointer, s, roles);
       const r = ok(s);
-      const p = parts[r.findIndex((x) => !x)] ?? parts[parts.length - 1];
-      return p ? partTargets(p, s, roles) : [];
+      const p = order.find((i) => !r[i]) ?? order[order.length - 1];
+      return p !== undefined ? partTargets(parts[p], s, roles) : [];
     },
   };
 }

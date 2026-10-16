@@ -42,8 +42,8 @@ export type EventName =
   | 'notes' | 'undos' | 'redos' | 'zooms' | 'flips' | 'shares' | 'bypasses' | 'news' | 'saves'
   | 'audio' | 'arpPlay' | 'snapshotA' | 'snapshotB' | 'probe' | 'selected' | 'bypassed';
 
-/** one requirement of a step. `label` replaces the generated checklist line. */
-export type Part =
+/** what a requirement checks. `label` replaces the generated checklist line. */
+export type PartSpec =
   | { kind: 'module'; type: string; count?: number; loose?: boolean; label?: string }
   | { kind: 'cable'; from: Ref; fromPort: string; to: Ref; toPort: string; label?: string }
   | { kind: 'noCable'; from: Ref; fromPort: string; to: Ref; toPort: string; label?: string }
@@ -65,6 +65,12 @@ export type Part =
   | { kind: 'sound'; mode: 'held' | 'silent'; threshold?: number; label?: string }
   /** a check from the code registry (registry.ts) */
   | { kind: 'custom'; name: string; args?: Record<string, string | number>; label?: string };
+
+/**
+ * A step's requirement: what it checks, plus a permanent `id` (the step's text places it as a checkbox with a link
+ * `[the learner's instruction](req:id)`, several ids comma-separated) and `hidden` for a guard the text does not show.
+ */
+export type Part = PartSpec & { id: string; hidden?: boolean };
 
 export type PartKind = Part['kind'];
 
@@ -201,8 +207,14 @@ export function validateShape(value: unknown, allowEmpty = false): asserts value
       text(st.why, `${sp}.why`, false);
       if (st.parts !== undefined && !Array.isArray(st.parts)) fail(`${sp}.parts`, 'expected a list');
       if (st.riff !== undefined && riffProblem(st.riff)) fail(`${sp}.riff`, riffProblem(st.riff));
+      const partIds = new Set<string>();
       for (const [j, p] of ((st.parts as unknown[]) ?? []).entries()) {
         if (!isObj(p) || !PART_KINDS.includes(p.kind as PartKind)) fail(`${sp}, part ${j + 1}`, 'unknown requirement kind');
+        const pp = `${sp}, part ${j + 1}`;
+        id((p as Record<string, unknown>).id, `${pp}.id`);
+        if (partIds.has((p as Record<string, unknown>).id as string)) fail(`${pp}.id`, `"${(p as Record<string, unknown>).id}" is used twice in the step`);
+        partIds.add((p as Record<string, unknown>).id as string);
+        if ((p as Record<string, unknown>).hidden !== undefined && typeof (p as Record<string, unknown>).hidden !== 'boolean') fail(`${pp}.hidden`, 'expected true or false');
         if ((p as Record<string, unknown>).label !== undefined) text((p as Record<string, unknown>).label, `${sp}, part ${j + 1}.label`, false);
       }
     });
