@@ -515,7 +515,7 @@ export class Editor {
   wheelHost: HTMLElement | null = null;
   /** the keyboard's octave buttons, shown under Main's output strip (set by the host, then rebuild) */
   dockOctave: HTMLElement | null = null;
-  /** the FM-1 budget meter, shown in its own column right of the knobs (set by the host, then rebuild) */
+  /** the FM-1 budget meter, shown in its own column right of the arpeggiator (set by the host, then rebuild) */
   dockBudget: HTMLElement | null = null;
 
   private docked(): ModuleInst | undefined {
@@ -583,9 +583,9 @@ export class Editor {
     el.append(title,
       col('dock-outputs', strip, ...(this.dockOctave ? [this.dockOctave] : [])),
       col('dock-knobs', null, knobs),
-      ...(this.dockBudget ? [col('dock-budget', null, this.dockBudget)] : []),
       col('dock-morph', null, morph, this.morphRow()),
-      col('dock-arp', jacks(ARP), arp));
+      col('dock-arp', jacks(ARP), arp),
+      ...(this.dockBudget ? [col('dock-budget', null, this.dockBudget)] : []));
     return el;
   }
 

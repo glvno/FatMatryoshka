@@ -78,7 +78,7 @@ device.onStatus = devStatus;
 /** upload the current patch; changes made meanwhile cause one more upload */
 async function sendPatch(): Promise<boolean> {
   if (!fitsDevice) {
-    devStatus('over the FM-1 budget: not sent (the FM-1 budget beside the knobs says what is over)');
+    devStatus('over the FM-1 budget: not sent (the FM-1 budget right of the arpeggiator says what is over)');
     return false;
   }
   if (uploading) {
