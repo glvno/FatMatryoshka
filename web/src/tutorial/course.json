@@ -51,7 +51,7 @@
           "id": "audio",
           "kind": "task",
           "title": "Enable audio",
-          "text": "Click `Enable audio` in the sidebar.",
+          "text": "[Click `Enable audio` in the sidebar.](req:enable-audio)",
           "why": "",
           "parts": [
             { "id": "enable-audio", "kind": "event", "event": "audio" }
@@ -61,7 +61,7 @@
           "id": "new",
           "kind": "task",
           "title": "The patch",
-          "text": "A *patch* is a catch-all term for any configuration of interconnected synth modules. The term comes from the *patch cables* we use to connect analog synth modules.[^1]\n\n# Click `NEW PATCH` in the sidebar. \n\n[^1]: Long ago, patch cables were used to hot-swap spare equipment into vital communications systems in which something had melted, burned out, or exploded. \n\n    These days, patch cables are mostly used by recreational drug users, commodity fetishists, and the neurodivergent in order to make things go *wubwubwubwub*\n",
+          "text": "A *patch* is a catch-all term for any configuration of interconnected synth modules. The term comes from the *patch cables* we use to connect analog synth modules.[^1]\n\n# [Click `NEW PATCH` in the sidebar.](req:press-new-patch) \n\n[^1]: Long ago, patch cables were used to hot-swap spare equipment into vital communications systems in which something had melted, burned out, or exploded. \n\n    These days, patch cables are mostly used by recreational drug users, commodity fetishists, and the neurodivergent in order to make things go *wubwubwubwub*\n",
           "why": "",
           "superseded": true,
           "parts": [
@@ -72,7 +72,7 @@
           "id": "osc",
           "kind": "task",
           "title": "Add an Oscillator",
-          "text": "`Main` here is what is going to send the information from our keyboard circulating through our patch. \n\nIts two most important functions are to send `pitch` (i.e., what note is being played) and `gate`, which answers yes or no to the question, \"Is a key being held down right now?\"[^1]\n\nThe output of `Output` is what you hear. It's can be thought of as the rectum of a patch. A synth patch poops sound into the toilet of the ear.\n\n# Add an `Oscillator` module using the sidebar button or command palette (`Ctrl/Cmd+K` or the `/` key). \n\nAny module on the canvas can be moved around by clicking on its header and dragging it around.\n\n[^1]: The caveats, exceptions, and backpedaling that go here are on our feature roadmap and are slated to be added in Q3 of FY 2029",
+          "text": "`Main` here is what is going to send the information from our keyboard circulating through our patch. \n\nIts two most important functions are to send `pitch` (i.e., what note is being played) and `gate`, which answers yes or no to the question, \"Is a key being held down right now?\"[^1]\n\nThe output of `Output` is what you hear. It's can be thought of as the rectum of a patch. A synth patch poops sound into the toilet of the ear.\n\n# [Add an `Oscillator` module using the sidebar button or command palette (`Ctrl/Cmd+K` or the `/` key).](req:add-an-oscillator) \n\nAny module on the canvas can be moved around by clicking on its header and dragging it around.\n\n[^1]: The caveats, exceptions, and backpedaling that go here are on our feature roadmap and are slated to be added in Q3 of FY 2029",
           "why": "",
           "parts": [
             { "id": "add-an-oscillator", "kind": "module", "type": "osc" }
@@ -82,7 +82,7 @@
           "id": "pitch",
           "kind": "task",
           "title": "Oscillators",
-          "text": "An *oscillator* is a machine named after what it does. It oscillates.[^1] \n\nWant it to stop oscillating? Too bad. If it stopped, that would constitute behavior that synth experts call `not oscillating`. For that you would need a completely different kind of machine.[^2]\n\n## Connect `main`’s pitch output to the `Oscillator’s` pitch input with a patch cable (click one jack and drag to the other jack). \n\nCongratulations! Your machine makes noise.  This noise is continuous.\n\n[^1]: Oscillation is any continuous fluctuation over time that is centered around some central value. Synth oscillators emit continuously fluctuating voltage -- traditionally anywhere from 5V to -5V, centered around 0V. \n\n[^2]: These machines are pricey, because they have only ever been made by one company. That company is called Teenage Engineering",
+          "text": "An *oscillator* is a machine named after what it does. It oscillates.[^1] \n\nWant it to stop oscillating? Too bad. If it stopped, that would constitute behavior that synth experts call `not oscillating`. For that you would need a completely different kind of machine.[^2]\n\n## [Connect `main`’s pitch output to the `Oscillator’s` pitch input with a patch cable (click one jack and drag to the other jack).](req:cable-main-pitch-oscillator-pitch) \n\n## [Cable Oscillator out → Output l](req:cable-oscillator-out-output-l)\n\nCongratulations! Your machine makes noise.  This noise is continuous.\n\n[^1]: Oscillation is any continuous fluctuation over time that is centered around some central value. Synth oscillators emit continuously fluctuating voltage -- traditionally anywhere from 5V to -5V, centered around 0V. \n\n[^2]: These machines are pricey, because they have only ever been made by one company. That company is called Teenage Engineering",
           "why": "",
           "parts": [
             {
@@ -100,22 +100,6 @@
               "fromPort": "out",
               "to": { "type": "output" },
               "toPort": "l"
-            },
-            {
-              "id": "cable-main-pitch-oscillator-pitch-2",
-              "kind": "cable",
-              "from": { "type": "fm1" },
-              "fromPort": "pitch",
-              "to": { "type": "osc" },
-              "toPort": "pitch"
-            },
-            {
-              "id": "cable-oscillator-out-output-l-2",
-              "kind": "cable",
-              "from": { "type": "osc" },
-              "fromPort": "out",
-              "to": { "type": "output" },
-              "toPort": "l"
             }
           ],
           "listen": true,
@@ -125,7 +109,7 @@
           "id": "out",
           "kind": "task",
           "title": "Shutting up an oscillator",
-          "text": "Press some keys on the home row of your computer keyboard. You should hear your noise change pitch. \n\nYou can do this for a while, but eventually your ears and brain will start to hurt. \n\nWhen you've had enough, **click on the patch cable between `Oscillator`'s `out` jack and `Output`'s `in` jack to remove the cable.**",
+          "text": "Press some keys on the home row of your computer keyboard. You should hear your noise change pitch. \n\nYou can do this for a while, but eventually your ears and brain will start to hurt. \n\nWhen you've had enough, **[click on the patch cable between `Oscillator`'s `out` jack and `Output`'s `in` jack to remove the cable.](req:remove-the-old-cable-oscillator-out-outp)**",
           "why": "",
           "listen": true,
           "superseded": true,
@@ -144,10 +128,10 @@
           "id": "vca",
           "kind": "task",
           "title": "Shutting up an oscillator (cont'd)",
-          "text": "Obviously, it would be impractical to unplug your oscillator every time you want a note to stop sounding. Luckily, there is a solution: the *voltage-controlled amplifier (VCA)*.\n\n## Add a VCA module. \n\nA VCA has two important inputs: `in`, for an audio signal, and `cv`, for control voltage. Its `output` is just those two signals multiplied together. \n\nIn the next step, we're going to use a VCA to multiply `Oscillator`'s  output voltage by zero. This is how we shut up an oscillator.",
+          "text": "Obviously, it would be impractical to unplug your oscillator every time you want a note to stop sounding. Luckily, there is a solution: the *voltage-controlled amplifier (VCA)*.\n\n## [Add a VCA module.](req:add-a-vca) \n\nA VCA has two important inputs: `in`, for an audio signal, and `cv`, for control voltage. Its `output` is just those two signals multiplied together. \n\nIn the next step, we're going to use a VCA to multiply `Oscillator`'s  output voltage by zero. This is how we shut up an oscillator.",
           "why": "",
           "parts": [
-            { "id": "make-it-silent-when-no-key-is-held", "kind": "sound", "mode": "silent" },
+            { "id": "make-it-silent-when-no-key-is-held", "kind": "sound", "mode": "silent", "hidden": true },
             { "id": "add-a-vca", "kind": "module", "type": "vca" }
           ],
           "listen": true
@@ -156,7 +140,7 @@
           "id": "vca-copy",
           "kind": "task",
           "title": "Shutting up an oscillator (cont'd) (cont'd)",
-          "text": "Let's put the VCA to work.\n\n## 1. Drag the Oscillator’s out jack to the VCA’s in jack. \n\n## 2. Drag the VCA’s out jack to Output’s l jack.\n\nSilence. The Oscillator is still oscillating, but the VCA is closed: nothing is plugged into its `control voltage` jack.\n\n## 3.  Drag `main`'s `gate` jack to VCA's `cv` jack.\n\n## 4. Press a key on your keyboard's home row. Play a little ditty.\n\nThis little machine is starting to resemble an instrument.",
+          "text": "Let's put the VCA to work.\n\n## 1. [Drag the Oscillator’s out jack to the VCA’s in jack.](req:cable-oscillator-out-vca-in) \n\n## 2. [Drag the VCA’s out jack to Output’s l jack.](req:cable-vca-out-output-l)\n\nSilence. The Oscillator is still oscillating, but the VCA is closed: nothing is plugged into its `control voltage` jack.\n\n## 3.  [Drag `main`'s `gate` jack to VCA's `cv` jack.](req:cable-main-gate-vca-cv)\n\n## 4. Press a key on your keyboard's home row. Play a little ditty.\n\nThis little machine is starting to resemble an instrument.",
           "why": "",
           "parts": [
             {
@@ -181,17 +165,10 @@
               "from": { "type": "osc" },
               "fromPort": "out",
               "to": { "type": "output" },
-              "toPort": "l"
+              "toPort": "l",
+              "hidden": true
             },
-            { "id": "make-it-silent-when-no-key-is-held", "kind": "sound", "mode": "silent" },
-            {
-              "id": "cable-oscillator-out-vca-in-2",
-              "kind": "cable",
-              "from": { "type": "osc" },
-              "fromPort": "out",
-              "to": { "type": "vca" },
-              "toPort": "in"
-            },
+            { "id": "make-it-silent-when-no-key-is-held", "kind": "sound", "mode": "silent", "hidden": true },
             {
               "id": "cable-main-gate-vca-cv",
               "kind": "cable",
@@ -199,14 +176,6 @@
               "fromPort": "gate",
               "to": { "type": "vca" },
               "toPort": "cv"
-            },
-            {
-              "id": "cable-vca-out-output-l-2",
-              "kind": "cable",
-              "from": { "type": "vca" },
-              "fromPort": "out",
-              "to": { "type": "output" },
-              "toPort": "l"
             }
           ],
           "listen": true
@@ -222,7 +191,7 @@
           "id": "scope",
           "kind": "task",
           "title": "Seeing sound",
-          "text": "To the left of the Oscillator’s `out` jack you'll find a little grey ◎ button.\n\n## Click it.\n\nThe window that just popped up is what's called an *oscilloscope*. \n\nWhat you see there is a live visualization of the oscillator's output voltage over time.  You may recognize this squiggle from high school math class as a *wave*.  \n\nConveniently, sound can also be represented as a wave.\n\n*Analog audio* gets its name from the strategy of using changes in voltage as an *analogy* for changes in air pressure.\n",
+          "text": "To the left of the Oscillator’s `out` jack you'll find a little grey ◎ button.\n\n## [Click it.](req:click-beside-oscillator-s-out)\n\nThe window that just popped up is what's called an *oscilloscope*. \n\nWhat you see there is a live visualization of the oscillator's output voltage over time.  You may recognize this squiggle from high school math class as a *wave*.  \n\nConveniently, sound can also be represented as a wave.\n\n*Analog audio* gets its name from the strategy of using changes in voltage as an *analogy* for changes in air pressure.\n",
           "why": "",
           "listen": true,
           "parts": [
@@ -231,8 +200,7 @@
               "kind": "event",
               "event": "probe",
               "ref": { "type": "osc" },
-              "port": "out",
-              "label": "Click ◎ beside the Oscillator’s out"
+              "port": "out"
             }
           ]
         },
@@ -240,16 +208,11 @@
           "id": "wave",
           "kind": "task",
           "title": "Change the wave",
-          "text": "The shape of a wave determines its timbre. \n\nRight now, our oscillator emits a `sine` wave -- reminscent of a french horn.  But there are a few other types of wave it can emit  -- hold a note and move its `wave` slider around to hear what they sound like.",
+          "text": "The shape of a wave determines its timbre. \n\nRight now, our oscillator emits a `sine` wave -- reminscent of a french horn.  But there are a few other types of wave it can emit  -- [hold a note and move its `wave` slider around to hear what they sound like](req:play-a-note).",
           "why": "",
           "listen": true,
           "parts": [
-            {
-              "id": "play-a-note",
-              "kind": "event",
-              "event": "notes",
-              "label": "Listen with Note or Riff, or play your keyboard"
-            }
+            { "id": "play-a-note", "kind": "event", "event": "notes" }
           ]
         }
       ]
