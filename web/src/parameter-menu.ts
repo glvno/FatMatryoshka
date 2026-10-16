@@ -42,7 +42,7 @@ export function parameterMenu(m: ModuleInst, def: ModuleDef, pd: ParamDef, ev: E
   };
   const label = longName(def.type, pd.name);
   const summary = document.createElement('summary');
-  summary.textContent = '⋯';
+  summary.textContent = '⋮';
   summary.title = `${def.label} ${label}: modulation and knob assignments`;
   summary.setAttribute('aria-label', summary.title);
   const content = document.createElement('div');

@@ -530,6 +530,8 @@ export class Editor {
   wheelHost: HTMLElement | null = null;
   /** the keyboard's octave buttons, shown under Main's output strip (set by the host, then rebuild) */
   dockOctave: HTMLElement | null = null;
+  /** the arpeggiator's play switch, shown beside its settings button (set by the host, then rebuild) */
+  dockArp: HTMLElement | null = null;
   /** the FM-1 budget meter, shown in its own column right of the arpeggiator (set by the host, then rebuild) */
   dockBudget: HTMLElement | null = null;
 
@@ -599,11 +601,19 @@ export class Editor {
       col('dock-outputs', strip, ...(this.dockOctave ? [this.dockOctave] : [])),
       col('dock-knobs', null, knobs),
       col('dock-morph', null, morph, this.morphRow()),
-      col('dock-arp', jacks(ARP), arp),
+      col('dock-arp', jacks(ARP), ...(this.dockArp ? [this.arpLine(arp)] : [arp])),
       ...(this.dockBudget ? [col('dock-budget', null, this.dockBudget)] : []));
     return el;
   }
 
+
+  /** the arpeggiator's play switch and its settings button side by side */
+  private arpLine(arp: HTMLElement): HTMLElement {
+    const line = document.createElement('div');
+    line.className = 'arp-line';
+    line.append(this.dockArp!, arp);
+    return line;
+  }
 
   private card(m: ModuleInst, def: ModuleDef, perVoice: number, open?: AssemblyInst): HTMLElement {
     const el = document.createElement('div');
@@ -860,7 +870,7 @@ export class Editor {
       pickJack.dataset.mod = String(m.id);
       pickJack.dataset.param = pd.name;
       pickJack.dataset.dir = 'in';
-      pickJack.title = `${def.label} ${longName(def.type, pd.name)}: drop a cable here to modulate it (depth in the ⋯ menu).`;
+      pickJack.title = `${def.label} ${longName(def.type, pd.name)}: drop a cable here to modulate it (depth in the ⋮ menu).`;
       pickJack.addEventListener('pointerdown', (e) => this.beginDrag(e, pickJack));
       this.sliderPorts.push({ m, pd, jack: pickJack, ticks: () => {} });
     }
@@ -1330,10 +1340,14 @@ export class Editor {
   // ---- click-to-connect: a click on a jack arms it, a click on a jack of the other direction connects; Esc cancels
 
   private armed: HTMLElement | null = null;
+  /** the ghost cable from the armed jack to the pointer (stops following when the arm ends) */
+  private armGhost: (() => void) | null = null;
 
   cancelArm(): void {
     this.armed?.classList.remove('armed');
     this.armed = null;
+    this.armGhost?.();
+    this.armGhost = null;
     this.setPatching(false);
     this.drag?.cancel();
   }
@@ -2166,6 +2180,8 @@ export class Editor {
     const t = e.target as HTMLElement;
     if (e.button !== 0 || t.closest('.module, .fhead, .dot, button, input, select, .ctx')) return;
     e.preventDefault();
+    // a click on the empty canvas drops an armed jack's ghost cable
+    if (this.armed) return this.cancelArm();
     if (e.pointerType === 'touch') {
       // one finger on the empty canvas pans it (a rubber band needs a mouse or shift)
       let lx = e.clientX, ly = e.clientY;
@@ -2459,10 +2475,7 @@ export class Editor {
     for (const { m, pd, jack } of this.sliderPorts) for (const port of parameterInputs(m, pd)) {
       const side = this.inputJack({ module: m.id, port });
       if (!side || (this.inDock(side) && this.inDock(jack))) continue; // the dock draws no routes inside itself
-      if (port === pd.input) {
-        if (side.closest('.erow') && side.closest('.erow') === jack.closest('.erow')) continue; // on its parameter's row: the row shows the link
-        add(side, jack, 'control', null, `Built in: ${port} sets ${pd.name}`, true);
-      }
+      if (port === pd.input) add(side, jack, 'control', null, `Built in: ${port} sets ${pd.name}`, true);
       else add(side, jack, 'control', () => this.change(() => {
         setInputRoute(m, DEFS[m.type], port, pd.name, false);
       }), `Disconnect ${DEFS[m.type].label} ${port} → ${pd.name}`, true);
@@ -2574,25 +2587,12 @@ export class Editor {
       return;
     }
     const kind = start.dataset.dir;
-    // the cable being dragged: in the layer over the whole window (not the canvas's), so it shows over the sidebar on its way
-    // to a sidebar slider's thumb
-    const path = document.createElementNS(SVGNS, 'path');
-    path.setAttribute('class', 'cable pending');
-    this.sideOverlay().append(path);
+    const { path, move, stop } = this.ghostCable(start);
     this.setPatching(true);
-    const move = (ev: PointerEvent): void => {
-      const c = this.world.getBoundingClientRect();
-      const p = { x: (ev.clientX - c.left) / this.zoom, y: (ev.clientY - c.top) / this.zoom };
-      const s = this.center(start);
-      const end = this.endOf(start);
-      path.setAttribute('d', kind === 'out' ? this.curve(s, p, end) : this.curve(p, s, 'side', end));
-      path.setAttribute('transform', `translate(${c.left} ${c.top}) scale(${this.zoom})`);
-    };
     const cancel = (): void => {
-      window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', cancel);
-      path.remove();
+      stop();
       this.drag = null;
       this.setPatching(false);
     };
@@ -2608,12 +2608,48 @@ export class Editor {
         this.armed = start;
         start.classList.add('armed');
         this.setPatching(true);
+        // click-to-connect: a ghost cable follows the pointer, as while dragging, until the second click or Esc
+        const ghost = this.ghostCable(start);
+        ghost.move(ev);
+        this.armGhost = ghost.stop;
       } else if (dot?.dataset.mod) this.connectJacks(start, dot);
     };
     this.drag = { path, cancel };
-    window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', cancel);
     move(e);
+  }
+
+  /**
+   * A cable from a jack to the pointer, following it until `stop`. It is drawn in the layer over the whole window (not the
+   * canvas's), so it shows over the sidebar on its way to a sidebar slider's thumb.
+   */
+  private ghostCable(start: HTMLElement): { path: SVGPathElement; move: (ev: PointerEvent) => void; stop: () => void } {
+    const kind = start.dataset.dir;
+    const path = document.createElementNS(SVGNS, 'path');
+    path.setAttribute('class', 'cable pending');
+    this.sideOverlay().append(path);
+    let last: PointerEvent | null = null;
+    const move = (ev: PointerEvent): void => {
+      last = ev;
+      const c = this.world.getBoundingClientRect();
+      const p = { x: (ev.clientX - c.left) / this.zoom, y: (ev.clientY - c.top) / this.zoom };
+      const s = this.center(start);
+      const end = this.endOf(start);
+      path.setAttribute('d', kind === 'out' ? this.curve(s, p, end) : this.curve(p, s, 'side', end));
+      path.setAttribute('transform', `translate(${c.left} ${c.top}) scale(${this.zoom})`);
+    };
+    // the canvas scrolling or zooming moves the jack under a still pointer
+    const again = (): void => { if (last) move(last); };
+    window.addEventListener('pointermove', move);
+    this.canvas.addEventListener('scroll', again);
+    return {
+      path, move,
+      stop: () => {
+        window.removeEventListener('pointermove', move);
+        this.canvas.removeEventListener('scroll', again);
+        path.remove();
+      },
+    };
   }
 }

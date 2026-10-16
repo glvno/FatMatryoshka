@@ -12,6 +12,7 @@ export class AudioHost {
   muted = false;
   mute(on: boolean): void {
     this.muted = on;
+    this.onState();
     if (this.gain && this.ctx) this.gain.gain.setTargetAtTime(on ? 0 : 1, this.ctx.currentTime, 0.01);
   }
   private ready: Promise<void> | null = null;
@@ -21,6 +22,8 @@ export class AudioHost {
   private valuesPending = false;
   private latestValues: ParameterValues | null = null;
   private frame = 0;
+  /** the audio went on or off (running and not muted): the deck's Audio on / Panic button follows it */
+  onState: () => void = () => {};
   onValues: (values: ParameterValues | null) => void = () => {};
   onError: (msg: string) => void = () => {};
   /** a scope probe's latest samples (oldest first) */
@@ -44,6 +47,7 @@ export class AudioHost {
     await this.ready;
     await resumed;
     this.watchValues();
+    this.onState();
   }
 
   private async prepare(ctx: AudioContext): Promise<void> {
@@ -68,7 +72,7 @@ export class AudioHost {
       node.connect(this.gain);
       this.gain.connect(ctx.destination);
       this.node = node;
-      ctx.onstatechange = () => this.watchValues();
+      ctx.onstatechange = () => { this.watchValues(); this.onState(); };
       if (this.pending) {
         this.send({ t: 'patch', patch: this.pending, revision: this.revision });
         this.send({ t: 'arp', cfg: this.pending.arp ?? ARP_DEFAULT });

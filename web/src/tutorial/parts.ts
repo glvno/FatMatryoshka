@@ -213,7 +213,7 @@ export function partLabel(part: PartSpec, roles: Roles): string {
       return `Set ${n(part.ref)}’s ${part.param} ${opText(part.op, pd, part.value, part.max)}`;
     }
     case 'routed': return `Drop ${n(part.from)}’s ${part.fromPort} on ${n(part.to)}’s ${part.param} thumb`;
-    case 'pinMap': return `Tick ${part.pin.toUpperCase()} in the ⋯ menu of ${part.param}`;
+    case 'pinMap': return `Tick ${part.pin.toUpperCase()} in the ⋮ menu of ${part.param}`;
     case 'att': {
       const what = part.pin ? `the ${part.pin} attenuverter` : `the depth on ${part.param}`;
       return part.op === 'changed' ? `Move ${what}` : `Set ${what} ${opText(part.op, undefined, part.value, part.max)}`;
@@ -397,7 +397,7 @@ export function partTargets(part: PartSpec, s: S, roles: Roles): Target[] {
         case 'audio': return T.ui('audio-btn');
         case 'news': return T.ui('new-patch-btn');
         case 'notes': return T.param(mod(p, 'output'), 'level');
-        case 'arpPlay': return T.module(mod(p, 'fm1')?.id);
+        case 'arpPlay': return T.ui('arp-btn');
         case 'probe': return T.probe(part.ref && one(part.ref), part.port ?? 'out');
         case 'bypassed': case 'bypasses': return T.module(part.ref ? one(part.ref)?.id : undefined);
         case 'selected': {

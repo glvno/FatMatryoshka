@@ -233,6 +233,15 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
 editor.wheelHost = $('wheels');
 editor.dockWheels = hands.wheels;
 editor.dockOctave = piano.octaveControls;
+// the arpeggiator's play switch, beside its settings in Main's arpeggiator column (kept across redraws)
+const arpBtn = document.createElement('button');
+arpBtn.id = 'arp-btn';
+arpBtn.type = 'button';
+arpBtn.textContent = 'Play';
+arpBtn.title = 'Arpeggiator: plays while keys are held (Space)';
+arpBtn.setAttribute('aria-label', 'Arpeggiator play');
+arpBtn.setAttribute('aria-pressed', 'false');
+editor.dockArp = arpBtn;
 editor.dockBudget = $('budget');
 editor.rebuild();
 showBudget();
@@ -460,7 +469,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Set snapshot B', keywords: 'compare ab', run: () => takeSnapshot('B') },
     { kind: 'command', label: 'Switch A / B snapshots', detail: 'Alt+B', run: inPatch(flipAB) },
     { kind: 'command', label: 'Start audio', keywords: 'sound browser', run: () => void startAudio() },
-    { kind: 'command', label: 'Panic: stop all notes', keywords: 'silence stuck', run: () => { tutorial.stop(); host.mute(true); sink.send({ t: 'panic' }); } },
+    { kind: 'command', label: 'Panic: stop all notes', keywords: 'silence stuck', run: panic },
     { kind: 'command', label: 'FM-1 & MIDI settings', keywords: 'connect send store sync hardware keyboard release', run: () => $<HTMLDialogElement>('device-bar').showModal() },
     { kind: 'command', label: 'Flash firmware', keywords: 'install update hardware', run: () => switchTab('flash') },
     { kind: 'command', label: 'About Matryoshka', keywords: 'credits', run: () => switchTab('about') },
@@ -745,11 +754,14 @@ try {
 } catch {
   /* storage blocked: no slack */
 }
-$('panic-btn').onclick = () => { tutorial.stop(); host.mute(true); sink.send({ t: 'panic' }); };
-
-// the deck's Arp button, Space and the Main card's arpeggiator box are one switch
+function panic(): void {
+  tutorial.stop();
+  host.mute(true);
+  sink.send({ t: 'panic' });
+}
+// the Arp button in Main's arpeggiator column, Space and the arpeggiator's enable box are one switch
 function syncArpBtn(): void {
-  $('arp-btn').setAttribute('aria-pressed', String(editor.arpPlay));
+  arpBtn.setAttribute('aria-pressed', String(editor.arpPlay));
 }
 function setArpPlay(on: boolean): void {
   if (on) host.mute(false);
@@ -763,7 +775,7 @@ function toggleArp(): void {
   setArpPlay(!editor.arpPlay);
   status.textContent = editor.arpPlay ? 'arpeggiator enabled · hold keys' : 'arpeggiator disabled';
 }
-$('arp-btn').onclick = toggleArp;
+arpBtn.onclick = toggleArp;
 
 // the keyboard folds away, leaving the deck's buttons; remembered per browser
 const KEYS_HIDDEN = 'matryoshka.keys-hidden';
@@ -874,12 +886,21 @@ const startAudio = async (): Promise<void> => {
   try {
     await host.start();
     status.textContent = 'audio running';
-    $('audio-btn').textContent = 'Audio on';
   } catch (e) {
     status.textContent = `audio failed: ${e}`;
   }
 };
-$('audio-btn').onclick = startAudio;
+// one button: Audio on while the audio is off (not started or silenced by a panic), Panic while it plays
+const audioBtn = $('audio-btn');
+const syncAudioBtn = (): void => {
+  const on = host.running && !host.muted;
+  audioBtn.textContent = on ? 'Panic' : 'Audio on';
+  audioBtn.title = on ? 'Stop all playing notes and silence the audio' : 'Start the audio';
+  audioBtn.classList.toggle('on', on);
+};
+host.onState = syncAudioBtn;
+syncAudioBtn();
+audioBtn.onclick = () => (host.running && !host.muted ? panic() : void startAudio());
 const noteKeys = attachKeyboard(sink, () => currentTab === 'patch' && !document.querySelector('dialog[open], [popover]:popover-open'), (o) => piano.setOctave(o));
 // Web MIDI is only asked for on request: while a page holds MIDI access, Chromium's ALSA backend tracks every MIDI port on the
 // system and aborts the whole browser (SIGILL in midi::MidiManager::SetInputPortState) when the ports change, for example when

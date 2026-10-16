@@ -331,7 +331,7 @@
           "kind": "task",
           "title": "A slider thumb is a jack",
           "text": "[Set the `wave` to square](req:osc-wave) (pulse width only matters for a square). Then [Alt-drag the thumb of the **Oscillator**’s `pw` slider onto the **ADSR**’s `env` jack](req:adsr-env-osc-pw) (or drag from `env` and drop it on the thumb). The envelope now also sweeps the pulse width.",
-          "why": "Dropping a signal on a thumb makes it modulate that parameter, with its own depth in the slider’s ⋯ menu. The same envelope shapes two things at once: loudness and timbre.",
+          "why": "Dropping a signal on a thumb makes it modulate that parameter, with its own depth in the slider’s ⋮ menu. The same envelope shapes two things at once: loudness and timbre.",
           "parts": [
             {
               "id": "osc-wave",
@@ -490,7 +490,7 @@
           "kind": "task",
           "title": "Wobble the cutoff",
           "text": "[Drag the **LFO**’s `out` to the **Filter**’s `cv` jack.](req:lfo-out-filter-cv) The grey route shows `cv` is built into `cutoff`; `cvamt` sets how far it reaches: [set it to 2 oct](req:filter-cvamt). Hold a note.",
-          "why": "The `cv` input is additive in octaves: a signal of 1 moves the cutoff up by `cvamt` octaves. A cable dropped on a thumb works differently: it adds to that parameter, with the depth set in the slider’s ⋯ menu.",
+          "why": "The `cv` input is additive in octaves: a signal of 1 moves the cutoff up by `cvamt` octaves. A cable dropped on a thumb works differently: it adds to that parameter, with the depth set in the slider’s ⋮ menu.",
           "parts": [
             {
               "id": "lfo-out-filter-cv",
@@ -551,7 +551,7 @@
           "id": "att",
           "kind": "task",
           "title": "Set the depth",
-          "text": "In the ⋯ menu of `cutoff`, [drag the depth of **Main** `K1` to about 0.5](req:filter-cutoff-depth): the knob now reaches half as far. Resonance moves with it, since one source on a module shares one depth (*Separate depth* in the menu splits them). A negative value turns the knob around.",
+          "text": "In the ⋮ menu of `cutoff`, [drag the depth of **Main** `K1` to about 0.5](req:filter-cutoff-depth): the knob now reaches half as far. Resonance moves with it, since one source on a module shares one depth (*Separate depth* in the menu splits them). A negative value turns the knob around.",
           "why": "",
           "parts": [
             {
@@ -2129,7 +2129,7 @@
           "id": "macro",
           "kind": "task",
           "title": "A knob with a range",
-          "text": "[Cable **Main** `K2` (the jack in the middle of the knob) to My voice’s `cutoff` thumb](req:main-k2-my-voice-cutoff). Open the ⋯ menu of My voice’s `cutoff`, tick *Play between two values*, then [set the ends to 150 Hz and 4000 Hz](req:my-voice-cutoff-range). Leave its depth at 1 so the knob reaches both ends.",
+          "text": "[Cable **Main** `K2` (the jack in the middle of the knob) to My voice’s `cutoff` thumb](req:main-k2-my-voice-cutoff). Open the ⋮ menu of My voice’s `cutoff`, tick *Play between two values*, then [set the ends to 150 Hz and 4000 Hz](req:my-voice-cutoff-range). Leave its depth at 1 so the knob reaches both ends.",
           "why": "A macro range maps the knob’s whole travel onto a slice of the parameter: the useful part of the `cutoff` instead of 20 Hz to 16 kHz.",
           "parts": [
             {
@@ -2630,7 +2630,7 @@
           "id": "group",
           "kind": "task",
           "title": "Group it as Hat and save it",
-          "text": "[Select the **Noise**, **Filter**, **Env** and **VCA**, press Ctrl+G (Cmd+G) and name it Hat](req:hat-exists). [Choose Save to library in its ⋯ menu](req:hat-saved).",
+          "text": "[Select the **Noise**, **Filter**, **Env** and **VCA**, press Ctrl+G (Cmd+G) and name it Hat](req:hat-exists). [Choose Save to library in its ⋮ menu](req:hat-saved).",
           "why": "",
           "parts": [
             { "id": "hat-exists", "kind": "assembly", "role": "hat", "fact": "exists" },
@@ -2926,7 +2926,7 @@
           "id": "legato-glide",
           "kind": "task",
           "title": "Glide only when legato",
-          "text": "[Turn **Glide** `time` all the way down](req:glide-time-short), then [drop **Part** `legato` on the `time` thumb](req:part-legato-glide-time) and [set its depth in the `time` ⋯ menu to about 0.6](req:glide-time-depth). Detached notes now jump, overlapping notes slide.",
+          "text": "[Turn **Glide** `time` all the way down](req:glide-time-short), then [drop **Part** `legato` on the `time` thumb](req:part-legato-glide-time) and [set its depth in the `time` ⋮ menu to about 0.6](req:glide-time-depth). Detached notes now jump, overlapping notes slide.",
           "why": "The **Part**’s `legato` output is high while its note started over a held one. Added to the glide time, it switches portamento on only when you play legato: the 303 slide, or Serum with *always* off.",
           "parts": [
             {
@@ -3037,7 +3037,7 @@
           "id": "drift",
           "kind": "task",
           "title": "Drift",
-          "text": "Real oscillators never stay exactly in tune. [Add a **Random**](req:add-random), [drag it into the voice’s frame](req:inside-poly-random) and [set its `mode` to walk](req:random-mode). [Drop its `out` on the **Oscillator**’s `fine` thumb](req:random-out-osc-fine) and [set the depth in the `fine` ⋯ menu between 0.03 and 0.2](req:osc-fine-depth). Hold a chord: every part wanders slowly on its own, and none of them sits exactly on pitch.",
+          "text": "Real oscillators never stay exactly in tune. [Add a **Random**](req:add-random), [drag it into the voice’s frame](req:inside-poly-random) and [set its `mode` to walk](req:random-mode). [Drop its `out` on the **Oscillator**’s `fine` thumb](req:random-out-osc-fine) and [set the depth in the `fine` ⋮ menu between 0.03 and 0.2](req:osc-fine-depth). Hold a chord: every part wanders slowly on its own, and none of them sits exactly on pitch.",
           "why": "Inside a poly assembly each part has its own copy of the **Random**, with its own value. `fine` spans ±100 cents, so a depth of 0.05 is ±5 cents, like a warmed-up analog synth; 0.3 sounds like one that needs service. `rate` sets how often the walk picks a new target.",
           "parts": [
             { "id": "add-random", "kind": "module", "type": "random" },
@@ -3078,7 +3078,7 @@
           "id": "tolerance",
           "kind": "task",
           "title": "Tolerances",
-          "text": "In an analog polysynth every voice is built from slightly different parts. [Add a second **Random**](req:add-random-2), [drag it into the frame too](req:inside-poly-random-2) and leave its `mode` at fixed. [Drop its `out` on the **Filter** `cutoff` thumb](req:random2-out-filter-cutoff) and [set its depth in the `cutoff` ⋯ menu between 0.05 and 0.3](req:filter-cutoff-depth). Play the same chord: now every note has its own brightness.",
+          "text": "In an analog polysynth every voice is built from slightly different parts. [Add a second **Random**](req:add-random-2), [drag it into the frame too](req:inside-poly-random-2) and leave its `mode` at fixed. [Drop its `out` on the **Filter** `cutoff` thumb](req:random2-out-filter-cutoff) and [set its depth in the `cutoff` ⋮ menu between 0.05 and 0.3](req:filter-cutoff-depth). Play the same chord: now every note has its own brightness.",
           "why": "`fixed` is a value between −1 and 1 that never changes, different in every part, like the tolerances of a real instrument’s voice cards. Patched with a small depth into cutoffs, envelope times or `fine`, it makes the notes differ the way real hardware does.",
           "parts": [
             { "id": "add-random-2", "kind": "module", "type": "random", "count": 2 },
@@ -3146,7 +3146,7 @@
           "kind": "task",
           "title": "Every slider is a jack",
           "text": "Any slider takes a cable: its thumb is a jack. [Drop the **LFO**’s `out` on the thumb of the **Filter**’s `res` slider](req:lfo-out-filter-res): drag from `out` and let go over the thumb, or Alt-drag the thumb to the jack. Hold a key and hear the resonance breathe.\n\nA modulated thumb shows the live value, and a small tick marks the base you set. A tick in a knob’s colour marks where that knob takes the slider: the blue one under `cutoff` belongs to `K1` on **Main**.",
-          "why": "A thumb drop is a real route: the ⋯ menu beside a slider lists what modulates it, sets each source’s depth and can give it a *macro range* (cutoff from 150 Hz to 4 kHz, say). A module takes up to two different sources; it is the same matrix the FM-1 runs, so the route works on the hardware too.",
+          "why": "A thumb drop is a real route: the ⋮ menu beside a slider lists what modulates it, sets each source’s depth and can give it a *macro range* (cutoff from 150 Hz to 4 kHz, say). A module takes up to two different sources; it is the same matrix the FM-1 runs, so the route works on the hardware too.",
           "parts": [
             {
               "id": "lfo-out-filter-res",
