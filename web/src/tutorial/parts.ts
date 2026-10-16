@@ -160,9 +160,34 @@ export function momentary(part: PartSpec): boolean {
   }
 }
 
-/** a requirement with a new id, made from its generated checklist line and unique among `taken` */
-export function withId(spec: PartSpec, roles: Roles, taken: Iterable<string>): Part {
-  return { ...spec, id: slugId(partLabel(spec, roles), taken) } as Part;
+/** a short name for what the part checks, the base of its id: `osc-out-vca-in`, `adsr-a`, `add-vca`, `my-voice-collapsed` */
+export function partSlug(spec: PartSpec): string {
+  const kebab = (v: string) => v.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+  const type = (t: string) => (t === 'fm1' ? 'main' : t);
+  const r = (x: Ref): string => {
+    const t = x.type ? `${type(x.type)}${x.index ? x.index + 1 : ''}` : '';
+    return x.role ? [kebab(x.role), t].filter(Boolean).join('-') : t;
+  };
+  switch (spec.kind) {
+    case 'module': return `add-${type(spec.type)}${(spec.count ?? 1) > 1 ? `-${spec.count}` : ''}`;
+    case 'cable': return `${r(spec.from)}-${spec.fromPort}-${r(spec.to)}-${spec.toPort}`;
+    case 'noCable': return `unplug-${r(spec.from)}-${spec.fromPort}-${r(spec.to)}-${spec.toPort}`;
+    case 'slider': return `${r(spec.ref)}-${spec.param}`;
+    case 'routed': return `${r(spec.from)}-${spec.fromPort}-${r(spec.to)}-${spec.param}`;
+    case 'pinMap': return `${r(spec.ref)}-${spec.pin}-${spec.param}`;
+    case 'att': return `${r(spec.ref)}-${spec.pin}-att`;
+    case 'macroRange': return `${r(spec.ref)}-${spec.pin}-${spec.param}-range`;
+    case 'assembly': return [kebab(spec.role), spec.fact, spec.type && type(spec.type), spec.param ?? spec.port, spec.child && kebab(spec.child)].filter(Boolean).join('-');
+    case 'voices': return 'voices';
+    case 'event': return [kebab(spec.event), spec.ref && r(spec.ref), spec.port, spec.on === undefined ? '' : spec.on ? 'on' : 'off'].filter(Boolean).join('-');
+    case 'sound': return `sound-${spec.mode}`;
+    case 'custom': return [kebab(spec.name), ...Object.values(spec.args ?? {}).map(String)].join('-');
+  }
+}
+
+/** a requirement with a new id, from `partSlug` and unique among `taken` */
+export function withId(spec: PartSpec, taken: Iterable<string>): Part {
+  return { ...spec, id: slugId(partSlug(spec), taken) } as Part;
 }
 
 /** the checklist line */

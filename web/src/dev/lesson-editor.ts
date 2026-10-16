@@ -650,7 +650,7 @@ async function mount() {
     const partList = el('div', 'lesson-parts');
     const redraw = () => { partList.replaceChildren(...(st.parts ?? []).map((_, i) => partEditor(st, i, redraw))); updateLive(); };
     redraw();
-    const add = select([['', '+ Add requirement…'], ...PART_KINDS.map((k) => [k, KINDS[k]] as [string, string])], '', (v) => { if (!v) return; (st.parts ??= []).push(withId(defaultPart(v as PartKind, draft), draft.roles, st.parts.map((p) => p.id))); edited(); redraw(); add.value = ''; }, 'Add requirement');
+    const add = select([['', '+ Add requirement…'], ...PART_KINDS.map((k) => [k, KINDS[k]] as [string, string])], '', (v) => { if (!v) return; (st.parts ??= []).push(withId(defaultPart(v as PartKind, draft), st.parts.map((p) => p.id))); edited(); redraw(); add.value = ''; }, 'Add requirement');
     reqs.append(partList, add);
     fields.append(flags, reqs, riffEditor(st), referenceEditor(ch, ci, st, k));
   }
@@ -861,7 +861,7 @@ async function mount() {
     const keepRef = check('Keep the synth’s patch as this step’s reference', true, () => {});
     const done = (add: boolean) => {
       if (add) {
-        if (st.kind === 'task') { const parts = (st.parts ??= []); for (const p of proposals.filter((_, i) => ticks[i])) parts.push(withId(p.part, draft.roles, parts.map((x) => x.id))); }
+        if (st.kind === 'task') { const parts = (st.parts ??= []); for (const p of proposals.filter((_, i) => ticks[i])) parts.push(withId(p.part, parts.map((x) => x.id))); }
         if ((keepRef.firstChild as HTMLInputElement).checked && st.kind === 'task') draft.references[key] = { patch: after, ...(savedDef ? { saved: savedDef } : {}) };
         if (later) tell('Later steps of this chapter were recorded on the old state: Course checks shows any that no longer hold.');
       }

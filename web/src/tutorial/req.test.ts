@@ -4,6 +4,7 @@ import { DEFS } from '../modules';
 import { newPatch, addModule } from '../patch';
 import { COURSE, compileStep } from './chapters';
 import { headlessState } from './model';
+import { partSlug, withId } from './parts';
 import { validateCourse } from './validate';
 import type { StepData } from './course-schema';
 
@@ -57,8 +58,22 @@ describe('the validator and req links', () => {
   it('requires every requirement to be placed in the text unless it is hidden', () => {
     const c = structuredClone(COURSE);
     const task = c.chapters[0].steps.find((s) => s.id === 'vca')!;
-    task.text = task.text.replace(/\[([^\]]*)\]\(req:add-a-vca\)/, '$1');
+    task.text = task.text.replace(/\[([^\]]*)\]\(req:add-vca\)/, '$1');
     const errors = validateCourse(c).errors.filter((e) => e.step === 'vca').map((e) => e.message);
-    expect(errors).toEqual(['Requirement "add-a-vca" is not placed in the text: place it, or mark it hidden']);
+    expect(errors).toEqual(['Requirement "add-vca" is not placed in the text: place it, or mark it hidden']);
+  });
+});
+
+describe('requirement ids', () => {
+  it('are short names of what the part checks', () => {
+    expect(partSlug({ kind: 'cable', from: { type: 'fm1' }, fromPort: 'gate', to: { type: 'vca' }, toPort: 'cv' })).toBe('main-gate-vca-cv');
+    expect(partSlug({ kind: 'noCable', from: { type: 'osc' }, fromPort: 'out', to: { type: 'output' }, toPort: 'l' })).toBe('unplug-osc-out-output-l');
+    expect(partSlug({ kind: 'slider', ref: { type: 'adsr' }, param: 'a', op: 'ge', value: 0.1 })).toBe('adsr-a');
+    expect(partSlug({ kind: 'module', type: 'osc', count: 2 })).toBe('add-osc-2');
+    expect(partSlug({ kind: 'assembly', role: 'myVoice', fact: 'promoted', type: 'filter', param: 'cutoff' })).toBe('my-voice-promoted-filter-cutoff');
+    expect(partSlug({ kind: 'cable', from: { type: 'clkdiv' }, fromPort: 'out', to: { type: 'clkdiv', index: 1 }, toPort: 'clock' })).toBe('clkdiv-out-clkdiv2-clock');
+  });
+  it('stay unique within the step', () => {
+    expect(withId({ kind: 'module', type: 'vca' }, ['add-vca']).id).toBe('add-vca-2');
   });
 });
