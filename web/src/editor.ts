@@ -554,7 +554,10 @@ export class Editor {
       this.wheelHost.replaceChildren(...(['bend', 'mod'] as const).map((n) => {
         const box = document.createElement('div');
         box.className = 'dock-wheel';
-        box.append(jacks([n]), wheels[n]);
+        // the wheel's own caption names it: the jack goes without a label (its tooltip still has the name)
+        const row = jacks([n]);
+        row.querySelectorAll('.port > span:not(.dot)').forEach((s) => s.remove());
+        box.append(row, wheels[n]);
         return box;
       }));
     el.append(title,
