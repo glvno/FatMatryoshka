@@ -1334,8 +1334,23 @@ export class Editor {
   cancelArm(): void {
     this.armed?.classList.remove('armed');
     this.armed = null;
-    this.canvas.classList.remove('patching');
+    this.setPatching(false);
     this.drag?.cancel();
+  }
+
+  /** the canvas is patching (a cable being dragged or a jack armed); the page knows too, so the sidebar's jack thumbs show it */
+  private setPatching(on: boolean): void {
+    this.canvas.classList.toggle('patching', on);
+    document.documentElement.classList.toggle('patching-any', on);
+  }
+
+  /** click-to-connect onto a sidebar slider's thumb: with an output armed, patch it there. Whether it did */
+  connectArmedToSide(key: SideKey): boolean {
+    const armed = this.armed;
+    if (!armed || armed.dataset.dir !== 'out' || !armed.dataset.mod) return false;
+    this.cancelArm();
+    this.setSideSource(key, { module: Number(armed.dataset.mod), port: armed.dataset.port! });
+    return true;
   }
 
   // ---- A / B: two snapshots; the toggle swaps them, as a parameter-only update when the structure matches
@@ -2285,25 +2300,31 @@ export class Editor {
    * strip between the jack and the dock's top edge: a cable to a module below the canvas's view stays under the panel.
    */
   /** the sidebar sliders' source cables, over everything up to their thumbs; each hidden while either end is not shown */
-  positionSideCables(): void {
+  /** the layer over the whole window for the cables into the sidebar sliders and the cable being dragged */
+  private sideOverlay(): SVGSVGElement {
     if (!this.sideLayer) {
       this.sideLayer = document.createElementNS(SVGNS, 'svg') as SVGSVGElement;
       this.sideLayer.setAttribute('class', 'cables slack-cable');
       this.sideLayer.setAttribute('aria-hidden', 'true');
       document.body.append(this.sideLayer);
     }
+    return this.sideLayer;
+  }
+
+  positionSideCables(): void {
+    this.sideOverlay();
     const w = this.world.getBoundingClientRect();
     const keep = new Set<SVGPathElement>();
     for (const [key, thumb] of this.sideThumbs) {
       const from = this.patch[key];
       const src = from && this.ports.get(this.key(from.module, from.port, 'out'));
       if (!src || !src.isConnected || this.canvas.offsetParent === null || thumb.offsetParent === null) continue;
-      let path = this.sideLayer.querySelector<SVGPathElement>(`path[data-key="${key}"]`);
+      let path = this.sideLayer!.querySelector<SVGPathElement>(`path[data-key="${key}"]`);
       if (!path) {
         path = document.createElementNS(SVGNS, 'path');
         path.dataset.key = key;
         path.addEventListener('click', () => this.setSideSource(key, null));
-        this.sideLayer.append(path);
+        this.sideLayer!.append(path);
       }
       keep.add(path);
       const m = this.patch.modules.find((x) => x.id === from!.module)!;
@@ -2316,7 +2337,7 @@ export class Editor {
       path.setAttribute('d', this.curve(this.center(src), b, this.endOf(src), 'up'));
       path.setAttribute('transform', `translate(${w.left} ${w.top}) scale(${this.zoom})`);
     }
-    for (const p of [...this.sideLayer.querySelectorAll('path')]) if (!keep.has(p)) p.remove();
+    for (const p of [...this.sideLayer!.querySelectorAll<SVGPathElement>('path[data-key]')]) if (!keep.has(p)) p.remove();
   }
 
   private positionCables(): void {
@@ -2553,16 +2574,19 @@ export class Editor {
       return;
     }
     const kind = start.dataset.dir;
+    // the cable being dragged: in the layer over the whole window (not the canvas's), so it shows over the sidebar on its way
+    // to a sidebar slider's thumb
     const path = document.createElementNS(SVGNS, 'path');
     path.setAttribute('class', 'cable pending');
-    this.preview.append(path);
-    this.canvas.classList.add('patching');
+    this.sideOverlay().append(path);
+    this.setPatching(true);
     const move = (ev: PointerEvent): void => {
       const c = this.world.getBoundingClientRect();
       const p = { x: (ev.clientX - c.left) / this.zoom, y: (ev.clientY - c.top) / this.zoom };
       const s = this.center(start);
       const end = this.endOf(start);
       path.setAttribute('d', kind === 'out' ? this.curve(s, p, end) : this.curve(p, s, 'side', end));
+      path.setAttribute('transform', `translate(${c.left} ${c.top}) scale(${this.zoom})`);
     };
     const cancel = (): void => {
       window.removeEventListener('pointermove', move);
@@ -2570,7 +2594,7 @@ export class Editor {
       window.removeEventListener('pointercancel', cancel);
       path.remove();
       this.drag = null;
-      this.canvas.classList.remove('patching');
+      this.setPatching(false);
     };
     const up = (ev: PointerEvent): void => {
       const t = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
@@ -2583,7 +2607,7 @@ export class Editor {
       if (dot === start) {
         this.armed = start;
         start.classList.add('armed');
-        this.canvas.classList.add('patching');
+        this.setPatching(true);
       } else if (dot?.dataset.mod) this.connectJacks(start, dot);
     };
     this.drag = { path, cancel };

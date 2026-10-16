@@ -660,6 +660,12 @@ function sideSlider(key: SideKey, rowId: string, s: Omit<SideSlider, 'bar' | 'ro
     side.setBase(clamp01(Number(input.value) - (editor.patch[key] ? side.live : 0)));
     showSide(key);
   });
+  // click-to-connect: with an output armed (a click on it), a press on the slider patches it instead of dragging
+  row.addEventListener('pointerdown', (e) => {
+    if (!editor.connectArmedToSide(key)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
   row.addEventListener('pointerdown', () => (side.dragging = true), true);
   input.addEventListener('change', () => {
     side.dragging = false;

@@ -829,6 +829,7 @@ input#patch-name:focus { border-color: var(--secondary); background: var(--bar);
 .side-bar > .slider-jack { --jack-size: 18px; }
 .side-bar > span:first-child { font: var(--cap); font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; }
 .side-bar .slider-port { background: var(--panel); }
+.patching-any .side-bar, .patching-any .side-bar .slider-port { cursor: crosshair; }
 .example-picker { display: grid; gap: 4px; }
 .example-picker > span { font-size: 11px; color: var(--muted); }
 .example-picker select { width: 100%; min-height: 28px; padding: 2px 6px; border-radius: 5px; border-color: var(--line); background: var(--bar); font: 500 13px/1.2 'Barlow', system-ui, sans-serif; }
@@ -864,3 +865,4 @@ input#patch-name:focus { border-color: var(--secondary); background: var(--bar);
 /* the cable into the cable slack's thumb: over the sidebar, unlike every other cable (z-index under panels and menus) */
 svg.slack-cable { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: 15; overflow: visible; pointer-events: none; }
 svg.slack-cable .cable { pointer-events: stroke; cursor: pointer; }
+svg.slack-cable .cable.pending { pointer-events: none; }
