@@ -429,13 +429,21 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .tutorial-row.done .n { color: var(--secondary); font-weight: 700; }
 .tutorial-row .grow { flex: 1; }
 .tutorial-row button { min-height: 28px; padding: 2px 10px; font-size: 12px; }
-@keyframes tour-pulse { 0%, 100% { outline-color: var(--secondary); } 50% { outline-color: transparent; } }
-.tour-focus { outline: 2px solid var(--secondary); outline-offset: 4px; animation: tour-pulse 1.6s ease-in-out infinite; border-radius: 6px; }
-.dot.tour-focus { outline-offset: 3px; border-radius: 50%; }
+/* what the tutorial points at: a steady outline plus a ring that grows out of it and fades, every 1.2 s. Motion and a big
+   change in brightness are what peripheral vision picks up, so the ring is wide and starts nearly opaque. `--tour-base`
+   keeps a shadow the element already has (a connected jack's inner ring). */
+@keyframes tour-ping {
+  0% { box-shadow: var(--tour-base, 0 0 0 0 transparent), 0 0 0 5px color-mix(in srgb, var(--secondary) 85%, transparent), 0 0 12px 6px color-mix(in srgb, var(--secondary) 60%, transparent); }
+  70%, 100% { box-shadow: var(--tour-base, 0 0 0 0 transparent), 0 0 0 30px color-mix(in srgb, var(--secondary) 0%, transparent), 0 0 40px 30px color-mix(in srgb, var(--secondary) 0%, transparent); }
+}
+@keyframes tour-glow { 0%, 100% { outline-color: var(--secondary); } 50% { outline-color: color-mix(in srgb, var(--secondary) 55%, var(--ink)); } }
+.tour-focus { outline: 3px solid var(--secondary); outline-offset: 3px; border-radius: 6px; animation: tour-ping 1.2s cubic-bezier(.15, .6, .35, 1) infinite, tour-glow 1.2s ease-in-out infinite; }
+.dot.tour-focus { outline-offset: 2px; border-radius: 50%; }
+.dot.connected.tour-focus { --tour-base: inset 0 0 0 3px var(--panel); }
 @media (max-width: 650px) { .tutorial { right: 0; bottom: 0; left: 0; width: auto; max-height: 55dvh; border-radius: 12px 12px 0 0; padding: 12px 16px 16px; } .tutorial p { font-size: 12px; } }
 
 /* Docking must be immediate on resize; desktop follow-target animation must not leave the panel offscreen. */
 @media (max-width: 650px) { .tutorial:not(.dragging) { transition: none; } }
-@media (prefers-reduced-motion: reduce) { .tutorial:not(.dragging) { transition: none; } .tour-focus { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tutorial:not(.dragging) { transition: none; } .tour-focus { animation: none; box-shadow: var(--tour-base, 0 0 0 0 transparent), 0 0 0 6px color-mix(in srgb, var(--secondary) 45%, transparent); } }
 .tutorial-audition button[aria-pressed="true"] { background: var(--secondary); color: var(--panel); }
 .tutorial input { max-width: 100%; min-width: 0; }

@@ -32,7 +32,7 @@ Every exercise and chapter finish has Note, Chord and a repeating Riff. A step c
 
 An intro's **Preview the finished sound** sends the completed patch to the audio engine for eight seconds without changing the editor patch, layout, history, selection, snapshots or library. Normal preview completion restores the editor sound and previous transport/mute state. Explicit Stop, blur and close silence it. Audio starts from a playback click.
 
-The panel docks at bottom right by default. **Follow** optionally places it near the highlighted target and scrolls that target into view. Drag the handle, or use its arrow keys to move it; Home docks it again. Below 650 px it docks immediately at the bottom, clears desktop inline positions and scrolls internally. Reduced-motion preferences suppress movement and pulsing. Required controls, then the optional Why, then expected listening outcomes keep the lesson readable.
+The panel docks at bottom right by default. **Follow** optionally places it near the highlighted target and scrolls that target into view. Drag the handle, or use its arrow keys to move it; Home docks it again. Below 650 px it docks immediately at the bottom, clears desktop inline positions and scrolls internally. The highlight on what to do next is a steady 3 px outline plus a ring that grows out of it and fades every 1.2 s (`tour-ping` in style.css), wide enough to catch in peripheral vision while reading. Reduced-motion preferences suppress movement and pulsing (the highlight becomes a still halo). Required controls, then the optional Why, then expected listening outcomes keep the lesson readable.
 
 ## Chapter payoffs
 
