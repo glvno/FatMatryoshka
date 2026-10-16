@@ -80,19 +80,30 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 syste
 input#patch-name { padding: 6px 0; background: transparent; border-color: transparent; border-radius: 0; font-size: 18px; font-weight: 650; letter-spacing: -.025em; cursor: text; }
 input#patch-name:hover, input#patch-name:focus { border-bottom-color: var(--line); }
 .patch-controls #preset { font-size: 12px; }
-/* the FM-1 budget meter: the fullest limit as a bar; open, every limit */
-.budget summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; font-size: 12px; color: var(--muted); }
+/* the FM-1 budget meter: memory (named by its fullest limit) and the estimated CPU load as bars; open, every limit and the
+ * costliest modules */
+.budget summary { display: grid; gap: 3px; list-style: none; cursor: pointer; font-size: 12px; color: var(--muted); }
 .budget summary::-webkit-details-marker { display: none; }
-.budget-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.budget-row { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 8px; }
+.budget-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .budget-bar > span { display: block; height: 100%; background: var(--secondary); }
-.budget-pct { min-width: 32px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
-.budget.near .budget-bar > span { background: var(--accent); }
-.budget.over .budget-bar > span { width: 100% !important; background: var(--danger); }
-.budget.over .budget-pct { color: var(--danger); font-weight: 650; }
+.budget-pct { min-width: 34px; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+.budget-row.near .budget-bar > span { background: var(--accent); }
+.budget-row.over .budget-bar > span { width: 100% !important; background: var(--danger); }
+.budget-row.over .budget-pct, .budget-row.over .budget-name { color: var(--danger); font-weight: 650; }
 .budget-list { display: grid; gap: 2px; padding: 6px 0 0; font-size: 11.5px; }
-.budget-item { display: flex; justify-content: space-between; gap: 8px; }
-.budget-item > :last-child { font-variant-numeric: tabular-nums; }
+.budget-head { margin-top: 4px; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.budget-item { display: grid; grid-template-columns: minmax(0, 1fr) 30px auto; align-items: center; gap: 6px; }
+.budget-item > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-item > :last-child { min-width: 44px; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.budget-mini { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.budget-mini > span { display: block; height: 100%; background: var(--secondary); }
+.budget-item.near .budget-mini > span { background: var(--accent); }
 .budget-item.over { color: var(--danger); font-weight: 650; }
+.budget-item.over .budget-mini > span { background: var(--danger); }
+.budget-item.pick { cursor: pointer; }
+.budget-item.pick:hover > :first-child { color: var(--ink); text-decoration: underline; }
 .budget-list p { margin: 4px 0 0; font-size: 11px; }
 .slack-row { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
 .slack-row input { width: 100%; margin: 0; accent-color: var(--secondary); }

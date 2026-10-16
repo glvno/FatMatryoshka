@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "golden": "vite-node scripts/golden.ts",
     "firmware": "node scripts/sync-firmware.mjs",
-    "export-defs": "vite-node scripts/export-defs.ts"
+    "export-defs": "vite-node scripts/export-defs.ts",
+    "cpu-costs": "vite-node scripts/cpu-costs.ts"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

@@ -2978,6 +2978,12 @@ static void process(const node_t *nd, inst_t *it, uint32_t n)
     }
 }
 
+/* Profiling hooks for the CPU estimate (tools/cpu): stage 0 before a module's input sums, 1 before its parameter
+ * inputs, 2 before it runs, 3 after; 4 at the start of a block, 5 at its end. Compiled out unless ENG_PROF is defined. */
+#ifndef ENG_PROF
+#define ENG_PROF(stage, node, part) ((void)0)
+#endif
+
 static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the selected voice alone, clamped */
 {
     uint32_t off, i, k, s, v;
@@ -2987,6 +2993,7 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
         return;
     for (off = 0; off < total; off += ENG_BLOCK) {
         uint32_t n = total - off < ENG_BLOCK ? total - off : ENG_BLOCK;
+        ENG_PROF(4, 0, 0);
         E.morph = E.has_b ? morph_position(n) : 0;
         E.clk_pulse = E.clk_seen != clk_ticks ? (n + 1u) / 2u : 0u;   /* the Main clock: half a block per block that saw a tick */
         E.clk_seen = clk_ticks;
@@ -2997,6 +3004,7 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
                 inst_t *it = &inst_pool[nd->inst0 + v];
                 cur_v = v;
                 cur_pv = &E.pv[cur_g->pv0 + v];
+                ENG_PROF(0, E.order[k], v);
                 for (s = it->sum0; s < (uint32_t)it->sum0 + it->nsum; s++) {
                     const sum_t *sm = &E.sum[s];
                     uint32_t q;
@@ -3008,7 +3016,9 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
                             sm->dst[i] += src[i];
                     }
                 }
+                ENG_PROF(1, E.order[k], v);
                 apply_cv(nd, it, n);
+                ENG_PROF(2, E.order[k], v);
                 if (nd->bypass)
                     m_bypass(nd, it, n);
                 else if (nd->disabled_inputs) {
@@ -3022,6 +3032,7 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
                     for (input = 0; input < DEFS[nd->type].nin; input++) it->in[input] = raw[input];
                 } else
                     process(nd, it, n);
+                ENG_PROF(3, E.order[k], v);
             }
         }
         for (k = 0; k < ENG_NPV; k++)                   /* a retrig lasts one block (every Main / Part module saw it) */
@@ -3036,6 +3047,7 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
                 right[off + i] += mul16(r[i], lvl);
             }
         }
+        ENG_PROF(5, 0, 0);
     }
     for (i = 0; i < total; i++) {
         left[i] = clampi(left[i], -ENG_ONE, ENG_ONE);

@@ -5,6 +5,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { Engine } from '../src/engine';
 import { encodePatch, toQ16 } from '../src/patchbin';
+import { cpuEstimate } from '../src/cpu';
 import { DEFS } from '../src/modules';
 import { attFrame, chunkFrames, commitFrame, paramFrame, slotEraseFrame, slotFrame, slotInfoFrame } from '../src/protocol';
 import { make, PRESETS, type Build } from '../src/presets';
@@ -1152,7 +1153,9 @@ for (const [name, patch] of Object.entries(tests)) {
     st[2 * i + 1] = r[i];
   }
   const f = slug(name);
-  writeFileSync(new URL(`${f}.m1p`, OUT), encodePatch(patch));
+  const cpu = cpuEstimate(patch).use;
+  if (cpu > 1) console.log(`${name}: estimated at ${Math.round(cpu * 100)} % of the FM-1's CPU (a correctness kit, not a real-time one)`);
+  writeFileSync(new URL(`${f}.m1p`, OUT), encodePatch(patch, true));
   writeFileSync(new URL(`${f}.f32`, OUT), new Uint8Array(st.buffer));
   writeFileSync(new URL(`${f}.ev`, OUT), evs.map(([fr, k, n]) => (k === 'on' ? `${fr} on ${n} 127` : `${fr} off ${n}`)).join('\n') + `\n${END} end\n`);
 }

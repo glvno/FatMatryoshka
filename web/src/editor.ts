@@ -129,7 +129,14 @@ export interface EditorEvents {
 /** an SVG path through a cubic Bézier's four points */
 /** how a cable leaves a jack: sideways, up (a docked jack) or down (a jack under a card's bottom edge) */
 type CableEnd = 'side' | 'up' | 'down';
-const pathOf = ([a, b, c, d]: { x: number; y: number }[]): string => `M${a.x},${a.y} C${b.x},${b.y} ${c.x},${c.y} ${d.x},${d.y}`;
+/** the straight run of a cable out of its jack at full slack, px */
+const CABLE_STUB = 20;
+/** a chain of cubic Béziers: a start point, then three points per segment */
+const pathOf = ([a, ...rest]: { x: number; y: number }[]): string => {
+  let d = `M${a.x},${a.y}`;
+  for (let i = 0; i + 2 < rest.length; i += 3) d += ` C${rest[i].x},${rest[i].y} ${rest[i + 1].x},${rest[i + 1].y} ${rest[i + 2].x},${rest[i + 2].y}`;
+  return d;
+};
 
 /** how far (px) beyond the jack's sides the strip a docked cable is drawn in over the panel reaches: none, so a cable
  * that bends away (to a module below the canvas's view) shows only its straight stub above the jack */
@@ -322,6 +329,17 @@ export class Editor {
   /** a structural change from outside (the tutorial's "do it for me"): undoable like the editor's own */
   transact(fn: () => unknown): boolean {
     return this.change(fn);
+  }
+
+  /** select a module where it shows: itself, or the outermost collapsed assembly that hides it */
+  reveal(id: number): void {
+    let hidden: AssemblyInst | undefined;
+    for (let a = assemblyOf(this.patch, id); a; a = parentOf(this.patch, a.id)) if (!a.open) hidden = a;
+    if (!hidden) return this.selectOnly([id]);
+    this.selected.clear();
+    this.selectedAsm.clear();
+    this.selectedAsm.add(hidden.id);
+    this.rebuild();
   }
 
   /** select exactly these modules */
@@ -917,7 +935,7 @@ export class Editor {
       return box;
     };
     const b = deviceBudget(this.patch);
-    const parts = item('parts', String, EDITOR_MAX_PARTS, 'parts', `How many copies of the modules inside run: one per note that can sound at once. ${b.fits ? `On the FM-1 this patch takes ${b.buffers} of ${DEVICE.buffers} signal buffers and ${b.instances} of ${DEVICE.instances} module instances.` : `Too big for the FM-1: ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} instances.`}`, 1);
+    const parts = item('parts', String, EDITOR_MAX_PARTS, 'parts', `How many copies of the modules inside run: one per note that can sound at once. ${b.fits ? `On the FM-1 this patch takes ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} module instances and about ${Math.round(b.cpu.use * 100)} % of the processor (an estimate).` : `Too big for the FM-1: ${b.over.map((i) => `${i.label} ${i.used} of ${i.max}`).join(', ')}.`}`, 1);
     parts.querySelector('.picker')!.classList.toggle('over', !b.fits);
     el.append(
       parts,
@@ -2143,15 +2161,43 @@ export class Editor {
 
   /**
    * A cable's Bézier points from a to b. An end leaves its jack sideways (out to the right, in from the left), upwards on
-   * a docked jack (the dock is below the canvas) and downwards on a jack under a card's bottom edge.
+   * a docked jack (the dock is below the canvas) and downwards on a jack under a card's bottom edge. Taut, it is one curve
+   * (split in two at its middle). Slack drops only the middle and puts a short straight stub at each end (`CABLE_STUB` at
+   * full slack): a plug holds the cable straight and it bends most where it hangs free, so a drooping cable still leaves
+   * its jack square, and one from a docked jack to a module just below the view still rises out of the dock before it falls.
    */
   private curvePts(a: Pt, b: Pt, dirA: CableEnd = 'side', dirB: CableEnd = 'side'): Pt[] {
+    const stub = this.slack * CABLE_STUB;
+    if (stub <= 0) return this.spanPts(a, b, dirA, dirB);
+    const away = (p: Pt, dir: CableEnd, sx: number, t: number): Pt =>
+      dir === 'up' ? { x: p.x, y: p.y - t } : dir === 'down' ? { x: p.x, y: p.y + t } : { x: p.x + sx * t, y: p.y };
+    const sa = (t: number): Pt => away(a, dirA, 1, t);
+    const sb = (t: number): Pt => away(b, dirB, -1, t);
+    return [a, sa(stub / 3), sa((2 * stub) / 3), ...this.spanPts(sa(stub), sb(stub), dirA, dirB), sb((2 * stub) / 3), sb(stub / 3), b];
+  }
+
+  /** the curve between the stubs: two cubic segments joined in the middle; slack drops the middle, the ends stay square */
+  private spanPts(a: Pt, b: Pt, dirA: CableEnd, dirB: CableEnd): Pt[] {
     const dx = Math.max(40, Math.abs(b.x - a.x) / 2);
     const dy = Math.max(60, Math.abs(b.y - a.y) / 2);
-    // slack: both handles drop by a share of the cable's length, so a long cable droops more than a short one
-    const sag = this.slack * (0.6 * Math.hypot(b.x - a.x, b.y - a.y) + 40);
-    const ctl = (p: Pt, dir: CableEnd, sx: number): Pt => (dir === 'up' ? { x: p.x, y: p.y - dy + sag } : dir === 'down' ? { x: p.x, y: p.y + dy + sag } : { x: p.x + sx, y: p.y + sag });
-    return [a, ctl(a, dirA, dx), ctl(b, dirB, -dx), b];
+    const handle = (p: Pt, dir: CableEnd, sx: number): Pt => (dir === 'up' ? { x: p.x, y: p.y - dy } : dir === 'down' ? { x: p.x, y: p.y + dy } : { x: p.x + sx, y: p.y });
+    const mid = (u: Pt, v: Pt): Pt => ({ x: (u.x + v.x) / 2, y: (u.y + v.y) / 2 });
+    const p1 = handle(a, dirA, dx);
+    const p2 = handle(b, dirB, -dx);
+    // de Casteljau split at t = 1/2
+    const q0 = mid(a, p1), q1 = mid(p1, p2), q2 = mid(p2, b);
+    const r0 = mid(q0, q1), r1 = mid(q1, q2), m = mid(r0, r1);
+    // slack: the middle drops by a share of the cable's length, so a long cable droops more than a short one
+    const sag = this.slack * 0.75 * (0.6 * Math.hypot(b.x - a.x, b.y - a.y) + 40);
+    if (sag <= 0) return [a, q0, r0, m, r1, q2, b];
+    const lead = (p: Pt, q: Pt): Pt => {
+      const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+      // the lead shortens as the slack grows, so the bend comes close to the plug
+      const k = (len * (1 - 0.55 * this.slack) + 0.08 * sag) / len;
+      return { x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k };
+    };
+    const drop = (p: Pt): Pt => ({ x: p.x, y: p.y + sag });
+    return [a, lead(a, q0), drop(r0), drop(m), drop(r1), lead(b, q2), b];
   }
 
   private curve(a: Pt, b: Pt, dirA: CableEnd = 'side', dirB: CableEnd = 'side'): string {

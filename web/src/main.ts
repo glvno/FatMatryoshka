@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+import { CPU, CPU_WARN } from './cpu';
 import { setupPopoverPositioning } from './popover';
 import { AudioHost } from './audio';
 import type { HostMsg } from './worklet';
@@ -27,7 +28,7 @@ import { Tutorial } from './tutorial/tutorial';
 import { synthLink } from './tutorial/link';
 import { CHAPTERS, LISTED, chapterEnd } from './tutorial/chapters';
 import { PRESETS } from './presets';
-import { deviceBudget } from './patchbin';
+import { deviceBudget, SHORT } from './patchbin';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const STORE = 'modular-1.patch';
@@ -283,34 +284,77 @@ nameInput.oninput = () => {
   queueSave(editor.patch);
 };
 /** the FM-1 budget meter under the patch name: the fullest limit as a bar, every limit in the list it opens */
+/** a meter row: name, bar, percent; `near` / `over` colour it */
+function meterRow(row: Element, name: string, frac: number, text: string): void {
+  row.classList.toggle('over', frac > 1);
+  row.classList.toggle('near', frac <= 1 && frac > CPU_WARN);
+  row.querySelector('.budget-name')!.textContent = name;
+  (row.querySelector('.budget-bar > span') as HTMLElement).style.width = `${Math.min(100, Math.round(frac * 100))}%`;
+  row.querySelector('.budget-pct')!.textContent = text;
+}
+
+/** a line of the open meter: name, a small bar, the figure; `warn`: colour it when nearly full (not a one-slot line: the patch's one
+ * delay fills it, which is fine) */
+function budgetLine(name: string, frac: number, figure: string, title = '', warn = true): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'budget-item' + (frac > 1 ? ' over' : warn && frac > CPU_WARN ? ' near' : '');
+  row.title = title;
+  const n = document.createElement('span');
+  n.textContent = name;
+  const bar = document.createElement('span');
+  bar.className = 'budget-mini';
+  const fill = document.createElement('span');
+  fill.style.width = `${Math.min(100, Math.round(frac * 100))}%`;
+  bar.append(fill);
+  const f = document.createElement('span');
+  f.textContent = figure;
+  row.append(n, bar, f);
+  return row;
+}
+
 function showBudget(): void {
   const b = deviceBudget(editor.patch);
   const was = fitsDevice;
   fitsDevice = b.fits;
   const el = $('budget');
   el.classList.toggle('over', !b.fits);
-  el.classList.toggle('near', b.fits && b.use > 0.8);
-  const pct = Math.round(b.use * 100);
-  el.querySelector<HTMLElement>('.budget-bar > span')!.style.width = `${Math.min(100, pct)}%`;
-  el.querySelector('.budget-pct')!.textContent = b.fits ? `${pct} %` : 'over';
-  el.querySelector('summary')!.title = b.fits ? `Fits the FM-1: the fullest limit is ${pct} % used. Open for every limit.` : `Over the FM-1 budget (${b.over.map((i) => i.label).join(', ')}): it plays here in the browser, the FM-1 cannot load it.`;
+  const memOver = b.over.filter((i) => i.key !== 'cpu');
+  const fullest = memOver[0] ?? b.fullest;
+  const memName = fullest && fullest.key !== 'cpu' && b.memory >= 0.5 ? SHORT[fullest.key] : 'memory';
+  const [mem, cpu] = el.querySelectorAll('.budget-row');
+  meterRow(mem, memName, memOver.length ? 1.01 : b.memory, memOver.length ? 'over' : `${Math.round(b.memory * 100)} %`);
+  meterRow(cpu, 'CPU', b.cpu.use, `~${Math.round(b.cpu.use * 100)} %`);
+  el.querySelector('summary')!.title = b.fits
+    ? `Fits the FM-1. Memory: the fullest limit (${fullest?.label ?? 'none'}) is ${Math.round(b.memory * 100)} % used. CPU: about ${Math.round(b.cpu.use * 100)} % of the audio time, an estimate. Open for the details.`
+    : `Over the FM-1 budget (${b.over.map((i) => i.label).join(', ')}): it plays here in the browser, the FM-1 cannot ${b.over.some((i) => i.key === 'cpu') ? 'keep up with' : 'load'} it.`;
   const list = el.querySelector('.budget-list')!;
-  list.replaceChildren(...b.items.filter((i) => i.used > 0).map((i) => {
-    const row = document.createElement('div');
-    row.className = 'budget-item' + (i.used > i.max ? ' over' : '');
-    const name = document.createElement('span');
-    name.textContent = i.label;
-    const n = document.createElement('span');
-    n.textContent = `${i.used} / ${i.max}`;
-    row.append(name, n);
-    return row;
-  }));
-  if (!b.fits) {
-    const note = document.createElement('p');
-    note.className = 'muted';
-    note.textContent = 'Plays in the browser. The FM-1 cannot load it: Send, Store and Live stay off, and the Library keeps it under "Over budget".';
-    list.append(note);
-  }
+  const head = (text: string): HTMLElement => {
+    const h = document.createElement('div');
+    h.className = 'budget-head';
+    h.textContent = text;
+    return h;
+  };
+  const block = CPU.cyclesPerUs * CPU.blockUs;
+  const costly = b.cpu.modules.slice(0, 6).map((m) => {
+    const mod = editor.patch.modules.find((x) => x.id === m.id)!;
+    const name = moduleName(m.type, DEFS[m.type].label) + (m.copies > 1 ? ` ×${m.copies}` : '');
+    const line = budgetLine(name, m.cycles / block, `${(100 * m.cycles / block).toFixed(1)} %`, 'Select it');
+    line.classList.add('pick');
+    line.addEventListener('click', () => editor.reveal(mod.id));
+    return line;
+  });
+  list.replaceChildren(
+    head('Memory'),
+    ...b.items.filter((i) => i.used > 0).map((i) => budgetLine(i.label, i.used / i.max, `${i.used} / ${i.max}`, '', i.max > 1)),
+    head('CPU, estimated'),
+    ...costly,
+  );
+  const note = document.createElement('p');
+  note.className = 'muted';
+  note.textContent = b.fits
+    ? 'The CPU figure is an estimate: the engine counted on a model of the processor, scaled by one load measured on the FM-1. Treat anything above 80 % as tight.'
+    : 'Plays in the browser. The FM-1 cannot run it: Send, Store and Live stay off, and the Library keeps it under "Over budget".';
+  list.append(note);
   if (was && !b.fits && device.connected) devStatus('over the FM-1 budget: Live paused until the patch fits');
 }
 const browser = new AssemblyBrowser((d) => { switchTab('patch'); editor.insert(d); });

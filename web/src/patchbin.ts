@@ -22,6 +22,7 @@
 import { DEFS } from './modules';
 import { hasMorph, MAX_MODULES, MAX_PARTS, SOURCES, type Patch } from './patch';
 import { copiesOf, MAX_POLY, polyGroups } from './poly';
+import { cpuEstimate, type CpuEstimate } from './cpu';
 
 export const TYPE_ORDER: string[] = Object.keys(DEFS);
 export const MAX_CABLES = 192;
@@ -78,9 +79,11 @@ export function encodedSize(p: Patch): number {
 }
 
 /** the binary patch; throws when the patch does not fit the FM-1 (deviceBudget): only a patch that fits is ever sent */
-export function encodePatch(p: Patch): Uint8Array {
+/** the binary patch; refused when it is over the FM-1 budget, unless `anyway` (tools that count the engine's work on patches the
+ * estimate has not seen yet: scripts/cpu-costs.ts) */
+export function encodePatch(p: Patch, anyway = false): Uint8Array {
   const budget = deviceBudget(p);
-  if (!budget.fits) throw new Error(`over the FM-1 budget: ${budget.over.map((i) => `${i.label} ${i.used} of ${i.max}`).join(', ')}`);
+  if (!budget.fits && !anyway) throw new Error(`over the FM-1 budget: ${budget.over.map((i) => `${i.label} ${i.used} of ${i.max}`).join(', ')}`);
   const index = new Map(p.modules.map((m, i) => [m.id, i]));
   const morph = hasMorph(p);
   const ranges = rangeList(p);
@@ -158,8 +161,14 @@ export const DEVICE = {
 } as const;
 
 export type BudgetKey = keyof typeof DEVICE;
-/** one line of the budget: what the patch uses of one FM-1 limit */
-export interface BudgetItem { key: BudgetKey; label: string; used: number; max: number }
+/** one line of the budget: what the patch uses of one FM-1 limit (`cpu`: the estimated load in percent of 100) */
+export interface BudgetItem { key: BudgetKey | 'cpu'; label: string; used: number; max: number }
+
+/** short names for the meter's label */
+export const SHORT: Record<BudgetKey, string> = {
+  modules: 'modules', cables: 'cables', poly: 'poly', parts: 'parts', instances: 'instances', buffers: 'buffers',
+  delays: 'delays', reverbs: 'reverbs', strings: 'strings', chorus: 'chorus', grains: 'grains', bytes: 'bytes',
+};
 
 const LABELS: Record<BudgetKey, string> = {
   modules: 'modules', cables: 'cables', poly: 'poly assemblies', parts: 'parts', instances: 'module instances', buffers: 'signal buffers',
@@ -171,10 +180,24 @@ const LABELS: Record<BudgetKey, string> = {
  * poly assembly has one per part); one signal buffer per connected output port and copy, plus one per input copy with
  * two or more sources (a module outside a poly assembly reading a per-part output has one source per part); the shared
  * lines (delay, reverb, chorus, granular) once each, a string or comb line per copy. `items` lists every limit, `over`
- * those the patch exceeds, `use` the fullest one as a fraction (single lines count only when exceeded); `fits` is false when the firmware would refuse the patch.
+ * those the patch exceeds, `memory` the fullest one as a fraction (single lines count only when exceeded) and `fullest` that
+ * line; `cpu` the estimated processor load (cpu.ts); `use` the larger of the two. `fits` is false when the firmware would
+ * refuse the patch or, by the estimate, could not render it in time.
  * The editor and the browser engine have none of these limits.
  */
-export function deviceBudget(p: Patch): { buffers: number; instances: number; fits: boolean; items: BudgetItem[]; over: BudgetItem[]; use: number } {
+export interface Budget {
+  buffers: number;
+  instances: number;
+  fits: boolean;
+  items: BudgetItem[];
+  over: BudgetItem[];
+  memory: number;
+  fullest: BudgetItem | undefined;
+  cpu: CpuEstimate;
+  use: number;
+}
+
+export function deviceBudget(p: Patch): Budget {
   const copies = copiesOf(p);
   const groups = polyGroups(p);
   const groupOf = new Map<number, number>();
@@ -206,10 +229,14 @@ export function deviceBudget(p: Patch): { buffers: number; instances: number; fi
     grains: count('grain'), bytes: encodedSize(p),
   };
   const items = (Object.keys(DEVICE) as BudgetKey[]).map((key) => ({ key, label: LABELS[key], used: used[key], max: DEVICE[key] }));
-  const over = items.filter((i) => i.used > i.max);
+  const over: BudgetItem[] = items.filter((i) => i.used > i.max);
   // a one-of-a-kind line (one delay, one reverb ...) is either there or not: it shows only when exceeded, so a patch with
   // its one reverb does not read as full
-  const use = Math.max(0, ...items.filter((i) => i.max > 1 || i.used > i.max).map((i) => i.used / i.max));
-  return { buffers, instances, fits: !over.length, items, over, use };
+  const counted = items.filter((i) => i.max > 1 || i.used > i.max);
+  const fullest = counted.reduce<BudgetItem | undefined>((a, i) => (!a || i.used / i.max > a.used / a.max ? i : a), undefined);
+  const memory = fullest ? fullest.used / fullest.max : 0;
+  const cpu = cpuEstimate(p);
+  if (cpu.use > 1) over.push({ key: 'cpu', label: 'CPU (estimate)', used: Math.round(cpu.use * 100), max: 100 });
+  return { buffers, instances, fits: !over.length, items, over, memory, fullest, cpu, use: Math.max(memory, cpu.use) };
 }
 
