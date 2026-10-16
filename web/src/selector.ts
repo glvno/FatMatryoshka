@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// A selector for a list of choices, in one of two shapes:
-// - a detent rail: every choice's name across the row, the jack standing over the live one (it hops between them as a
-//   modulated slider's thumb glides), the base underlined;
-// - a drum, when the names do not fit: a window of three, the jack fixed in the middle, the names rolling past it.
-// Clicking a name picks it, a drag along the row scrubs, the arrow keys step; the drum also takes the scroll wheel.
-// The FM-1 knobs' resting choices are marked under the names in the knobs' colours.
+// A selector for a list of choices: a notched groove. A thin line with a notch per choice; the jack rides on the live
+// choice's notch and hops from notch to notch as modulation moves it (a modulated slider's thumb glides). When every
+// name fits under its notch they are all written there, else only the live one, riding under the jack. While modulated
+// the base notch is marked; the FM-1 knobs' resting choices are marked over their notches in the knobs' colours.
+// Click or drag along the groove to pick (the nearest notch), arrow keys step; the jack drags too, as a slider's thumb
+// does, and patches with Alt or while a cable is being patched.
 
 export interface Selector {
   element: HTMLElement;
-  /** the marker over the live choice: a jack (cables land on it) or, with nothing to patch, a plain thumb */
+  /** the marker on the live choice: a jack (cables land on it) or, with nothing to patch, a plain thumb */
   jack: HTMLElement;
   /** show the live choice (modulated) and the base (the setting) */
   update(live: number, base: number): void;
@@ -18,15 +18,11 @@ export interface Selector {
   setNames(names: string[]): void;
 }
 
-/** the names do not fit in their columns: a drum, rechecked when the row's width changes */
+/** whether the names fit under their notches is measured, and rechecked when the row's width changes */
 const fit = new ResizeObserver((entries) => {
   for (const e of entries) checks.get(e.target)?.();
 });
 const checks = new WeakMap<Element, () => void>();
-
-/** drag and wheel travel per step */
-const STEP_PX = 28;
-const WHEEL_STEP = 40;
 
 export function selector(o: {
   label: string;
@@ -34,27 +30,36 @@ export function selector(o: {
   /** the base index */
   get: () => number;
   set: (i: number) => void;
-  /** the jack: a cable starts from it; without, a plain thumb that takes no cables */
+  /** the jack: Alt (or a cable being patched) starts a cable from it; without, a plain thumb that takes no cables */
   onPatch?: (e: PointerEvent, jack: HTMLElement) => void;
 }): Selector {
   let names = o.names;
   let live = o.get(), base = o.get();
-  let drum = false;
   const el = document.createElement('div');
   el.className = 'sel-track';
   el.tabIndex = 0;
   el.setAttribute('role', 'slider');
   el.setAttribute('aria-label', o.label);
-  const opts = document.createElement('div');
-  opts.className = 'sel-opts';
+  const groove = document.createElement('span');
+  groove.className = 'sel-groove';
+  const notches = document.createElement('span');
+  notches.className = 'sel-notches';
+  const labels = document.createElement('span');
+  labels.className = 'sel-labels';
+  const rider = document.createElement('span');
+  rider.className = 'sel-rider';
+  const baseMark = document.createElement('span');
+  baseMark.className = 'sel-base';
+  baseMark.setAttribute('aria-hidden', 'true');
   const jack = document.createElement('span');
   jack.className = o.onPatch ? 'dot control slider-port sel-jack' : 'dot slider-thumb sel-jack';
   jack.setAttribute('aria-hidden', 'true');
-  if (o.onPatch) jack.addEventListener('pointerdown', (e) => o.onPatch!(e, jack));
-  el.append(opts, jack);
+  el.append(groove, notches, baseMark, labels, rider, jack);
 
   const n = (): number => names.length;
   const clamp = (i: number): number => Math.max(0, Math.min(n() - 1, Math.round(i)));
+  /** a notch's centre along the groove */
+  const pos = (i: number): string => `${((i + 0.5) / Math.max(1, n())) * 100}%`;
   const pick = (i: number): void => {
     i = clamp(i);
     if (i === o.get()) return;
@@ -67,37 +72,24 @@ export function selector(o: {
 
   let items: HTMLElement[] = [];
   const build = (): void => {
+    notches.replaceChildren(...names.map((_, i) => {
+      const d = document.createElement('span');
+      d.className = 'sel-notch';
+      d.style.left = pos(i);
+      return d;
+    }));
     items = names.map((name, i) => {
       const b = document.createElement('span');
       b.className = 'sel-opt';
       b.textContent = name;
-      b.dataset.i = String(i);
+      b.style.left = pos(i);
       return b;
     });
-    opts.replaceChildren(...items, ...ticks);
+    labels.replaceChildren(...items);
     el.setAttribute('aria-valuemin', '0');
     el.setAttribute('aria-valuemax', String(Math.max(0, n() - 1)));
     check();
     draw();
-  };
-
-  // the names sit at their natural widths: the rail spreads them across the row and the jack stands over the live one;
-  // the drum slides them so the live one is in the middle, under the fixed jack. Knob marks sit under their names.
-  const centre = (i: number): number => {
-    const it = items[i];
-    return it ? it.offsetLeft + it.offsetWidth / 2 : 0;
-  };
-  const place = (): void => {
-    if (!el.isConnected || !el.clientWidth) return;
-    const l = clamp(live);
-    if (drum) {
-      opts.style.transform = `translateX(${el.clientWidth / 2 - centre(l)}px)`;
-      jack.style.left = '';
-    } else {
-      opts.style.transform = '';
-      jack.style.left = `${centre(l) - 7}px`;
-    }
-    for (const tk of ticks) tk.style.left = `${centre(Number(tk.dataset.i)) - 3 + Number(tk.dataset.k) * 7}px`;
   };
 
   const draw = (): void => {
@@ -106,25 +98,29 @@ export function selector(o: {
       it.classList.toggle('live', i === l);
       it.classList.toggle('base', i === b && l !== b);
     });
-    place();
+    jack.style.left = `calc(${pos(l)} - 7px)`;
+    rider.textContent = names[l] ?? '';
+    // the riding name stays over its notch, but inside the groove's ends
+    const w = el.clientWidth, rw = rider.offsetWidth;
+    rider.style.left = w && rw ? `${Math.max(0, Math.min(w - rw, ((l + 0.5) / Math.max(1, n())) * w - rw / 2))}px` : '0px';
+    baseMark.hidden = l === b;
+    baseMark.style.left = pos(b);
     el.setAttribute('aria-valuenow', String(b));
     el.setAttribute('aria-valuetext', names[b] ?? '');
     el.title = l !== b ? `${o.label}: ${names[l] ?? ''} (set to ${names[b] ?? ''})` : `${o.label}: ${names[b] ?? ''}`;
   };
 
-  // rail or drum: the drum when the names at their natural widths do not fit across the row
+  // every name under its notch when each fits in its share of the groove, else only the live one under the jack
   const check = (): void => {
     if (!el.isConnected || !el.clientWidth) return;
-    el.classList.add('measure');
-    drum = n() > 1 && opts.scrollWidth > el.clientWidth + 0.5;
-    el.classList.remove('measure');
-    el.classList.toggle('drum', drum);
-    place();
+    const room = el.clientWidth / Math.max(1, n()) - 4;
+    el.classList.toggle('many', items.some((it) => it.offsetWidth > room));
+    draw();
   };
   checks.set(el, check);
   fit.observe(el);
 
-  // the knobs' resting choices, under the names (they ride with the drum)
+  // the knobs' resting choices, over their notches (several on one notch sit side by side)
   const ticks: HTMLElement[] = [];
   const setKnobTicks = (list: { knob: string; unit: number }[]): void => {
     const shown = list
@@ -137,59 +133,50 @@ export function selector(o: {
         tk = document.createElement('span');
         tk.className = 'sel-knob';
         tk.setAttribute('aria-hidden', 'true');
-        opts.append(tk);
+        el.insertBefore(tk, jack);
         ticks.push(tk);
       }
-      // knobs on the same choice sit side by side
       const same = shown.slice(0, k).filter((x) => x.i === t.i).length;
-      tk.dataset.i = String(t.i);
-      tk.dataset.k = String(same);
+      const count = shown.filter((x) => x.i === t.i).length;
+      tk.style.left = `calc(${pos(t.i)} - 3px + ${(same - (count - 1) / 2) * 7}px)`;
       tk.style.color = `var(--${t.knob})`;
       tk.title = `${t.knob.toUpperCase()} rests it at ${names[t.i] ?? ''}`;
     });
-    place();
   };
 
-  // pointer: a press picks the name under it (the drum: a neighbour); a drag scrubs (the rail: the name under the
-  // pointer; the drum: one step per name's width, the names following the pointer)
-  el.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 || e.target === jack) return;
+  /** the notch nearest a pointer's x */
+  const nearest = (x: number): number => {
+    const r = el.getBoundingClientRect();
+    return clamp(((x - r.left) / r.width) * n() - 0.5);
+  };
+  /** press and drag: the value follows the pointer, notch by notch */
+  const scrub = (e: PointerEvent): void => {
     e.preventDefault();
     e.stopPropagation();
     el.focus({ preventScroll: true });
-    const x0 = e.clientX, i0 = o.get();
-    let moved = false;
-    // the rail: the name nearest the pointer (by the names' centres)
-    const at = (x: number): number => {
-      const r = opts.getBoundingClientRect();
-      const scale = r.width / (opts.offsetWidth || 1); // the canvas zoom
-      let best = 0, d = Infinity;
-      items.forEach((_, i) => {
-        const di = Math.abs(r.left + centre(i) * scale - x);
-        if (di < d) (d = di), (best = i);
-      });
-      return best;
-    };
+    pick(nearest(e.clientX));
     const move = (m: PointerEvent): void => {
-      if (m.pointerId !== e.pointerId) return;
-      if (Math.abs(m.clientX - x0) > 3) moved = true;
-      if (!moved) return;
-      pick(drum ? i0 - Math.round((m.clientX - x0) / STEP_PX) : at(m.clientX));
+      if (m.pointerId === e.pointerId) pick(nearest(m.clientX));
     };
     const up = (u: PointerEvent): void => {
       if (u.pointerId !== e.pointerId) return;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      if (moved) return;
-      const hit = (document.elementFromPoint(u.clientX, u.clientY) as HTMLElement | null)?.closest<HTMLElement>('.sel-opt');
-      if (hit && el.contains(hit)) pick(Number(hit.dataset.i));
-      else if (!drum) pick(at(u.clientX));
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
+  };
+  el.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target === jack) return;
+    scrub(e);
   });
+  if (o.onPatch)
+    jack.addEventListener('pointerdown', (e) => {
+      if (e.altKey || jack.closest('.patching')) return o.onPatch!(e, jack);
+      if (e.button === 0) scrub(e);
+    });
   el.addEventListener('keydown', (e) => {
     const d = e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : 0;
     if (d) pick(o.get() + d);
@@ -199,16 +186,6 @@ export function selector(o: {
     e.preventDefault();
     e.stopPropagation();
   });
-  let wheel = 0;
-  el.addEventListener('wheel', (e) => {
-    if (!drum) return;
-    e.preventDefault();
-    wheel += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    const steps = Math.trunc(wheel / WHEEL_STEP);
-    if (!steps) return;
-    wheel -= steps * WHEEL_STEP;
-    pick(o.get() + steps);
-  }, { passive: false });
 
   build();
   return {

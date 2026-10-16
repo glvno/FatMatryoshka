@@ -879,29 +879,32 @@ svg.slack-cable { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-ind
 svg.slack-cable .cable { pointer-events: stroke; cursor: pointer; }
 svg.slack-cable .cable.pending { pointer-events: none; }
 
-/* ---- Selectors (selector.ts): no shading. The name on the card at the left, the choices written across the row, the
-   jack over the live one (a detent rail); a drum when the names do not fit (three at a time, the jack fixed in the
-   middle, the names rolling past). The base is underlined while modulation moves the live choice; the FM-1 knobs'
-   resting choices are marked under the names in the knobs' colours. ---- */
-.param.bar.sel { display: flex; align-items: flex-end; gap: 6px; height: 34px; background: transparent; }
-.param.bar.sel > span:first-child { flex: none; max-width: 40%; padding: 0 0 4px 6px; }
+/* ---- Selectors (selector.ts): a notched groove, no shading. The name on the card at the left; a thin line with a notch
+   per choice, the jack on the live one; the names under their notches when they fit, else the live name riding under
+   the jack. While modulated the base notch is ringed; the FM-1 knobs' resting choices are coloured marks under their
+   notches. ---- */
+.param.bar.sel { display: flex; align-items: flex-end; gap: 8px; height: 34px; background: transparent; }
+.param.bar.sel > span:first-child { flex: none; max-width: 40%; padding: 0 0 2px 6px; }
 .param.bar.sel > .parameter-routing { top: auto; bottom: 0; }
 .param.bar.sel.shown::after { top: 6px; }
-.sel-track { position: relative; flex: 1; min-width: 0; height: 34px; cursor: pointer; touch-action: none; outline: none; border-radius: 4px; }
-.sel-track:focus-visible { box-shadow: 0 0 0 1.5px var(--secondary); }
+.sel-track { position: relative; flex: 1; min-width: 0; height: 34px; margin-right: 7px; cursor: pointer; touch-action: none; outline: none; }
+.sel-track:focus-visible .sel-groove { box-shadow: 0 0 0 1.5px var(--secondary); }
 .module .mbody .sel-track, .module .mbody .sel-track * { pointer-events: auto; }
-.sel-opts { position: absolute; left: 0; bottom: 0; width: 100%; height: 20px; display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; }
-.sel-track.measure .sel-opts, .sel-track.drum .sel-opts { width: max-content; justify-content: flex-start; gap: 12px; }
-.sel-track.drum .sel-opts { transition: transform .18s ease-out; }
-.sel-opt { flex: none; white-space: nowrap; text-align: center; padding: 0 0 4px; line-height: 16px; font: var(--cap); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.sel-opt:hover { color: var(--ink); }
-.sel-opt.live { color: var(--secondary); }
-.sel-opt.base { text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
-.sel-knob { position: absolute; bottom: 0; width: 6px; height: 3px; border-radius: 1px; background: currentColor; pointer-events: none; }
+.sel-groove { position: absolute; top: 7px; left: 0; right: 0; height: 2px; border-radius: 1px; background: var(--line); }
+.sel-notches, .sel-labels { position: absolute; inset: 0; pointer-events: none; }
+.sel-notch { position: absolute; top: 6px; width: 4px; height: 4px; border-radius: 50%; transform: translateX(-50%); background: var(--muted); }
+.sel-base { position: absolute; top: 3.5px; width: 9px; height: 9px; box-sizing: border-box; border-radius: 50%; transform: translateX(-50%); border: 2px solid var(--secondary); background: var(--panel); pointer-events: none; }
+.sel-knob { position: absolute; top: 12px; width: 6px; height: 3px; border-radius: 1px; background: currentColor; pointer-events: none; }
+.sel-opt, .sel-rider { position: absolute; bottom: 2px; white-space: nowrap; line-height: 14px; font: var(--cap); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.sel-opt.live, .sel-rider { color: var(--secondary); }
+.sel-opt.base { color: var(--ink); }
+.sel-opt { transform: translateX(-50%); }
+.sel-rider { display: none; pointer-events: none; transition: left .14s cubic-bezier(.3, 1.4, .6, 1); }
+.sel-track.many .sel-labels { display: none; }
+.sel-track.many .sel-rider { display: block; }
 .sel-track .sel-jack { position: absolute; z-index: 4; top: 1px; width: 14px; height: 14px; transform: none;
-  border-width: 2.5px; box-shadow: none; cursor: crosshair; transition: left .14s cubic-bezier(.3, 1.4, .6, 1); }
-.sel-track .sel-jack.slider-thumb { color: var(--muted); cursor: pointer; pointer-events: none; }
-.sel-track.drum { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 28%, #000 72%, transparent); mask-image: linear-gradient(90deg, transparent, #000 28%, #000 72%, transparent); }
-.sel-track.drum .sel-jack { left: calc(50% - 7px); transition: none; }
+  border-width: 2.5px; box-shadow: none; cursor: ew-resize; transition: left .14s cubic-bezier(.3, 1.4, .6, 1); }
+.patching .sel-track .sel-jack { cursor: crosshair; }
+.sel-track .sel-jack.slider-thumb { color: var(--muted); pointer-events: none; }
 .picking .sel-track { pointer-events: none; }
-@media (pointer: coarse) { .param.bar.sel, .sel-track { height: 40px; } .sel-opts { height: 26px; } }
+@media (pointer: coarse) { .param.bar.sel, .sel-track { height: 40px; } }
