@@ -135,9 +135,10 @@ export interface Patch {
   assemblies?: AssemblyInst[];
   /** the name of the patch the B side (paramsB) was taken from, for display */
   morphName?: string;
-  /** an output that sways the cables: its signal adds to the editor's cable slack (an editor-only toy; the engine, the encoder
-   * and the FM-1 ignore it) */
+  /** outputs patched into the sidebar's sliders (an editor-only toy; the engine, the encoder and the FM-1 ignore them): one
+   * sways the cables (its signal adds to the cable slack), one moves the zoom */
   slackFrom?: Endpoint;
+  zoomFrom?: Endpoint;
   /** the arpeggiator's settings (arp.ts), an optional overlay: the browser's arpeggiator and the FM-1's (ARP command) take
    * them with the patch; the binary patch does not carry them */
   arp?: ArpCfg;
@@ -313,7 +314,7 @@ export function addModule(p: Patch, def: ModuleDef, x: number, y: number): Modul
 export function removeModule(p: Patch, id: number): void {
   p.modules = p.modules.filter((m) => m.id !== id);
   p.cables = p.cables.filter((c) => c.from.module !== id && c.to.module !== id);
-  if (p.slackFrom?.module === id) delete p.slackFrom;
+  for (const k of SIDE_KEYS) if (p[k]?.module === id) delete p[k];
 }
 
 /** Connect an output to an input. Several cables into one input are summed. Returns false if rejected. */
@@ -328,9 +329,13 @@ export function connect(p: Patch, defs: Record<string, ModuleDef>, from: Endpoin
   return true;
 }
 
-/** whether the patch's cable-slack source is an output that exists (removeModule and the loader drop one that does not) */
-export function slackSourceOk(p: Patch, defs: Record<string, ModuleDef>): boolean {
-  const e = p.slackFrom;
+/** the patch's sidebar slider sources (see Patch.slackFrom) */
+export const SIDE_KEYS = ['slackFrom', 'zoomFrom'] as const;
+export type SideKey = (typeof SIDE_KEYS)[number];
+
+/** whether a sidebar slider's source is an output that exists (removeModule and the loader drop one that does not) */
+export function sideSourceOk(p: Patch, key: SideKey, defs: Record<string, ModuleDef>): boolean {
+  const e = p[key];
   const m = e && p.modules.find((x) => x.id === e.module);
   return !!m && !!defs[m.type]?.outputs.some((o) => o.name === e!.port);
 }
@@ -431,6 +436,6 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
   if (!hasMorph(p as Patch) || typeof p.morphName !== 'string') delete p.morphName;
   if (p.arp && typeof p.arp === 'object') p.arp = fixArp(p.arp);
   else delete p.arp;
-  if (!slackSourceOk(p as Patch, defs)) delete p.slackFrom;
+  for (const k of SIDE_KEYS) if (!sideSourceOk(p as Patch, k, defs)) delete p[k];
   return p as Patch;
 }

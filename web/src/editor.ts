@@ -25,6 +25,7 @@ import {
   sameEnd,
   type Cable,
   type Endpoint,
+  type SideKey,
   type ModuleDef,
   type ModuleInst,
   type Patch,
@@ -131,6 +132,9 @@ export interface EditorEvents {
 type CableEnd = 'side' | 'up' | 'down';
 /** the straight run of a cable out of its jack at full slack, px */
 const CABLE_STUB = 20;
+/** the zoom's range (the wheel, pinch, fit and the sidebar's zoom slider) */
+export const ZOOM_MIN = 0.3;
+export const ZOOM_MAX = 2;
 /** a chain of cubic Béziers: a start point, then three points per segment */
 const pathOf = ([a, ...rest]: { x: number; y: number }[]): string => {
   let d = `M${a.x},${a.y}`;
@@ -168,10 +172,10 @@ export class Editor {
   private expandedOnce = new Set<number>();
   /** how far cables sag, 0 (taut, the default) .. 1: the sidebar's setting */
   slack = 0;
-  /** the sidebar's cable slack slider: its thumb is a jack (Patch.slackFrom; set by the host) */
-  slackThumb: HTMLInputElement | null = null;
-  /** the cable from the slack source to that thumb: in its own layer over the whole window, so it crosses the sidebar */
-  private slackLayer: SVGSVGElement | null = null;
+  /** the sidebar sliders whose thumbs are jacks (cable slack, zoom): Patch.slackFrom / zoomFrom; set by the host */
+  readonly sideThumbs = new Map<SideKey, HTMLElement>();
+  /** the cables from their sources to those thumbs: in their own layer over the whole window, so they cross the sidebar */
+  private sideLayer: SVGSVGElement | null = null;
   /** the patch's slack source (Patch.slackFrom) as it plays: added to `slack` */
   private slackMod = 0;
   private slackFrame = 0;
@@ -1000,14 +1004,17 @@ export class Editor {
   // ---- zoom and touch: the cards and cables are scaled by `zoom`; offsets stay in layout pixels, pointer deltas are divided by it
 
   zoom = 1;
-  onZoom: (z: number) => void = () => {};
+  /** `live`: the zoom slider's source moved it, not the user */
+  onZoom: (z: number, live: boolean) => void = () => {};
 
-  setZoom(z: number): void {
-    this.zoom = Math.min(2, Math.max(0.3, Math.round(z * 100) / 100));
+  setZoom(z: number, live = false): void {
+    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
+    if (live && next === this.zoom) return;
+    this.zoom = next;
     this.world.style.transform = this.zoom === 1 ? '' : `scale(${this.zoom})`;
     this.sizeCanvas();
     this.drawCables();
-    this.onZoom(this.zoom);
+    this.onZoom(this.zoom, live);
   }
 
   /** Tidy up: line the cards up in columns, keeping their arrangement (tidy.ts); one undo step */
@@ -1040,18 +1047,29 @@ export class Editor {
     });
   }
 
-  /** patch an output into the cable slack (null: unplug it); an undo step, no engine reload */
-  setSlackSource(from: Endpoint | null): void {
+  /** patch an output into a sidebar slider (null: unplug it); an undo step, no engine reload */
+  setSideSource(key: SideKey, from: Endpoint | null): void {
     const before = JSON.stringify(this.patch);
-    if (from) this.patch.slackFrom = { ...from };
-    else delete this.patch.slackFrom;
+    if (from) this.patch[key] = { ...from };
+    else delete this.patch[key];
     if (JSON.stringify(this.patch) === before) return;
     this.history.push(before);
     if (this.history.length > HISTORY) this.history.shift();
     this.future = [];
-    if (!from) this.slackMod = 0;
+    if (key === 'slackFrom' && !from) this.slackMod = 0;
     this.rebuild();
     this.ev.onLayout(this.patch);
+  }
+
+  /** the zoom, holding the canvas's centre in place (the zoom slider and its source); `live`: a modulation, not the user's */
+  zoomAround(z: number, live = false): void {
+    const c = this.canvas;
+    const cx = (c.scrollLeft + c.clientWidth / 2) / this.zoom, cy = (c.scrollTop + c.clientHeight / 2) / this.zoom;
+    const was = this.zoom;
+    this.setZoom(z, live);
+    if (this.zoom === was) return;
+    c.scrollLeft = cx * this.zoom - c.clientWidth / 2;
+    c.scrollTop = cy * this.zoom - c.clientHeight / 2;
   }
 
   /** every card in view: the zoom that fits the cards' extent into the canvas, scrolled to its top left */
@@ -2266,45 +2284,43 @@ export class Editor {
    * its copy on the dock's overlay draws the rest (the same curve, mapped from world to overlay space), but only the
    * strip between the jack and the dock's top edge: a cable to a module below the canvas's view stays under the panel.
    */
-  /** the slack source's cable, over everything up to the sidebar's thumb; hidden while either end is not shown */
-  positionSlackCable(): void {
-    const from = this.patch.slackFrom;
-    const src = from && this.ports.get(this.key(from.module, from.port, 'out'));
-    const thumb = this.slackThumb;
-    const shown = !!src && !!thumb && src.isConnected && this.canvas.offsetParent !== null && thumb.offsetParent !== null;
-    if (!shown) {
-      this.slackLayer?.replaceChildren();
-      return;
+  /** the sidebar sliders' source cables, over everything up to their thumbs; each hidden while either end is not shown */
+  positionSideCables(): void {
+    if (!this.sideLayer) {
+      this.sideLayer = document.createElementNS(SVGNS, 'svg') as SVGSVGElement;
+      this.sideLayer.setAttribute('class', 'cables slack-cable');
+      this.sideLayer.setAttribute('aria-hidden', 'true');
+      document.body.append(this.sideLayer);
     }
-    if (!this.slackLayer) {
-      this.slackLayer = document.createElementNS(SVGNS, 'svg') as SVGSVGElement;
-      this.slackLayer.setAttribute('class', 'cables slack-cable');
-      this.slackLayer.setAttribute('aria-hidden', 'true');
-      document.body.append(this.slackLayer);
-    }
-    let path = this.slackLayer.querySelector('path');
-    if (!path) {
-      path = document.createElementNS(SVGNS, 'path');
-      path.addEventListener('click', () => this.setSlackSource(null));
-      this.slackLayer.append(path);
-    }
-    const m = this.patch.modules.find((x) => x.id === from!.module)!;
-    const kind = DEFS[m.type].outputs.find((o) => o.name === from!.port)?.kind ?? 'control';
-    path.setAttribute('class', `cable ${kind}${m.type === 'fm1' && isKnob(from!.port) ? ` knob-${from!.port}` : ''}`);
-    const title = 'Swaying the cables: click to unplug';
-    path.setAttribute('aria-label', title);
-    // the thumb's centre: the input's value along its track (the thumb is as wide as the bar is tall)
     const w = this.world.getBoundingClientRect();
-    const r = thumb!.getBoundingClientRect();
-    const v = (Number(thumb!.value) - Number(thumb!.min)) / (Number(thumb!.max) - Number(thumb!.min) || 1);
-    const tx = r.left + r.height / 2 + v * (r.width - r.height), ty = r.top + r.height / 2;
-    const b = { x: (tx - w.left) / this.zoom, y: (ty - w.top) / this.zoom };
-    path.setAttribute('d', this.curve(this.center(src!), b, this.endOf(src!), 'up'));
-    path.setAttribute('transform', `translate(${w.left} ${w.top}) scale(${this.zoom})`);
+    const keep = new Set<SVGPathElement>();
+    for (const [key, thumb] of this.sideThumbs) {
+      const from = this.patch[key];
+      const src = from && this.ports.get(this.key(from.module, from.port, 'out'));
+      if (!src || !src.isConnected || this.canvas.offsetParent === null || thumb.offsetParent === null) continue;
+      let path = this.sideLayer.querySelector<SVGPathElement>(`path[data-key="${key}"]`);
+      if (!path) {
+        path = document.createElementNS(SVGNS, 'path');
+        path.dataset.key = key;
+        path.addEventListener('click', () => this.setSideSource(key, null));
+        this.sideLayer.append(path);
+      }
+      keep.add(path);
+      const m = this.patch.modules.find((x) => x.id === from!.module)!;
+      const kind = DEFS[m.type].outputs.find((o) => o.name === from!.port)?.kind ?? 'control';
+      path.setAttribute('class', `cable ${kind}${m.type === 'fm1' && isKnob(from!.port) ? ` knob-${from!.port}` : ''}`);
+      path.setAttribute('aria-label', 'A sidebar slider\'s source: click to unplug');
+      // into the thumb's centre (it moves with the live value), from above
+      const r = thumb.getBoundingClientRect();
+      const b = { x: (r.left + r.width / 2 - w.left) / this.zoom, y: (r.top + r.height / 2 - w.top) / this.zoom };
+      path.setAttribute('d', this.curve(this.center(src), b, this.endOf(src), 'up'));
+      path.setAttribute('transform', `translate(${w.left} ${w.top}) scale(${this.zoom})`);
+    }
+    for (const p of [...this.sideLayer.querySelectorAll('path')]) if (!keep.has(p)) p.remove();
   }
 
   private positionCables(): void {
-    this.positionSlackCable();
+    this.positionSideCables();
     const w = this.world.getBoundingClientRect();
     const o = this.dockCables?.getBoundingClientRect();
     for (const { path, from, to, origin } of this.cablePaths) {
@@ -2330,7 +2346,7 @@ export class Editor {
 
   /** Outside cables end at side jacks; internal branches are editable input-to-parameter routes. */
   drawCables(): void {
-    this.positionSlackCable();
+    this.positionSideCables();
     for (const { path } of this.cablePaths) path.remove();
     this.cablePaths = [];
     this.dockCables?.replaceChildren();
@@ -2561,7 +2577,9 @@ export class Editor {
       const dot = t?.closest('.dot') as HTMLElement | null;
       cancel();
       // an output dropped on the sidebar's cable slack bar sways the cables
-      if (kind === 'out' && t?.closest('.sbar')) return this.setSlackSource({ module: Number(start.dataset.mod), port: start.dataset.port! });
+      // an output dropped on a sidebar slider whose thumb is a jack (cable slack, zoom) patches it
+      const side = kind === 'out' ? (t?.closest('[data-side]') as HTMLElement | null)?.dataset.side as SideKey | undefined : undefined;
+      if (side) return this.setSideSource(side, { module: Number(start.dataset.mod), port: start.dataset.port! });
       if (dot === start) {
         this.armed = start;
         start.classList.add('armed');

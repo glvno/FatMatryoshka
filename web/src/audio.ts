@@ -25,8 +25,8 @@ export class AudioHost {
   onError: (msg: string) => void = () => {};
   /** a scope probe's latest samples (oldest first) */
   onProbe: (key: string, data: Float32Array, sr: number) => void = () => {};
-  /** the watched output's mean over the last two blocks (the cable slack's source) */
-  onWatch: (v: number) => void = () => {};
+  /** a watched output's mean over the last two blocks (a sidebar slider's source, by key) */
+  onWatch: (key: string, v: number) => void = () => {};
 
   get running(): boolean {
     return this.ctx?.state === 'running';
@@ -53,8 +53,8 @@ export class AudioHost {
       node.port.onmessage = (ev) => {
         if (ev.data?.error) {
           this.latestValues = null; this.onValues(null); this.onError(ev.data.error);
-        } else if (typeof ev.data?.watch === 'number') {
-          this.onWatch(ev.data.watch);
+        } else if (typeof ev.data?.watch === 'string') {
+          this.onWatch(ev.data.watch, ev.data.v);
         } else if (ev.data?.probe) {
           if (ev.data.revision === this.revision) this.onProbe(ev.data.probe, ev.data.data, ev.data.sr);
         }
@@ -75,6 +75,7 @@ export class AudioHost {
       }
       for (const msg of this.early) this.send(msg);
       this.early = [];
+      for (const msg of this.watches.values()) node.port.postMessage(msg);
     } catch (error) {
       void ctx.close(); this.ctx = null; this.ready = null; this.early = [];
       throw error;
@@ -115,7 +116,13 @@ export class AudioHost {
     this.send({ t: 'arp', cfg: patch.arp ?? ARP_DEFAULT });
   }
 
+  /** the standing watches (sidebar slider sources), sent again once the worklet exists: a watch asked for before audio started
+   * would otherwise be lost */
+  private watches = new Map<string, HostMsg>();
+
   send(msg: HostMsg): void {
+    if (msg.t === 'watch') this.watches.set(msg.key, msg);
+    else if (msg.t === 'unwatch') this.watches.delete(msg.key);
     if (this.node) this.node.port.postMessage(msg);
     else if (this.ctx && !['patch', 'arp'].includes(msg.t)) this.early.push(msg);
   }

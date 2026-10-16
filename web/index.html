@@ -35,7 +35,8 @@
           <div class="shead"><span class="mtag shp">VIEW</span><span class="stitle">Canvas</span></div>
           <div class="sbody">
             <div class="view-row"><button id="tidy-btn" title="Line the cards up in columns, keeping their order (undo with Ctrl/Cmd+Z)">TIDY</button><button id="fit-btn" title="Zoom so every card is in view">FIT</button></div>
-            <label class="sbar" title="How far the cables sag. Its thumb is a jack: drop a cable from any output on it and that signal sways the cables"><span>Cable slack</span><output id="slack-out">0 %</output><input id="slack-input" type="range" min="0" max="1" step="0.05" value="0" aria-label="Cable slack" /></label>
+            <div id="slack-bar" class="param bar side-bar"><span>Cable slack</span><output id="slack-out">0 %</output><input id="slack-input" type="range" min="0" max="1" step="0.01" value="0" aria-label="Cable slack" /></div>
+            <div id="zoom-bar" class="param bar side-bar"><span>Zoom</span><output id="zoom-out">100 %</output><input id="zoom-input" type="range" min="0" max="1" step="0.005" value="0.63" aria-label="Zoom" /></div>
           </div>
         </section>
         <section class="spanel" aria-label="Learn">

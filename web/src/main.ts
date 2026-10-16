@@ -4,7 +4,7 @@ import { setupPopoverPositioning } from './popover';
 import { AudioHost } from './audio';
 import type { HostMsg } from './worklet';
 import { DeviceLink } from './device';
-import { Editor, probeKey } from './editor';
+import { Editor, probeKey, ZOOM_MAX, ZOOM_MIN } from './editor';
 import { addToBank, bankPatches, buildBankTab } from './bank';
 import { buildAssembliesTab, storeAssembly, storeTutorialAssembly } from './assemblies';
 import { AssemblyBrowser } from './browser';
@@ -12,11 +12,13 @@ import { searchCommands, type Command } from './commands';
 import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi, isTextEntry } from './input';
 import { Piano } from './piano';
+import { sliderJack } from './slider-jack';
+import { isKnob } from './knob-rest';
 import { longName, moduleName } from './labels';
 import { DeckControls } from './deck';
 import { releaseFocusAfterPointer } from './focus';
 import { DEFS } from './modules';
-import { newPatch, validatePatch, type Patch } from './patch';
+import { newPatch, validatePatch, type Patch, type SideKey } from './patch';
 import { ARP_DEFAULT } from './arp';
 import { Scope } from './scope';
 import { diffCount, diffLines, diffPatches } from './diff';
@@ -148,13 +150,14 @@ const patchCandidates = (): { name: string; patch: Patch }[] => {
 };
 const scope = new Scope($('scope'));
 host.onProbe = (key, data, sr) => scope.feed(key, data, sr);
-/** the cable slack's source as it plays, and which output the worklet watches ("" none): see syncSlackWatch */
-let slackLive = 0;
-let watching = '';
+/** the sidebar's sliders whose thumbs are jacks (cable slack, zoom): see sideSlider below; filled once the editor exists */
+const sides = new Map<SideKey, SideSlider>();
+/** the zoom slider's setting (the user's zoom; a source adds to it) */
+let zoomBase = 1;
 const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   onStructure(p) {
     $<HTMLInputElement>('patch-name').value = p.name;
-    syncSlackWatch();
+    syncSides();
     scope.clearSamples();
     host.setPatch(p);
     queueSave(p);
@@ -208,7 +211,7 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   },
   onLayout(p) {
     queueSave(p);
-    syncSlackWatch();
+    syncSides();
   },
   onError(msg) {
     status.textContent = msg;
@@ -231,7 +234,6 @@ editor.wheelHost = $('wheels');
 editor.dockWheels = hands.wheels;
 editor.dockOctave = piano.octaveControls;
 editor.dockBudget = $('budget');
-editor.slackThumb = $<HTMLInputElement>('slack-input');
 editor.rebuild();
 showBudget();
 snapshotCandidates = () => editor.snapshots.B ? [{ name: 'Snapshot B', patch: { ...JSON.parse(editor.snapshots.B) as Patch, name: 'Snapshot B' } }] : [];
@@ -260,7 +262,12 @@ const tutorial = new Tutorial({
   rename: (name) => { editor.patch.name = name; nameInput.value = name; queueSave(editor.patch); },
   status: (msg) => { status.textContent = msg; },
 });
-editor.onZoom = () => tutorial.zoomed();
+editor.onZoom = (z, live) => {
+  if (live) return;
+  zoomBase = z;          // the user's zoom is the zoom slider's setting
+  tutorial.zoomed();
+  showSide('zoomFrom');
+};
 host.onValues = (values) => {
   editor.showParameterValues(values);
   if (!host.running) scope.clearSamples();
@@ -465,7 +472,8 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Cable slack: none', keywords: 'slack sag tight straight', run: inPatch(() => setSlack(0)) },
     { kind: 'command', label: 'Cable slack: half', keywords: 'slack sag droop hang loose', run: inPatch(() => setSlack(0.5)) },
     { kind: 'command', label: 'Cable slack: full', keywords: 'slack sag droop hang heavy', run: inPatch(() => setSlack(1)) },
-    ...(editor.patch.slackFrom ? [{ kind: 'command' as const, label: 'Cable slack: unplug its input', keywords: 'slack sway modulate', run: inPatch(() => editor.setSlackSource(null)) }] : []),
+    ...(editor.patch.slackFrom ? [{ kind: 'command' as const, label: 'Cable slack: unplug its input', keywords: 'slack sway modulate', run: inPatch(() => editor.setSideSource('slackFrom', null)) }] : []),
+    ...(editor.patch.zoomFrom ? [{ kind: 'command' as const, label: 'Zoom: unplug its input', keywords: 'zoom modulate', run: inPatch(() => editor.setSideSource('zoomFrom', null)) }] : []),
     { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },
     { kind: 'command', label: 'Reset canvas scale', keywords: 'zoom 100%', run: inPatch(() => editor.setZoom(1)) },
     ...Object.values(DEFS).filter((d) => d.type !== 'fm1').map((d) => ({ kind: 'add module', tags: ['module'], label: moduleName(d.type, d.label), keywords: d.label, run: () => editor.add(d.type) })),
@@ -604,60 +612,127 @@ window.addEventListener('keydown', (e) => {
     e.stopImmediatePropagation();
   }
 }, true);
-// cable slack: a sidebar slider and palette commands, remembered per browser
+// The sidebar's cable slack and zoom sliders: a card's value bar (sliderJack) each, and (the easter egg) their thumbs are
+// jacks. An output dropped on one (Editor.setSideSource: Patch.slackFrom / zoomFrom) moves it: the worklet sends that
+// output's mean (watch), which adds to the slider's setting in its unit (0..1). As on a card the thumb and value show the
+// live position, a tick the setting, a knob's tick where that knob rests it; a drag moves the setting by the thumb's travel.
+// A right-click on the bar or a click on its cable unplugs it.
+interface SideSlider {
+  bar: ReturnType<typeof sliderJack>;
+  row: HTMLElement;
+  /** the source's latest value, and whether the thumb is being dragged (it shows the pointer then, not the live value) */
+  live: number;
+  dragging: boolean;
+  watching: string;
+  /** the setting in the slider's unit, 0..1, and setting it */
+  base(): number;
+  setBase(u: number): void;
+  /** apply the live position (setting + source) */
+  apply(u: number, modulated: boolean): void;
+  text(u: number): string;
+  name: string;
+}
 const SLACK = 'matryoshka.cable-slack';
-const slackInput = $<HTMLInputElement>('slack-input');
+const clamp01 = (u: number): number => Math.min(1, Math.max(0, u));
+// zoom in the slider's unit: octaves of its range, like the wheel and pinch
+const zoomUnit = (z: number): number => Math.log(z / ZOOM_MIN) / Math.log(ZOOM_MAX / ZOOM_MIN);
+const unitZoom = (u: number): number => ZOOM_MIN * Math.pow(ZOOM_MAX / ZOOM_MIN, clamp01(u));
+zoomBase = editor.zoom;
 function setSlack(v: number): void {
   editor.setSlack(v);
-  slackInput.value = String(editor.slack);
-  showSlack();
+  showSide('slackFrom');
   try {
     localStorage.setItem(SLACK, String(editor.slack));
   } catch {
     /* storage blocked: the slack lasts until the page is reloaded */
   }
 }
-slackInput.oninput = () => setSlack(Number(slackInput.value));
-// the slack's input (an easter egg): an output dropped on the bar sways the cables (Patch.slackFrom, Editor.setSlackSource);
-// the worklet sends that output's mean, the bar's fill follows it, a right-click unplugs it
-function showSlack(): void {
-  const slackInput = $<HTMLInputElement>('slack-input');
-  const from = editor.patch.slackFrom;
+function sideSlider(key: SideKey, rowId: string, s: Omit<SideSlider, 'bar' | 'row' | 'live' | 'dragging' | 'watching'>): void {
+  const row = $(rowId);
+  const input = row.querySelector('input')!;
+  const bar = sliderJack(input, () => {});
+  row.append(bar.element);
+  row.dataset.side = key;
+  editor.sideThumbs.set(key, bar.jack);
+  const side: SideSlider = { ...s, bar, row, live: 0, dragging: false, watching: '' };
+  sides.set(key, side);
+  input.addEventListener('input', () => {
+    side.setBase(clamp01(Number(input.value) - (editor.patch[key] ? side.live : 0)));
+    showSide(key);
+  });
+  row.addEventListener('pointerdown', () => (side.dragging = true), true);
+  input.addEventListener('change', () => {
+    side.dragging = false;
+    showSide(key);
+  });
+  row.addEventListener('contextmenu', (e) => {
+    if (!editor.patch[key]) return;
+    e.preventDefault();
+    editor.setSideSource(key, null);
+  });
+}
+function showSide(key: SideKey): void {
+  const side = sides.get(key);
+  if (!side) return;
+  const input = side.row.querySelector('input')!;
+  const from = editor.patch[key];
   const m = from && editor.patch.modules.find((x) => x.id === from.module);
-  const bar = slackInput.parentElement!;
-  bar.style.setProperty('--v', String(Math.min(1, Math.max(0, editor.slack + (from ? slackLive : 0)))));
-  bar.classList.toggle('modulated', !!m);
-  $('slack-out').textContent = m ? `${moduleName(m.type, DEFS[m.type].label)} ${longName(m.type, from!.port)}` : `${Math.round(editor.slack * 100)} %`;
-  bar.title = m
-    ? `Swayed by ${moduleName(m.type, DEFS[m.type].label)} ${longName(m.type, from!.port)}. Right-click to unplug.`
-    : 'How far the cables sag. Its thumb is a jack: drop a cable from any output on it and that signal sways the cables';
+  const base = side.base();
+  const u = clamp01(base + (m ? side.live : 0));
+  if (!side.dragging) input.value = String(u);
+  side.bar.update();
+  side.bar.setBase(m ? base : null);
+  side.bar.setKnobTicks(m && m.type === 'fm1' && isKnob(from!.port) ? [{ knob: from!.port, unit: clamp01(base + (m.params[from!.port] ?? 0)) }] : []);
+  side.bar.jack.classList.toggle('connected', !!m);
+  side.row.classList.toggle('automated', !!m);
+  side.row.querySelector('output')!.textContent = side.text(u);
+  side.row.title = m
+    ? `${side.name}: moved by ${moduleName(m.type, DEFS[m.type].label)} ${longName(m.type, from!.port)}. Right-click (or click its cable) to unplug.`
+    : `${side.name}. Its thumb is a jack: drop a cable from any output on it and that signal moves it.`;
 }
-function syncSlackWatch(): void {
-  const from = editor.patch.slackFrom;
-  const key = from ? `${from.module}:${from.port}` : '';
-  if (key !== watching) {
-    watching = key;
-    slackLive = 0;
-    editor.modulateSlack(0);
-    host.send(from ? { t: 'watch', id: from.module, port: from.port } : { t: 'unwatch' });
+/** watch the patched outputs (and stop watching unplugged ones) */
+function syncSides(): void {
+  for (const [key, side] of sides) {
+    const from = editor.patch[key];
+    const want = from ? `${from.module}:${from.port}` : '';
+    if (want !== side.watching) {
+      side.watching = want;
+      side.live = 0;
+      side.apply(side.base(), false);
+      host.send(from ? { t: 'watch', key, id: from.module, port: from.port } : { t: 'unwatch', key });
+    }
+    showSide(key);
   }
-  showSlack();
 }
-host.onWatch = (v) => {
-  slackLive = v;
-  editor.modulateSlack(v);
-  showSlack();
+host.onWatch = (key, v) => {
+  const side = sides.get(key as SideKey);
+  if (!side || !editor.patch[key as SideKey]) return;
+  side.live = v;
+  side.apply(clamp01(side.base() + v), true);
+  showSide(key as SideKey);
 };
-// the sidebar scrolls and the window resizes under the slack cable (it is drawn over the whole window)
-$('workspace-sidebar').addEventListener('scroll', () => editor.positionSlackCable(), { passive: true });
-addEventListener('resize', () => editor.positionSlackCable());
-// the thumb is the jack: a right-click on the bar unplugs it (and a click on its cable)
-$('slack-input').parentElement!.addEventListener('contextmenu', (e) => {
-  if (!editor.patch.slackFrom) return;
-  e.preventDefault();
-  editor.setSlackSource(null);
+sideSlider('slackFrom', 'slack-bar', {
+  name: 'Cable slack',
+  base: () => editor.slack,
+  setBase: (u) => setSlack(u),
+  // the editor adds the source to the setting itself (Editor.sway)
+  apply: (_u, modulated) => editor.modulateSlack(modulated ? sides.get('slackFrom')!.live : 0),
+  text: (u) => `${Math.round(u * 100)} %`,
 });
-syncSlackWatch();
+sideSlider('zoomFrom', 'zoom-bar', {
+  name: 'Zoom',
+  base: () => zoomUnit(zoomBase),
+  setBase: (u) => {
+    zoomBase = unitZoom(u);
+    if (!editor.patch.zoomFrom) editor.zoomAround(zoomBase);
+  },
+  apply: (u, modulated) => editor.zoomAround(modulated ? unitZoom(u) : zoomBase, modulated),
+  text: (u) => `${Math.round(unitZoom(u) * 100)} %`,
+});
+// the sidebar scrolls and the window resizes under the source cables (they are drawn over the whole window)
+$('workspace-sidebar').addEventListener('scroll', () => editor.positionSideCables(), { passive: true });
+addEventListener('resize', () => editor.positionSideCables());
+syncSides();
 try {
   const v = Number(localStorage.getItem(SLACK) ?? 0);
   if (v > 0) setSlack(v);
@@ -866,7 +941,7 @@ const switchTab = (name: string): void => {
   }
   for (const tab of document.querySelectorAll<HTMLElement>('.tab')) tab.hidden = tab.id !== `tab-${name}`;
   document.querySelector<HTMLElement>('.patch-controls')!.hidden = name !== 'patch';
-  editor.positionSlackCable();
+  editor.positionSideCables();
   if (name === 'patch') requestAnimationFrame(() => editor.drawCables());
   if (name === 'library') refreshBank();
 };

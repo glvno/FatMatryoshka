@@ -21,8 +21,8 @@ export type HostMsg =
   | { t: 'arpplay'; on: boolean }
   | { t: 'probe'; key: string; id: number; port: string }
   | { t: 'unprobe'; key: string }
-  | { t: 'watch'; id: number; port: string }
-  | { t: 'unwatch' }
+  | { t: 'watch'; key: string; id: number; port: string }
+  | { t: 'unwatch'; key: string }
   | { t: 'on'; note: number; vel: number }
   | { t: 'off'; note: number }
   | { t: 'clock' }
@@ -47,8 +47,9 @@ class ModularProcessor extends AudioWorkletProcessor {
   /** scope probes: the last PROBE_LEN samples of an output, sent to the host about 30 times a second */
   private probes = new Map<string, { id: number; port: string; ring: Float32Array; w: number }>();
   private probeBlocks = 0;
-  /** the output that sways the editor's cables (Patch.slackFrom): its mean over two blocks, sent about 170 times a second */
-  private watched: { id: number; port: string; sum: number; n: number } | null = null;
+  /** outputs patched into the editor's sidebar sliders (Patch.slackFrom, zoomFrom) by key: their mean over two blocks, sent
+   * about 170 times a second */
+  private watched = new Map<string, { id: number; port: string; sum: number; n: number }>();
   constructor() {
     super();
     this.port.onmessage = (ev: MessageEvent<HostMsg>) => {
@@ -69,8 +70,8 @@ class ModularProcessor extends AudioWorkletProcessor {
         else if (m.t === 'range') this.engine.setRange(m.id, m.index, m.name, m.range);
         else if (m.t === 'probe') this.probes.set(m.key, { id: m.id, port: m.port, ring: new Float32Array(PROBE_LEN), w: 0 });
         else if (m.t === 'unprobe') this.probes.delete(m.key);
-        else if (m.t === 'watch') this.watched = { id: m.id, port: m.port, sum: 0, n: 0 };
-        else if (m.t === 'unwatch') this.watched = null;
+        else if (m.t === 'watch') this.watched.set(m.key, { id: m.id, port: m.port, sum: 0, n: 0 });
+        else if (m.t === 'unwatch') this.watched.delete(m.key);
         else if (m.t === 'arp') this.arp.set(m.cfg);
         else if (m.t === 'arpplay') {
           this.arp.play = m.on;
@@ -112,14 +113,15 @@ class ModularProcessor extends AudioWorkletProcessor {
   }
 
   private feedWatch(n: number): void {
-    const w = this.watched!;
-    const src = this.engine.probe(w.id, w.port);
-    for (let i = 0; i < n; i++) w.sum += src?.[i] ?? 0;
-    w.n += n;
-    if (w.n < 256) return;
-    this.port.postMessage({ watch: w.sum / w.n });
-    w.sum = 0;
-    w.n = 0;
+    for (const [key, w] of this.watched) {
+      const src = this.engine.probe(w.id, w.port);
+      for (let i = 0; i < n; i++) w.sum += src?.[i] ?? 0;
+      w.n += n;
+      if (w.n < 256) continue;
+      this.port.postMessage({ watch: key, v: w.sum / w.n });
+      w.sum = 0;
+      w.n = 0;
+    }
   }
 
   process(_in: Float32Array[][], outputs: Float32Array[][]): boolean {
@@ -128,7 +130,7 @@ class ModularProcessor extends AudioWorkletProcessor {
       this.arp.run(out[0].length, this.engine);
       this.engine.render(out[0], out[1] ?? out[0]);
       if (this.probes.size) this.feedProbes(out[0].length, out);
-      if (this.watched) this.feedWatch(out[0].length);
+      if (this.watched.size) this.feedWatch(out[0].length);
       if (this.valuesRequested) {
         this.valuesRequested = false;
         this.port.postMessage({ values: this.engine.parameterValues(), revision: this.revision });
