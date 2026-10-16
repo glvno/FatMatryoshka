@@ -405,13 +405,12 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 @media (max-width: 650px) { .tutorial-prose { font-size: 12px; } }
 .tutorial-warn { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--ink); }
 .tutorial-why { font-size: 13px; margin: 6px 0; }
-/* a requirement placed in the lesson text: a box the panel ticks, the next one marked; clicking points the highlight at it */
+/* a requirement placed in the lesson text: a box the panel ticks; clicking points the highlight at it */
 .tutorial-prose .req { cursor: pointer; border-radius: 4px; }
 .tutorial-prose .req-box { display: inline-block; box-sizing: border-box; width: .95em; height: .95em; margin-right: .4em; vertical-align: -.12em; border: 1.5px solid var(--secondary); border-radius: 3px; text-align: center; line-height: .8em; font-size: 1em; }
 .tutorial-prose .req.done .req-box { background: var(--secondary); }
 .tutorial-prose .req.done .req-box::after { content: '✓'; color: var(--panel); font-size: .75em; font-weight: 800; }
 .tutorial-prose .req.done .req-text { color: var(--muted); }
-.tutorial-prose .req.next .req-text { text-decoration: underline 2px var(--secondary); text-underline-offset: 3px; }
 .tutorial-todo { font-size: 12px; margin: 8px 0 2px; padding: 6px 10px; border-radius: 6px; background: var(--surface-tint); }
 .tutorial-todo > span { color: var(--secondary); font-weight: 700; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
 .tutorial-todo ul { margin: 4px 0 0; padding-left: 18px; color: var(--ink); line-height: 1.5; }
