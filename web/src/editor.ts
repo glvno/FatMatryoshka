@@ -492,8 +492,8 @@ export class Editor {
     const param = (name: string): HTMLElement => this.paramRow(m, def, def.params.find((pd) => pd.name === name)!);
     // outputs with a home next to the control or setting that makes them; the rest in the strip
     const wheels = this.dockWheels;
-    const WHEELS = wheels ? ['bend', 'mod'] : [], DRIFT = ['tol', 'drift'], ARP = ['clock'];
-    const homed = [...WHEELS, ...DRIFT, ...ARP];
+    const WHEELS = wheels ? ['bend', 'mod'] : [], VOICES = ['spread'], VOICING = ['legato', 'jump'], DRIFT = ['tol', 'drift'], ARP = ['clock'];
+    const homed = [...WHEELS, ...VOICES, ...VOICING, ...DRIFT, ...ARP];
     const strip = jacks(def.outputs.map((p) => p.name).filter((n) => !isKnob(n) && !homed.includes(n)));
     const knobs = document.createElement('div');
     knobs.className = 'deck-knobs';
@@ -519,8 +519,8 @@ export class Editor {
       ...(wheelCol ? [col('dock-wheels', null, ...wheelCol)] : []),
       col('dock-outputs', strip, ...(this.dockOctave ? [this.dockOctave] : [])),
       col('dock-knobs', null, knobs),
-      col('dock-voices', null, this.voicesRow()),
-      col('dock-voicing', null, param('legato'), param('priority')),
+      col('dock-voices', jacks(VOICES), this.voicesRow()),
+      col('dock-voicing', jacks(VOICING), param('legato'), param('priority')),
       col('dock-morph', null, morph, this.morphRow()),
       col('dock-drift', jacks(DRIFT), param('unit')),
       col('dock-arp', jacks(ARP), arp));
