@@ -58,8 +58,9 @@ export function selector(o: {
 
   const n = (): number => names.length;
   const clamp = (i: number): number => Math.max(0, Math.min(n() - 1, Math.round(i)));
-  /** a notch's centre along the groove */
-  const pos = (i: number): string => `${((i + 0.5) / Math.max(1, n())) * 100}%`;
+  /** where a notch is along the groove, 0..1: the first and last at its ends (inset by half the jack, so the jack stays on it) */
+  const frac = (i: number): number => (n() > 1 ? i / (n() - 1) : 0.5);
+  const pos = (i: number): string => `calc(7px + ${frac(i)} * (100% - 14px))`;
   const pick = (i: number): void => {
     i = clamp(i);
     if (i === o.get()) return;
@@ -80,7 +81,8 @@ export function selector(o: {
     }));
     items = names.map((name, i) => {
       const b = document.createElement('span');
-      b.className = 'sel-opt';
+      // the end names line up with the groove's ends, the others are centred under their notches
+      b.className = 'sel-opt' + (n() > 1 && i === 0 ? ' first' : n() > 1 && i === n() - 1 ? ' last' : '');
       b.textContent = name;
       b.style.left = pos(i);
       return b;
@@ -102,7 +104,7 @@ export function selector(o: {
     rider.textContent = names[l] ?? '';
     // the riding name stays over its notch, but inside the groove's ends
     const w = el.clientWidth, rw = rider.offsetWidth;
-    rider.style.left = w && rw ? `${Math.max(0, Math.min(w - rw, ((l + 0.5) / Math.max(1, n())) * w - rw / 2))}px` : '0px';
+    rider.style.left = w && rw ? `${Math.max(0, Math.min(w - rw, 7 + frac(l) * (w - 14) - rw / 2))}px` : '0px';
     baseMark.hidden = l === b;
     baseMark.style.left = pos(b);
     el.setAttribute('aria-valuenow', String(b));
@@ -113,8 +115,13 @@ export function selector(o: {
   // every name under its notch when each fits in its share of the groove, else only the live one under the jack
   const check = (): void => {
     if (!el.isConnected || !el.clientWidth) return;
-    const room = el.clientWidth / Math.max(1, n()) - 4;
-    el.classList.toggle('many', items.some((it) => it.offsetWidth > room));
+    // the space between two notches; a name at an end may take most of it, as its neighbour is centred
+    const gap = n() > 1 ? (el.clientWidth - 14) / (n() - 1) : el.clientWidth;
+    el.classList.toggle('many', items.some((it, i) => {
+      const end = n() > 1 && (i === 0 || i === n() - 1);
+      const next = items[i === 0 ? 1 : i - 1];
+      return end ? it.offsetWidth - 7 + (next?.offsetWidth ?? 0) / 2 > gap - 4 : it.offsetWidth > gap - 4;
+    }));
     draw();
   };
   checks.set(el, check);
@@ -147,7 +154,8 @@ export function selector(o: {
   /** the notch nearest a pointer's x */
   const nearest = (x: number): number => {
     const r = el.getBoundingClientRect();
-    return clamp(((x - r.left) / r.width) * n() - 0.5);
+    const k = r.width / (el.offsetWidth || 1); // the canvas zoom
+    return n() > 1 ? clamp(((x - r.left - 7 * k) / (r.width - 14 * k)) * (n() - 1)) : 0;
   };
   /** press and drag: the value follows the pointer, notch by notch */
   const scrub = (e: PointerEvent): void => {
