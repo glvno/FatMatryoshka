@@ -82,7 +82,7 @@ export function selector(o: {
     items = names.map((name, i) => {
       const b = document.createElement('span');
       // the end names line up with the groove's ends, the others are centred under their notches
-      b.className = 'sel-opt' + (n() > 1 && i === 0 ? ' first' : n() > 1 && i === n() - 1 ? ' last' : '');
+      b.className = 'sel-opt';
       b.textContent = name;
       b.style.left = pos(i);
       return b;
@@ -102,9 +102,7 @@ export function selector(o: {
     });
     jack.style.left = `calc(${pos(l)} - 7px)`;
     rider.textContent = names[l] ?? '';
-    // the riding name stays over its notch, but inside the groove's ends
-    const w = el.clientWidth, rw = rider.offsetWidth;
-    rider.style.left = w && rw ? `${Math.max(0, Math.min(w - rw, 7 + frac(l) * (w - 14) - rw / 2))}px` : '0px';
+    rider.style.left = `${place(l, rider.offsetWidth)}px`;
     baseMark.hidden = l === b;
     baseMark.style.left = pos(b);
     el.setAttribute('aria-valuenow', String(b));
@@ -112,16 +110,28 @@ export function selector(o: {
     el.title = l !== b ? `${o.label}: ${names[l] ?? ''} (set to ${names[b] ?? ''})` : `${o.label}: ${names[b] ?? ''}`;
   };
 
-  // every name under its notch when each fits in its share of the groove, else only the live one under the jack
+  /**
+   * where a name of width `w` starts (px from the groove's left end): centred under its notch, but kept within the row,
+   * so it may reach under the row's name on the left (the line under the name is free) and to the row's right edge
+   */
+  const place = (i: number, w: number): number => {
+    const width = el.clientWidth;
+    if (!width) return 0;
+    const centre = 7 + frac(i) * (width - 14);
+    const right = width + (el.parentElement ? el.parentElement.clientWidth - el.offsetLeft - width : 0);
+    return Math.max(-el.offsetLeft, Math.min(right - w, centre - w / 2));
+  };
+  // every name under its notch when none overlaps its neighbour, else only the live one, riding under the jack
   const check = (): void => {
     if (!el.isConnected || !el.clientWidth) return;
-    // the space between two notches; a name at an end may take most of it, as its neighbour is centred
-    const gap = n() > 1 ? (el.clientWidth - 14) / (n() - 1) : el.clientWidth;
-    el.classList.toggle('many', items.some((it, i) => {
-      const end = n() > 1 && (i === 0 || i === n() - 1);
-      const next = items[i === 0 ? 1 : i - 1];
-      return end ? it.offsetWidth - 7 + (next?.offsetWidth ?? 0) / 2 > gap - 4 : it.offsetWidth > gap - 4;
-    }));
+    let end = -Infinity, over = false;
+    items.forEach((it, i) => {
+      const w = it.offsetWidth, x = place(i, w);
+      it.style.left = `${x}px`;
+      if (x < end + 6) over = true;
+      end = x + w;
+    });
+    el.classList.toggle('many', over);
     draw();
   };
   checks.set(el, check);

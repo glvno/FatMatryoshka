@@ -898,7 +898,7 @@ svg.slack-cable .cable.pending { pointer-events: none; }
 .sel-track { position: relative; flex: 1; min-width: 0; height: 34px; margin-right: 7px; cursor: pointer; touch-action: none; outline: none; }
 .sel-track:focus-visible .sel-groove { box-shadow: 0 0 0 1.5px var(--secondary); }
 .module .mbody .sel-track, .module .mbody .sel-track * { pointer-events: auto; }
-.sel-groove { position: absolute; top: 7px; left: 0; right: 0; height: 2px; border-radius: 1px; background: var(--line); }
+.sel-groove { position: absolute; top: 7px; left: 7px; right: 7px; height: 2px; border-radius: 1px; background: var(--line); }
 .sel-notches, .sel-labels { position: absolute; inset: 0; pointer-events: none; }
 .sel-notch { position: absolute; top: 6px; width: 4px; height: 4px; border-radius: 50%; transform: translateX(-50%); background: var(--muted); }
 .sel-base { position: absolute; top: 3.5px; width: 9px; height: 9px; box-sizing: border-box; border-radius: 50%; transform: translateX(-50%); border: 2px solid var(--secondary); background: var(--panel); pointer-events: none; }
@@ -906,11 +906,8 @@ svg.slack-cable .cable.pending { pointer-events: none; }
 .sel-opt, .sel-rider { position: absolute; bottom: 2px; white-space: nowrap; line-height: 14px; font: var(--cap); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .sel-opt.live, .sel-rider { color: var(--secondary); }
 .sel-opt.base { color: var(--ink); }
-.sel-opt { transform: translateX(-50%); }
-.sel-opt.first { transform: translateX(-7px); }
-.sel-opt.last { transform: translateX(calc(-100% + 7px)); }
 .sel-rider { display: none; pointer-events: none; transition: left .14s cubic-bezier(.3, 1.4, .6, 1); }
-.sel-track.many .sel-labels { display: none; }
+.sel-track.many .sel-labels { visibility: hidden; }
 .sel-track.many .sel-rider { display: block; }
 .sel-track .sel-jack { position: absolute; z-index: 4; top: 1px; width: 14px; height: 14px; transform: none;
   border-width: 2.5px; box-shadow: none; cursor: ew-resize; transition: left .14s cubic-bezier(.3, 1.4, .6, 1); }
