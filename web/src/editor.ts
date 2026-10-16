@@ -1059,6 +1059,12 @@ export class Editor {
       a.open = !a.open;
       if (a.open && overlapping(this.patch, a)) tileMembers(this.patch, a); // stacked cards (an old file, members added at one spot) spread out
       if (a.open && a.poly) makeRoom(this.patch, a);
+      // the frame's header goes above the members: move them down when it would stick out of the canvas's top
+      if (a.open) {
+        const ys = allModules(this.patch, a).map((id) => this.patch.modules.find((m) => m.id === id)?.y ?? Infinity);
+        const room = FRAME_PAD + FRAME_HEAD + (a.poly ? POLY_STRIP : 0) + 8;
+        if (Math.min(...ys) < room) moveAssembly(this.patch, a, 0, room - Math.min(...ys));
+      }
     });
   }
 

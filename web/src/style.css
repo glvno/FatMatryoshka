@@ -752,3 +752,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 /* pick mode under the bottom edge: label, check box, jack, top to bottom */
 .picking .mfoot, .picking .mfoot .port.bottom { height: 34px; }
 .mfoot .port.bottom > .pickbox { order: 0; }
+/* a jack's row takes clicks (pick mode, Cmd / Ctrl-click put it on the assembly card); the card body otherwise lets them through */
+.module .mbody .port, .module .mbody .port > span { pointer-events: auto; }
+/* the ▸ / ▾ of an assembly: bright enough to find */
+:is(.mhead, .fhead) button.chev { width: 18px; font-size: 13px; color: var(--ink); }

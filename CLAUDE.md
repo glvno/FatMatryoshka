@@ -331,6 +331,7 @@ The current course behavior is specified in [docs/TUTORIAL.md](docs/TUTORIAL.md)
 - Wording: in the web app "voices" = polyphony (the Prophet sense). The four-voice firmware build's LCD / manual use "voice" for one of four layered patches (SEL, per-voice MIDI channel, mixer) and "POLYPHONY" for the note count: suggested to the user to rename those to "part" when device work resumes (not done).
 - Scope probes: shift-click a jack (`Editor.toggleProbe`; an input probes the output feeding it); the ◎ buttons are gone, the tutorial's probe target is the output's jack.
 - Synthetic key events for browser checks must be dispatched on `document.body`, not `window`: main.ts's shortcut handler calls `target.closest`.
+- Walking tutorial chapters without touching the user's patch, bank or progress: open http://[::1]:5173 (same dev server, its own localStorage; 127.0.0.1 is not served). Stub `window.prompt` there before Make assembly / Save to library (the browser automation must not open dialogs); jump to a step by writing `matryoshka.tutorial` (`{chapter, step, stepId, page: 'steps'}`), reload, Resume, then "Start step over" loads the step's canned start. Screenshot coordinates are CSS px x (1568 / innerWidth).
 
 ## Poly assemblies (2026-10-16, decided with the user; all three stages done: model, browser engine, editor, conversion, binary format 20, C engine, panel, content; host-tested: vitest 455, golden 88 kits in both builds, arp + proto tests, LCD previews; NOT built with the JieLi toolchain, not flashed; the tutorial drafts were not walked in a browser)
 
