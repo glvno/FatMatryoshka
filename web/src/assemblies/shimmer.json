@@ -35,7 +35,7 @@
     {
       "id": 2,
       "type": "reverb",
-      "x": 270,
+      "x": 320,
       "y": 0,
       "params": {
         "size": 0.8,
@@ -64,7 +64,7 @@
     {
       "id": 3,
       "type": "grain",
-      "x": 540,
+      "x": 640,
       "y": 0,
       "params": {
         "position": 0.05,

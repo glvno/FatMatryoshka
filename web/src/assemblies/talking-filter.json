@@ -36,7 +36,7 @@
     {
       "id": 2,
       "type": "scale",
-      "x": 270,
+      "x": 320,
       "y": 0,
       "params": {
         "gain": 4,
@@ -62,7 +62,7 @@
     {
       "id": 3,
       "type": "vowel",
-      "x": 540,
+      "x": 640,
       "y": 0,
       "params": {
         "vowel": 0,

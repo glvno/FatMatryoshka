@@ -56,7 +56,7 @@
     {
       "id": 3,
       "type": "modal",
-      "x": 270,
+      "x": 320,
       "y": 0,
       "params": {
         "coarse": 0,
@@ -85,7 +85,7 @@
     {
       "id": 4,
       "type": "shift",
-      "x": 540,
+      "x": 640,
       "y": 0,
       "params": {
         "shift": 3,

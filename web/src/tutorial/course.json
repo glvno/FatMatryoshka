@@ -623,7 +623,7 @@
           "id": "expand",
           "kind": "task",
           "title": "Open it up",
-          "text": "[Click expand on the My voice card.](req:my-voice-open) A frame shows the modules inside. Its **card** button chooses what the collapsed card shows.",
+          "text": "[Click ▸ before the My voice card’s name.](req:my-voice-open) A frame shows the modules inside. Its **card** button chooses what the collapsed card shows.",
           "why": "",
           "superseded": true,
           "parts": [
@@ -678,7 +678,7 @@
           "id": "collapse",
           "kind": "task",
           "title": "Close it",
-          "text": "[Click collapse in the frame’s header.](req:my-voice-collapsed) One card: `pitch`, `gate`, `out`, the **LFO**’s `out`, `cutoff` and `r`. Play it.",
+          "text": "[Click ▾ at the left of the frame’s header.](req:my-voice-collapsed) One card: `pitch`, `gate`, `out`, the **LFO**’s `out`, `cutoff` and `r`. Play it.",
           "why": "",
           "parts": [
             { "id": "my-voice-collapsed", "kind": "assembly", "role": "myVoice", "fact": "collapsed" }
@@ -700,7 +700,7 @@
           "id": "save",
           "kind": "task",
           "title": "Save it to your library",
-          "text": "[Click save on the card and keep the name My voice.](req:my-voice-saved) It is now in the Library tab and in + Add assembly, under Your library, ready for any patch.",
+          "text": "[Open the card’s ⋯ menu, choose Save to library and keep the name My voice.](req:my-voice-saved) It is now in the Library tab and in + Add assembly, under Your library, ready for any patch.",
           "why": "",
           "parts": [
             {
@@ -951,7 +951,7 @@
           "id": "save",
           "kind": "task",
           "title": "Save My space",
-          "text": "[Click save on the My space card.](req:my-space-saved) Your library now holds an instrument and an effect; the next chapters use both.",
+          "text": "[Choose Save to library in the My space card’s ⋯ menu.](req:my-space-saved) Your library now holds an instrument and an effect; the next chapters use both.",
           "why": "",
           "parts": [
             {
@@ -1270,7 +1270,7 @@
           "id": "save",
           "kind": "task",
           "title": "Save FM keys",
-          "text": "[Click save on the FM keys card.](req:fm-keys-saved) My space travels inside it.",
+          "text": "[Choose Save to library in the FM keys card’s ⋯ menu.](req:fm-keys-saved) My space travels inside it.",
           "why": "",
           "parts": [
             {
@@ -1573,7 +1573,7 @@
           "id": "save",
           "kind": "task",
           "title": "Save Pluck",
-          "text": "[Click save on the Pluck card.](req:pluck-saved) Chapter 10 plays it from a melody machine.",
+          "text": "[Choose Save to library in the Pluck card’s ⋯ menu.](req:pluck-saved) Chapter 10 plays it from a melody machine.",
           "why": "",
           "parts": [
             {
@@ -2630,7 +2630,7 @@
           "id": "group",
           "kind": "task",
           "title": "Group it as Hat and save it",
-          "text": "[Select the **Noise**, **Filter**, **Env** and **VCA**, press Ctrl+G (Cmd+G) and name it Hat](req:hat-exists). [Click save on its card](req:hat-saved).",
+          "text": "[Select the **Noise**, **Filter**, **Env** and **VCA**, press Ctrl+G (Cmd+G) and name it Hat](req:hat-exists). [Choose Save to library in its ⋯ menu](req:hat-saved).",
           "why": "",
           "parts": [
             { "id": "hat-exists", "kind": "assembly", "role": "hat", "fact": "exists" },
@@ -3135,8 +3135,8 @@
           "id": "assemblies",
           "kind": "task",
           "title": "Modules inside modules",
-          "text": "stack voice and echo are *assemblies*: groups of modules that behave as one. A closed assembly shows only the jacks and sliders its author brought out, so stack voice reads like a single voice module and echo like a single effect.\n\n[Expand stack voice](req:stack-voice-open) with *expand* on its header to see the oscillators, mixer, filter, envelope and VCA inside.",
-          "why": "Assemblies nest up to three deep, save to the Library and insert like a module. Inside an expanded assembly every port and slider has a toggle that brings it out onto the closed card. Select some cards and press Ctrl/Cmd+G to make your own. The engine never sees assemblies: on the FM-1 the patch is the plain modules underneath.",
+          "text": "stack voice and echo are *assemblies*: groups of modules that behave as one. A closed assembly shows only the jacks and sliders its author brought out, so stack voice reads like a single voice module and echo like a single effect.\n\n[Expand stack voice](req:stack-voice-open) with ▸ before its name to see the oscillators, mixer, filter, envelope and VCA inside.",
+          "why": "Assemblies nest up to three deep, save to the Library and insert like a module. Inside an expanded assembly the frame’s **card** button (or Cmd/Ctrl-click) picks which ports and sliders the closed card shows. Select some cards and press Ctrl/Cmd+G to make your own. The engine never sees assemblies: on the FM-1 the patch is the plain modules underneath.",
           "parts": [
             { "id": "stack-voice-open", "kind": "assembly", "role": "stackVoice", "fact": "open" }
           ]

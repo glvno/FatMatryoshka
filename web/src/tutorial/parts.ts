@@ -233,7 +233,7 @@ export function partLabel(part: PartSpec, roles: Roles): string {
         case 'merged': return `Merge the ${part.port} inputs of ${a} (merge into…)`;
         case 'contains': return `Drag the ${roleLabel(roles, part.child ?? '')} card into the ${a} frame`;
         case 'resized': return 'Resize the frame (drag ◢)';
-        case 'saved': return `Save it as "${part.name ?? a}" (save on the card)`;
+        case 'saved': return `Save it as "${part.name ?? a}" (⋯ menu → Save to library)`;
       }
       break;
     }

@@ -347,7 +347,7 @@ describe('assemblies', () => {
     expect(overlapping(p, a)).toBe(true);
     tileMembers(p, a);
     expect(overlapping(p, a)).toBe(false);
-    expect(p.modules.filter((m) => a.modules.includes(m.id)).map((m) => [m.x, m.y])).toEqual([[50, 50], [320, 50], [590, 50]]);
+    expect(p.modules.filter((m) => a.modules.includes(m.id)).map((m) => [m.x, m.y])).toEqual([[50, 50], [370, 50], [690, 50]]);
     for (const d of FACTORY) {
       const q = emptyPatch();
       expect(overlapping(q, insertAssembly(q, DEFS, d, 0, 0))).toBe(false);
@@ -415,11 +415,11 @@ describe('assemblies', () => {
 
   it('finds the first free grid cell for an inserted card', () => {
     expect(freeSpot([], 250, 540)).toEqual({ x: 20, y: 20 });
-    const row = [0, 1, 2, 3].map((i) => ({ x: 20 + 270 * i, y: 20, w: 250, h: 300 }));
+    const row = [0, 1, 2, 3].map((i) => ({ x: 20 + 320 * i, y: 20, w: 300, h: 300 }));
     expect(freeSpot(row, 250, 540)).toEqual({ x: 20, y: 580 });
-    expect(freeSpot(row.slice(0, 2), 250, 540)).toEqual({ x: 560, y: 20 });
+    expect(freeSpot(row.slice(0, 2), 250, 540)).toEqual({ x: 660, y: 20 });
     // a card sitting off the grid blocks the cells it touches
-    expect(freeSpot([{ x: 100, y: 100, w: 250, h: 300 }], 250, 540)).toEqual({ x: 560, y: 20 });
+    expect(freeSpot([{ x: 100, y: 100, w: 300, h: 300 }], 250, 540)).toEqual({ x: 660, y: 20 });
   });
 
   it('nests: a selection inside an expanded assembly becomes a child, with members, boundary and hiding through the levels', () => {

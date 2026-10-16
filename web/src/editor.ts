@@ -140,12 +140,14 @@ const SCOPE_HINT = '\nShift-click: show on the scope';
 export const probeKey = (id: number, port: string): string => `${id}:${port}`;
 type Pt = { x: number; y: number };
 /** the footprint of a new card for the free-spot search: a grid cell less its gutters */
-const CARD_W = 250;
+const CARD_W = 300;
 const CARD_H = 540;
 /** jacks on each side edge of a card; the rest hang off its bottom edge */
 const EDGE_JACKS = 4;
 /** an input for a card's edge layout: its row element and which port it is (a parameter's dedicated input joins its row) */
 type EdgePort = { el: HTMLElement; module: number; port: string };
+/** an entry of a card's menu: `key` is the shortcut shown at the right, `rule` a line above it */
+type MenuItem = { text: string; run: () => void; key?: string; danger?: boolean; rule?: boolean };
 /** a drop is judged by the card's header (where it is held), this far below its top */
 const HEAD_Y = 15;
 
@@ -556,12 +558,13 @@ export class Editor {
     const title = document.createElement('span');
     title.append(this.tag(def.type), moduleName(def.type, def.label));
     if (perVoice) title.append(this.badge(perVoice));
-    const del = this.button('×', `Remove ${def.label}`, () => this.change(() => removeModule(this.patch, m.id)), 'x');
     const tools = document.createElement('span');
     tools.className = 'tools';
     if (def.type !== 'fm1' && def.type !== 'output') tools.append(this.bypassButton(m, def, el));
-    tools.append(del);
+    const menu = (at: Pt): void => this.contextMenu(m, def, at);
+    tools.append(this.moreButton(menu));
     head.append(title, tools);
+    this.headMenu(head, menu);
     el.classList.toggle('off', !!m.bypass);
     this.moduleDrag(head, m);
 
@@ -1015,36 +1018,95 @@ export class Editor {
 
   /** a long press on a card header (touch): the context actions */
   private contextMenu(m: ModuleInst, def: ModuleDef, at: Pt): void {
-    document.querySelector('.ctx')?.remove();
-    const menu = document.createElement('div');
-    menu.className = 'ctx';
-    const item = (text: string, run: () => void): void => {
-      const b = document.createElement('button');
-      b.textContent = text;
-      b.onclick = (e) => {
-        e.stopPropagation();
-        menu.remove();
-        run();
-      };
-      menu.append(b);
-    };
-    if (def.type !== 'fm1' && def.type !== 'output') item(m.bypass ? 'turn on' : 'bypass', () => {
+    const items: MenuItem[] = [];
+    if (def.type !== 'fm1' && def.type !== 'output') items.push({ text: m.bypass ? 'Turn on' : 'Bypass', key: 'B', run: () => {
       this.selected.clear();
       this.selected.add(m.id);
       this.bypassSelected();
-    });
-    item('duplicate', () => {
+    } });
+    items.push({ text: 'Duplicate', key: '⌘D', run: () => {
       this.selected.clear();
       this.selected.add(m.id);
       this.duplicateSelected();
-    });
-    item('select', () => {
+    } });
+    items.push({ text: 'Select', run: () => {
       this.selected.add(m.id);
       this.showSelection();
+    } });
+    items.push({ text: 'Delete', key: 'Del', danger: true, rule: true, run: () => this.change(() => removeModule(this.patch, m.id)) });
+    this.popMenu(items, at);
+  }
+
+  /** an assembly's menu (its header's ⋯, a right-click on its header) */
+  private assemblyMenu(a: AssemblyInst, at: Pt): void {
+    this.popMenu([
+      { text: a.open ? 'Collapse' : 'Expand', key: a.open ? '▾' : '▸', run: () => this.toggleOpen(a) },
+      { text: 'Choose what the card shows', run: () => {
+        if (!a.open) this.toggleOpen(a);
+        this.pickAsm = a.id;
+        this.rebuild();
+      } },
+      { text: 'Rename', key: 'dbl-click', run: () => this.rename(a) },
+      { text: 'Save to library', rule: true, run: () => this.saveAssembly(a) },
+      { text: 'Ungroup', run: () => this.change(() => ungroup(this.patch, a.id)) },
+      { text: 'Delete with its modules', danger: true, rule: true, run: () => this.change(() => deleteAssembly(this.patch, a.id)) },
+    ], at);
+  }
+
+  /** expand or collapse an assembly */
+  private toggleOpen(a: AssemblyInst): void {
+    this.change(() => {
+      a.open = !a.open;
+      if (a.open && overlapping(this.patch, a)) tileMembers(this.patch, a); // stacked cards (an old file, members added at one spot) spread out
+      if (a.open && a.poly) makeRoom(this.patch, a);
     });
-    item('remove', () => this.change(() => removeModule(this.patch, m.id)));
-    item('cancel', () => {});
-    Object.assign(menu.style, { left: `${at.x}px`, top: `${at.y}px` });
+  }
+
+  /** a header's ⋯: opens the card's menu under it */
+  private moreButton(open: (at: Pt) => void): HTMLButtonElement {
+    const b = this.button('⋯', 'Menu (also right-click the header)', () => {
+      const r = b.getBoundingClientRect();
+      const w = this.world.getBoundingClientRect();
+      open({ x: (r.right - w.left) / this.zoom - 190, y: (r.bottom - w.top) / this.zoom + 4 });
+    }, 'more');
+    return b;
+  }
+
+  /** right-click on a header opens its menu at the pointer */
+  private headMenu(head: HTMLElement, open: (at: Pt) => void): void {
+    head.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const w = this.world.getBoundingClientRect();
+      open({ x: (e.clientX - w.left) / this.zoom, y: (e.clientY - w.top) / this.zoom });
+    });
+  }
+
+  /** a small menu at a canvas point; a press anywhere else closes it */
+  private popMenu(items: MenuItem[], at: Pt): void {
+    document.querySelector('.ctx')?.remove();
+    const menu = document.createElement('div');
+    menu.className = 'ctx';
+    menu.setAttribute('role', 'menu');
+    for (const it of items) {
+      const b = document.createElement('button');
+      b.setAttribute('role', 'menuitem');
+      b.className = (it.danger ? 'danger' : '') + (it.rule ? ' rule' : '');
+      const label = document.createElement('span');
+      label.textContent = it.text;
+      b.append(label);
+      if (it.key) {
+        const k = document.createElement('kbd');
+        k.textContent = it.key;
+        b.append(k);
+      }
+      b.onclick = (e) => {
+        e.stopPropagation();
+        menu.remove();
+        it.run();
+      };
+      menu.append(b);
+    }
+    Object.assign(menu.style, { left: `${Math.max(0, at.x)}px`, top: `${Math.max(0, at.y)}px` });
     this.modulesEl.append(menu);
     const away = (e: Event): void => {
       if (!menu.contains(e.target as Node)) {
@@ -1528,20 +1590,15 @@ export class Editor {
     }, 'pw');
     pw.classList.toggle('on', !a.bypass);
     pw.setAttribute('aria-pressed', String(!a.bypass));
-    return [
-      pw,
-      this.button(a.open ? 'collapse' : 'expand', a.open ? 'Collapse to one card' : 'Expand: show and edit the modules inside', () =>
-        this.change(() => {
-          a.open = !a.open;
-          if (a.open && overlapping(this.patch, a)) tileMembers(this.patch, a); // stacked cards (an old file, members added at one spot) spread out
-          if (a.open && a.poly) makeRoom(this.patch, a);
-        }),
-      ),
-      this.polyButton(a),
-      this.button('save', 'Save to the assembly library', () => this.saveAssembly(a)),
-      this.button('ungroup', 'Dissolve: the modules stay as plain modules', () => this.change(() => ungroup(this.patch, a.id))),
-      this.button('×', `Remove "${a.label}" with its modules`, () => this.change(() => deleteAssembly(this.patch, a.id)), 'x'),
-    ];
+    return [this.polyButton(a), pw, this.moreButton((at) => this.assemblyMenu(a, at))];
+  }
+
+  /** ▸ / ▾ before an assembly's title: expand or collapse */
+  private chevron(a: AssemblyInst): HTMLButtonElement {
+    const b = this.button(a.open ? '▾' : '▸', a.open ? 'Collapse to one card' : 'Expand: show and edit the modules inside', () => this.toggleOpen(a), 'chev');
+    b.setAttribute('aria-expanded', String(!!a.open));
+    b.dataset.asm = String(a.id);
+    return b;
   }
 
   /** the Poly switch: the modules inside run once per part, with their own allocator (poly.ts setPoly) */
@@ -1561,7 +1618,7 @@ export class Editor {
     title.textContent = a.label;
     title.title = `${a.name}: double-click to rename`;
     title.ondblclick = () => this.rename(a);
-    if (perVoice) title.append(' ', this.badge(perVoice));
+    if (perVoice) title.append(this.badge(perVoice));
     return title;
   }
 
@@ -1583,7 +1640,8 @@ export class Editor {
     tools.append(...this.assemblyButtons(a));
     const title = this.titleOf(a, perVoice);
     title.prepend(this.tag(null));
-    head.append(title, tools);
+    head.append(this.chevron(a), title, tools);
+    this.headMenu(head, (at) => this.assemblyMenu(a, at));
     this.assemblyDrag(el, head, a);
 
     const body = document.createElement('div');
@@ -1637,7 +1695,8 @@ export class Editor {
     el.classList.toggle('picking', this.picking(a));
     const title = this.titleOf(a, perVoice);
     title.prepend(this.tag(null));
-    head.append(title, tools);
+    head.append(this.chevron(a), title, tools);
+    this.headMenu(head, (at) => this.assemblyMenu(a, at));
     el.append(head);
     if (a.poly) {
       const strip = this.polySettings(a, true);

@@ -496,10 +496,10 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 /* Names, values, and actions have separate type roles inside the patch field. */
 .module, .fhead { font-family: 'Barlow', system-ui, sans-serif; font-weight: 500; }
 .mhead { position: relative; height: 28px; min-height: 28px; gap: 6px; padding: 0 8px 0 10px; }
-.mhead > span:first-child, .fhead > span:first-child { font: 600 15px/1 'Barlow Condensed', 'Barlow Semi Condensed', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .07em; }
-.mhead > span:first-child { display: flex; align-items: center; gap: 7px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mhead > span:not(.tools), .fhead > span:not(.tools) { font: 600 15px/1 'Barlow Condensed', 'Barlow Semi Condensed', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .07em; }
+.mhead > span:not(.tools) { display: flex; align-items: center; gap: 7px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mhead .tools, .fhead .tools { flex-shrink: 0; }
-.fhead > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fhead > span:not(.tools) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mhead .voices, .fhead .voices { font: 500 12px/1.2 'Barlow', system-ui, sans-serif; white-space: nowrap; }
 .module .port > span:not(.dot) { line-height: 1.35; }
 .module :is(select, .routing-controls, .empty) { font-family: 'Barlow', system-ui, sans-serif; font-weight: 500; font-size: 14px; }
@@ -622,13 +622,34 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .mtag.src { --tag: var(--tag-src); } .mtag.shp { --tag: var(--tag-shp); } .mtag.mod { --tag: var(--tag-mod); }
 .mtag.fx { --tag: var(--tag-fx); } .mtag.util { --tag: var(--tag-util); } .mtag.asm { --tag: var(--tag-asm); background: color-mix(in srgb, var(--tag) 22%, transparent); }
 .mhead .voices { font: 600 11px/1 'Barlow Condensed', system-ui, sans-serif; padding: 1px 5px; border: 1px solid currentColor; border-radius: 8px; color: var(--accent); }
-/* the header's buttons appear on hover, focus or selection; until then a ⋯ says they are there */
-.module .mhead .tools { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); padding-left: 6px; background: inherit; border-radius: 6px;
-  opacity: 0; pointer-events: none; transition: opacity .12s; }
-.module .mhead::after { content: '⋯'; margin-left: auto; color: var(--muted); letter-spacing: 1px; font-size: 15px; }
-.module:is(:hover, :focus-within, .selected) .mhead .tools, .module .mhead:has(.tour-focus) .tools { opacity: 1; pointer-events: auto; }
-.module:is(:hover, :focus-within, .selected) .mhead::after, .module .mhead:has(.tour-focus)::after { visibility: hidden; }
-@media (pointer: coarse) { .module .mhead .tools { position: static; transform: none; opacity: 1; pointer-events: auto; padding: 0; } .module .mhead::after { content: none; } .mhead { height: auto; padding: 4px 8px; } }
+/* the header: ▸ (an assembly), the tag and the title (the drag handle), then poly (an assembly), ⏻ and ⋯, always shown */
+.mhead { padding: 0 4px 0 6px; }
+.mhead > span:not(.tools), .fhead > span:not(.tools) { flex: 1; contain: inline-size; }
+.module .mhead .tools, .fhead .tools { display: flex; gap: 2px; align-items: center; flex: none; }
+:is(.mhead, .fhead) :is(button.chev, button.more, button.pw) { display: grid; place-items: center; width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; border-radius: 5px;
+  background: transparent; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
+:is(.mhead, .fhead) button.more { color: var(--ink); font-size: 15px; letter-spacing: 1px; }
+:is(.mhead, .fhead) button.chev { width: 16px; font-size: 11px; }
+:is(.mhead, .fhead) button.pw.on { color: var(--accent); }
+:is(.mhead, .fhead) :is(button.chev, button.more, button.pw):hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
+/* poly: small capitals in a small outlined button; filled when on */
+:is(.mhead, .fhead) button.poly-btn { height: 16px; padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--muted);
+  font: 600 9px/1 'Barlow Condensed', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; }
+:is(.mhead, .fhead) button.poly-btn[aria-pressed="true"] { color: var(--panel); background: var(--secondary); border-color: var(--secondary); }
+@media (pointer: coarse) { :is(.mhead, .fhead) :is(button.chev, button.more, button.pw) { width: 30px; height: 30px; } :is(.mhead, .fhead) button.poly-btn { height: 24px; } }
+/* the card's menu */
+.ctx { min-width: 190px; gap: 0; }
+.ctx button { display: flex; justify-content: space-between; gap: 16px; padding: 6px 12px; border-radius: 5px; font-size: 13px; }
+.ctx button.rule { margin-top: 3px; border-top: 1px solid var(--line); border-radius: 0 0 5px 5px; }
+.ctx button.danger { color: var(--danger); }
+.ctx kbd { color: var(--muted); font: 12px/1 'Barlow', system-ui, sans-serif; }
+/* a card is as wide as its labels need: input labels + a bar of at least 120 px + output labels, from 236 to 300 px; the
+   title, the bars and the poly settings take the width they are given, they do not set it */
+.module { width: max-content; min-width: 236px; max-width: 300px; }
+.erows { grid-template-columns: auto minmax(120px, 1fr) auto; }
+.erow > .em, .module .mbody > :not(.erows, .mfoot) { contain: inline-size; }
+.erow > :is(.el, .er) { max-width: 100px; }
+.erow .port > span:not(.dot) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 .erows { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 6px; padding: 5px 8px; }
 .erow { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: 24px; }
@@ -688,7 +709,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .param.bar > .toggle-line input:checked::before { left: 14px; background: var(--secondary); }
 .module .poly-set { padding: 6px 8px 0; margin: 0; font: var(--cap); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
 .module .poly-set .pick-value { font: 500 12px/1 'Barlow', system-ui, sans-serif; text-transform: none; }
-.fhead > span:first-child { display: flex; align-items: center; gap: 7px; }
+.fhead > span:not(.tools) { display: flex; align-items: center; gap: 7px; }
 .fpoly { font: var(--cap); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
 
 /* ---- The Main dock in the same style: capital labels, value bars, the same pickers ---- */

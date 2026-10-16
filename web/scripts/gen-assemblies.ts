@@ -8,7 +8,7 @@ import { defaultMap, defaultParams, POLY_DEFAULT, type ModuleInst, type PolyCfg,
 import { pinsToParams, type AssemblyDef, type PortRef, type ParamRef } from '../src/assembly';
 
 const OUT = new URL('../src/assemblies/', import.meta.url);
-const GX = 270;
+const GX = 320;
 const GY = 560;
 
 interface B {

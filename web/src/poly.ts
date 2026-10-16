@@ -87,10 +87,10 @@ export function polyProblem(p: Patch, a: AssemblyInst): string | null {
 const KEY_PORTS = ['pitch', 'gate', 'vel'];
 
 /** a card-sized spot next to `near` (left, right, below), clear of other cards (collapsed assemblies too), else the first free grid cell */
-function spotNear(p: Patch, near: ModuleInst[], w = 236, h = 220): { x: number; y: number } {
+function spotNear(p: Patch, near: ModuleInst[], w = 300, h = 220): { x: number; y: number } {
   const rects: Rect[] = [
-    ...p.modules.map((m) => ({ x: m.x, y: m.y, w: 236, h: 300 })),
-    ...(Array.isArray(p.assemblies) ? p.assemblies : []).filter((a) => a && !a.open && Number.isFinite(a.x)).map((a) => ({ x: a.x, y: a.y, w: 236, h: 400 })),
+    ...p.modules.map((m) => ({ x: m.x, y: m.y, w: 300, h: 300 })),
+    ...(Array.isArray(p.assemblies) ? p.assemblies : []).filter((a) => a && !a.open && Number.isFinite(a.x)).map((a) => ({ x: a.x, y: a.y, w: 300, h: 400 })),
   ];
   const x0 = Math.min(...near.map((m) => m.x));
   const y0 = Math.min(...near.map((m) => m.y));

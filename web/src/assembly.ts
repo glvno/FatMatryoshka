@@ -625,8 +625,8 @@ export function moveAssembly(p: Patch, a: AssemblyInst, dx: number, dy: number):
   }
 }
 
-/** the editor's card grid: columns 270 px apart, rows 560 px (what "Add module" uses), a 20 px margin */
-export const GRID = { x: 270, y: 560, cols: 4, margin: 20 };
+/** the editor's card grid: columns 320 px apart (a card is 236..300 px wide), rows 560 px (what "Add module" uses), a 20 px margin */
+export const GRID = { x: 320, y: 560, cols: 4, margin: 20 };
 
 export interface Rect {
   x: number;
