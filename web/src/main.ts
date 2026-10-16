@@ -719,12 +719,24 @@ function syncSides(): void {
     showSide(key);
   }
 }
+// the worklet reports a watched output every 256 samples; the sliders and what they move follow once per frame
+let watchFrame = 0;
+const watchDirty = new Set<SideKey>();
 host.onWatch = (key, v) => {
   const side = sides.get(key as SideKey);
   if (!side || !editor.patch[key as SideKey]) return;
   side.live = v;
-  side.apply(clamp01(side.base() + v), true);
-  showSide(key as SideKey);
+  watchDirty.add(key as SideKey);
+  watchFrame ||= requestAnimationFrame(() => {
+    watchFrame = 0;
+    for (const k of watchDirty) {
+      const s = sides.get(k);
+      if (!s || !editor.patch[k]) continue;
+      s.apply(clamp01(s.base() + s.live), true);
+      showSide(k);
+    }
+    watchDirty.clear();
+  });
 };
 sideSlider('slackFrom', 'slack-bar', {
   name: 'Cable slack',

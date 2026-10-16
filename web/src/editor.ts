@@ -1034,12 +1034,15 @@ export class Editor {
   onZoom: (z: number, live: boolean) => void = () => {};
 
   setZoom(z: number, live = false): void {
-    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
+    // the user's zoom is in whole percent; a source's (live) is not rounded, so a small wobble stays smooth
+    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, live ? z : Math.round(z * 100) / 100));
     if (live && next === this.zoom) return;
     this.zoom = next;
     this.world.style.transform = this.zoom === 1 ? '' : `scale(${this.zoom})`;
     this.sizeCanvas();
-    this.drawCables();
+    // a live zoom only moves the cables' ends (the same cables); the user's redraws them
+    if (live) this.positionCables();
+    else this.drawCables();
     this.onZoom(this.zoom, live);
   }
 
