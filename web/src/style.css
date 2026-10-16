@@ -407,9 +407,9 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .tutorial-why { font-size: 13px; margin: 6px 0; }
 /* a requirement placed in the lesson text: a box the panel ticks; clicking points the highlight at it */
 .tutorial-prose .req { cursor: pointer; border-radius: 4px; }
-.tutorial-prose .req-box { display: inline-block; box-sizing: border-box; width: .95em; height: .95em; margin-right: .4em; vertical-align: -.12em; border: 1.5px solid var(--secondary); border-radius: 3px; text-align: center; line-height: .8em; font-size: 1em; }
-.tutorial-prose .req.done .req-box { background: var(--secondary); }
-.tutorial-prose .req.done .req-box::after { content: '✓'; color: var(--panel); font-size: .75em; font-weight: 800; }
+.tutorial-prose .req-box { position: relative; display: inline-block; box-sizing: border-box; width: .95em; height: .95em; margin-right: .4em; vertical-align: -.12em; border: 1.5px solid var(--secondary); border-radius: 3px; }
+/* the check: the right and bottom border of a tall box turned 40°, its corner low in the box, the long stroke past the top right */
+.tutorial-prose .req.done .req-box::after { content: ''; position: absolute; left: .4em; top: -.31em; box-sizing: border-box; width: .38em; height: 1.1em; border: solid var(--secondary); border-width: 0 .15em .15em 0; border-radius: 0 0 .05em 0; transform: rotate(40deg); }
 .tutorial-prose .req.done .req-text { color: var(--muted); }
 .tutorial-todo { font-size: 12px; margin: 8px 0 2px; padding: 6px 10px; border-radius: 6px; background: var(--surface-tint); }
 .tutorial-todo > span { color: var(--secondary); font-weight: 700; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
