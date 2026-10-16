@@ -30,11 +30,11 @@ function peak(p: Patch, key = true): number {
 const ref = (chapter: number, step: string): Patch => referenceOf(COURSE, COURSE.chapters[chapter].id, step)!.patch;
 
 describe('tutorial course', () => {
-  it('has eleven chapters with deliberate listening breaks, every step with a title and text', () => {
+  it('has eleven chapters whose steps wait for Continue, every step with a title and text', () => {
     expect(CHAPTERS).toHaveLength(11);
     for (const ch of CHAPTERS) {
       expect(ch.steps.length).toBeGreaterThanOrEqual(6);
-      expect(ch.steps.some((st) => st.listen)).toBe(true);
+      expect(ch.steps.every((st) => st.listen)).toBe(true);
       expect(ch.payoff).toBeTruthy();
       expect(ch.challenge).toBeTruthy();
       expect(ch.intro.trim()).toBeTruthy();

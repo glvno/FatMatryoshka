@@ -613,7 +613,7 @@ async function mount() {
     const k = stepIndex(page);
     const key = refKey(ch.id, st.id);
     heading.textContent = `Chapter ${ci + 1} · Step ${k + 1}. ${st.title}`;
-    context.textContent = st.kind === 'continue' ? 'A Continue step: text to read (and optionally listen to), no requirements. The learner presses Continue.' : 'A task step: the learner meets every requirement below, then the tutorial moves on.';
+    context.textContent = st.kind === 'continue' ? 'A Continue step: text to read (and optionally listen to), no requirements. The learner presses Continue.' : 'A task step: the learner meets every requirement below, then presses Continue.';
     pageTools.append(
       button('+ Task step after', () => addStep(ch.id, k, 'task')), button('+ Continue step after', () => addStep(ch.id, k, 'continue')),
       button('↑', () => moveStepTo(ch.id, st.id, ch.id, k - 1 < 0 ? 0 : k - 1), '', 'Move the step up'), button('↓', () => moveStepTo(ch.id, st.id, ch.id, Math.min(ch.steps.length - 1, k + 1)), '', 'Move the step down'),
@@ -622,7 +622,7 @@ async function mount() {
     const kindRow = el('div', 'lesson-row');
     kindRow.append(el('strong', '', 'Kind '), select([['task', 'Task: requirements to meet'], ['continue', 'Continue: read or listen, then Continue']], st.kind, (v) => {
       st.kind = v as 'task' | 'continue';
-      if (st.kind === 'continue') { delete st.parts; delete st.listen; delete st.superseded; delete st.optional; delete draft.references[key]; } else { st.parts ??= []; delete st.pointer; delete st.playback; }
+      if (st.kind === 'continue') { delete st.parts; delete st.advance; delete st.superseded; delete st.optional; delete draft.references[key]; } else { st.parts ??= []; delete st.pointer; delete st.playback; }
       edited({ fields: true });
     }, 'Step kind'));
     fields.append(
@@ -642,7 +642,7 @@ async function mount() {
     const flags = el('section', 'lesson-section'); flags.append(el('h3', '', 'Pace'));
     const transient = compileStep(st, draft.roles).transient;
     flags.append(
-      check('Wait for Continue (a listening step)', !!st.listen, (v) => { st.listen = v || undefined; edited(); }, 'otherwise it moves on 0.9 s after its requirements are met'),
+      check('Move on by itself', !!st.advance, (v) => { st.advance = v || undefined; edited(); }, '0.9 s after its requirements are met; otherwise it waits for Continue'),
       check('Optional (the learner may skip it)', !!st.optional, (v) => { st.optional = v || undefined; edited(); }),
       check('Superseded (a later step undoes it on purpose)', !!st.superseded, (v) => { st.superseded = v || undefined; edited(); }, 'it is not re-checked after its turn'),
       el('p', 'muted', transient ? 'Transient: a requirement here is something that happens during the step, so a finished patch cannot show it. The step is skipped when judging whether a patch completes the chapter.' : 'Structural: a finished patch must still meet this step.'));

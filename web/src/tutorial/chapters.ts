@@ -28,7 +28,7 @@ export function compileStep(st: StepData, roles: Roles): Step {
   const order = [...new Set([...placedIds.map(index).filter((i) => i >= 0), ...parts.map((_, i) => i).filter((i) => !parts[i].hidden), ...parts.map((_, i) => i)])];
   return {
     id: st.id, kind: st.kind, title: st.title, text: st.text, why: st.why || undefined,
-    listen: st.kind === 'continue' || !!st.listen, optional: !!st.optional, superseded: !!st.superseded,
+    listen: st.kind === 'continue' || !st.advance, optional: !!st.optional, superseded: !!st.superseded,
     transient: st.kind === 'continue' || parts.some(momentary), playback: st.kind === 'continue' ? !!st.playback : true, riff: st.riff,
     check: (s) => ok(s).every(Boolean),
     todo: (s) => { const r = ok(s); return parts.filter((_, i) => !r[i]).map((p) => partLabel(p, roles)); },

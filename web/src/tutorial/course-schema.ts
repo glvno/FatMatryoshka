@@ -89,8 +89,8 @@ export interface StepData {
   title: string;
   text: string;
   why: string;
-  /** a task step waits for Continue instead of advancing by itself */
-  listen?: boolean;
+  /** a task step moves on by itself 0.9 s after its requirements are met; absent = it waits for Continue */
+  advance?: boolean;
   optional?: boolean;
   /** a later step of the chapter undoes this one's state: not re-checked afterwards */
   superseded?: boolean;
@@ -206,6 +206,7 @@ export function validateShape(value: unknown, allowEmpty = false): asserts value
       text(st.text, `${sp}.text`, true);
       text(st.why, `${sp}.why`, false);
       if (st.parts !== undefined && !Array.isArray(st.parts)) fail(`${sp}.parts`, 'expected a list');
+      if (st.advance !== undefined && typeof st.advance !== 'boolean') fail(`${sp}.advance`, 'expected true or false');
       if (st.riff !== undefined && riffProblem(st.riff)) fail(`${sp}.riff`, riffProblem(st.riff));
       const partIds = new Set<string>();
       for (const [j, p] of ((st.parts as unknown[]) ?? []).entries()) {

@@ -77,3 +77,11 @@ describe('requirement ids', () => {
     expect(withId({ kind: 'module', type: 'vca' }, ['add-vca']).id).toBe('add-vca-2');
   });
 });
+
+describe('pace', () => {
+  it('a task step waits for Continue unless it says advance', () => {
+    const st: StepData = { id: 's', kind: 'task', title: 'T', text: '[Add a VCA](req:add-vca)', why: '', parts: [{ id: 'add-vca', kind: 'module', type: 'vca' }] };
+    expect(compileStep(st, {}).listen).toBe(true);
+    expect(compileStep({ ...st, advance: true }, {}).listen).toBe(false);
+  });
+});
