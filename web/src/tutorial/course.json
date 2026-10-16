@@ -3123,7 +3123,7 @@
     },
     {
       "id": "tour",
-      "title": "A tour for synthesists",
+      "title": "Overview for advanced users",
       "tour": true,
       "intro": "A quick look around for people who already patch: no cable basics, just what is different here. It runs on a finished patch, Warm Pad: two detuned saws through a filter and a VCA, then echo and reverb. Play it from your computer keyboard or a MIDI keyboard whenever you like.\n\nMatryoshka is a modular in the Nord Modular tradition. It runs in the browser, and its patches are made to run on the M-VAVE FM-1 too, the four knobs included.",
       "payoff": "That is the tour. The numbered chapters build all of this from an empty canvas, one idea at a time; the tutorial menu lists them if you want the reasoning behind any of it. Press ? for every keyboard shortcut.",

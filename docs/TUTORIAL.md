@@ -38,7 +38,7 @@ The panel docks at bottom right by default. **Follow** optionally places it near
 
 A chapter with `tour: true` (the lesson editor's **Tour** check box; at most one, and it cannot continue from or into another chapter) is not numbered: `LISTED` leaves it out, `TOUR` (chapters.ts) points at it, the offer card's third button starts it, the tutorial menu lists it first with an arrow, and its panel says "Tour" instead of "Chapter n of m". Its end offers chapter 1. It is the last entry of `course.json` so the chapter indices do not move.
 
-The tour ("A tour for synthesists") is for people who already patch. It starts from the factory patch Warm Pad and stops at what is different here: assemblies (expand stack voice), slider thumbs as jacks (LFO onto the filter's `res`, with the base and knob ticks), the Main panel as the FM-1 (knobs, arpeggiator, morph; polyphony lives on assemblies), the command palette (add a Wavetable), a list of the notable modules, and the listening tools (scope, A/B, bypass, changes, share links).
+The tour ("Overview for advanced users") is for people who already patch. It starts from the factory patch Warm Pad and stops at what is different here: assemblies (expand stack voice), slider thumbs as jacks (LFO onto the filter's `res`, with the base and knob ticks), the Main panel as the FM-1 (knobs, arpeggiator, morph; polyphony lives on assemblies), the command palette (add a Wavetable), a list of the notable modules, and the listening tools (scope, A/B, bypass, changes, share links).
 
 ## Chapter payoffs
 
