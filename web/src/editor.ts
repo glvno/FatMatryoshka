@@ -166,8 +166,15 @@ export class Editor {
   readonly selectedAsm = new Set<number>();
   /** assemblies expanded in this session: the first expansion tidies the inside (#37) */
   private expandedOnce = new Set<number>();
-  /** how far cables sag, 0 (taut, the default) .. 1 */
+  /** how far cables sag, 0 (taut, the default) .. 1: the sidebar's setting */
   slack = 0;
+  /** the patch's slack source (Patch.slackFrom) as it plays: added to `slack` */
+  private slackMod = 0;
+  private slackFrame = 0;
+  /** the sag the cables are drawn with: the setting plus the source's signal, 0 .. 1.5 */
+  private get sway(): number {
+    return Math.min(1.5, Math.max(0, this.slack + this.slackMod));
+  }
   private modulesEl: HTMLElement;
   private svg: SVGSVGElement;
   private preview: SVGSVGElement;
@@ -1017,6 +1024,30 @@ export class Editor {
   setSlack(v: number): void {
     this.slack = Math.min(1, Math.max(0, v));
     this.positionCables();
+  }
+
+  /** the slack source's latest value (the host's watch of Patch.slackFrom): redraws the cables once per frame */
+  modulateSlack(v: number): void {
+    this.slackMod = this.patch.slackFrom ? v : 0;
+    if (this.slackFrame) return;
+    this.slackFrame = requestAnimationFrame(() => {
+      this.slackFrame = 0;
+      this.positionCables();
+    });
+  }
+
+  /** patch an output into the cable slack (null: unplug it); an undo step, no engine reload */
+  setSlackSource(from: Endpoint | null): void {
+    const before = JSON.stringify(this.patch);
+    if (from) this.patch.slackFrom = { ...from };
+    else delete this.patch.slackFrom;
+    if (JSON.stringify(this.patch) === before) return;
+    this.history.push(before);
+    if (this.history.length > HISTORY) this.history.shift();
+    this.future = [];
+    if (!from) this.slackMod = 0;
+    this.rebuild();
+    this.ev.onLayout(this.patch);
   }
 
   /** every card in view: the zoom that fits the cards' extent into the canvas, scrolled to its top left */
@@ -2173,7 +2204,7 @@ export class Editor {
    * its jack square, and one from a docked jack to a module just below the view still rises out of the dock before it falls.
    */
   private curvePts(a: Pt, b: Pt, dirA: CableEnd = 'side', dirB: CableEnd = 'side'): Pt[] {
-    const stub = this.slack * CABLE_STUB;
+    const stub = this.sway * CABLE_STUB;
     if (stub <= 0) return this.spanPts(a, b, dirA, dirB);
     const away = (p: Pt, dir: CableEnd, sx: number, t: number): Pt =>
       dir === 'up' ? { x: p.x, y: p.y - t } : dir === 'down' ? { x: p.x, y: p.y + t } : { x: p.x + sx * t, y: p.y };
@@ -2194,12 +2225,12 @@ export class Editor {
     const q0 = mid(a, p1), q1 = mid(p1, p2), q2 = mid(p2, b);
     const r0 = mid(q0, q1), r1 = mid(q1, q2), m = mid(r0, r1);
     // slack: the middle drops by a share of the cable's length, so a long cable droops more than a short one
-    const sag = this.slack * 0.75 * (0.6 * Math.hypot(b.x - a.x, b.y - a.y) + 40);
+    const sag = this.sway * 0.75 * (0.6 * Math.hypot(b.x - a.x, b.y - a.y) + 40);
     if (sag <= 0) return [a, q0, r0, m, r1, q2, b];
     const lead = (p: Pt, q: Pt): Pt => {
       const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
       // the lead shortens as the slack grows, so the bend comes close to the plug
-      const k = (len * (1 - 0.55 * this.slack) + 0.08 * sag) / len;
+      const k = (len * (1 - 0.55 * this.sway) + 0.08 * sag) / len;
       return { x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k };
     };
     const drop = (p: Pt): Pt => ({ x: p.x, y: p.y + sag });
@@ -2486,6 +2517,8 @@ export class Editor {
       const t = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
       const dot = t?.closest('.dot') as HTMLElement | null;
       cancel();
+      // an output dropped on the sidebar's cable slack bar sways the cables
+      if (kind === 'out' && t?.closest('.slack-jack, .sbar')) return this.setSlackSource({ module: Number(start.dataset.mod), port: start.dataset.port! });
       if (dot === start) {
         this.armed = start;
         start.classList.add('armed');

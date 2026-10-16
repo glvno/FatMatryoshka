@@ -25,6 +25,8 @@ export class AudioHost {
   onError: (msg: string) => void = () => {};
   /** a scope probe's latest samples (oldest first) */
   onProbe: (key: string, data: Float32Array, sr: number) => void = () => {};
+  /** the watched output's mean over the last two blocks (the cable slack's source) */
+  onWatch: (v: number) => void = () => {};
 
   get running(): boolean {
     return this.ctx?.state === 'running';
@@ -51,6 +53,8 @@ export class AudioHost {
       node.port.onmessage = (ev) => {
         if (ev.data?.error) {
           this.latestValues = null; this.onValues(null); this.onError(ev.data.error);
+        } else if (typeof ev.data?.watch === 'number') {
+          this.onWatch(ev.data.watch);
         } else if (ev.data?.probe) {
           if (ev.data.revision === this.revision) this.onProbe(ev.data.probe, ev.data.data, ev.data.sr);
         }

@@ -12,7 +12,7 @@ import { searchCommands, type Command } from './commands';
 import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi, isTextEntry } from './input';
 import { Piano } from './piano';
-import { moduleName } from './labels';
+import { longName, moduleName } from './labels';
 import { DeckControls } from './deck';
 import { releaseFocusAfterPointer } from './focus';
 import { DEFS } from './modules';
@@ -148,9 +148,13 @@ const patchCandidates = (): { name: string; patch: Patch }[] => {
 };
 const scope = new Scope($('scope'));
 host.onProbe = (key, data, sr) => scope.feed(key, data, sr);
+/** the cable slack's source as it plays, and which output the worklet watches ("" none): see syncSlackWatch */
+let slackLive = 0;
+let watching = '';
 const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   onStructure(p) {
     $<HTMLInputElement>('patch-name').value = p.name;
+    syncSlackWatch();
     scope.clearSamples();
     host.setPatch(p);
     queueSave(p);
@@ -204,6 +208,7 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   },
   onLayout(p) {
     queueSave(p);
+    syncSlackWatch();
   },
   onError(msg) {
     status.textContent = msg;
@@ -456,9 +461,10 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Scope: waveform', keywords: 'oscilloscope time', run: inPatch(() => scope.setMode('time')) },
     { kind: 'command', label: 'Scope: spectrum', keywords: 'oscilloscope frequency fft', run: inPatch(() => scope.setMode('spectrum')) },
     { kind: 'command', label: 'Tidy up the canvas', keywords: 'clean up arrange align layout grid', run: inPatch(() => editor.tidyUp()) },
-    { kind: 'command', label: 'Cables: taut', keywords: 'slack sag tight straight', run: inPatch(() => setSlack(0)) },
-    { kind: 'command', label: 'Cables: loose', keywords: 'slack sag droop hang', run: inPatch(() => setSlack(0.5)) },
-    { kind: 'command', label: 'Cables: droopy', keywords: 'slack sag droop hang heavy', run: inPatch(() => setSlack(1)) },
+    { kind: 'command', label: 'Cable slack: none', keywords: 'slack sag tight straight', run: inPatch(() => setSlack(0)) },
+    { kind: 'command', label: 'Cable slack: half', keywords: 'slack sag droop hang loose', run: inPatch(() => setSlack(0.5)) },
+    { kind: 'command', label: 'Cable slack: full', keywords: 'slack sag droop hang heavy', run: inPatch(() => setSlack(1)) },
+    ...(editor.patch.slackFrom ? [{ kind: 'command' as const, label: 'Cable slack: unplug its input', keywords: 'slack sway modulate', run: inPatch(() => editor.setSlackSource(null)) }] : []),
     { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },
     { kind: 'command', label: 'Reset canvas scale', keywords: 'zoom 100%', run: inPatch(() => editor.setZoom(1)) },
     ...Object.values(DEFS).filter((d) => d.type !== 'fm1').map((d) => ({ kind: 'add module', tags: ['module'], label: moduleName(d.type, d.label), keywords: d.label, run: () => editor.add(d.type) })),
@@ -603,9 +609,7 @@ const slackInput = $<HTMLInputElement>('slack-input');
 function setSlack(v: number): void {
   editor.setSlack(v);
   slackInput.value = String(editor.slack);
-  // the bar's fill and its name for the setting (the palette's taut / loose / droopy)
-  slackInput.parentElement!.style.setProperty('--v', String(editor.slack));
-  $('slack-out').textContent = editor.slack === 0 ? 'taut' : editor.slack < 0.75 ? 'loose' : 'droopy';
+  showSlack();
   try {
     localStorage.setItem(SLACK, String(editor.slack));
   } catch {
@@ -613,11 +617,42 @@ function setSlack(v: number): void {
   }
 }
 slackInput.oninput = () => setSlack(Number(slackInput.value));
+// the slack's input (an easter egg): an output dropped on the bar sways the cables (Patch.slackFrom, Editor.setSlackSource);
+// the worklet sends that output's mean, the bar's fill follows it, its jack unplugs it
+function showSlack(): void {
+  const slackInput = $<HTMLInputElement>('slack-input');
+  const from = editor.patch.slackFrom;
+  const m = from && editor.patch.modules.find((x) => x.id === from.module);
+  const bar = slackInput.parentElement!;
+  bar.style.setProperty('--v', String(Math.min(1, Math.max(0, editor.slack + (from ? slackLive : 0)))));
+  bar.classList.toggle('modulated', !!m);
+  $('slack-out').textContent = m ? `${moduleName(m.type, DEFS[m.type].label)} ${longName(m.type, from!.port)}` : `${Math.round(editor.slack * 100)} %`;
+  $('slack-jack').classList.toggle('plugged', !!m);
+  $('slack-jack').title = m ? `Swayed by ${moduleName(m.type, DEFS[m.type].label)} ${longName(m.type, from!.port)}: click to unplug` : 'Drag a cable from any output onto the cable slack bar: its signal sways the cables';
+}
+function syncSlackWatch(): void {
+  const from = editor.patch.slackFrom;
+  const key = from ? `${from.module}:${from.port}` : '';
+  if (key !== watching) {
+    watching = key;
+    slackLive = 0;
+    editor.modulateSlack(0);
+    host.send(from ? { t: 'watch', id: from.module, port: from.port } : { t: 'unwatch' });
+  }
+  showSlack();
+}
+host.onWatch = (v) => {
+  slackLive = v;
+  editor.modulateSlack(v);
+  showSlack();
+};
+$('slack-jack').onclick = () => editor.setSlackSource(null);
+syncSlackWatch();
 try {
   const v = Number(localStorage.getItem(SLACK) ?? 0);
   if (v > 0) setSlack(v);
 } catch {
-  /* storage blocked: taut cables */
+  /* storage blocked: no slack */
 }
 $('panic-btn').onclick = () => { tutorial.stop(); host.mute(true); sink.send({ t: 'panic' }); };
 
