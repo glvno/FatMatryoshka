@@ -53,6 +53,7 @@
           "title": "Enable audio",
           "text": "[Click `Enable audio` in the sidebar.](req:audio)",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "audio", "kind": "event", "event": "audio" }
           ]
@@ -63,6 +64,7 @@
           "title": "The patch",
           "text": "A *patch* is a catch-all term for any configuration of interconnected synth modules. The term comes from the *patch cables* we use to connect analog synth modules.[^1]\n\n[Click `NEW PATCH` in the sidebar.](req:new-patch)\n\n[^1]: Long ago, patch cables were used to hot-swap spare equipment into vital communications systems in which something had melted, burned out, or exploded.\n\n    These days, patch cables are mostly used by recreational drug users, commodity fetishists, and the neurodivergent in order to make things go *wubwubwubwub*\n",
           "why": "",
+          "listen": true,
           "superseded": true,
           "parts": [
             { "id": "new-patch", "kind": "custom", "name": "newPatch" }
@@ -74,6 +76,7 @@
           "title": "Add an Oscillator",
           "text": "**Main** here is what is going to send the information from our keyboard circulating through our patch.\n\nIts two most important functions are to send `pitch` (i.e., what note is being played) and `gate`, which answers yes or no to the question, \"Is a key being held down right now?\"[^1]\n\nThe output of **Output** is what you hear. It's can be thought of as the rectum of a patch. A synth patch poops sound into the toilet of the ear.\n\n[Add an **Oscillator** module using the sidebar button or command palette (`Ctrl/Cmd+K` or the `/` key).](req:add-osc)\n\nAny module on the canvas can be moved around by clicking on its header and dragging it around.\n\n[^1]: The caveats, exceptions, and backpedaling that go here are on our feature roadmap and are slated to be added in Q3 of FY 2029",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-osc", "kind": "module", "type": "osc" }
           ]
@@ -233,6 +236,7 @@
           "title": "Add an envelope",
           "text": "There are many kinds of envelope. The most common, and the one we're going to use, is an *ADSR* envelope, which is named after its four parameters. An envelope module can control any other module's parameter[^1], but let's consider an example envelope that controls amplitude (volume):\n- *attack*: The time that elapses between silence and the sound's peak volume\n- *decay*: The time that elapses between peak volume and...\n- ... *sustain*: The volume that the signal settles at if the note persists longer than `(attack + decay)` milliseconds.\n- *release*: The time that elapses between the end of the note and silence.\n\n[^1]: Including another envelope module's parameters! If there's one thing you should take away from this tutorials is that if it's a parameter, it can be manipulated by control voltage.\n\n    The possibilities are quite literally endless. A synth like the one Wendy Carlos (in-)famously used to record *Switched-On Bach* had something like 10¹³⁴ possible patch cable configurations. Most of them would have sounded like shit, but still.\n\n[Add an **ADSR** module.](req:add-adsr)\n",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-adsr", "kind": "module", "type": "adsr" }
           ]
@@ -243,6 +247,7 @@
           "title": "Controlling note volume with an envelope",
           "text": "Instead of controlling the **VCA** with a simple on/off `gate`, let's give a note's volume some shape.\n\n## First, play a few notes to get a sense of what our starting point sounds like.\n\n[Then click the cable from **Main**’s `gate` to the **VCA**'s `cv` to remove it.](req:unplug-main-gate-vca-cv)\n\n[Connect **Main**'s `gate` to **ADSR**'s `gate`.](req:main-gate-adsr-gate)\n\nNow, instead of controlling note volume directly with `gate` we're using `gate` to control the envelope, which controls the volume: When voltage enters the envelope module through `gate`, volume will\n1. increase and peak (`attack`),\n2. fade until it reaches its a specific volume ('decay'),\n3. remain at that specific volume (aka the 'sustain' volume)  until the gate voltage stops, at which point\n4.  volume fades to silence ('release')\n\n\n\n[Connect **ADSR**'s `env`(elope) to  **VCA** `cv`](req:adsr-env-vca-cv)",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "unplug-main-gate-vca-cv",
@@ -349,6 +354,7 @@
           "title": "A slider thumb is a jack",
           "text": "[Set the `wave` to square](req:osc-wave) (pulse width only matters for a square). Then [Alt-drag the thumb of the **Oscillator**’s `pw` slider onto the **ADSR**’s `env` jack](req:adsr-env-osc-pw) (or drag from `env` and drop it on the thumb). The envelope now also sweeps the pulse width.",
           "why": "Dropping a signal on a thumb routes it through one of the module’s parameter inputs, `p1` or `p2`. The same envelope shapes two things at once: loudness and timbre.",
+          "listen": true,
           "parts": [
             {
               "id": "osc-wave",
@@ -374,6 +380,7 @@
           "title": "Undo and redo",
           "text": "[Press Ctrl+Z (Cmd+Z on a Mac), or Commands → Undo](req:undos): the route is gone. [Press Shift+Ctrl+Z (Commands → Redo) and it is back](req:redos,adsr-env-osc-pw). Forty steps of history are kept, cables and modules included.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "undos", "kind": "event", "event": "undos" },
             { "id": "redos", "kind": "event", "event": "redos" },
@@ -405,6 +412,7 @@
           "title": "Add a Filter",
           "text": "[Add a **Filter**](req:add-filter) and put it between the **Oscillator** and the **VCA**: [**Oscillator** `out` → **Filter** `in`](req:osc-out-filter-in), [**Filter** `lp24` → **VCA** `in`](req:filter-lp24-vca-in), and [remove the cable from the **Oscillator** to the **VCA**](req:unplug-osc-out-vca-in).",
           "why": "VCO → VCF → VCA is the classic subtractive chain. `lp24` is a 24 dB low pass: steep. `lp12` is gentler, `hp` lets the highs through instead.",
+          "listen": true,
           "parts": [
             { "id": "add-filter", "kind": "module", "type": "filter" },
             {
@@ -493,6 +501,7 @@
           "title": "Add an LFO",
           "text": "[Add an **LFO**](req:add-lfo) (*low frequency oscillator*). It is an oscillator too slow to hear, made to move other things. [Set its `rate` to about 0.5 Hz.](req:lfo-rate)",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-lfo", "kind": "module", "type": "lfo" },
             {
@@ -549,6 +558,7 @@
           "title": "One knob, two parameters",
           "text": "[Drag **Main**’s blue `k1` jack to the **Filter**’s `p1`.](req:main-k1-filter-p1) [Open the ⋯ menu of `cutoff` and tick `P1`](req:filter-p1-cutoff); [do the same for `res`](req:filter-p1-res). **Main**’s `k1` slider stands for the first knob of the FM-1.",
           "why": "The matrix in the ⋯ menu decides which parameters a pin reaches. A blue tick appears on each slider the knob reaches: that is where the knob alone holds the parameter.",
+          "listen": true,
           "parts": [
             {
               "id": "main-k1-filter-p1",
@@ -580,6 +590,7 @@
           "title": "Set the depth",
           "text": "In the ⋯ menu of `cutoff`, [drag the `p1` attenuverter to about 0.5](req:filter-p1-att): the knob now reaches half as far. A negative value turns the knob around.",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "filter-p1-att",
@@ -628,6 +639,7 @@
           "title": "Select the modules",
           "text": "[Shift-click the **Oscillator**, **Filter**, **ADSR**, **VCA** and **LFO**, or drag a box around them on the empty canvas.](req:selected) Selected cards get a highlight. **Main** and **Output** stay outside.",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "selected",
@@ -643,6 +655,7 @@
           "title": "Group them",
           "text": "[Press Ctrl+G (Cmd+G on a Mac), or Commands → Make assembly, and name it My voice.](req:my-voice-exists) The five cards fold into one that shows the ports which had cables from outside: `pitch`, `gate` and `out`.",
           "why": "Grouping changes nothing in the sound. Ports with outside cables are exposed automatically; the rest is hidden until you expose it.",
+          "listen": true,
           "parts": [
             { "id": "my-voice-exists", "kind": "assembly", "role": "myVoice", "fact": "exists" }
           ]
@@ -653,6 +666,7 @@
           "title": "Open it up",
           "text": "[Click expand on the My voice card.](req:my-voice-open) A frame shows the modules inside; every port and slider has a ○ toggle.",
           "why": "",
+          "listen": true,
           "superseded": true,
           "parts": [
             { "id": "my-voice-open", "kind": "assembly", "role": "myVoice", "fact": "open" }
@@ -664,6 +678,7 @@
           "title": "Put two knobs on the card",
           "text": "[Click ○ next to the **Filter**’s `cutoff`](req:my-voice-promoted-filter-cutoff) and [next to the **ADSR**’s `r`](req:my-voice-promoted-adsr-r). They become sliders on the collapsed card. [Click ○ beside the **LFO**’s `out` too](req:my-voice-exposed-lfo-out): an extra output.",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "my-voice-promoted-filter-cutoff",
@@ -709,6 +724,7 @@
           "title": "Close it",
           "text": "[Click collapse in the frame’s header.](req:my-voice-collapsed) One card: `pitch`, `gate`, `out`, the **LFO**’s `out`, `cutoff` and `r`. Play it.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "my-voice-collapsed", "kind": "assembly", "role": "myVoice", "fact": "collapsed" }
           ]
@@ -731,6 +747,7 @@
           "title": "Save it to your library",
           "text": "[Click save on the card and keep the name My voice.](req:my-voice-saved) It is now in the Library tab and in + Add assembly, under Your library, ready for any patch.",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "my-voice-saved",
@@ -748,6 +765,7 @@
           "title": "Fit the patch to the screen",
           "text": "[Commands → Fit patch to screen](req:zooms) scales the canvas so everything is in view. Ctrl+wheel (pinch on touch) zooms freely; Reset canvas scale goes back to 100 %.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "zooms", "kind": "event", "event": "zooms" }
           ]
@@ -943,6 +961,7 @@
           "title": "Group the three",
           "text": "[Select the **Delay**, **Reverb** and **Chorus** and press Ctrl+G (Cmd+G)](req:my-space-exists). Name the assembly My space. Its card shows `in`, `l` and `r`.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "my-space-exists", "kind": "assembly", "role": "mySpace", "fact": "exists" }
           ]
@@ -953,6 +972,7 @@
           "title": "Choose its knobs",
           "text": "Expand My space, [click ○ on the **Delay**’s `time` and `mix`](req:my-space-promoted-delay-time,my-space-promoted-delay-mix) and [on the **Reverb**’s `mix`](req:my-space-promoted-reverb-mix), [then collapse it](req:my-space-collapsed). An effect needs few knobs on the outside.",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "my-space-promoted-delay-time",
@@ -987,6 +1007,7 @@
           "title": "Save My space",
           "text": "[Click save on the My space card.](req:my-space-saved) Your library now holds an instrument and an effect; the next chapters use both.",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "my-space-saved",
@@ -1016,6 +1037,7 @@
           "title": "An oscillator, cabled to the pitch",
           "text": "[Add an **Oscillator**](req:add-osc) and [cable **Main** `pitch` → **Oscillator** `pitch`](req:main-pitch-osc-pitch). Leave the `wave` on sine: FM wants pure tones.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-osc", "kind": "module", "type": "osc" },
             {
@@ -1070,6 +1092,7 @@
           "title": "Duplicate it",
           "text": "Click the **Oscillator** to select it and [press Ctrl+D (Cmd+D), or Commands → Duplicate selection](req:add-osc-2). The copy keeps its settings. Cables from outside the selection are not copied: [connect **Main** `pitch` to the new **Oscillator**’s `pitch`](req:main-pitch-osc-pitch).",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-osc-2", "kind": "module", "type": "osc", "count": 2 },
             {
@@ -1137,6 +1160,7 @@
           "title": "Loudness from a level / rate envelope",
           "text": "[Add an **Env L/R**](req:add-env). [Remove **Main** `gate` → **VCA** `cv`](req:unplug-main-gate-vca-cv). Cable [carrier `out` → **VCA** `in`](req:carrier-out-vca-in), [**Main** `gate` → **Env** `gate`](req:main-gate-env-gate), [**Env** `env` → **VCA** `cv`](req:env-env-vca-cv), [**VCA** `out` → **Output** `l`](req:vca-out-output-l).",
           "why": "**Env L/R** is the DX7 envelope: four levels and the rate to reach each one. The last level, `l4`, is where the note ends after the key is released.",
+          "listen": true,
           "superseded": true,
           "parts": [
             { "id": "add-vca", "kind": "module", "type": "vca", "hidden": true },
@@ -1232,6 +1256,7 @@
           "title": "Group it as FM keys",
           "text": "[Select both **Oscillators**, the **Env** and the **VCA** and press Ctrl+G (Cmd+G)](req:fm-keys-exists). Name it FM keys. It exposes `pitch` (twice, one per oscillator), `gate` and `out`.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "fm-keys-exists", "kind": "assembly", "role": "fmKeys", "fact": "exists" }
           ]
@@ -1242,6 +1267,7 @@
           "title": "Insert My space",
           "text": "[Click + Add assembly and pick My space under Your library](req:my-space-exists) (the one you saved in chapter 5). It arrives as one card.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "my-space-exists", "kind": "assembly", "role": "mySpace", "fact": "exists" }
           ]
@@ -1252,6 +1278,7 @@
           "title": "Put the effect behind the keys",
           "text": "Cable [FM keys `out` → My space `in`](req:fm-out-out-space-in-in), [My space `l` → **Output** `l`](req:space-out-l-output-l) and [My space `r` → **Output** `r`](req:space-out-r-output-r). [Remove the cable from FM keys to **Output**](req:unplug-fm-out-out-output-l).",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "fm-out-out-space-in-in",
@@ -1293,6 +1320,7 @@
           "title": "Nest the effect inside the instrument",
           "text": "Expand FM keys and [drag the My space card into its frame by its header](req:fm-keys-contains-my-space): it becomes part of FM keys, which now exposes `l` and `r` itself. [Collapse FM keys](req:fm-keys-collapsed).",
           "why": "Assemblies nest three levels deep. An instrument that carries its own effect is one card wherever you use it.",
+          "listen": true,
           "parts": [
             {
               "id": "fm-keys-contains-my-space",
@@ -1310,6 +1338,7 @@
           "title": "Save FM keys",
           "text": "[Click save on the FM keys card.](req:fm-keys-saved) My space travels inside it.",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "fm-keys-saved",
@@ -1339,6 +1368,7 @@
           "title": "A string",
           "text": "[Add a **String**](req:add-string). Cable [**Main** `pitch` → **String** `pitch`](req:main-pitch-string-pitch), [**Main** `gate` → **String** `gate`](req:main-gate-string-gate) and [**String** `out` → **Output** `l`](req:string-out-output-l). Each key plucks it.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-string", "kind": "module", "type": "string" },
             {
@@ -1466,6 +1496,7 @@
           "title": "Blow noise through a comb",
           "text": "[Add **Noise**, a **Comb** and a **VCA**](req:add-noise,add-comb,add-vca). Cable [**Noise** `out` → **Comb** `in`](req:noise-out-comb-in), [**Main** `pitch` → **Comb** `pitch`](req:main-pitch-comb-pitch), [**Comb** `out` → **VCA** `in`](req:comb-out-vca-in), [**Main** `gate` → **VCA** `cv`](req:main-gate-vca-cv), [**VCA** `out` → **Output** `l`](req:vca-out-output-l).",
           "why": "A *comb filter* is a tuned delay line: noise through it rings at the note, like breath through a pipe. The **VCA** is a simple on / off here, straight from the `gate`.",
+          "listen": true,
           "superseded": true,
           "parts": [
             { "id": "add-noise", "kind": "module", "type": "noise" },
@@ -1601,6 +1632,7 @@
           "title": "Group the pluck",
           "text": "[Select the **String** and the **Modal** and press Ctrl+G (Cmd+G)](req:pluck-exists). Name it Pluck. Expand it, [click ○ on the **String**’s `decay`](req:pluck-promoted-string-decay) and [the **Modal**’s `struct`](req:pluck-promoted-modal-struct), and [collapse it again](req:pluck-collapsed).",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "pluck-exists", "kind": "assembly", "role": "pluck", "fact": "exists" },
             {
@@ -1628,6 +1660,7 @@
           "title": "Save Pluck",
           "text": "[Click save on the Pluck card.](req:pluck-saved) Chapter 10 plays it from a melody machine.",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "pluck-saved",
@@ -1657,6 +1690,7 @@
           "title": "A wavetable oscillator",
           "text": "[Add a **Wavetable**](req:add-wavetable) and [cable **Main** `pitch` → **Wavetable** `pitch`](req:main-pitch-wavetable-pitch). [Set `bank` to formant](req:wavetable-bank). Next we give it a gated output, then listen to the vowels.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-wavetable", "kind": "module", "type": "wavetable" },
             {
@@ -1895,6 +1929,7 @@
           "title": "Place it in the stereo field",
           "text": "[Add a **Pan**](req:add-pan). Cable [**Granular** `out` → **Pan** `in`](req:grain-out-pan-in), [**Pan** `l` → **Output** `l`](req:pan-l-output-l), [**Pan** `r` → **Output** `r`](req:pan-r-output-r). [Remove **Granular** `out` → **Output** `l`](req:unplug-grain-out-output-l). Then [drop the **LFO**’s `out` on the `pan` slider’s thumb](req:lfo-out-pan-pos): `pos` is the **Pan**’s built-in input, so the cable goes there.",
           "why": "",
+          "listen": true,
           "superseded": true,
           "parts": [
             { "id": "add-pan", "kind": "module", "type": "pan" },
@@ -1946,6 +1981,7 @@
           "title": "A phaser on the way out",
           "text": "[Add a **Phaser** between the **Granular** and the **Pan**](req:add-phaser): [**Granular** `out` → **Phaser** `in`](req:grain-out-phaser-in), [**Phaser** `out` → **Pan** `in`](req:phaser-out-pan-in), and [remove the cable from the **Granular** to the **Pan**](req:unplug-grain-out-pan-in).",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-phaser", "kind": "module", "type": "phaser" },
             {
@@ -1980,6 +2016,7 @@
           "title": "Zoom out",
           "text": "Nine cards no longer fit. [Hold Ctrl (Cmd) and scroll to zoom, pinch on a touch screen, or use Commands → Fit patch to screen](req:zooms).",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "zooms", "kind": "event", "event": "zooms" }
           ]
@@ -2019,6 +2056,7 @@
           "title": "Insert My voice",
           "text": "[Click + Add assembly and pick My voice from Your library](req:my-voice-exists). Cable [**Main** `pitch` → its `pitch`](req:main-pitch-my-voice-osc-pitch) and [**Main** `gate` → its `gate`](req:main-gate-my-voice-adsr-gate).",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "my-voice-exists", "kind": "assembly", "role": "myVoice", "fact": "exists" },
             {
@@ -2045,6 +2083,7 @@
           "title": "Insert FM keys",
           "text": "[Insert FM keys the same way.](req:fm-keys-exists) Its card shows two `pitch` inputs, one per oscillator, and a `gate`.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "fm-keys-exists", "kind": "assembly", "role": "fmKeys", "fact": "exists" }
           ]
@@ -2055,6 +2094,7 @@
           "title": "Merge the two pitch inputs",
           "text": "Expand FM keys. Next to one of the exposed `pitch` inputs [open merge into… and choose the other `pitch`](req:fm-keys-merged-pitch). One `pitch` jack now feeds both oscillators. [Collapse it.](req:fm-keys-collapsed)",
           "why": "A *merged input* sends one cable to several inner inputs. Split undoes it.",
+          "listen": true,
           "parts": [
             {
               "id": "fm-keys-merged-pitch",
@@ -2072,6 +2112,7 @@
           "title": "Cable the second instrument",
           "text": "[Cable **Main** `pitch` → FM keys `pitch`](req:main-pitch-fm-keys-osc-pitch) and [**Main** `gate` → FM keys `gate`](req:main-gate-fm-env-gate). Both instruments are ready for the mixer in the next step.",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "main-pitch-fm-keys-osc-pitch",
@@ -2097,6 +2138,7 @@
           "title": "Mix them",
           "text": "[Add a **Mixer 4**](req:add-mixer). Cable [My voice `out` → `in1`](req:my-voice-out-out-mixer-in1), [FM keys `l` → `in2`](req:space-out-l-mixer-in2), [FM keys `r` → `in3`](req:space-out-r-mixer-in3), and [**Mixer** `out` → **Output** `l` and `r`](req:mixer-out-output-l,mixer-out-output-r). `l1`..`l4` are the levels.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-mixer", "kind": "module", "type": "mixer", "loose": true },
             {
@@ -2250,6 +2292,7 @@
           "title": "A clock",
           "text": "[Add an **LFO**](req:add-lfo), [set its `wave` to square](req:lfo-wave) and [its `rate` to 4 Hz](req:lfo-rate). A square wave is a *clock*: its rising edge is a *tick*.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-lfo", "kind": "module", "type": "lfo" },
             {
@@ -2276,6 +2319,7 @@
           "title": "Divide it",
           "text": "[Add a **Clock div**](req:add-clkdiv) and [cable **LFO** `out` → **Clock div** `clock`](req:lfo-out-clkdiv-clock). Its outputs `out`, `d2`, `d4` and `d8` tick every `div`, 2, 4 and 8 ticks.",
           "why": "",
+          "listen": true,
           "superseded": true,
           "parts": [
             { "id": "add-clkdiv", "kind": "module", "type": "clkdiv" },
@@ -2295,6 +2339,7 @@
           "title": "A random value per tick",
           "text": "[Add **Noise**](req:add-noise) and [an **S&H** (*sample and hold*)](req:add-sh). Cable [**Noise** `out` → **S&H** `in`](req:noise-out-sh-in) and [**Clock div** `out` → **S&H** `clock`](req:clkdiv-out-sh-clock). On every tick the **S&H** grabs the noise’s value and holds it.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-noise", "kind": "module", "type": "noise" },
             { "id": "add-sh", "kind": "module", "type": "sh" },
@@ -2322,6 +2367,7 @@
           "title": "Snap it to a scale",
           "text": "[Add a **Quantizer**](req:add-quant), [cable **S&H** `out` → **Quantizer** `in`](req:sh-out-quant-in) and [set `scale` to pent min](req:quant-scale). Random voltages become notes of a pentatonic minor scale.",
           "why": "Pitch is a control signal: one unit per octave, a semitone is a twelfth. The quantizer rounds to the nearest note of the scale, which is why random noise sounds like a melody.",
+          "listen": true,
           "superseded": true,
           "parts": [
             { "id": "add-quant", "kind": "module", "type": "quant" },
@@ -2349,6 +2395,7 @@
           "title": "Play Pluck with it",
           "text": "[Insert Pluck from Your library](req:pluck-exists). Cable [**Quantizer** `out` → Pluck `pitch`](req:quant-out-pluck-string-pitch), [**Clock div** `out` → Pluck `gate`](req:clkdiv-out-pluck-string-gate) and [Pluck `out` → **Output** `l`](req:pluck-out). The machine plays on its own now.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "pluck-exists", "kind": "assembly", "role": "pluck", "fact": "exists" },
             {
@@ -2376,6 +2423,7 @@
           "title": "FM keys on every second tick",
           "text": "[Add a **Pulse** with `time` 0.05 s](req:add-pulse,pulse-time) and [cable **Clock div** `d2` → **Pulse** `trig`](req:clkdiv-d2-pulse-trig). [Insert FM keys](req:fm-keys-exists); cable [**Quantizer** `out` → FM keys `pitch`](req:quant-out-fm-keys-osc-pitch), [**Pulse** `out` → FM keys `gate`](req:pulse-out-fm-env-gate), [FM keys `l` → **Output** `r`](req:space-out-l-output-r).",
           "why": "A divider passes selected input pulses with their original width. **Pulse** makes a predictable 0.05 s gate regardless of the clock’s pulse width.",
+          "listen": true,
           "superseded": true,
           "parts": [
             { "id": "add-pulse", "kind": "module", "type": "pulse" },
@@ -2440,6 +2488,7 @@
           "title": "A written melody instead",
           "text": "[Add a **Sequencer**](req:add-seq), [cable **Clock div** `out` → **Sequencer** `clock`](req:clkdiv-out-seq-clock) and [**Sequencer** `out` → **Quantizer** `in`](req:seq-out-quant-in), and [remove the cable from the **S&H** to the **Quantizer**](req:unplug-sh-out-quant-in). Set `s1`..`s4` to a few different values; [`len` to 4](req:seq-len).",
           "why": "The **Sequencer**’s steps are the same kind of signal the **S&H** made, just chosen by you. Through the quantizer the steps land on scale notes whatever you set them to.",
+          "listen": true,
           "parts": [
             { "id": "add-seq", "kind": "module", "type": "seq" },
             {
@@ -2482,6 +2531,7 @@
           "title": "Lock to the arpeggiator’s clock",
           "text": "[Cable **Main** `clock` → **Clock div** `clock`](req:main-clock-clkdiv-clock) and [remove the **LFO**’s cable to it](req:unplug-lfo-out-clkdiv-clock); [set the **Clock div**’s `div` to 6](req:clkdiv-div). [Add a second **Clock div**](req:add-clkdiv-2): [first `out` → second `clock`](req:clkdiv-out-clkdiv2-clock), [second `d2` → **Pulse** `trig`](req:clkdiv2-d2-pulse-trig); [remove first `d2` → **Pulse** `trig`](req:unplug-clkdiv-d2-pulse-trig). Press Space: **Main**’s `clock` now ticks 24 times per beat at the arp tempo, and on the FM-1 it follows MIDI clock.",
           "why": "",
+          "listen": true,
           "parts": [
             {
               "id": "main-clock-clkdiv-clock",
@@ -2563,6 +2613,7 @@
           "title": "Noise through a high pass",
           "text": "[Add **Noise**](req:add-noise) and [a **Filter**](req:add-filter). [Cable **Noise** `out` → **Filter** `in`](req:noise-out-filter-in) and [set the `cutoff` to about 6 kHz](req:filter-cutoff): the **Filter**’s `hp` output is the hiss of a hat.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-noise", "kind": "module", "type": "noise" },
             { "id": "add-filter", "kind": "module", "type": "filter" },
@@ -2684,6 +2735,7 @@
           "title": "Group it as Hat and save it",
           "text": "[Select the **Noise**, **Filter**, **Env** and **VCA**, press Ctrl+G (Cmd+G) and name it Hat](req:hat-exists). [Click save on its card](req:hat-saved).",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "hat-exists", "kind": "assembly", "role": "hat", "fact": "exists" },
             {
@@ -2702,6 +2754,7 @@
           "title": "Borrow a kick and a snare",
           "text": "Click + Add assembly and [insert kick and snare from the Drums shelf](req:kick-exists,snare-exists). Expand one to see how it is built: a kick is a sine with a pitch envelope.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "kick-exists", "kind": "assembly", "role": "kick", "fact": "exists" },
             { "id": "snare-exists", "kind": "assembly", "role": "snare", "fact": "exists" }
@@ -2713,6 +2766,7 @@
           "title": "A clock and a divider",
           "text": "[Add an **LFO** (square, 8 Hz)](req:add-lfo,lfo-wave,lfo-rate) and [a **Clock div** with `div` 2](req:add-clkdiv,clkdiv-div). [Cable **LFO** `out` → **Clock div** `clock`](req:lfo-out-clkdiv-clock).",
           "why": "",
+          "listen": true,
           "superseded": true,
           "parts": [
             { "id": "add-lfo", "kind": "module", "type": "lfo" },
@@ -2757,6 +2811,7 @@
           "title": "A pattern from the divisions",
           "text": "Cable [**LFO** `out` → Hat `gate`](req:lfo-out-hat-gate-gate) (every eighth), [**Clock div** `d2` → kick `gate`](req:drum-triggered-kick-d2) (every beat) and [**Clock div** `d4` → snare `gate`](req:drum-triggered-snare-d4) (every second beat). [Remove the cable from **Main**’s `gate` to the Hat](req:unplug-main-gate-hat-gate-gate).",
           "why": "",
+          "listen": true,
           "superseded": true,
           "parts": [
             {
@@ -2795,6 +2850,7 @@
           "title": "Mix the kit",
           "text": "[Add a **Mixer 4**](req:add-mixer): [kick `out` → `in1`](req:drum-out-kick-in1), [snare `out` → `in2`](req:drum-out-snare-in2), [Hat `out` → `in3`](req:hat-out-out-mixer-in3), and [**Mixer** `out` → **Output** `l` and `r`](req:mixer-out-output-l,mixer-out-output-r). [Remove the Hat’s own cable to **Output**](req:unplug-hat-out-out-output-l). [Set `l1` to 0.9](req:mixer-l1) and [`l3` to 0.4](req:mixer-l3).",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "add-mixer", "kind": "module", "type": "mixer", "loose": true },
             {
@@ -2888,6 +2944,7 @@
           "title": "Share it",
           "text": "[Commands → Share patch link](req:shares) copies a link to this patch to your clipboard. Anyone who opens it gets the beat, your Pluck instrument and the eight-bar arrangement. Name and save a personal variation at the finish.",
           "why": "",
+          "listen": true,
           "parts": [
             { "id": "shares", "kind": "event", "event": "shares" }
           ]
