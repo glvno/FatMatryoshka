@@ -253,22 +253,6 @@
       "module": 5,
       "port": "gate",
       "label": "gate"
-    },
-    {
-      "module": 4,
-      "port": "p1",
-      "label": "tolerance",
-      "also": [
-        {
-          "module": 5,
-          "port": "p1"
-        }
-      ]
-    },
-    {
-      "module": 2,
-      "port": "p1",
-      "label": "wander"
     }
   ],
   "outputs": [
@@ -318,6 +302,11 @@
       "module": 5,
       "param": "r",
       "label": "r"
+    },
+    {
+      "module": 2,
+      "param": "fine",
+      "label": "fine tune"
     }
   ]
 }

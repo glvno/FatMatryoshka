@@ -5,7 +5,7 @@
 import { writeFileSync } from 'node:fs';
 import { DEFS } from '../src/modules';
 import { defaultMap, defaultParams, type ModuleInst, type Source } from '../src/patch';
-import type { AssemblyDef, PortRef, ParamRef } from '../src/assembly';
+import { pinsToParams, type AssemblyDef, type PortRef, type ParamRef } from '../src/assembly';
 
 const OUT = new URL('../src/assemblies/', import.meta.url);
 const GX = 270;
@@ -1017,5 +1017,7 @@ asm('auto pan', 'Effects', (b) => {
   b.param('centre', pan, 'pan');
 });
 
+// an exposed pin is offered as the sliders it routes to (the editor has no p1 / p2 jacks): the same migration as on load
+for (const d of defs) d.inputs = pinsToParams(d.inputs, d.params, (id) => d.modules.find((m) => m.id === id));
 for (const d of defs) writeFileSync(new URL(`${d.name.replace(/[^a-z0-9]+/g, '-')}.json`, OUT), JSON.stringify(d, null, 2) + '\n');
 console.log(`wrote ${defs.length} assemblies: ${defs.map((d) => d.name).join(', ')}`);

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { makeAssembly, toDef, validateAssemblyDef, insertAssembly } from './assembly';
 import { DEFS } from './modules';
 import { addModule, connect, emptyPatch, validatePatch } from './patch';
-import { connectParameter, parameterInputs, setParameterInput, setInputRoute } from './parameter-routing';
+import { canSeparate, connectParameter, parameterInputs, PinsInUse, removeRoute, separateDepth, setParameterInput, setInputRoute } from './parameter-routing';
 
 function setup() {
   const p = emptyPatch();
@@ -87,13 +87,17 @@ describe('slider jack routing', () => {
     expect(parameterInputs(loaded, DEFS.filter.params[0])).toContain('cv');
   });
 
-  it('aliases dedicated CV jacks and makes duplicate drops a no-op', () => {
-    const { p, target, from } = setup();
-    const original = structuredClone(target);
+  it('routes a thumb drop through a pin even where a dedicated input exists, and makes duplicate drops a no-op', () => {
+    const { p, target, from, second } = setup();
     connectParameter(p, DEFS, from, target.id, 'cutoff');
     connectParameter(p, DEFS, from, target.id, 'cutoff');
-    expect(p.cables).toEqual([{ from, to: { module: target.id, port: 'cv' } }]);
-    expect(target).toEqual(original);
+    expect(p.cables).toEqual([{ from, to: { module: target.id, port: 'p1' } }]);
+    expect(target.map!.p1).toEqual(['cutoff']);
+    // a source already on the dedicated jack reaches the parameter: dropping it on the thumb adds nothing
+    const viaJack = { module: second.id, port: 'out' };
+    connect(p, DEFS, viaJack, { module: target.id, port: 'cv' });
+    connectParameter(p, DEFS, viaJack, target.id, 'cutoff');
+    expect(p.cables).toHaveLength(2);
   });
 
   it('uses the existing parameter assignment, preserved in compatible saved patches', () => {
@@ -136,7 +140,11 @@ describe('slider jack routing', () => {
     connect(p, DEFS, { module: second.id, port: 'out' }, { module: target.id, port: 'p1' });
     connect(p, DEFS, { module: other.id, port: 'out' }, { module: target.id, port: 'p2' });
     const before = JSON.stringify(p);
-    expect(() => connectParameter(p, DEFS, from, target.id, 'cvamt')).toThrow('Both parameter inputs');
+    let err: unknown;
+    try { connectParameter(p, DEFS, from, target.id, 'cvamt'); } catch (e) { err = e; }
+    expect(err).toBeInstanceOf(PinsInUse);
+    expect((err as Error).message).toMatch(/takes two modulation sources, and Constant out and Noise out use them/);
+    expect((err as PinsInUse).cables.map((c) => c.to.port)).toEqual(['p1', 'p2']);
     expect(JSON.stringify(p)).toBe(before);
   });
 
@@ -155,5 +163,38 @@ describe('slider jack routing', () => {
     expect(parameterInputs(target, DEFS.filter.params[0])).toEqual(['cv', 'p1', 'p2']);
     for (const def of Object.values(DEFS)) for (const pd of def.params)
       if (pd.input) expect(def.inputs.some((p) => p.name === pd.input && p.kind === 'control')).toBe(true);
+  });
+
+  it('removes one drawn route at a time: the cable goes with its last parameter, the pin keeps its assignment', () => {
+    const { p, target, from } = setup();
+    connectParameter(p, DEFS, from, target.id, 'res');
+    connectParameter(p, DEFS, from, target.id, 'cvamt');
+    const pin = p.cables[0].to.port as 'p1' | 'p2';
+    target.range = { [pin]: { res: [0.2, 0.8] } };
+    removeRoute(p, p.cables[0], 'res');
+    expect(p.cables).toHaveLength(1);
+    expect(target.map![pin]).toEqual(['cvamt']);
+    expect(target.range![pin]).toEqual({});
+    removeRoute(p, p.cables[0], 'cvamt');
+    expect(p.cables).toHaveLength(0);
+    expect(target.map![pin]).toEqual(['cvamt']); // as the FM-1 matrix had it; the next source on this pin starts from there
+  });
+
+  it('gives a fresh pin full depth, and separates a shared depth onto the free pin with the same source', () => {
+    const { p, target, from } = setup();
+    target.att = [0.3, 0.3];
+    target.map!.p1 = []; target.map!.p2 = [];
+    connectParameter(p, DEFS, from, target.id, 'res');
+    expect(target.att[0]).toBe(1);
+    connectParameter(p, DEFS, from, target.id, 'cvamt');
+    expect(target.map!.p1).toEqual(['res', 'cvamt']);
+    target.att[0] = 0.4;
+    expect(canSeparate(p, target, 'cvamt')).toBe(true);
+    separateDepth(p, DEFS, target, 'cvamt');
+    expect(target.map!.p1).toEqual(['res']);
+    expect(target.map!.p2).toEqual(['cvamt']);
+    expect(target.att).toEqual([0.4, 0.4]);
+    expect(p.cables.map((c) => c.to.port)).toEqual(['p1', 'p2']);
+    expect(canSeparate(p, target, 'res')).toBe(false); // it has its pin to itself now
   });
 });

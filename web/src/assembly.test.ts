@@ -37,6 +37,7 @@ import { CATEGORIES, categoryOf, FACTORY } from './assemblies';
 import { newPatch } from './patch';
 import { Engine } from './engine';
 import { DEFS } from './modules';
+import { longName } from './labels';
 import { addModule, connect, emptyPatch, removeModule, validatePatch, type Patch } from './patch';
 import { encodePatch } from './patchbin';
 import { PRESETS } from './presets';
@@ -153,7 +154,11 @@ describe('assemblies', () => {
     const a = makeAssembly(p, [osc, env, vca], 'operator');
     connect(p, DEFS, { module: kb, port: 'vel' }, { module: vca, port: 'p1' });
     reconcileAll(p, DEFS);
-    expect(a.inputs.at(-1)).toEqual({ module: vca, port: 'p1', label: 'p1' });
+    // a routed pin is never a card input: the parameters it feeds are promoted, and the cable shows on their sliders
+    const routed = p.modules.find((m) => m.id === vca)!.map!.p1;
+    expect(routed.length).toBeGreaterThan(0);
+    expect(a.inputs.some((r) => r.module === vca && r.port === 'p1')).toBe(false);
+    for (const param of routed) expect(a.params).toContainEqual({ module: vca, param, label: longName('vca', param) });
     removeModule(p, vca);
     reconcileAll(p, DEFS);
     expect(a.modules).toEqual([osc, env]);
@@ -403,7 +408,8 @@ describe('assemblies', () => {
     expect(b.inputs.find((r) => r.label === 'gate')!.also).toBeUndefined();
     // the factory voice has one merged gate
     const voiceDef = FACTORY.find((d) => d.name === 'voice')!;
-    expect(voiceDef.inputs.map((r) => r.label)).toEqual(['pitch', 'gate', 'cutoff cv']);
+    expect(voiceDef.inputs.map((r) => r.label)).toEqual(['pitch', 'gate']);
+    expect(voiceDef.params.some((r) => r.param === 'cutoff')).toBe(true); // its "cutoff cv" pin became the cutoff slider
     expect(voiceDef.inputs[1].also).toHaveLength(1);
   });
 
@@ -464,7 +470,8 @@ describe('assemblies', () => {
     const { p, kb, e1, e2, vca, osc } = twoEnv();
     const envs = makeAssembly(p, [e1, e2], 'envs');
     const voice = makeAssembly(p, [osc, vca], 'voice');
-    expect(voice.inputs.map((r) => r.port)).toEqual(['pitch', 'cv', 'p1']);
+    expect(voice.inputs.map((r) => r.port)).toEqual(['pitch', 'cv']);
+    expect(voice.params.length).toBeGreaterThan(0); // the osc's p1 cable shows on a promoted slider
     addChild(p, voice, envs.id);
     expect(voice.children).toEqual([envs.id]);
     expect(voice.inputs.map((r) => r.port)).toEqual(['pitch']); // cv and p1 are fed from inside now
@@ -487,7 +494,7 @@ describe('assemblies', () => {
     expect(def.children).toEqual([1]);
     expect(def.assemblies![0].modules.sort()).toEqual([3, 4]);
     expect(def.inputs.find((r) => r.port === 'gate')!.also).toEqual([{ module: 4, port: 'gate' }]);
-    expect(def.params).toEqual([{ module: 3, param: 'a', label: 'a' }]);
+    expect(def.params).toContainEqual({ module: 3, param: 'a', label: 'a' }); // besides the routed pins' promoted sliders
     // insert: fresh ids, the tree rebuilt
     const q = emptyPatch('q');
     addModule(q, DEFS.fm1, 0, 0);
@@ -496,7 +503,7 @@ describe('assemblies', () => {
     const child = parentOf(q, q.assemblies!.find((a) => a.name === 'envs')!.id);
     expect(child).toBe(v2);
     expect(v2.inputs.map((r) => r.port)).toEqual(['pitch', 'gate']);
-    expect(v2.params).toHaveLength(1);
+    expect(v2.params).toHaveLength(def.params.length);
     expect(hiddenModules(q).size).toBe(4);
     // a second insert gets unique labels for the nested one too
     insertAssembly(q, DEFS, def, 600, 0);
@@ -507,7 +514,7 @@ describe('assemblies', () => {
     // removeChild frees the child; ungroup of a parent hands its members to the grandparent; delete keeps children
     removeChild(p, voice, envs.id);
     expect(parentOf(p, envs.id)).toBeUndefined();
-    expect(voice.inputs.map((r) => r.port)).toEqual(['pitch', 'cv', 'p1']);
+    expect(voice.inputs.map((r) => r.port)).toEqual(['pitch', 'cv']);
     addChild(p, voice, envs.id);
     const amp = makeAssembly(p, [vca], 'amp'); // child of voice
     ungroup(p, voice.id);

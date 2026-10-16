@@ -52,9 +52,10 @@ export type PartSpec =
   /** a signal dropped on a parameter's thumb: cabled to p1 or p2, with that pin mapped to the parameter */
   | { kind: 'routed'; from: Ref; fromPort: string; to: Ref; param: string }
   | { kind: 'pinMap'; ref: Ref; pin: Pin; param: string }
-  | { kind: 'att'; ref: Ref; pin: Pin; op: SliderOp; value: number; max?: number; tolerance?: number }
-  /** a macro range of `pin` on `param`, from `min` to `max` in the parameter's units; `depth` also requires that attenuverter */
-  | { kind: 'macroRange'; ref: Ref; pin: Pin; param: string; min: number; max: number; depth?: number }
+  /** a modulation depth: of `pin`, or (the editor shows no pins) of whichever pin is routed to `param` */
+  | { kind: 'att'; ref: Ref; pin?: Pin; param?: string; op: SliderOp; value: number; max?: number; tolerance?: number }
+  /** a macro range on `param` (of `pin`, or of whichever pin routes to it), from `min` to `max` in the parameter's units; `depth` also requires that depth */
+  | { kind: 'macroRange'; ref: Ref; pin?: Pin; param: string; min: number; max: number; depth?: number }
   /** a fact about an assembly role; `type` + `param` / `port` name a member's control, `child` a nested role, `tag` + `name` a save */
   /** `type` + `index` (0-based, absent = the first) name the member module of a promoted / exposed fact */
   | { kind: 'assembly'; role: string; fact: AssemblyFact; type?: string; index?: number; param?: string; port?: string; child?: string; tag?: string; name?: string }

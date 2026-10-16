@@ -196,6 +196,13 @@ export function newPatch(defs: Record<string, ModuleDef>, name = 'init'): Patch 
   return p;
 }
 
+/** give a patch its Main module if it has none (the editor keeps one in the dock, always). Returns whether it added one. */
+export function ensureMain(p: Patch, defs: Record<string, ModuleDef>): boolean {
+  if (p.modules.some((m) => m.type === 'fm1')) return false;
+  addModule(p, defs.fm1, 20, 20);
+  return true;
+}
+
 /** the voice count of a patch: a whole number 1..MAX_VOICES, 1 when missing */
 export function voicesOf(p: Pick<Patch, 'voices'>): number {
   const v = Math.round(Number(p.voices));

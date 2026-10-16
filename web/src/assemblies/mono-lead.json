@@ -201,11 +201,6 @@
       "label": "gate"
     },
     {
-      "module": 1,
-      "port": "p1",
-      "label": "glide on legato"
-    },
-    {
       "module": 3,
       "port": "cv",
       "label": "cutoff cv"

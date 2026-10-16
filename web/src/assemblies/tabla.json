@@ -314,11 +314,6 @@
     },
     {
       "module": 6,
-      "port": "p1",
-      "label": "vel"
-    },
-    {
-      "module": 6,
       "port": "pitch",
       "label": "pitch"
     }
@@ -355,6 +350,11 @@
       "module": 4,
       "param": "gain",
       "label": "slap"
+    },
+    {
+      "module": 6,
+      "param": "bright",
+      "label": "brightness"
     }
   ]
 }

@@ -45,7 +45,7 @@ export type Target =
   | { kind: 'asm'; id: number }
   | { kind: 'port'; id: number; port: string; dir: 'in' | 'out' }
   | { kind: 'param'; id: number; param: string }
-  /** the ◎ scope-probe button beside an output */
+  /** an output's jack, to shift-click for the scope */
   | { kind: 'probe'; id: number; port: string }
   | { kind: 'ui'; id: string };
 

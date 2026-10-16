@@ -16,7 +16,7 @@
   /* The FM-1 knobs K1..K4 in Sloop's hues (blue, green, yellow, orange), darkened for paper. */
   --k1: #2d5fb5; --k2: #1f8a55; --k3: #9a7a12; --k4: #c4541c;
   --danger: var(--ref-red); --warning: var(--gate);
-  --piano-h: 96px;
+  --piano-h: 160px;
   /* The on-screen keyboard: paper and ink keys, the lettered range tinted teal, held keys in the accent. */
   --key-white: var(--ref-white); --key-black: var(--ref-ink); --key-edge: var(--ref-sand);
   --key-white-mapped: color-mix(in oklab, var(--ref-deep-teal) 12%, var(--ref-white));
@@ -44,8 +44,26 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+/* Scroll bars everywhere: thin, a faint ink thumb on no track, in either scheme (the tokens follow it); a little firmer on
+   hover. Chrome and Safari draw the -webkit- pseudo-elements; Chrome ignores those wherever scrollbar-width / -color is
+   set (and macOS overlay bars ignore scrollbar-color), so the standard properties are for Firefox only. */
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 14%, transparent) transparent; }
+  *:hover { scrollbar-color: color-mix(in srgb, var(--ink) 28%, transparent) transparent; }
+}
+::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
+::-webkit-scrollbar-thumb { border-radius: 3px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--ink) 28%, transparent); }
+::-webkit-scrollbar-corner { background: transparent; }
 /* The synth is the workspace: a control rail beside an uninterrupted patch field. */
-.workspace { display: grid; grid-template-columns: 208px minmax(0, 1fr); height: 100dvh; }
+.workspace { display: grid; grid-template-columns: 208px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; height: 100dvh; }
+/* the sidebar runs down to the keyboard; the Main panel sits under the canvas only, so every cable reaches its jack */
+.workspace > .sidebar { grid-row: 1 / 3; }
+.workspace > main, .workspace > .dock-wrap { grid-column: 2; }
+.dock-wrap { position: relative; z-index: 2; min-width: 0; } /* above the canvas: the dock's jacks reach up over its edge */
+/* the cables' continuation from the canvas down to the docked jacks; drawn over the panel, never taking the pointer */
+.dock-cables { z-index: 3; overflow: hidden; }
+.dock-cables .cable { pointer-events: none; }
 .sidebar { display: flex; flex-direction: column; gap: 24px; padding: 20px 16px 16px; min-height: 0; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); }
 .brand { display: grid; justify-items: center; gap: 6px; min-width: 0; }
 .brand img { width: 100%; height: auto; min-width: 0; object-fit: contain; }
@@ -61,8 +79,6 @@ input#patch-name:hover, input#patch-name:focus { border-bottom-color: var(--line
 .patch-controls #preset { font-size: 12px; }
 .sidebar button, .sidebar select { min-height: 36px; }
 .sidebar-bottom { margin-top: auto; display: grid; gap: 12px; padding-top: 24px; }
-.audio-controls { display: flex; gap: 6px; }
-.audio-controls #audio-btn { flex: 1; font-weight: 600; background: var(--secondary); border-color: var(--secondary); color: var(--panel); }
 #audio-status { font-size: 11px; overflow-wrap: anywhere; }
 #palette-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; background: transparent; }
 kbd { font: 10px system-ui, sans-serif; color: var(--muted); }
@@ -113,6 +129,28 @@ select.over { border-color: var(--danger); color: var(--danger); }
 .param { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 8px; font-size: 14px; }
 .param > span:not(.slider-jack) { min-width: 0; overflow-wrap: anywhere; }
 .param > output { text-align: right; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+/* an enum parameter: name, its jack centred above the picker, the routing menu; jack and picker outlined together */
+.param.choice { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 2px; margin: 3px -6px; padding: 3px 6px 4px;
+  border-radius: 7px; }
+.param.choice.jacked { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 75%, transparent); }
+.param.choice > :first-child { grid-column: 1; }
+.param.choice > .picker-jack, .param.choice > span:nth-child(2) { grid-column: 2; justify-self: center; }
+.param.choice > .parameter-routing { grid-column: 3; }
+.slider-port.picker-jack { position: relative; top: auto; left: auto; transform: none; width: 14px; height: 14px; border-width: 2px; box-shadow: none; cursor: crosshair; }
+/* one control: the arrows joined to the value's field inside a single outline */
+.picker { grid-column: 1 / -1; display: flex; align-items: stretch; gap: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.toggle-line { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 22px; cursor: pointer; }
+.param .toggle-line input { grid-column: auto; width: auto; margin: 0; }
+.cable.flash { stroke-width: 6; opacity: 1; animation: cable-flash .4s ease-in-out 4 alternate; }
+@keyframes cable-flash { to { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .cable.flash { animation: none; } }
+.port.unrouted > span:not(.dot) { color: var(--danger); font-style: italic; }
+.picker .pick { flex: none; padding: 0 7px; min-height: 22px; font-size: 10px; line-height: 1; color: var(--muted); background: transparent; border: 0; border-radius: 0; }
+.picker .pick:hover { color: var(--secondary); }
+/* the value's field: a shade off the panel (lighter in dark mode, a faint grey on the white light panel) */
+.picker .pick-value { flex: 1; min-width: 0; text-align: center; color: var(--ink); display: flex; align-items: center; justify-content: center; padding: 1px 4px; border-inline: 1px solid var(--line); background: color-mix(in srgb, var(--ink) 7%, var(--panel)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.param.automated .picker .pick-value { color: var(--secondary); }
+.picker.over .pick-value { color: var(--danger); }
 .dot.armed { background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 40%, transparent); }
 .panel { position: fixed; right: 16px; bottom: 16px; z-index: 20; width: 420px; max-width: calc(100% - 32px); max-height: 50vh; overflow: auto; background: var(--panel); border: 1px solid var(--muted); border-radius: 8px; box-shadow: 0 2px 8px var(--shadow); padding: 8px 10px; font-size: 12px; }
 .panel h3 { margin: 0 0 4px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
@@ -163,8 +201,6 @@ dialog.help td:first-child { white-space: nowrap; color: var(--accent); font-fam
 .scope-head .scope-handle { flex: 1; text-align: left; font-weight: 600; border-color: transparent; cursor: grab; touch-action: none; user-select: none; }
 .scope-head .scope-handle.dragging { cursor: grabbing; }
 .scope-window canvas { display: block; width: 100%; height: 160px; min-height: 0; flex: 1 1 160px; background: var(--surface-tint); border-radius: 4px; }
-button.prb { padding: 0 2px; line-height: 1; border: none; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
-button.prb.on { color: var(--accent); }
 .dot.probed { box-shadow: 0 0 0 2px var(--accent); }
 details.arp { margin: 4px 8px 6px; border-top: 1px solid var(--line); padding-top: 4px; }
 details.arp summary { cursor: pointer; color: var(--ink); font-size: 14px; padding: 5px 0; }
@@ -191,7 +227,7 @@ progress { width: 100%; }
   .mhead { padding: 8px; }
   .toolbar button, .toolbar select, .toolbar .btn { padding: 8px 12px; }
   .param input[type=range] { height: 28px; }
-  .x, button.tog, button.prb, button.pw { min-width: 28px; min-height: 28px; }
+  .x, button.tog, button.pw { min-width: 28px; min-height: 28px; }
 }
 @media (max-width: 640px) {
   .panel { width: calc(100% - 24px); right: 12px; bottom: 80px; }
@@ -274,9 +310,11 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .cables { z-index: 1; }
 .patch-preview { z-index: 4; }
 .internal-cables { z-index: 3; pointer-events: none; }
+/* the stretch of an outside cable over its card, up to the thumb it ends on: clipped to the card, under the thumb */
+.entry-cables { z-index: 3; overflow: hidden; border-radius: 8px; pointer-events: none; }
 .module .port > span:not(.dot), .module .param > input { position: relative; z-index: 2; }
 .module:has(.parameter-routing[open]) { z-index: 3; }
-.module .mhead, .module .param > span:not(.slider-jack), .module .param > output, .module .parameter-routing, .module .prb, .module .tog, .module .voices-row, .module .morph-row { position: relative; z-index: 2; }
+.module .mhead, .module .param > span:not(.slider-jack), .module .param > output, .module .parameter-routing, .module .tog, .module .voices-row, .module .morph-row { position: relative; z-index: 2; }
 .cable.alias { stroke-width: 3; stroke-dasharray: 3 4; opacity: .6; pointer-events: none; }
 .cable.alias:hover, .cable.alias:focus, .cable.alias.hover { stroke-width: 6; opacity: 1; }
 /* the click area of an editable route: invisible, 1.5x the stroke, on top of the card's controls */
@@ -293,6 +331,10 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .routing-controls label { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 4px 0; }
 .routing-controls input[type=checkbox] { width: auto; margin: 0; }
 .routing-controls input[type=range] { width: 100%; }
+.routing-controls h4 { margin: 10px 0 4px; font-size: 11px; font-weight: 650; letter-spacing: .02em; color: var(--muted); }
+.routing-controls .routing-source { margin: 4px 0 8px; padding: 6px 8px; border-radius: 6px; background: var(--surface-tint); }
+.routing-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.routing-head strong { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .routing-controls output { margin-left: auto; }
 .routing-controls fieldset { display: flex; gap: 8px; border: 0; padding: 5px 0 0; margin: 5px 0 0; border-top: 1px solid var(--line); }
 .routing-controls legend { color: var(--muted); }
@@ -308,15 +350,88 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .device-controls p { margin: 4px 0 10px; font-size: 12px; }
 .device-controls form { margin-top: 20px; text-align: right; }
 #dev-status { display: block; font-size: 12px; overflow-wrap: anywhere; }
-#tab-patch { position: relative; height: 100%; isolation: isolate; background: var(--surface-tint); display: flex; flex-direction: column; }
-#tab-patch[hidden] { display: none; }
-.canvas { width: 100%; min-width: 0; min-height: 0; flex: 1; isolation: isolate; z-index: 1; }
+#tab-patch { position: relative; height: 100%; isolation: isolate; background: var(--surface-tint); }
+.canvas { width: 100%; min-width: 0; min-height: 0; height: 100%; isolation: isolate; z-index: 1; }
+/* The deck: the performance controls and the keyboard, across the whole window under the sidebar and the patch, like
+   the FM-1's keys under its panel. Folded, only the buttons stay. */
+.deck { grid-column: 1 / -1; grid-row: 3; display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); user-select: none; }
+.deck-row { height: 92px; display: flex; gap: 8px; padding: 6px 8px 8px; }
+.deck.folded .deck-row { height: auto; }
+/* The Main module, docked: its jacks along the top edge (cables come down to them from the canvas), then its settings */
+/* The dock scrolls sideways when narrow; it starts 8px above its visible edge (a see-through band that takes no pointer)
+   so the jacks reaching up over the edge are not clipped by the scrolling */
+.dock { display: flex; min-width: 0; margin-top: -8px; padding-top: 8px; overflow-x: auto; overflow-y: hidden; pointer-events: none;
+  background: linear-gradient(transparent 8px, var(--line) 8px, var(--line) 9px, var(--panel) 9px); }
+.dock > * { pointer-events: auto; }
+.dock-main { display: flex; align-items: stretch; padding: 0 0 0 8px; }
+.dock-title { align-self: center; padding-right: 8px; font-weight: 650; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 12px; color: var(--muted); }
+/* Columns of related controls, spread across the panel: jacks along the top (the cables come down to them), the
+   rest centred in the height that is left */
+.dock-main { flex: 1; }
+.dock-col { flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 10px 6px; border-left: 1px solid var(--line); }
+/* the jacks sit on the dock's top edge, half over it, as a card's jacks sit on the card's side */
+.dock-jacks { margin-top: -8px; }
+/* the keyboard's octave buttons, in a row under the outputs */
+/* side by side, filling the room under the outputs, the readout under them */
+.dock-outputs .dock-body { align-self: stretch; }
+.dock .piano-octave { flex: 1; width: auto; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr auto; gap: 3px 6px; }
+.dock .piano-octave > button:first-child { grid-area: 1 / 1; }
+.dock .piano-octave > button:last-child { grid-area: 1 / 2; }
+.dock .piano-octave > output { grid-area: 2 / 1 / 3 / 3; }
+.dock-body { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+.dock-knobs .dock-body, .dock-wheels .dock-body { flex-direction: row; justify-content: center; gap: 8px; }
+.dock-wheel { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.dock-wheel .deck-wheel { flex: 1; grid-template-rows: 1fr; }
+.dock-wheel .deck-wheel > span { display: none; }
+.dock-jacks { display: flex; justify-content: center; gap: 2px; }
+.dock-jacks .port { flex-direction: column-reverse; justify-content: flex-end; gap: 1px; min-width: 30px; padding: 0 2px; font-size: 10px; }
+.dock-jacks .port .dot { margin: 0; }
+.dock-jacks .port > span:not(.dot) { white-space: nowrap; }
+.dock-body > .param { width: 150px; margin: 0; font-size: 12px; }
+.dock-drift .dock-body > .param { width: 120px; }
+.dock-body > .param select { grid-column: 1 / -1; width: 100%; font-size: 12px; padding: 2px 4px; }
+.dock-arp { align-items: center; }
+.dock details.arp { margin: 0; border: 0; padding: 0; }
+.dock details.arp summary { font-size: 12px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); white-space: nowrap; }
+.dock details.arp[open] summary { border-color: var(--secondary); color: var(--secondary); }
+/* the arpeggiator's rows open as a panel above the deck (fixed: the dock scrolls sideways and would clip it) */
+.dock details.arp .arp-rows { position: fixed; z-index: 30; right: 16px; bottom: calc(var(--piano-h) + 8px); width: 280px; max-height: calc(100dvh - var(--piano-h) - 32px); overflow: auto;
+  padding: 8px 12px; background: var(--panel); border: 1px solid var(--muted); border-radius: 8px; box-shadow: 0 4px 16px var(--shadow); }
+.deck-controls { flex: none; display: grid; grid-template-columns: 1fr auto; gap: 4px 6px; width: 176px; align-content: stretch; }
+.deck-controls button { padding: 0 8px; font-size: 12px; }
+.deck-controls #audio-btn { font-weight: 600; background: var(--secondary); border-color: var(--secondary); color: var(--panel); }
+.deck-controls #arp-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.deck-controls #keys-btn[aria-expanded="true"] { color: var(--secondary); border-color: var(--secondary); }
+.deck.folded .piano { display: none; }
+/* K1..K4 as knobs in the knobs' colours: the arc from 7 to 5 o'clock is the value, the line on the cap points at it */
+.deck-knobs { display: flex; gap: 6px; align-items: stretch; }
+.deck-knob { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; font-weight: 650; color: var(--knob); }
+/* the jack at the top with the others, the dial centred below it */
+.deck-knob > .dial { margin: auto 0; }
+.deck-knob.off { opacity: .4; pointer-events: none; }
+.dial { --v: .5; position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; cursor: ns-resize; touch-action: none;
+  background: conic-gradient(from -135deg, var(--knob) calc(var(--v) * 270deg), var(--line) 0 270deg, transparent 0); }
+.dial::after { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: var(--panel); box-shadow: 0 1px 2px var(--shadow); }
+.dial::before { content: ''; position: absolute; z-index: 1; left: calc(50% - 1px); top: 6px; width: 2px; height: 7px; border-radius: 1px; background: var(--ink);
+  transform-origin: 1px 16px; transform: rotate(calc(-135deg + var(--v) * 270deg)); }
+/* the knob's output jack above it (drag from it to patch), the name on the cap (drag the knob to turn) */
+.deck-knob > .dot { margin: -8px 0 0; color: var(--knob); cursor: crosshair; }
+.dial-name { position: relative; z-index: 2; pointer-events: none; font-size: 11px; font-weight: 700; color: var(--knob); }
+/* the wheels: a recessed track and a ridge at the value; bend rests in the middle */
+.deck-wheels { display: flex; gap: 6px; align-items: stretch; padding: 2px 0; }
+.deck-wheel { display: grid; grid-template-rows: 1fr auto; justify-items: center; gap: 3px; font-size: 9px; font-weight: 650; color: var(--muted); }
+.wheel { --v: 0; position: relative; width: 20px; border-radius: 5px; cursor: ns-resize; touch-action: none; overflow: hidden;
+  background: linear-gradient(var(--shadow), transparent 30%, transparent 70%, var(--shadow)), var(--bg); border: 1px solid var(--line); }
+.wheel::after { content: ''; position: absolute; left: 2px; right: 2px; height: 6px; border-radius: 2px; background: var(--secondary);
+  bottom: calc(var(--v) * (100% - 6px)); }
+.dock-wheel [role=slider]:focus-visible, .deck-knob [role=slider]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.deck.folded .deck-controls { grid-template-columns: auto auto auto auto; width: auto; }
 /* The keyboard: 88 keys in a strip that scrolls sideways; the octave buttons stay at its left. */
-.piano { flex: none; height: var(--piano-h); display: flex; gap: 8px; padding: 6px 8px 8px; background: var(--panel); border-top: 1px solid var(--line); z-index: 2; user-select: none; }
-.piano-octave { flex: none; display: grid; grid-template-rows: 1fr auto 1fr; gap: 2px; width: 64px; }
-.piano-octave button { padding: 0 6px; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.piano { flex: 1; min-width: 0; display: flex; gap: 8px; }
+.piano-octave { flex: none; display: grid; grid-template-rows: 1fr auto 1fr; gap: 2px; width: 100px; }
+.piano-octave button { padding: 0 6px; font-size: 12px; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .piano-octave output { text-align: center; font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.piano-keys { flex: 1; min-width: 0; container-type: size; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; touch-action: pan-x; }
+.piano-keys { flex: 1; min-width: 0; container-type: size; overflow-x: auto; overflow-y: hidden; touch-action: pan-x; }
 .piano-bed { --w: max(24px, calc(100cqw / var(--whites))); position: relative; height: 100%; width: calc(var(--whites) * var(--w)); }
 .key { position: absolute; top: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 4px; font-size: 11px; line-height: 1.1; cursor: pointer; }
 .key.white { left: calc(var(--at) * var(--w)); width: var(--w); height: 100%; background: var(--key-white); border: 1px solid var(--key-edge); border-left-width: 0; border-radius: 0 0 4px 4px; color: var(--key-white-letter); z-index: 1; }
@@ -339,6 +454,11 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 }
 @media (max-width: 700px) {
   .workspace { grid-template-columns: minmax(0, 1fr); height: calc(100dvh - 44px); }
+  .workspace > main, .workspace > .dock-wrap { grid-column: 1; }
+  .deck-row { padding: 6px 4px 8px 8px; gap: 6px; }
+  .deck-controls { width: 112px; }
+  .deck-controls button { padding: 0 4px; font-size: 11px; }
+  .piano-octave { width: 88px; }
   .mobile-bar { height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 4px 10px; border-bottom: 1px solid var(--line); background: var(--panel); }
   .mobile-bar button { border: 0; background: transparent; font-size: 12px; }
   .sidebar { display: none; position: fixed; top: 44px; bottom: 0; left: 0; width: 208px; z-index: 41; }
@@ -381,7 +501,6 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .module :is(select, .routing-controls, .empty) { font-family: 'Barlow', system-ui, sans-serif; font-weight: 500; font-size: 14px; }
 .module .parameter-routing summary { font-size: 12px; line-height: 1.2; padding: 1px 5px; }
 .module .morph-row select { grid-column: 1 / -1; width: 100%; }
-.module .prb { font-size: 13px; }
 .module button.sm, .fhead button.sm { font: 500 12px/1.5 'Barlow', system-ui, sans-serif; }
 .module button.pw { font-size: 14px; }
 .module .x { font-size: 20px; }

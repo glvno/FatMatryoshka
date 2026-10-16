@@ -161,7 +161,7 @@ export class Scope {
     };
   }
 
-  /** a probe set with ◎: the window appears with its first one (nothing is traced before that) */
+  /** a probe set by shift-clicking a jack: the window appears with its first one (nothing is traced before that) */
   add(key: string, kind: ProbeKind): void {
     if (this.probes.some((p) => p.key === key)) return;
     this.probes.push({ key, kind, data: null, sr: 48000 });
@@ -217,7 +217,7 @@ export class Scope {
       g.fillStyle = style.getPropertyValue('--muted').trim();
       g.font = '12px system-ui, sans-serif';
       g.textAlign = 'center';
-      g.fillText('Click ◎ beside an output to watch it here', W / 2, H / 2 + 4);
+      g.fillText('Shift-click a jack to watch it here', W / 2, H / 2 + 4);
       return;
     }
     const traceHeight = Math.max(1, H - 16), traceBottom = H / 2 + traceHeight / 2;

@@ -140,12 +140,15 @@ export const SOUND_DEFAULT = { held: 0.01, silent: 1e-4 };
 const PINS = ['p1', 'p2'] as const;
 const pinned = (p: Patch, from: M, port: string, to: M, param: string): boolean =>
   !!from && !!to && PINS.some((pin) => cabled(p, from, port, to, pin) && !!to.map?.[pin].includes(param));
+/** the pins a depth / range part looks at: the named one, else the pins routed to its parameter */
+const pinsOf = (m: M, part: { pin?: 'p1' | 'p2'; param?: string }): ('p1' | 'p2')[] =>
+  part.pin ? [part.pin] : PINS.filter((pin) => !!part.param && !!m?.map?.[pin].includes(part.param));
 
 const EVENT_LABEL: Record<EventName, string> = {
   notes: 'Play a note', undos: 'Press Ctrl+Z to undo', redos: 'Press Shift+Ctrl+Z to redo', zooms: 'Zoom the canvas (Ctrl+wheel, or Fit patch to screen)',
   flips: 'Press Alt+B', shares: 'Copy a share link (Commands → Share patch link)', bypasses: 'Bypass a module (B)', news: 'Press New patch', saves: 'Save an assembly',
   audio: 'Enable audio', arpPlay: 'Start the arpeggiator (Space)', snapshotA: 'Set snapshot A (Commands)', snapshotB: 'Set snapshot B (Commands)',
-  probe: 'Click ◎ beside a jack', selected: 'Select the modules', bypassed: 'Switch the module back on',
+  probe: 'Shift-click a jack', selected: 'Select the modules', bypassed: 'Switch the module back on',
 };
 const COUNTERS: EventName[] = ['notes', 'undos', 'redos', 'zooms', 'flips', 'shares', 'bypasses', 'news', 'saves'];
 
@@ -175,8 +178,8 @@ export function partSlug(spec: PartSpec): string {
     case 'slider': return `${r(spec.ref)}-${spec.param}`;
     case 'routed': return `${r(spec.from)}-${spec.fromPort}-${r(spec.to)}-${spec.param}`;
     case 'pinMap': return `${r(spec.ref)}-${spec.pin}-${spec.param}`;
-    case 'att': return `${r(spec.ref)}-${spec.pin}-att`;
-    case 'macroRange': return `${r(spec.ref)}-${spec.pin}-${spec.param}-range`;
+    case 'att': return `${r(spec.ref)}-${spec.pin ?? spec.param}-${spec.pin ? 'att' : 'depth'}`;
+    case 'macroRange': return `${r(spec.ref)}${spec.pin ? `-${spec.pin}` : ''}-${spec.param}-range`;
     case 'assembly': return [kebab(spec.role), spec.fact, spec.type && type(spec.type), spec.param ?? spec.port, spec.child && kebab(spec.child)].filter(Boolean).join('-');
     case 'voices': return 'voices';
     case 'event': return [kebab(spec.event), spec.ref && r(spec.ref), spec.port, spec.on === undefined ? '' : spec.on ? 'on' : 'off'].filter(Boolean).join('-');
@@ -210,10 +213,13 @@ export function partLabel(part: PartSpec, roles: Roles): string {
     }
     case 'routed': return `Drop ${n(part.from)}’s ${part.fromPort} on ${n(part.to)}’s ${part.param} thumb`;
     case 'pinMap': return `Tick ${part.pin.toUpperCase()} in the ⋯ menu of ${part.param}`;
-    case 'att': return part.op === 'changed' ? `Move the ${part.pin} attenuverter` : `Set the ${part.pin} attenuverter ${opText(part.op, undefined, part.value, part.max)}`;
+    case 'att': {
+      const what = part.pin ? `the ${part.pin} attenuverter` : `the depth on ${part.param}`;
+      return part.op === 'changed' ? `Move ${what}` : `Set ${what} ${opText(part.op, undefined, part.value, part.max)}`;
+    }
     case 'macroRange': {
       const pd = paramDef(refType(roles, part.ref), part.param);
-      return `Map ${part.param} from ${valueText(pd, part.min)} to ${valueText(pd, part.max)}${part.depth !== undefined ? ` with ${part.pin.toUpperCase()} depth ${part.depth}` : ''}`;
+      return `Map ${part.param} from ${valueText(pd, part.min)} to ${valueText(pd, part.max)}${part.depth !== undefined ? ` with depth ${part.depth}` : ''}`;
     }
     case 'assembly': {
       const a = roleLabel(roles, part.role);
@@ -232,7 +238,7 @@ export function partLabel(part: PartSpec, roles: Roles): string {
     }
     case 'voices': return `Set voices to ${part.min} or more on the Main card`;
     case 'event': {
-      if (part.event === 'probe' && part.ref) return `Click ◎ beside ${n(part.ref)}’s ${part.port ?? 'out'}`;
+      if (part.event === 'probe' && part.ref) return `Shift-click ${n(part.ref)}’s ${part.port ?? 'out'} jack`;
       if (part.event === 'selected' && part.types) return `Select the ${part.types.map(typeLabel).join(', ')}`;
       if (part.event === 'bypassed' && part.ref) return part.on ? `Bypass ${n(part.ref)}` : `Switch ${n(part.ref)} back on`;
       const c = part.count ?? 1;
@@ -266,17 +272,23 @@ export function partCheck(part: PartSpec, s: S, roles: Roles): boolean {
     case 'att': {
       const m = one(part.ref);
       if (!m) return false;
-      const i = part.pin === 'p1' ? 0 : 1;
-      const entry = part.op === 'changed' ? (resolve({ ...s, patch: s.entry }, roles, part.ref)?.att?.[i] ?? 1) : undefined;
-      return compare(part.op, m.att?.[i] ?? 1, part.value, part.max, part.tolerance, entry);
+      const before = resolve({ ...s, patch: s.entry }, roles, part.ref);
+      return pinsOf(m, part).some((pin) => {
+        const i = pin === 'p1' ? 0 : 1;
+        const entry = part.op === 'changed' ? (before?.att?.[i] ?? 1) : undefined;
+        return compare(part.op, m.att?.[i] ?? 1, part.value, part.max, part.tolerance, entry);
+      });
     }
     case 'macroRange': {
       const m = one(part.ref);
       const pd = paramDef(m?.type, part.param);
-      const r = m?.range?.[part.pin]?.[part.param];
-      if (!m || !pd || !r) return false;
-      const ok = Math.abs(r[0] - paramUnit(pd, part.min)) < 0.02 && Math.abs(r[1] - paramUnit(pd, part.max)) < 0.02;
-      return ok && (part.depth === undefined || m.att?.[part.pin === 'p1' ? 0 : 1] === part.depth);
+      if (!m || !pd) return false;
+      return pinsOf(m, part).some((pin) => {
+        const r = m.range?.[pin]?.[part.param];
+        if (!r) return false;
+        const ok = Math.abs(r[0] - paramUnit(pd, part.min)) < 0.02 && Math.abs(r[1] - paramUnit(pd, part.max)) < 0.02;
+        return ok && (part.depth === undefined || m.att?.[pin === 'p1' ? 0 : 1] === part.depth);
+      });
     }
     case 'assembly': {
       const a = roleAssembly(p, roles, part.role);
@@ -333,7 +345,7 @@ export function partTargets(part: PartSpec, s: S, roles: Roles): Target[] {
     case 'slider': return T.param(one(part.ref), part.param);
     case 'routed': return [...T.param(one(part.to), part.param), ...T.port(one(part.from), part.fromPort, 'out')];
     case 'pinMap': case 'macroRange': return T.param(one(part.ref), part.param);
-    case 'att': { const m = one(part.ref); const mapped = m?.map?.[part.pin]?.[0]; return mapped ? T.param(m, mapped) : T.module(m?.id); }
+    case 'att': { const m = one(part.ref); const mapped = part.param ?? (part.pin ? m?.map?.[part.pin]?.[0] : undefined); return mapped ? T.param(m, mapped) : T.module(m?.id); }
     case 'assembly': {
       const a = roleAssembly(p, roles, part.role);
       const asm = T.asm(a?.id);

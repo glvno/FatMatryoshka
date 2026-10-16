@@ -23,6 +23,8 @@ import {
   type ModuleInst,
   type Patch,
 } from './patch';
+import { isPin } from './parameter-routing';
+import { longName } from './labels';
 
 export type Target = Endpoint;
 
@@ -249,6 +251,36 @@ function uniqueLabel(taken: Iterable<string>, want: string): string {
   for (let n = 2; ; n++) if (!set.has(`${want} ${n}`)) return `${want} ${n}`;
 }
 
+/**
+ * Exposed pins become promoted parameters. The editor has no p1 / p2 jacks, so an assembly offers modulation through the
+ * sliders of the parameters a pin routes to (a cable to such a slider goes to the inner pin). A pin routed nowhere stays
+ * an exposed input, so its cable can still be seen. Returns the inputs left; the promotions are added to `params`.
+ */
+export function pinsToParams(inputs: PortRef[], params: ParamRef[], moduleOf: (id: number) => ModuleInst | undefined): PortRef[] {
+  const out: PortRef[] = [];
+  for (const r of inputs) {
+    const keep: Target[] = [];
+    for (const t of targetsOf(r)) {
+      const m = moduleOf(t.module);
+      const routed = isPin(t.port) && m?.map?.[t.port]?.length ? m.map[t.port] : null;
+      if (!routed || !m) {
+        keep.push(t);
+        continue;
+      }
+      for (const param of routed) promoteOnce(params, m, param);
+    }
+    if (!keep.length) continue;
+    const next: PortRef = { module: keep[0].module, port: keep[0].port, label: r.label };
+    if (keep.length > 1) next.also = keep.slice(1);
+    out.push(next);
+  }
+  return out;
+}
+
+const promoteOnce = (params: ParamRef[], m: ModuleInst, param: string): void => {
+  if (!params.some((q) => q.module === m.id && q.param === param)) params.push({ module: m.id, param, label: longName(m.type, param) });
+};
+
 /** the inner ports with a cable to or from outside: the ports an assembly must expose */
 export function boundary(p: Patch, members: Iterable<number>): { inputs: Target[]; outputs: Target[] } {
   const m = new Set(members);
@@ -344,11 +376,20 @@ export function reconcile(p: Patch, a: AssemblyInst, defs?: Record<string, Modul
     }
     return out;
   };
-  a.inputs = clean('in', a.inputs);
+  const moduleOf = (id: number): ModuleInst | undefined => p.modules.find((m) => m.id === id);
+  a.inputs = clean('in', pinsToParams(a.inputs, a.params, moduleOf));
   a.outputs = clean('out', a.outputs);
   a.params = a.params.filter((r) => member.has(r.module) && (!defs || defs[typeOf(r.module)].params.some((q) => q.name === r.param)) && reachableParam(p, a, r.module, r.param));
   const b = boundary(p, members);
-  for (const r of b.inputs) if (!isExposed(a, 'in', r.module, r.port)) a.inputs.push({ ...r, label: uniqueLabel(a.inputs.map((x) => x.label), r.port) });
+  for (const r of b.inputs) {
+    // an outside cable into a routed pin shows on the sliders it feeds: promote those instead of exposing the pin
+    const m = moduleOf(r.module);
+    const routed = isPin(r.port) && m?.map?.[r.port]?.length ? m.map[r.port] : null;
+    if (routed && m) for (const param of routed) {
+      if (reachableParam(p, a, m.id, param)) promoteOnce(a.params, m, param);
+    }
+    else if (!isExposed(a, 'in', r.module, r.port)) a.inputs.push({ ...r, label: uniqueLabel(a.inputs.map((x) => x.label), r.port) });
+  }
   for (const r of b.outputs) if (!isExposed(a, 'out', r.module, r.port)) a.outputs.push({ ...r, label: uniqueLabel(a.outputs.map((x) => x.label), r.port) });
   return true;
 }
@@ -816,9 +857,10 @@ export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef
       if (!t || !defs[t].params.some((q) => q.name === r.param)) throw new Error(`promoted parameter "${String(r.param)}" does not exist`);
       return [{ module: Number(r.module), param: String(r.param), label: String(r.label ?? r.param) }];
     });
-  d.inputs = ports(d.inputs, 'in');
-  d.outputs = ports(d.outputs, 'out');
+  const moduleOf = (id: number): ModuleInst | undefined => d.modules.find((m) => m.id === id);
   d.params = params(d.params);
+  d.inputs = pinsToParams(ports(d.inputs, 'in'), d.params, moduleOf);
+  d.outputs = ports(d.outputs, 'out');
   // nested assemblies: local ids, disjoint direct members, a tree of at most MAX_DEPTH levels
   const rawNested = (raw as { assemblies?: unknown }).assemblies;
   if (Array.isArray(rawNested) && rawNested.length) {
@@ -843,10 +885,11 @@ export function validateAssemblyDef(raw: unknown, defs: Record<string, ModuleDef
         open: !!e.open,
         ...assemblyLayout(e),
         modules: mods,
-        inputs: ports(e.inputs, 'in'),
+        inputs: [],
         outputs: ports(e.outputs, 'out'),
         params: params(e.params),
       };
+      n.inputs = pinsToParams(ports(e.inputs, 'in'), n.params, moduleOf);
       if (Array.isArray(e.children) && e.children.length) n.children = e.children.map(Number);
       return n;
     });

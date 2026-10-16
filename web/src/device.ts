@@ -204,4 +204,17 @@ export class DeviceLink {
     else if (msg.t === 'off') this.out!.send([0x80, msg.note! & 0x7f, 0]);
     else if (msg.t === 'panic') this.out!.send([0xb0, 123, 0]);
   }
+
+  /** pitch bend, -1..1 (the firmware bends ±2 semitones) */
+  bend(v: number): void {
+    if (!this.connected) return;
+    const x = Math.max(0, Math.min(16383, Math.round(8192 + v * 8192)));
+    this.out!.send([0xe0, x & 0x7f, x >> 7]);
+  }
+
+  /** a control change, value 0..127 (CC 1 = mod wheel) */
+  cc(n: number, v: number): void {
+    if (!this.connected) return;
+    this.out!.send([0xb0, n & 0x7f, Math.max(0, Math.min(127, Math.round(v)))]);
+  }
 }

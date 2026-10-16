@@ -121,13 +121,15 @@ export function capture(rec: Recorded, roles: Roles): Capture {
       if (!routedPins.has(`${m.id}:${pin}`)) for (const param of fresh) add({ kind: 'pinMap', ref: ref(m), pin, param });
       const i = pin === 'p1' ? 0 : 1;
       const a = m.att?.[i] ?? 1, b = was?.att?.[i] ?? 1;
-      if (a !== b) add({ kind: 'att', ref: ref(m), pin, op: 'eq', value: a, tolerance: 0.05 });
+      // pins are invisible in the editor: a depth is named by the parameter its pin routes to
+      const routed = m.map?.[pin]?.[0];
+      if (a !== b) add(routed ? { kind: 'att', ref: ref(m), param: routed, op: 'eq', value: a, tolerance: 0.05 } : { kind: 'att', ref: ref(m), pin, op: 'eq', value: a, tolerance: 0.05 });
       for (const [param, r] of Object.entries(m.range?.[pin] ?? {})) {
         if (same(r, was?.range?.[pin]?.[param])) continue;
         const pd = def.params.find((x) => x.name === param);
         if (!pd) continue;
         const round = (x: number) => Number(x.toPrecision(3));
-        add({ kind: 'macroRange', ref: ref(m), pin, param, min: round(paramValue(pd, r[0])), max: round(paramValue(pd, r[1])), depth: a });
+        add({ kind: 'macroRange', ref: ref(m), param, min: round(paramValue(pd, r[0])), max: round(paramValue(pd, r[1])), depth: a });
       }
     }
   }

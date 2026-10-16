@@ -30,10 +30,6 @@
         <label class="example-picker">Examples<select id="preset" aria-label="Load an example"></select></label>
       </div>
       <div class="sidebar-bottom">
-        <div class="audio-controls">
-          <button id="audio-btn" class="primary">Enable audio</button>
-          <button id="panic-btn" title="Stop all playing notes" aria-label="Panic: stop all notes">■</button>
-        </div>
         <span id="audio-status" class="muted" role="status">Audio ready · play a key</span>
         <button id="palette-btn" title="All commands (Ctrl/Cmd+K)">Commands <kbd>⌘ / Ctrl K</kbd></button>
       </div>
@@ -53,12 +49,23 @@
         <div id="canvas-space"><div id="patch-world"><svg id="cables" class="cables"></svg><div id="modules"></div><svg id="patch-preview" class="cables patch-preview"></svg></div></div>
       </div>
       <div id="diff" class="panel" hidden></div>
-      <div id="piano" class="piano" role="group" aria-label="Keyboard"></div>
     </section>
     <section id="tab-library" class="tab" role="tabpanel" aria-labelledby="nav-library" hidden></section>
     <section id="tab-flash" class="tab" aria-label="Flash firmware" hidden></section>
     <section id="tab-about" class="tab" aria-label="About Matryoshka" hidden></section>
     </main>
+    <div class="dock-wrap"><div id="dock" class="dock" role="group" aria-label="Main"></div><svg class="dock-cables cables" aria-hidden="true"></svg></div>
+    <footer id="deck" class="deck" aria-label="Performance">
+      <div class="deck-row">
+      <div class="deck-controls">
+        <button id="audio-btn" class="primary">Enable audio</button>
+        <button id="panic-btn" title="Stop all playing notes" aria-label="Panic: stop all notes">■</button>
+        <button id="arp-btn" aria-pressed="false" title="Arpeggiator: plays while keys are held (Space)">Arp</button>
+        <button id="keys-btn" aria-expanded="true" aria-controls="piano" title="Show or hide the keyboard">Keys</button>
+      </div>
+      <div id="piano" class="piano" role="group" aria-label="Keyboard"></div>
+      </div>
+    </footer>
   </div>
   <input id="load-file" type="file" accept="application/json,.json" hidden />
   <dialog id="palette" class="palette" aria-label="Command palette">

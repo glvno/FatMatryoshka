@@ -11,6 +11,8 @@ import { searchCommands, type Command } from './commands';
 import { buildFlashTab } from './flasher';
 import { attachKeyboard, attachMidi, isTextEntry } from './input';
 import { Piano } from './piano';
+import { moduleName } from './labels';
+import { DeckControls } from './deck';
 import { releaseFocusAfterPointer } from './focus';
 import { DEFS } from './modules';
 import { newPatch, validatePatch, voicesOf, type Patch } from './patch';
@@ -101,14 +103,24 @@ const piano = new Piano($('piano'), {
   off: (note) => sink.send({ t: 'off', note }),
   shift: (d) => noteKeys.shift(d),
 });
+/** the wheels: pitch bend and CC 1, shown in the dock under Main's bend and modulation jacks (the editor places them) */
+const hands = new DeckControls(document.createElement('div'), {
+  bend: (v) => sink.send({ t: 'bend', v }),
+  mod: (v) => sink.send({ t: 'cc', n: 1, v: v * 127 }),
+});
 /** notes go to the browser engine and, with Live on, to the FM-1 */
 const sink = {
   send(msg: HostMsg): void {
     if (msg.t === 'on') host.mute(false);
     host.send(msg);
     piano.track(msg);
+    hands.track(msg);
     if (msg.t === 'on') tutorial.noteOn();
-    if (live()) device.note(msg as { t: string; note?: number; vel?: number });
+    if (live()) {
+      device.note(msg as { t: string; note?: number; vel?: number });
+      if (msg.t === 'bend') device.bend(msg.v);
+      else if (msg.t === 'cc') device.cc(msg.n, msg.v);
+    }
   },
 };
 
@@ -170,6 +182,7 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   onArpPlay(on) {
     host.send({ t: 'arpplay', on });
     if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, on);
+    syncArpBtn();
   },
   onProbe(key, id, port, kind, _label, on) {
     if (on) {
@@ -198,7 +211,11 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
     else tutorial.redone();
   },
   morphCandidates: patchCandidates,
-});
+}, $('dock'));
+// the wheels live in the dock, each under its output's jack; the octave buttons under the outputs
+editor.dockWheels = hands.wheels;
+editor.dockOctave = piano.octaveControls;
+editor.rebuild();
 snapshotCandidates = () => editor.snapshots.B ? [{ name: 'Snapshot B', patch: { ...JSON.parse(editor.snapshots.B) as Patch, name: 'Snapshot B' } }] : [];
 host.setPatch(editor.patch);
 const tutorial = new Tutorial({
@@ -218,7 +235,7 @@ const tutorial = new Tutorial({
   snapshot: (side) => takeSnapshot(side),
   flipAB: () => flipAB(),
   share: () => sharePatch(),
-  arpPlay: (on) => { if (on) host.mute(false); editor.arpPlay = on; host.send({ t: 'arpplay', on }); if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, on); editor.rebuild(); },
+  arpPlay: (on) => setArpPlay(on),
   probe: (id, port) => { const key = probeKey(id, port); if (editor.probes.has(key)) return; editor.probes.add(key); const def = DEFS[editor.patch.modules.find((m) => m.id === id)?.type ?? '']; const kind = def?.outputs.find((o) => o.name === port)?.kind ?? 'audio'; scope.add(key, kind); host.send({ t: 'probe', key, id, port }); editor.rebuild(); },
   bypass: (id, on) => { const m = editor.patch.modules.find((m) => m.id === id); if (!m) return; if (on) m.bypass = true; else delete m.bypass; host.send({ t: 'bypass', id, on }); tutorial.bypassed(); editor.rebuild(); queueSave(editor.patch); },
   bankSave: addToBank,
@@ -340,7 +357,7 @@ const commands = (): Command[] => {
     { kind: 'command', label: 'Scope: spectrum', keywords: 'oscilloscope frequency fft', run: inPatch(() => scope.setMode('spectrum')) },
     { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },
     { kind: 'command', label: 'Reset canvas scale', keywords: 'zoom 100%', run: inPatch(() => editor.setZoom(1)) },
-    ...Object.values(DEFS).map((d) => ({ kind: 'add module', tags: ['module'], label: d.label, run: () => editor.add(d.type) })),
+    ...Object.values(DEFS).filter((d) => d.type !== 'fm1').map((d) => ({ kind: 'add module', tags: ['module'], label: moduleName(d.type, d.label), keywords: d.label, run: () => editor.add(d.type) })),
     ...loadLibrary().map((d) => assembly(d, USER_SHELF)),
     ...FACTORY.map((d) => assembly(d, categoryOf(d))),
     ...patchCandidates().map((c) => ({ kind: 'load patch', label: c.name, run: () => loadNamed(c.patch) })),
@@ -448,7 +465,7 @@ window.addEventListener('keydown', (e) => {
   const t = e.target as HTMLElement | null;
   const typing = isTextEntry(t) || t?.tagName === 'SELECT';
   if (document.querySelector('dialog[open], [popover]:popover-open') || typing) return;
-  const control = t?.closest('button, summary, [role=tab], input, select');
+  const control = t?.closest('button, summary, [role=tab], [role=slider], input, select');
   if (control && [' ', 'Enter', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
   const mod = e.metaKey || e.ctrlKey;
   const k = e.key;
@@ -462,11 +479,7 @@ window.addEventListener('keydown', (e) => {
   else if (!mod && k.toLowerCase() === 'b') done = editor.bypassSelected();
   else if (mod && k.toLowerCase() === 'g') (editor.makeAssembly(), (done = true)); // plain G is a note key
   else if (k === ' ') {
-    editor.arpPlay = !editor.arpPlay;
-    host.send({ t: 'arpplay', on: editor.arpPlay });
-    if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, editor.arpPlay);
-    status.textContent = editor.arpPlay ? 'arpeggiator enabled · hold keys' : 'arpeggiator disabled';
-    editor.rebuild();
+    toggleArp();
     done = true;
   } else if (k.startsWith('Arrow')) {
     const d = e.shiftKey ? 100 : 10;
@@ -478,6 +491,52 @@ window.addEventListener('keydown', (e) => {
   }
 }, true);
 $('panic-btn').onclick = () => { tutorial.stop(); host.mute(true); sink.send({ t: 'panic' }); };
+
+// the deck's Arp button, Space and the Main card's arpeggiator box are one switch
+function syncArpBtn(): void {
+  $('arp-btn').setAttribute('aria-pressed', String(editor.arpPlay));
+}
+function setArpPlay(on: boolean): void {
+  if (on) host.mute(false);
+  editor.arpPlay = on;
+  host.send({ t: 'arpplay', on });
+  if (live()) device.arp(editor.patch.arp ?? ARP_DEFAULT, on);
+  editor.rebuild();
+  syncArpBtn();
+}
+function toggleArp(): void {
+  setArpPlay(!editor.arpPlay);
+  status.textContent = editor.arpPlay ? 'arpeggiator enabled · hold keys' : 'arpeggiator disabled';
+}
+$('arp-btn').onclick = toggleArp;
+
+// the keyboard folds away, leaving the deck's buttons; remembered per browser
+const KEYS_HIDDEN = 'matryoshka.keys-hidden';
+const deck = $('deck');
+const keysBtn = $('keys-btn');
+const showKeys = (on: boolean): void => {
+  deck.classList.toggle('folded', !on);
+  keysBtn.setAttribute('aria-expanded', String(on));
+  try {
+    if (on) localStorage.removeItem(KEYS_HIDDEN);
+    else localStorage.setItem(KEYS_HIDDEN, '1');
+  } catch {
+    /* storage blocked: the choice lasts until the page is reloaded */
+  }
+};
+keysBtn.onclick = () => showKeys(deck.classList.contains('folded'));
+// the panels that dock above the deck (tutorial, diff) keep clear of it and the Main panel at whatever height they have
+{
+  const dockEl = $('dock');
+  const fit = new ResizeObserver(() => document.documentElement.style.setProperty('--piano-h', `${deck.offsetHeight + dockEl.offsetHeight}px`));
+  fit.observe(deck);
+  fit.observe(dockEl);
+}
+try {
+  if (localStorage.getItem(KEYS_HIDDEN)) showKeys(false);
+} catch {
+  /* storage blocked: the keyboard starts shown */
+}
 
 // FM-1 link
 $('dev-btn').onclick = async () => {

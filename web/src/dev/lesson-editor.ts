@@ -74,7 +74,7 @@ const ORD = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const OPS: Record<SliderOp, string> = { le: '≤ at most', ge: '≥ at least', eq: '= exactly', ne: '≠ not', between: 'between', changed: 'moved from its start' };
 const KINDS: Record<PartKind, string> = {
   module: 'Module present', cable: 'Cable', noCable: 'Cable removed', slider: 'Slider', routed: 'Routed to a parameter', pinMap: 'Pin map',
-  att: 'Attenuverter', macroRange: 'Macro range', assembly: 'Assembly', voices: 'Voices', event: 'Event', sound: 'Sound', custom: 'Custom check',
+  att: 'Modulation depth', macroRange: 'Macro range', assembly: 'Assembly', voices: 'Voices', event: 'Event', sound: 'Sound', custom: 'Custom check',
 };
 const FACTS: Record<AssemblyFact, string> = { exists: 'exists', open: 'is expanded', collapsed: 'is collapsed', promoted: 'has a promoted slider', exposed: 'has an exposed output', merged: 'has merged inputs', contains: 'contains another assembly', resized: 'was resized', saved: 'was saved to the library' };
 const EVENTS: Record<EventName, string> = {
@@ -98,8 +98,8 @@ const defaultPart = (kind: PartKind, course: CourseData): PartSpec => {
     case 'slider': return { kind, ref: { type: 'osc' }, param: 'wave', op: 'eq', value: 0 };
     case 'routed': return { kind, from: { type: 'lfo' }, fromPort: 'out', to: { type: 'osc' }, param: 'pw' };
     case 'pinMap': return { kind, ref: { type: 'filter' }, pin: 'p1', param: 'cutoff' };
-    case 'att': return { kind, ref: { type: 'filter' }, pin: 'p1', op: 'ne', value: 1, tolerance: 0.05 };
-    case 'macroRange': return { kind, ref: { type: 'filter' }, pin: 'p1', param: 'cutoff', min: 150, max: 4000 };
+    case 'att': return { kind, ref: { type: 'filter' }, param: 'cutoff', op: 'ne', value: 1, tolerance: 0.05 };
+    case 'macroRange': return { kind, ref: { type: 'filter' }, param: 'cutoff', min: 150, max: 4000 };
     case 'assembly': return { kind, role: asmRole, fact: 'exists' };
     case 'voices': return { kind, min: 2 };
     case 'event': return { kind, event: 'notes' };
@@ -481,8 +481,11 @@ async function mount() {
           labelled('drives', paramPicker(T(part.ref), part.param, (v) => set({ ...part, param: v }))));
         break;
       case 'att':
-        body.append(labelled('module', refPicker(part.ref, (r) => set({ ...part, ref: r }), false)), labelled('pin', select([['p1', 'P1'], ['p2', 'P2']], part.pin, (v) => set({ ...part, pin: v as 'p1' }))),
-          labelled('is', select(SLIDER_OPS.map((o) => [o, OPS[o]]), part.op, (v) => set({ ...part, op: v as SliderOp }))));
+        // the editor has no pin jacks: a depth is normally named by its parameter (whichever pin routes to it)
+        body.append(labelled('module', refPicker(part.ref, (r) => set({ ...part, ref: r, param: part.param && fixParam(T(r), part.param) }), false)),
+          labelled('pin', select([['', 'routed to the parameter'], ['p1', 'P1'], ['p2', 'P2']], part.pin ?? '', (v) => set({ ...part, pin: (v || undefined) as 'p1' | undefined }))));
+        if (!part.pin) body.append(labelled('parameter', paramPicker(T(part.ref), part.param ?? '', (v) => set({ ...part, param: v }))));
+        body.append(labelled('is', select(SLIDER_OPS.map((o) => [o, OPS[o]]), part.op, (v) => set({ ...part, op: v as SliderOp }))));
         if (part.op !== 'changed') body.append(numberInput(part.value, (v) => set({ ...part, value: v ?? 0 }, false), 'value (-1..1)'));
         if (part.op === 'between') body.append(labelled('and', numberInput(part.max, (v) => set({ ...part, max: v }, false), 'upper value')));
         body.append(labelled('tolerance', numberInput(part.tolerance, (v) => set({ ...part, tolerance: v || undefined }, false), 'tolerance')));
@@ -490,7 +493,7 @@ async function mount() {
       case 'macroRange': {
         const t = T(part.ref);
         body.append(labelled('module', refPicker(part.ref, (r) => set({ ...part, ref: r, param: fixParam(T(r), part.param) }), false), paramPicker(t, part.param, (v) => set({ ...part, param: v }))),
-          labelled('pin', select([['p1', 'P1'], ['p2', 'P2']], part.pin, (v) => set({ ...part, pin: v as 'p1' }))),
+          labelled('pin', select([['', 'routed to the parameter'], ['p1', 'P1'], ['p2', 'P2']], part.pin ?? '', (v) => set({ ...part, pin: (v || undefined) as 'p1' | undefined }))),
           labelled('from', valuePicker(t, part.param, part.min, (v) => set({ ...part, min: v ?? 0 }, false), 'from')), labelled('to', valuePicker(t, part.param, part.max, (v) => set({ ...part, max: v ?? 0 }, false), 'to')),
           labelled('depth', numberInput(part.depth, (v) => set({ ...part, depth: v }, false), 'any')));
         break;

@@ -66,7 +66,13 @@ export function partProblems(part: PartSpec, roles: Roles): string[] {
       param(ref(part.to, 'to'), part.param, 'to');
       break;
     case 'pinMap': param(ref(part.ref, 'module'), part.param, 'parameter'); break;
-    case 'att': ref(part.ref, 'module'); if (part.op !== 'changed') num(part.value, 'value'); break;
+    case 'att': {
+      const t = ref(part.ref, 'module');
+      if (!part.pin && !part.param) out.push('a depth needs its parameter (or a pin)');
+      if (part.param) param(t, part.param, 'parameter');
+      if (part.op !== 'changed') num(part.value, 'value');
+      break;
+    }
     case 'macroRange': param(ref(part.ref, 'module'), part.param, 'parameter'); num(part.min, 'from'); num(part.max, 'to'); break;
     case 'assembly': {
       const r = roles[part.role];

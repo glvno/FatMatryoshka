@@ -87,7 +87,7 @@ describe('pace', () => {
 });
 
 describe('scope steps', () => {
-  it('point at the ◎ probe button of the output, not its jack', () => {
+  it('point at the jack of the output', () => {
     const p = newPatch(DEFS); const osc = addModule(p, DEFS.osc, 300, 20);
     const st = compileStep({ id: 's', kind: 'task', title: 'S', text: '[Probe it](req:probe-osc-out)', why: '', parts: [{ id: 'probe-osc-out', kind: 'event', event: 'probe', ref: { type: 'osc' }, port: 'out' }] }, COURSE.roles);
     expect(st.focus!(headlessState(p))).toEqual([{ kind: 'probe', id: osc.id, port: 'out' }]);

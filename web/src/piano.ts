@@ -22,6 +22,8 @@ export class Piano {
   private keys = new Map<number, HTMLElement>();
   private strip: HTMLElement;
   private where: HTMLElement;
+  /** the octave buttons and the A = note readout: the editor shows them in the dock, under Main's outputs */
+  readonly octaveControls: HTMLElement;
   /** how many sources hold each note (the mouse and a letter key can hold the same one) */
   private held = new Map<number, number>();
   /** pointer id -> the note it holds */
@@ -35,7 +37,7 @@ export class Piano {
     const button = (d: number, letter: string, label: string): HTMLButtonElement => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.innerHTML = `<kbd>${letter}</kbd>${d < 0 ? '−' : '+'}`;
+      b.textContent = label;
       b.title = `${label} (${letter})`;
       b.setAttribute('aria-label', label);
       b.onclick = () => host.shift(d);
@@ -44,6 +46,7 @@ export class Piano {
     this.where = document.createElement('output');
     this.where.title = 'The note key A plays';
     ctl.append(button(-1, 'Z', 'Octave down'), this.where, button(1, 'X', 'Octave up'));
+    this.octaveControls = ctl;
 
     this.strip = document.createElement('div');
     this.strip.className = 'piano-keys';

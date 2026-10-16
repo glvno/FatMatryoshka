@@ -202,11 +202,6 @@
           "port": "gate"
         }
       ]
-    },
-    {
-      "module": 2,
-      "port": "p1",
-      "label": "cutoff cv"
     }
   ],
   "outputs": [

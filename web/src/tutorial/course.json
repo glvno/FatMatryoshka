@@ -178,7 +178,7 @@
           "id": "scope",
           "kind": "task",
           "title": "Seeing sound",
-          "text": "To the left of the **Oscillator**’s `out` jack you'll find a little grey ◎ button.\n\n[Click it.](req:probe-osc-out)\n\nThe window that just popped up is what's called an *oscilloscope*.\n\nWhat you see there is a live visualization of the oscillator's output voltage over time.  You may recognize this squiggle from high school math class as a *wave*.\n\nConveniently, sound can also be represented as a wave.\n\n*Analog audio* gets its name from the strategy of using changes in voltage as an *analogy* for changes in air pressure.\n",
+          "text": "Hold Shift and [click the **Oscillator**’s `out` jack](req:probe-osc-out).\n\nThe window that just popped up is what's called an *oscilloscope*.\n\nWhat you see there is a live visualization of the oscillator's output voltage over time.  You may recognize this squiggle from high school math class as a *wave*.\n\nConveniently, sound can also be represented as a wave.\n\n*Analog audio* gets its name from the strategy of using changes in voltage as an *analogy* for changes in air pressure.\n",
           "why": "",
           "parts": [
             {
@@ -331,7 +331,7 @@
           "kind": "task",
           "title": "A slider thumb is a jack",
           "text": "[Set the `wave` to square](req:osc-wave) (pulse width only matters for a square). Then [Alt-drag the thumb of the **Oscillator**’s `pw` slider onto the **ADSR**’s `env` jack](req:adsr-env-osc-pw) (or drag from `env` and drop it on the thumb). The envelope now also sweeps the pulse width.",
-          "why": "Dropping a signal on a thumb routes it through one of the module’s parameter inputs, `p1` or `p2`. The same envelope shapes two things at once: loudness and timbre.",
+          "why": "Dropping a signal on a thumb makes it modulate that parameter, with its own depth in the slider’s ⋯ menu. The same envelope shapes two things at once: loudness and timbre.",
           "parts": [
             {
               "id": "osc-wave",
@@ -490,7 +490,7 @@
           "kind": "task",
           "title": "Wobble the cutoff",
           "text": "[Drag the **LFO**’s `out` to the **Filter**’s `cv` jack.](req:lfo-out-filter-cv) The grey route shows `cv` is built into `cutoff`; `cvamt` sets how far it reaches: [set it to 2 oct](req:filter-cvamt). Hold a note.",
-          "why": "The `cv` input is additive in octaves: a signal of 1 moves the cutoff up by `cvamt` octaves. Pins `p1` and `p2` work differently: they reach any parameter you tick in its ⋯ menu.",
+          "why": "The `cv` input is additive in octaves: a signal of 1 moves the cutoff up by `cvamt` octaves. A cable dropped on a thumb works differently: it adds to that parameter, with the depth set in the slider’s ⋯ menu.",
           "parts": [
             {
               "id": "lfo-out-filter-cv",
@@ -526,29 +526,23 @@
           "id": "knob",
           "kind": "task",
           "title": "One knob, two parameters",
-          "text": "[Drag **Main**’s blue `k1` jack to the **Filter**’s `p1`.](req:main-k1-filter-p1) [Open the ⋯ menu of `cutoff` and tick `P1`](req:filter-p1-cutoff); [do the same for `res`](req:filter-p1-res). **Main**’s `k1` slider stands for the first knob of the FM-1.",
-          "why": "The matrix in the ⋯ menu decides which parameters a pin reaches. A blue tick appears on each slider the knob reaches: that is where the knob alone holds the parameter.",
+          "text": "[Drag from the jack in the middle of **Main**’s blue `K1` knob to the **Filter**’s `cutoff` thumb.](req:main-k1-filter-cutoff) [Then drop it on the `resonance` thumb as well](req:main-k1-filter-res): one knob can turn several parameters. **Main**’s `K1` knob (on the panel above the keyboard) stands for the first knob of the FM-1.",
+          "why": "A blue tick appears on each slider the knob reaches: that is where the knob alone holds the parameter. A module takes up to two different modulation sources, and one source can reach as many of its parameters as you like.",
           "parts": [
             {
-              "id": "main-k1-filter-p1",
-              "kind": "cable",
+              "id": "main-k1-filter-cutoff",
+              "kind": "routed",
               "from": { "type": "fm1" },
               "fromPort": "k1",
               "to": { "type": "filter" },
-              "toPort": "p1"
-            },
-            {
-              "id": "filter-p1-cutoff",
-              "kind": "pinMap",
-              "ref": { "type": "filter" },
-              "pin": "p1",
               "param": "cutoff"
             },
             {
-              "id": "filter-p1-res",
-              "kind": "pinMap",
-              "ref": { "type": "filter" },
-              "pin": "p1",
+              "id": "main-k1-filter-res",
+              "kind": "routed",
+              "from": { "type": "fm1" },
+              "fromPort": "k1",
+              "to": { "type": "filter" },
               "param": "res"
             }
           ]
@@ -557,14 +551,14 @@
           "id": "att",
           "kind": "task",
           "title": "Set the depth",
-          "text": "In the ⋯ menu of `cutoff`, [drag the `p1` attenuverter to about 0.5](req:filter-p1-att): the knob now reaches half as far. A negative value turns the knob around.",
+          "text": "In the ⋯ menu of `cutoff`, [drag the depth of **Main** `K1` to about 0.5](req:filter-cutoff-depth): the knob now reaches half as far. Resonance moves with it, since one source on a module shares one depth (*Separate depth* in the menu splits them). A negative value turns the knob around.",
           "why": "",
           "parts": [
             {
-              "id": "filter-p1-att",
+              "id": "filter-cutoff-depth",
               "kind": "att",
               "ref": { "type": "filter" },
-              "pin": "p1",
+              "param": "cutoff",
               "op": "ne",
               "value": 1,
               "tolerance": 0.05
@@ -575,7 +569,7 @@
           "id": "live",
           "kind": "task",
           "title": "Live value and base value",
-          "text": "Hold a note and watch the `cutoff` slider: the thumb follows the live, wobbling value and a tick marks the base. [Now move **Main**’s `k1` slider](req:main-k1): the blue ticks move, and so does the sound.",
+          "text": "Hold a note and watch the `cutoff` slider: the thumb follows the live, wobbling value and a tick marks the base. [Now turn **Main**’s `K1` knob](req:main-k1): the blue ticks move, and so does the sound.",
           "why": "",
           "parts": [
             {
@@ -1364,7 +1358,7 @@
           "id": "voices",
           "kind": "task",
           "title": "Play chords",
-          "text": "[On the **Main** card set `voices` to 4.](req:voices) The **String** card shows ×4: it runs once per voice. Hold a chord.",
+          "text": "[On the **Main** panel above the keyboard set `voices` to 4.](req:voices) The **String** card shows ×4: it runs once per voice. Hold a chord.",
           "why": "Every module that hears `pitch`, `gate` or velocity runs once per voice; effects and the **Output** stay single and sum the voices.",
           "parts": [
             { "id": "voices", "kind": "voices", "min": 2 }
@@ -1947,7 +1941,7 @@
           "id": "spectrum",
           "kind": "task",
           "title": "Watch the cloud",
-          "text": "[Click ◎ on the **Granular**’s `out`](req:probe-grain-out) and switch the scope to Spectrum. Hold a note: the grains smear the harmonics into a band.",
+          "text": "[Shift-click the **Granular**’s `out` jack](req:probe-grain-out) and switch the scope to Spectrum. Hold a note: the grains smear the harmonics into a band.",
           "why": "",
           "parts": [
             {
@@ -2115,7 +2109,7 @@
           "id": "arp",
           "kind": "task",
           "title": "Let the arpeggiator play",
-          "text": "Open the arp panel on the **Main** card and [press Space (or Commands → arpeggiator)](req:arp-play). Hold a chord: the keys are played one after another at the rate shown.",
+          "text": "Open **Arpeggiator** on the **Main** panel and [press Space (or Commands → arpeggiator)](req:arp-play). Hold a chord: the keys are played one after another at the rate shown.",
           "why": "",
           "parts": [
             { "id": "arp-play", "kind": "event", "event": "arpPlay" }
@@ -2125,29 +2119,21 @@
           "id": "macro",
           "kind": "task",
           "title": "A knob with a range",
-          "text": "[Cable **Main** `k2` → My voice `p1`](req:main-k2-my-voice-filter-p1) (the pin of the **Filter** inside). Open the ⋯ menu of My voice’s `cutoff`, [tick `P1`](req:my-voice-filter-p1-cutoff) and Map between two values, then [set the ends to 150 Hz and 4000 Hz](req:my-voice-filter-p1-cutoff-range). Set the **Filter**’s `P1` depth to 1 so the knob reaches both ends.",
+          "text": "[Cable **Main** `K2` (the jack in the middle of the knob) to My voice’s `cutoff` thumb](req:main-k2-my-voice-cutoff). Open the ⋯ menu of My voice’s `cutoff`, tick *Play between two values*, then [set the ends to 150 Hz and 4000 Hz](req:my-voice-cutoff-range). Leave its depth at 1 so the knob reaches both ends.",
           "why": "A macro range maps the knob’s whole travel onto a slice of the parameter: the useful part of the `cutoff` instead of 20 Hz to 16 kHz.",
           "parts": [
             {
-              "id": "main-k2-my-voice-filter-p1",
-              "kind": "cable",
+              "id": "main-k2-my-voice-cutoff",
+              "kind": "routed",
               "from": { "type": "fm1" },
               "fromPort": "k2",
               "to": { "role": "myVoice", "type": "filter" },
-              "toPort": "p1"
-            },
-            {
-              "id": "my-voice-filter-p1-cutoff",
-              "kind": "pinMap",
-              "ref": { "role": "myVoice", "type": "filter" },
-              "pin": "p1",
               "param": "cutoff"
             },
             {
-              "id": "my-voice-filter-p1-cutoff-range",
+              "id": "my-voice-cutoff-range",
               "kind": "macroRange",
               "ref": { "role": "myVoice", "type": "filter" },
-              "pin": "p1",
               "param": "cutoff",
               "min": 150,
               "max": 4000,
@@ -2939,7 +2925,7 @@
           "id": "legato-glide",
           "kind": "task",
           "title": "Glide only when legato",
-          "text": "[Turn **Glide** `time` all the way down](req:glide-time-short), then [drop **Main** `legato` on the `time` thumb](req:main-legato-glide-time) and [set the p1 depth to about 0.6](req:glide-p1-att). Detached notes now jump, overlapping notes slide.",
+          "text": "[Turn **Glide** `time` all the way down](req:glide-time-short), then [drop **Main** `legato` on the `time` thumb](req:main-legato-glide-time) and [set its depth in the `time` ⋯ menu to about 0.6](req:glide-time-depth). Detached notes now jump, overlapping notes slide.",
           "why": "The `legato` output is high while the current note started over a held one. Added to the glide time, it switches portamento on only when you play legato: the 303 slide, or Serum with *always* off.",
           "parts": [
             {
@@ -2959,10 +2945,10 @@
               "param": "time"
             },
             {
-              "id": "glide-p1-att",
+              "id": "glide-time-depth",
               "kind": "att",
               "ref": { "type": "glide" },
-              "pin": "p1",
+              "param": "time",
               "op": "between",
               "value": 0.3,
               "max": 0.9
@@ -3067,7 +3053,7 @@
           "id": "tolerance",
           "kind": "task",
           "title": "Tolerances",
-          "text": "In an analog polysynth every voice is built from slightly different parts. [Drop **Main** `tol` on the **Filter** `cutoff` thumb](req:main-tol-filter-cutoff) and [set the p1 depth between 0.05 and 0.3](req:filter-p1-att). Play the same chord: now every note has its own brightness.",
+          "text": "In an analog polysynth every voice is built from slightly different parts. [Drop **Main** `tolerance` on the **Filter** `cutoff` thumb](req:main-tol-filter-cutoff) and [set its depth in the `cutoff` ⋯ menu between 0.05 and 0.3](req:filter-cutoff-depth). Play the same chord: now every note has its own brightness.",
           "why": "`tol` is a fixed value between −1 and 1 for each note, different for every voice. Patched with a small depth into cutoffs, envelope times or `fine`, it makes the notes differ the way a real instrument's voice cards do. **Main** `drift` is the slow wandering version of the same idea.",
           "parts": [
             {
@@ -3079,10 +3065,10 @@
               "param": "cutoff"
             },
             {
-              "id": "filter-p1-att",
+              "id": "filter-cutoff-depth",
               "kind": "att",
               "ref": { "type": "filter" },
-              "pin": "p1",
+              "param": "cutoff",
               "op": "between",
               "value": 0.05,
               "max": 0.3
@@ -3128,8 +3114,8 @@
           "id": "thumbs",
           "kind": "task",
           "title": "Every slider is a jack",
-          "text": "Any slider takes a cable: its thumb is a jack. [Drop the **LFO**’s `out` on the thumb of the **Filter**’s `res` slider](req:lfo-out-filter-res): drag from `out` and let go over the thumb, or Alt-drag the thumb to the jack. Hold a key and hear the resonance breathe.\n\nA modulated thumb shows the live value, and a small tick marks the base you set. A tick in a knob’s colour marks where that knob takes the slider: the blue one under `cutoff` belongs to `k1` on **Main**.",
-          "why": "Each module has two parameter inputs, `p1` and `p2`, each with an attenuverter. The ⋯ menu beside a slider shows which one drives it, sets the depth and can give it a *macro range* (cutoff from 150 Hz to 4 kHz, say). It is the same matrix the FM-1 runs, so a drop on a thumb is a real route on the hardware too.",
+          "text": "Any slider takes a cable: its thumb is a jack. [Drop the **LFO**’s `out` on the thumb of the **Filter**’s `res` slider](req:lfo-out-filter-res): drag from `out` and let go over the thumb, or Alt-drag the thumb to the jack. Hold a key and hear the resonance breathe.\n\nA modulated thumb shows the live value, and a small tick marks the base you set. A tick in a knob’s colour marks where that knob takes the slider: the blue one under `cutoff` belongs to `K1` on **Main**.",
+          "why": "A thumb drop is a real route: the ⋯ menu beside a slider lists what modulates it, sets each source’s depth and can give it a *macro range* (cutoff from 150 Hz to 4 kHz, say). A module takes up to two different sources; it is the same matrix the FM-1 runs, so the route works on the hardware too.",
           "parts": [
             {
               "id": "lfo-out-filter-res",
@@ -3179,7 +3165,7 @@
           "id": "tools",
           "kind": "continue",
           "title": "Hearing and comparing",
-          "text": "- ◎ on any output puts it on the *scope*, as a waveform or a spectrum.\n- Snapshots A and B hold two versions of the patch; Alt+B flips between them while you play.\n- B bypasses the selected modules; ⏻ bypasses an assembly.\n- *Show changes* lists what moved since you loaded or sent the patch.\n- *Share patch link* puts the whole patch in a URL.\n\nAll of them are in the palette.",
+          "text": "- Shift-click any jack to put it on the *scope*, as a waveform or a spectrum.\n- Snapshots A and B hold two versions of the patch; Alt+B flips between them while you play.\n- B bypasses the selected modules; ⏻ bypasses an assembly.\n- *Show changes* lists what moved since you loaded or sent the patch.\n- *Share patch link* puts the whole patch in a URL.\n\nAll of them are in the palette.",
           "why": "",
           "playback": false,
           "pointer": { "kind": "ui", "id": "palette-btn" }

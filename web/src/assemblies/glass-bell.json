@@ -152,11 +152,6 @@
       "module": 3,
       "port": "pitch",
       "label": "pitch"
-    },
-    {
-      "module": 3,
-      "port": "p1",
-      "label": "vel"
     }
   ],
   "outputs": [
