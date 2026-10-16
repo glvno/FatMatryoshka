@@ -753,6 +753,8 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .param.bar.jacked { margin-left: 18px; }
 :is(.module, .dock) .param.bar > .picker-jack { grid-area: auto; position: absolute; left: -17px; top: 2px; width: 14px; height: 14px; border-width: 2.5px; }
 .param.bar > span:nth-child(2):not(.picker-jack):empty { display: none; }
+/* a selector (picker) is a faint yellow wash, not the slider grey: it steps through choices, it is not a track */
+.param.bar:is(.choice:not(.toggle), .morph-row) { background: color-mix(in oklab, var(--gate) 16%, var(--bar)); }
 .param.bar > .picker { grid-area: 1 / 2; border: 0; border-radius: 0; height: 18px; background: transparent; }
 .param.bar > .picker .pick { min-height: 18px; padding: 0 4px; font-size: 8px; background: transparent; }
 .param.bar > .picker .pick-value { padding: 0 2px; border: 0; background: transparent; font: var(--cap); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--secondary); }
