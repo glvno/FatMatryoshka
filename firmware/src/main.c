@@ -679,7 +679,7 @@ static void poly_turn(uint32_t field, int32_t clicks)
     }
     c = clampi(c + (clicks > 0 ? 1 : -1), 0, 2);
     if (eng_poly_set(0, field, (uint32_t)c))
-        m1_cur[8u + field] = (uint8_t)c;
+        m1_cur[8u + field] = (uint8_t)((uint32_t)c | (m1_cur[8u + field] & 0x80u));   /* the legato byte keeps its unison bit */
     if (!ui_dirty)
         ui_dirty = 1;
 }

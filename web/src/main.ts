@@ -32,6 +32,7 @@ import { synthLink } from './tutorial/link';
 import { CHAPTERS, LISTED, chapterEnd } from './tutorial/chapters';
 import { PRESETS } from './presets';
 import { deviceBudget } from './patchbin';
+import { ALLOC } from './poly';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const STORE = 'modular-1.patch';
@@ -174,6 +175,12 @@ const editor = new Editor($('canvas'), loadSaved() ?? starterPatch(), {
   onParam(id, name, value) {
     host.send({ t: 'param', id, name, value });
     queueSave(editor.patch);
+    if (editor.patch.modules.find((m) => m.id === id)?.type === ALLOC) {
+      // a Voice allocator's setting changes the poly groups: the FM-1 takes the whole patch again
+      showBudget();
+      if (live()) queueUpload();
+      return;
+    }
     if (live() && !uploading) device.param(editor.patch, id, name, value);
     else if (live()) dirty = true;
   },
@@ -513,7 +520,7 @@ const commands = (): Command[] => {
     ...(editor.patch.zoomFrom ? [{ kind: 'command' as const, label: 'Zoom: unplug its input', keywords: 'zoom modulate', run: inPatch(() => editor.setSideSource('zoomFrom', null)) }] : []),
     { kind: 'command', label: 'Fit patch to screen', keywords: 'zoom view', run: inPatch(() => editor.zoomToFit()) },
     { kind: 'command', label: 'Reset canvas scale', keywords: 'zoom 100%', run: inPatch(() => editor.setZoom(1)) },
-    ...Object.values(DEFS).filter((d) => d.type !== 'fm1').map((d) => ({ kind: 'add module', tags: ['module'], label: moduleName(d.type, d.label), keywords: d.label, run: () => editor.add(d.type) })),
+    ...Object.values(DEFS).filter((d) => d.type !== 'fm1' && d.type !== 'part').map((d) => ({ kind: 'add module', tags: ['module'], label: moduleName(d.type, d.label), keywords: d.label, run: () => editor.add(d.type) })),
     ...loadLibrary().map((d) => assembly(d, USER_SHELF)),
     ...FACTORY.map((d) => assembly(d, categoryOf(d))),
     ...patchCandidates().map((c) => ({ kind: 'load patch', label: c.name, run: () => loadNamed(c.patch) })),

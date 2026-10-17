@@ -10,10 +10,10 @@
 #define ENG_SR 44100u
 #define ENG_BLOCK 128u
 #define ENG_ONE 65536
-#define ENG_PATCH_VERSION 21
+#define ENG_PATCH_VERSION 22   /* 22: bit 7 of a group record's legato byte = unison (written only when a group uses it) */
 #define ENG_PATCH_COMPAT_VERSION 21
 #define ENG_MAX_PARTS 8               /* parts of a poly group (notes it plays at once) */
-#define ENG_GROUP_REC (4u + 5u * ENG_MAX_PARTS)   /* a poly group record: parts, assign, legato, priority, five flaw bytes per part (patchbin.ts GROUP_REC) */
+#define ENG_GROUP_REC (4u + 5u * ENG_MAX_PARTS)   /* a poly group record: parts, assign, legato (bit 7: unison), priority, five flaw bytes per part (patchbin.ts GROUP_REC) */
 
 /* where the module records of a patch binary start: after the 8 header bytes, the poly groups' records (ENG_GROUP_REC each,
  * header byte 3 = their count) and, with any group, one membership byte per module. 0 if the binary is too short. */

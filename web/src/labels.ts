@@ -56,7 +56,7 @@ const TAGS: Record<string, [string, TagFamily]> = {
   delay: ['DELAY', 'fx'], reverb: ['VERB', 'fx'], chorus: ['CHORUS', 'fx'], phaser: ['PHASER', 'fx'], shift: ['SHIFT', 'fx'],
   comb: ['COMB', 'fx'], modal: ['MODAL', 'fx'],
   mixer: ['MIX', 'util'], math: ['MATH', 'util'], logic: ['LOGIC', 'util'], const: ['DC', 'util'], scale: ['SCALE', 'util'],
-  output: ['OUT', 'util'], fm1: ['MAIN', 'util'], part: ['PART', 'util'],
+  output: ['OUT', 'util'], fm1: ['MAIN', 'util'], part: ['PART', 'util'], alloc: ['VOICES', 'util'],
 };
 
 /** the short tag before a card's title and the family that colours it */

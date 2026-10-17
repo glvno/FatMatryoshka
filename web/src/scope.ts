@@ -2,7 +2,7 @@
 import { resizeHandle } from './resize-handle';
 
 // Draggable, resizable scope window, anchored to the patch viewport independently of patch zoom.
-type ProbeKind = 'audio' | 'control' | 'gate';
+type ProbeKind = 'audio' | 'control' | 'gate' | 'keys';
 interface Probe {
   key: string;
   kind: ProbeKind;

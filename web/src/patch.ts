@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import type { AssemblyInst } from './assembly';
 import { fixArp, type ArpCfg } from './arp';
-import { migrateVoicing } from './poly';
+import { migratePatchParts, migrateVoicing } from './poly';
 // Patch data model, shared by the editor, the WebAudio engine and (later) the firmware encoder.
 
-export type SignalKind = 'audio' | 'control' | 'gate';
+/** keys: the held keys from Main to a Voice allocator (only into a keys input) */
+export type SignalKind = 'audio' | 'control' | 'gate' | 'keys';
 
 export interface PortDef {
   name: string;
@@ -188,8 +189,9 @@ export function morphValue(pd: ParamDef, a: number, b: number, t: number): numbe
 export const MAX_MODULES = 32;
 
 /**
- * A poly assembly's settings (AssemblyInst.poly; poly.ts has the rules): its member modules run once per part, and its
- * own allocator hands the notes to the parts. assign / legato / priority index ASSIGN_MODES / LEGATO_MODES / PRIORITIES.
+ * How a poly group plays (poly.ts polyGroups / deviceView; the engines' and the binary's form): the settings of the Voice
+ * allocator that drives it plus the flaws of its voice cards. assign / legato / priority index ASSIGN_MODES / LEGATO_MODES /
+ * PRIORITIES. In a patch these live on the allocator module (its parameters) and on the poly assembly (PolyCards).
  */
 export interface PolyCfg {
   /** 1 .. EDITOR_MAX_PARTS (the FM-1 plays up to MAX_PARTS) */
@@ -200,6 +202,8 @@ export interface PolyCfg {
   legato: number;
   /** which held notes sound when there are more than parts: 0 last, 1 low, 2 high */
   priority: number;
+  /** every part plays the one note the priority picks (several parts only; the browser's engine, not yet the FM-1's) */
+  unison?: boolean;
   /**
    * Each part's own flaws, set by hand (an analog polysynth's voice cards are never quite alike): flaws[i] is part i's,
    * a missing entry is FLAW_NONE. Kept for every part number up to EDITOR_MAX_PARTS, so fewer parts and back keeps them.
@@ -240,8 +244,33 @@ export const MAX_PARTS = 8;
 export const EDITOR_MAX_PARTS = 16;
 export const POLY_DEFAULT: PolyCfg = { parts: 4, assign: 0, legato: 0, priority: 0 };
 
+/** a poly assembly's own settings (AssemblyInst.poly): the flaws of its voice cards. How many cards run and how notes reach
+ * them is the Voice allocator's that feeds it (poly.ts allocatorOf). */
+export interface PolyCards {
+  flaws?: PartFlaw[];
+}
+
+/** a poly assembly's settings from a file: the flaws (an old file's parts / assign / legato / priority go to its allocator,
+ * poly.ts migrateParts, before this runs) */
+export function fixCards(raw: unknown): PolyCards {
+  const flaws = fixFlaws((raw && typeof raw === 'object' ? raw : {}) && (raw as Record<string, unknown>).flaws);
+  return flaws ? { flaws } : {};
+}
+
+/** the group settings of an allocator module (its parameters) and the cards it drives */
+export function polyCfg(alloc: ModuleInst, cards: PolyCards = {}): PolyCfg {
+  const int = (k: string, lo: number, hi: number, d: number): number => {
+    const v = Math.round(Number(alloc.params[k]));
+    return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d;
+  };
+  const cfg: PolyCfg = { parts: int('voices', 1, EDITOR_MAX_PARTS, POLY_DEFAULT.parts), assign: int('assign', 0, 2, 0), legato: int('legato', 0, 2, 0), priority: int('priority', 0, 2, 0) };
+  if (int('unison', 0, 1, 0) && cfg.parts > 1) cfg.unison = true;
+  if (cards.flaws) cfg.flaws = cards.flaws;
+  return cfg;
+}
+
 /** part i's flaws (FLAW_NONE when it has none) */
-export const flawOf = (cfg: PolyCfg, i: number): PartFlaw => cfg.flaws?.[i] ?? FLAW_NONE;
+export const flawOf = (cfg: { flaws?: PartFlaw[] }, i: number): PartFlaw => cfg.flaws?.[i] ?? FLAW_NONE;
 export const isFlawless = (f: PartFlaw): boolean => FLAW_KEYS.every((k) => f[k] === FLAW_NONE[k]);
 
 /** flaws from a file, every field an integer in range; trailing flawless parts are dropped, none at all = undefined */
@@ -379,8 +408,16 @@ export function connect(p: Patch, defs: Record<string, ModuleDef>, from: Endpoin
   if (!defs[mf.type]?.outputs.some((o) => o.name === from.port)) return false;
   if (!defs[mt.type]?.inputs.some((i) => i.name === to.port)) return false;
   if (p.cables.some((c) => sameEnd(c.from, from) && sameEnd(c.to, to))) return false;
+  if (!kindsFit(defs, mf.type, from.port, mt.type, to.port)) return false;
   p.cables.push({ from: { ...from }, to: { ...to } });
   return true;
+}
+
+/** keys go only into keys inputs and those take only keys; every other kind patches anywhere */
+export function kindsFit(defs: Record<string, ModuleDef>, fromType: string, fromPort: string, toType: string, toPort: string): boolean {
+  const a = defs[fromType]?.outputs.find((o) => o.name === fromPort)?.kind;
+  const b = defs[toType]?.inputs.find((i) => i.name === toPort)?.kind;
+  return (a === 'keys') === (b === 'keys');
 }
 
 /** the patch's sidebar slider sources (see Patch.slackFrom) */
@@ -477,6 +514,7 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
   }
   (p as { version: number }).version = 2;
   migrateVoicing(p as Patch, defs);
+  migratePatchParts(p as Patch, defs); // Part modules (before Voice allocators) become allocators
   for (const c of p.cables) {
     const mf = p.modules.find((m) => m.id === c.from?.module);
     if (mf?.type === 'filter' && c.from?.port === 'lp') c.from.port = 'lp12'; // the filter's 12 dB output used to be called lp
@@ -486,6 +524,7 @@ export function validatePatch(raw: unknown, defs: Record<string, ModuleDef>): Pa
     if (!defs[mf.type].outputs.some((o) => o.name === c.from.port)) throw new Error(`no output "${c.from.port}" on ${mf.type}`);
     if (!defs[mt.type].inputs.some((i) => i.name === c.to.port)) throw new Error(`no input "${c.to.port}" on ${mt.type}`);
   }
+  p.cables = p.cables.filter((c) => kindsFit(defs, p.modules.find((m) => m.id === c.from.module)!.type, c.from.port, p.modules.find((m) => m.id === c.to.module)!.type, c.to.port));
   p.name = String(p.name ?? 'patch');
   if (!hasMorph(p as Patch) || typeof p.morphName !== 'string') delete p.morphName;
   if (p.arp && typeof p.arp === 'object') p.arp = fixArp(p.arp);

@@ -3,9 +3,9 @@
 // fixed-point engine's instructions on an rv32im model (tools/cpu, `npm run cpu-costs`), scaled by the one CPU load measured
 // on the device; a table measured on the FM-1 itself can replace it (`source`). Every figure here is an estimate.
 import TABLE from './cpu-costs.json';
-import { DEFS } from './modules';
+import { DEFS, STACKS } from './modules';
 import { hasMorph, type ModuleInst, type Patch } from './patch';
-import { copiesOf, polyGroups } from './poly';
+import { deviceView } from './poly';
 
 /** what changes a module's cost: a choice / switch / small integer (its measured values, the nearest one counts), a number
  * being above its minimum (the oscillator's FM index turns FM mode on), a number across its range (measured points,
@@ -26,6 +26,8 @@ export interface TypeCost {
   grid?: number[];
   /** dims left out of the grid (too many combinations): cycles added per value, measured with everything else at default */
   extra?: { dim: CostDim; add: number[] }[];
+  /** cycles added when the pitch input moves every sample (not just from the keyboard), per unison copy */
+  moving?: number;
 }
 
 export interface CpuTable {
@@ -127,11 +129,23 @@ export function runCost(m: ModuleInst, t: TypeCost, inputs: Set<string>, outputs
   return c;
 }
 
-export function cpuEstimate(p: Patch, table: CpuTable = CPU): CpuEstimate {
-  const copies = copiesOf(p);
-  const groups = polyGroups(p);
+/** modules whose output never holds still (a periodic or noisy signal) */
+const MOVERS = new Set(['lfo', 'osc', 'noise', 'wavetable', 'string', 'grain']);
+
+/** does a signal from module `id` keep moving: a mover feeds it, through any chain of modules */
+function keepsMoving(p: Patch, id: number, seen = new Set<number>()): boolean {
+  if (seen.has(id)) return false;
+  seen.add(id);
+  if (MOVERS.has(p.modules.find((m) => m.id === id)?.type ?? '')) return true;
+  return p.cables.some((c) => c.to.module === id && keepsMoving(p, c.from.module, seen));
+}
+
+export function cpuEstimate(source: Patch, table: CpuTable = CPU): CpuEstimate {
+  // counted on what the FM-1 runs (poly.ts deviceView): an allocator is a Part in each group it drives
+  const { patch: p, groups } = deviceView(source);
+  const copies = new Map<number, number>();
   const groupOf = new Map<number, number>();
-  groups.forEach((g, i) => g.modules.forEach((id) => groupOf.set(id, i)));
+  groups.forEach((g, i) => g.modules.forEach((id) => (groupOf.set(id, i), copies.set(id, g.cfg.parts))));
   const ninst = (id: number): number => copies.get(id) ?? 1;
   const morph = hasMorph(p);
   let total = table.block;
@@ -171,6 +185,9 @@ export function cpuEstimate(p: Patch, table: CpuTable = CPU): CpuEstimate {
       for (const [name, v] of Object.entries(m.paramsB ?? {})) if (v !== m.params[name]) moved.add(name);
     }
     one += m.bypass ? table.bypass * outputs.size : runCost(m, t, inputs, outputs, moved, table.note);
+    // a pitch input that keeps moving: something that never holds still reaches it (an envelope or a glide only moves for a moment)
+    if (t.moving && !m.bypass && p.cables.some((c) => c.to.module === m.id && c.to.port === 'pitch' && keepsMoving(p, c.from.module)))
+      one += t.moving * (m.type === 'osc' ? Math.max(Math.round(m.params.unison ?? 1), STACKS[Math.round(m.params.stack ?? 0)]?.length ?? 1) : 1);
     if (m.type === 'output') total += table.output;
     const k = ninst(m.id);
     modules.push({ id: m.id, type: m.type, copies: k, cycles: one * k });

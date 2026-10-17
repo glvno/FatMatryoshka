@@ -62,6 +62,8 @@ interface KitCfg {
   outputs?: string[];
   /** what feeds the inputs: an oscillator (edges every few samples) or the Main gate (high for whole blocks) */
   feed?: 'osc' | 'gate';
+  /** an LFO adds to the pitch input: it moves every sample (the oscillator works out its increments only when the pitch moves) */
+  moving?: boolean;
 }
 
 /** Main + the module + Output, its first output into the Output, a pitch input always fed by the Main pitch (the played note
@@ -74,6 +76,7 @@ function kit(type: string, cfg: KitCfg = {}): { p: Patch; m: ModuleInst } {
   const def = DEFS[type];
   let src: ModuleInst | undefined;
   if (m !== main && def.inputs.some((i) => i.name === 'pitch')) connect(p, DEFS, { module: main.id, port: 'pitch' }, { module: m.id, port: 'pitch' });
+  if (cfg.moving) connect(p, DEFS, { module: addModule(p, DEFS.lfo, 0, 600).id, port: 'out' }, { module: m.id, port: 'pitch' });
   for (const name of cfg.inputs ?? []) {
     if (name === 'pitch') continue;
     if ((name === 'gate' || cfg.feed === 'gate') && m !== main) connect(p, DEFS, { module: main.id, port: 'gate' }, { module: m.id, port: name });
@@ -207,6 +210,11 @@ async function typeCost(type: string): Promise<TypeCost> {
   const extra: Dim[] = [];
   while (dims.reduce((n, d) => n * d.values.length, 1) > GRID_MAX) extra.unshift(dims.pop()!);
   const out: TypeCost = { run: Math.round(base.run), cv: Math.round(base.cv) };
+  // a pitch that moves every sample (an LFO, a glide, an envelope into it), per copy of a unison oscillator
+  if (def.inputs.some((i) => i.name === 'pitch')) {
+    const moving = Math.round((await measure(type, { moving: true })).run - base.run);
+    if (moving > thr) out.moving = moving;
+  }
   if (dims.length) {
     out.dims = dims.map((d) => d.dim);
     const cells: KitCfg[] = [];

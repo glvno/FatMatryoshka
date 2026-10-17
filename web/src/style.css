@@ -136,6 +136,8 @@ main { min-width: 0; min-height: 0; overflow: auto; }
 .cables { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .cable { fill: none; stroke-width: 3; opacity: .85; pointer-events: stroke; cursor: pointer; }
 .cable.audio { stroke: var(--audio); } .cable.control { stroke: var(--control); } .cable.gate { stroke: var(--gate); }
+/* keys: Main's held keys to a Voice allocator, a ribbon cable rather than a signal */
+.cable.keys { stroke: var(--ink); stroke-dasharray: 1 5; stroke-linecap: round; }
 /* The FM-1 knobs: their jacks, slider rows and cables carry the knob's colour. */
 .cable.knob-k1 { stroke: var(--k1); } .cable.knob-k2 { stroke: var(--k2); } .cable.knob-k3 { stroke: var(--k3); } .cable.knob-k4 { stroke: var(--k4); }
 .dot[data-knob=k1] { color: var(--k1); } .dot[data-knob=k2] { color: var(--k2); } .dot[data-knob=k3] { color: var(--k3); } .dot[data-knob=k4] { color: var(--k4); }
@@ -155,7 +157,7 @@ select.over { border-color: var(--danger); color: var(--danger); }
 .port.out { justify-content: flex-end; }
 .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; background: var(--panel); cursor: crosshair; touch-action: none; }
 .in .dot { margin-left: -8px; } .out .dot { margin-right: -8px; }
-.dot.audio { color: var(--audio); } .dot.control { color: var(--control); } .dot.gate { color: var(--gate); }
+.dot.audio { color: var(--audio); } .dot.control { color: var(--control); } .dot.gate { color: var(--gate); } .dot.keys { color: var(--ink); }
 .dot:hover { background: currentColor; }
 .params { padding: 4px 10px 6px; display: grid; gap: 0; border-top: 1px solid var(--line); }
 .param { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 8px; font-size: 14px; }
@@ -299,11 +301,6 @@ button.tog { padding: 0 2px; line-height: 1; border: none; background: transpare
 .rename:hover { text-decoration: underline dotted; }
 .module .empty { margin: 0; padding: 6px 8px 8px; font-size: 12px; }
 /* A poly assembly's settings: a strip under a frame's header, a two-column grid on a collapsed card */
-.poly-set { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; margin: 0 0 6px; font-size: 12px; }
-.poly-set.row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.poly-item { display: grid; gap: 2px; min-width: 0; }
-.poly-item > span:first-child { color: var(--muted); }
-.fpoly { position: absolute; left: 10px; right: 10px; top: 30px; height: 46px; margin: 0; pointer-events: auto; color: var(--ink); font-weight: 500; }
 .poly-btn[aria-pressed="true"] { color: var(--panel); background: var(--secondary); border-color: var(--secondary); }
 .frame { position: absolute; z-index: 0; border: 1px dashed var(--secondary); border-radius: 12px; background: color-mix(in oklab, var(--secondary) 5%, transparent); pointer-events: none; }
 .fhead { position: absolute; left: 0; right: 0; top: 0; height: 30px; display: flex; justify-content: space-between; align-items: center; padding: 0 10px; font-weight: 600; color: var(--secondary); cursor: grab; touch-action: none; pointer-events: auto; user-select: none; }
@@ -684,6 +681,10 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 /* the header: ▸ (an assembly), the tag and the title (the drag handle), then poly (an assembly), ⏻ and ⋯, always shown */
 .mhead { padding: 0 4px 0 6px; }
 .mhead > span:not(.tools), .fhead > span:not(.tools) { flex: 1; contain: inline-size; }
+/* an assembly's title: tag, name (shortened first), ×N, the voice control drop-down */
+:is(.mhead, .fhead) .asm-title { display: flex; align-items: center; gap: 4px; min-width: 0; }
+:is(.mhead, .fhead) .asm-name { min-width: 2.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(.mhead, .fhead) .asm-title > :not(.asm-name) { flex: none; }
 .module .mhead .tools, .fhead .tools { display: flex; gap: 2px; align-items: center; flex: none; }
 :is(.mhead, .fhead) :is(button.chev, button.more, button.pw, button.out) { display: grid; place-items: center; width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; border-radius: 5px;
   background: transparent; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
@@ -696,7 +697,14 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 :is(.mhead, .fhead) button.poly-btn { height: 16px; padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--muted);
   font: 600 9px/1 'Barlow Condensed', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; }
 :is(.mhead, .fhead) button.poly-btn[aria-pressed="true"] { color: var(--panel); background: var(--secondary); border-color: var(--secondary); }
-@media (pointer: coarse) { :is(.mhead, .fhead) :is(button.chev, button.more, button.pw, button.out) { width: 30px; height: 30px; } :is(.mhead, .fhead) button.poly-btn { height: 24px; } }
+/* voice control: the cards' flaws as a drop-down, in the same small capitals; warm when any card has flaws, red without an allocator */
+:is(.mhead, .fhead) button.vc-btn { height: 16px; padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--muted);
+  font: 600 9px/1 'Barlow Condensed', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; flex: none; }
+:is(.mhead, .fhead) button.vc-btn:hover { color: var(--ink); border-color: var(--secondary); }
+:is(.mhead, .fhead) button.vc-btn.set { color: var(--gate); }
+:is(.mhead, .fhead) button.vc-btn.over { color: var(--danger); border-color: var(--danger); }
+.flaw-note { padding: 6px 8px 0; color: var(--muted); font-size: 12px; }
+@media (pointer: coarse) { :is(.mhead, .fhead) :is(button.chev, button.more, button.pw, button.out) { width: 30px; height: 30px; } :is(.mhead, .fhead) :is(button.poly-btn, button.vc-btn) { height: 24px; } }
 /* the card's menu */
 .ctx { min-width: 190px; gap: 0; }
 .ctx button { display: flex; justify-content: space-between; gap: 16px; padding: 6px 12px; border-radius: 5px; font-size: 13px; }
@@ -706,6 +714,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 /* a card is as wide as its labels need: input labels + a bar of at least 120 px + output labels, from 236 to 300 px; the
    title, the bars and the poly settings take the width they are given, they do not set it */
 .module { width: max-content; min-width: 236px; max-width: 300px; }
+.module.assembly.poly { min-width: 300px; } /* room in the header for ×N and voice control */
 .erows { grid-template-columns: auto minmax(120px, 1fr) auto; }
 .erow > .em, .module .mbody > :not(.erows, .mfoot) { contain: inline-size; }
 .erow > :is(.el, .er) { max-width: 100px; }
@@ -775,10 +784,7 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
   box-shadow: 0 0 0 1.5px var(--bar); cursor: pointer; transition: left .12s; }
 .tog-switch input:checked + .tog-jack { left: 18px; }
 .patching .tog-switch .tog-jack { cursor: crosshair; }
-.module .poly-set { padding: 6px 8px 0; margin: 0; font: var(--cap); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
-.module .poly-set .pick-value { font: 500 12px/1 'Barlow', system-ui, sans-serif; text-transform: none; }
 .fhead > span:not(.tools) { display: flex; align-items: center; gap: 7px; }
-.fpoly { font: var(--cap); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
 
 /* ---- The Main dock in the same style: capital labels, value bars, the same pickers ---- */
 .dock-title { font: var(--cap); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
@@ -927,10 +933,7 @@ svg.slack-cable .cable.pending { pointer-events: none; }
 .picking .sel-track { pointer-events: none; }
 @media (pointer: coarse) { .param.bar.sel, .sel-track { height: 40px; } }
 
-/* ---- the flaws card of a poly assembly (flaws-panel.ts): a row per part, a slider per flaw ---- */
-.poly-item .flaw-btn { height: 26px; min-height: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bar); color: var(--ink);
-  font: 500 12px/1 'Barlow', system-ui, sans-serif; text-transform: none; cursor: pointer; }
-.poly-item .flaw-btn:hover { border-color: var(--secondary); }
+/* ---- voice control, the voice cards' flaws (flaws-panel.ts): a drop-down from the assembly header, a row per voice, a slider per flaw ---- */
 .flaw-panel { position: fixed; z-index: 30; width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
   border: 1px solid color-mix(in srgb, var(--muted) 45%, var(--panel)); border-radius: 8px; background: var(--panel); box-shadow: 0 6px 20px var(--shadow); }
 .flaw-head { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 6px; border-bottom: 1px solid var(--line); background: var(--surface-tint); border-radius: 8px 8px 0 0; }

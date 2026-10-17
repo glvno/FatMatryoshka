@@ -19,7 +19,7 @@ describe('patch diff', () => {
     const dly = b.modules.find((m) => m.type === 'delay')!;
     removeModule(b, dly.id);
     const grouped = makeAssembly(b, [lfo.id], 'wobble');
-    grouped.poly = { parts: 4, assign: 0, legato: 0, priority: 0 };
+    grouped.poly = {};
     b.arp = { ...(a.arp ?? { mode: 0, scale: 5, root: 60, octaves: 1, chaos: 0, vchaos: 0, rchaos: 0, steps: 16, pulses: 16, rot: 0, rate: 6, bpm: 120 }), bpm: 140 };
     const d = diffPatches(a, b, DEFS);
     expect(d.params).toHaveLength(1);
@@ -29,7 +29,7 @@ describe('patch diff', () => {
     expect(d.cablesAdded).toHaveLength(1);
     expect(d.cablesRemoved.length).toBeGreaterThan(0); // the delay's cables went with it
     expect(d.other).toContain(`Filter #${flt.id}: bypassed`);
-    expect(d.other).toContain('wobble: poly on (4 parts)');
+    expect(d.other).toContain('wobble: poly on');
     expect(d.other.some((s) => s.startsWith('arpeggiator'))).toBe(true);
     const lines = diffLines(d);
     expect(lines[0]).toBe(`Filter #${flt.id} cutoff: ${Number(a.modules.find((m) => m.id === flt.id)!.params.cutoff.toFixed(4))} → 999`);

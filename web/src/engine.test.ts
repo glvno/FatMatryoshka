@@ -2,10 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import { BLOCK, Engine } from './engine';
 import { DEFS, DELAY_TIME_MAX, DELAY_TIME_MIN } from './modules';
-import { EDITOR_MAX_PARTS, addModule, clearMorph, connect, disconnect, emptyPatch, fromUnit, hasMorph, modulate, morphValue, paramUnit, paramValue, processingOrder, removeModule, sameStructure, setMorphTarget, toUnit, validatePatch, POLY_DEFAULT, type Patch, type PolyCfg } from './patch';
+import { EDITOR_MAX_PARTS, addModule, clearMorph, connect, disconnect, emptyPatch, fromUnit, hasMorph, modulate, morphValue, paramUnit, paramValue, processingOrder, removeModule, sameStructure, setMorphTarget, toUnit, validatePatch, type Patch, type PolyCfg } from './patch';
 import { copiesOf, polyGroups } from './poly';
 import { fixAssemblies, makeAssembly } from './assembly';
-import { polyCfg, withParts } from './test-poly';
+import { addAlloc, polyCfg, withParts } from './test-poly';
 import { PRESETS } from './presets';
 import { encodePatch, recordSize } from './patchbin';
 
@@ -135,7 +135,7 @@ describe('engine', () => {
   it('every module but fm1 and output has the two parameter inputs and a matrix', () => {
     for (const d of Object.values(DEFS)) {
       const has = d.inputs.filter((i) => i.pin).map((i) => i.name);
-      if (['fm1', 'output'].includes(d.type) || !d.params.length) expect(has, d.type).toEqual([]); // nothing to modulate (the Part)
+      if (['fm1', 'output', 'alloc'].includes(d.type) || !d.params.length) expect(has, d.type).toEqual([]); // nothing to modulate (the Part); the allocator's settings are structure
       else expect(has, d.type).toEqual(['p1', 'p2']);
       const m = addModule(emptyPatch(), d, 0, 0);
       expect(!!m.map, d.type).toBe(!!d.paramInputs);
@@ -1161,15 +1161,17 @@ describe('polyphony', () => {
     w(lfo.id, 'out', flt.id, 'p1');
     w(env.id, 'env', lfo2.id, 'p1');
     const q = withParts(p, parts, cfg);
-    const part = q.modules.find((m) => m.type === 'part');
+    const part = q.modules.find((m) => m.type === 'alloc');
     return { p: q, ids: { kb: kb.id, osc: osc.id, flt: flt.id, env: env.id, vca: vca.id, dly: dly.id, out: out.id, lfo: lfo.id, lfo2: lfo2.id, part: part?.id ?? -1 } };
   }
 
-  it('converts an old patch with voices: what heard pitch / gate / vel goes into a poly assembly with a Part; delay / output and free modules stay outside', () => {
+  it('converts an old patch with voices: what heard pitch / gate / vel goes into a poly assembly fed by an allocator (Main keys in); delay / output and free modules stay outside', () => {
     const { p, ids } = polyPatch(4);
     const [g] = polyGroups(p);
     expect(g.cfg).toMatchObject({ parts: 4, assign: 2 });
-    expect([...g.modules].sort()).toEqual([ids.osc, ids.flt, ids.env, ids.vca, ids.lfo2, ids.part].sort());
+    expect(g.alloc.id).toBe(ids.part);
+    expect([...g.modules].sort()).toEqual([ids.osc, ids.flt, ids.env, ids.vca, ids.lfo2].sort()); // the allocator runs once
+    expect(p.cables.some((c) => c.from.module === ids.kb && c.from.port === 'keys' && c.to.module === ids.part)).toBe(true);
     expect(p.cables.some((c) => c.from.module === ids.part && c.from.port === 'pitch' && c.to.module === ids.osc)).toBe(true);
     expect(p.cables.some((c) => c.from.module === ids.kb && c.to.module === ids.osc)).toBe(false);
     expect('voices' in p).toBe(false);
@@ -1319,15 +1321,16 @@ describe('polyphony', () => {
   });
 
   it('a patch file carries the poly settings and they survive validation, clamped', () => {
-    const { p } = polyPatch(6);
+    const { p, ids } = polyPatch(6);
     const q = validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
     fixAssemblies(q, DEFS);
     expect(polyCfg(q)).toEqual(polyCfg(p));
     const raw = JSON.parse(JSON.stringify(p));
-    raw.assemblies.find((a: { poly?: unknown }) => a.poly).poly = { parts: 99, assign: 7, legato: -1, priority: 'x', unit: 64, flaws: [{ detune: 99, drift: -5, bright: 2.4, env: 'x', level: 300 }, {}] };
+    raw.assemblies.find((a: { poly?: unknown }) => a.poly).poly = { flaws: [{ detune: 99, drift: -5, bright: 2.4, env: 'x', level: 300 }, {}] };
+    Object.assign(raw.modules.find((m: { id: number }) => m.id === ids.part).params, { voices: 99, assign: 7, legato: -1, priority: 'x' });
     const r = validatePatch(raw, DEFS);
     fixAssemblies(r, DEFS);
-    expect(polyCfg(r)).toEqual({ parts: EDITOR_MAX_PARTS, assign: 2, legato: 0, priority: 0, flaws: [{ detune: 50, drift: 0, bright: 2, env: 0, level: 100 }] });
+    expect(polyGroups(r)[0].cfg).toEqual({ parts: EDITOR_MAX_PARTS, assign: 2, legato: 0, priority: 0, flaws: [{ detune: 50, drift: 0, bright: 2, env: 0, level: 100 }] });
   });
 
   it('two poly assemblies layer: each plays every note on its own parts; a cable out of one sums its parts', () => {
@@ -1335,12 +1338,12 @@ describe('polyphony', () => {
     const out = addModule(p, DEFS.output, 0, 0);
     out.params.level = 1;
     const voice = (level: number): number => {
-      const part = addModule(p, DEFS.part, 0, 0);
+      const part = addAlloc(p, { parts: 2 });
       const o = addModule(p, DEFS.osc, 0, 0);
       o.params.level = level;
       connect(p, DEFS, { module: part.id, port: 'pitch' }, { module: o.id, port: 'pitch' });
       connect(p, DEFS, { module: o.id, port: 'out' }, { module: out.id, port: 'l' });
-      makeAssembly(p, [part.id, o.id], 'v').poly = { ...POLY_DEFAULT, parts: 2 };
+      makeAssembly(p, [part.id, o.id], 'v').poly = {};
       return o.id;
     };
     voice(0.2);
@@ -1359,7 +1362,7 @@ describe('polyphony', () => {
 describe('Part and Random', () => {
   it('part flaws: detune and drift on the Part pitch, bright on the cutoff, env on the ADSR times, level on the VCA gain', () => {
     const p = emptyPatch();
-    const part = addModule(p, DEFS.part, 0, 0);
+    const part = addAlloc(p, { parts: 3, assign: 1 });
     const flt = addModule(p, DEFS.filter, 0, 0);
     const env = addModule(p, DEFS.adsr, 0, 0);
     const vca = addModule(p, DEFS.vca, 0, 0);
@@ -1367,7 +1370,6 @@ describe('Part and Random', () => {
     env.params.a = 0.1;
     vca.params.gain = 1;
     makeAssembly(p, [part.id, flt.id, env.id, vca.id], 'v').poly = {
-      ...POLY_DEFAULT, parts: 3, assign: 1,
       flaws: [{ detune: 30, drift: 0, bright: 12, env: 50, level: 40 }, { detune: 0, drift: 100, bright: 0, env: 0, level: 100 }],
     };
     const e = new Engine(SR);
@@ -1397,8 +1399,8 @@ describe('Part and Random', () => {
 
   it('Part: index is -1..1 across the parts (0 with one), legato and jump per part', () => {
     const p = emptyPatch();
-    const part = addModule(p, DEFS.part, 0, 0);
-    makeAssembly(p, [part.id], 'v').poly = { ...POLY_DEFAULT, parts: 3, assign: 1 };
+    const part = addAlloc(p, { parts: 3, assign: 1 });
+    makeAssembly(p, [part.id], 'v').poly = {};
     const e = new Engine(SR);
     e.load(p);
     e.noteOn(60);
@@ -1417,7 +1419,7 @@ describe('Part and Random', () => {
       const p = emptyPatch();
       const r = addModule(p, DEFS.random, 0, 0);
       r.params.mode = mode;
-      makeAssembly(p, [r.id], 'v').poly = { ...POLY_DEFAULT, parts: 2 };
+      makeAssembly(p, [addAlloc(p, { parts: 2 }).id, r.id], 'v').poly = {};
       const e = new Engine(SR);
       e.load(p);
       return { e, id: r.id };

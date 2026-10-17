@@ -52,6 +52,8 @@ export interface ModuleImpl<S = any> {
 const audio = (name: string): PortDef => ({ name, kind: 'audio' });
 const control = (name: string): PortDef => ({ name, kind: 'control' });
 const gate = (name: string): PortDef => ({ name, kind: 'gate' });
+/** the keyboard's held keys (Main -> Voice allocator): no signal a module reads, the allocator takes its notes through it */
+const keys = (name: string): PortDef => ({ name, kind: 'keys' });
 const param = (name: string, min: number, max: number, def: number, extra: Partial<ParamDef> = {}): ParamDef => ({
   name,
   min,
@@ -162,8 +164,9 @@ const fm1: ModuleImpl<null> = {
     // the one input: the morph position added to the `morph` parameter (block mean, one block late), so an LFO or a
     // sequencer can morph the patch; the engine reads it, not this module (engine.ts morphPosition)
     inputs: [control('morph')],
-    // pitch / gate / vel: the shared keyboard (one note: the last held, legato); a poly assembly's Part module plays its own
-    outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), gate('clock'), control('bend'), control('mod'), control('at')],
+    // pitch / gate / vel: the shared keyboard (one note: the last held, legato); keys: the held keys for Voice allocators
+    // (the keyboard's ribbon cable to a polysynth's CPU)
+    outputs: [control('pitch'), gate('gate'), control('vel'), ...knobNames.map(control), gate('clock'), control('bend'), control('mod'), control('at'), keys('keys')],
     params: [
       ...knobNames.map((n) => param(n, 0, 1, 0.5, { step: 0.01 })),
       param('morph', 0, 1, 0, { step: 0.01, input: 'morph', rest: (p, cv) => (p.morph ?? 0) + cv }),
@@ -177,6 +180,7 @@ const fm1: ModuleImpl<null> = {
     c.out.bend.fill(c.voice.bend, 0, c.n); // the raw wheel, for other uses
     c.out.mod.fill(c.voice.mod, 0, c.n);
     c.out.at.fill(c.voice.at, 0, c.n);
+    c.out.keys.fill(c.voice.gate, 0, c.n); // 1 while a key is down (a scope shows it; the allocators take the keys themselves)
     for (const n of knobNames) c.out[n].fill(c.p[n] ?? 0, 0, c.n);
     // clock: 24 ppqn from the arpeggiator or MIDI in, a pulse of half a block per tick; nothing without a source
     const hi = c.voice.clock ? Math.ceil(c.n / 2) : 0;
@@ -2079,14 +2083,15 @@ const crush: ModuleImpl<{ held: number; cnt: number } & OsState> = {
 };
 
 /**
- * A poly assembly's own keyboard: the note its part plays (pitch with the bend and the part's detune / drift flaw, gate, velocity), the part's place among
+ * The engine's form of a Voice allocator (poly.ts deviceView puts one in every poly group, as the FM-1 runs it; patches
+ * do not hold it any more: old ones get an allocator instead). A poly assembly's own keyboard: the note its part plays (pitch with the bend and the part's detune / drift flaw, gate, velocity), the part's place among
  * the parts (index -1 first .. 1 last, 0 with one part), whether the note began over a held one (legato) and its pitch
  * step from the previous note in octaves (jump; the first from C4). Outside a poly assembly it is the shared keyboard.
  */
 const part: ModuleImpl<null> = {
   def: {
     type: 'part',
-    label: 'Part',
+    label: 'Part (engine)',
     inputs: [],
     outputs: [control('pitch'), gate('gate'), control('vel'), control('index'), gate('legato'), control('jump')],
     params: [],
@@ -2132,7 +2137,32 @@ const random: ModuleImpl<RandomState> = {
   },
 };
 
-const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic, grain, comb, modal, shift, part, random];
+export const UNISON_MODES = ['off', 'on'];
+/**
+ * Voice allocator: a polysynth's CPU. It takes the keys held on its `keys` input (Main's keys) and hands them to `voices`
+ * voices (assign, priority, legato as poly.ts describes; unison: every voice plays the one note the priority picks). Each
+ * output is per voice: into a poly assembly voice i reaches copy i (the voice cards), into a module that runs once the
+ * voices sum. The poly assemblies it feeds run once per voice. The engines run it in its Part form (poly.ts deviceView).
+ */
+const alloc: ModuleImpl<null> = {
+  def: {
+    type: 'alloc',
+    label: 'Voice allocator',
+    inputs: [keys('keys')],
+    outputs: [control('pitch'), gate('gate'), control('vel'), control('index'), gate('legato'), control('jump')],
+    params: [
+      param('voices', 1, 16, 4, { step: 1 }),
+      param('assign', 0, 2, 0, { step: 1, choices: ASSIGN_MODES }),
+      param('legato', 0, 2, 0, { step: 1, choices: LEGATO_MODES }),
+      param('priority', 0, 2, 0, { step: 1, choices: PRIORITIES }),
+      param('unison', 0, 1, 0, { step: 1, choices: UNISON_MODES, toggle: true }),
+    ],
+  },
+  init: () => null,
+  process: (c) => part.process(c, null),
+};
+
+const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, delay, reverb, output, glide, shape, env, string, wavetable, chorus, seq, clkdiv, sh, quant, pulse, pan, xfade, vowel, phaser, crush, ladder, dyn, math, logic, grain, comb, modal, shift, part, random, alloc];
 
 /**
  * Every module except the FM-1 panel (the input) and the output has two parameter inputs, p1 and p2, each with an
@@ -2140,7 +2170,7 @@ const ALL = [fm1, osc, lfo, noise, constant, scale, adsr, vca, filter, mixer, de
  * effective value is its base + (block mean of p1 x att1 + block mean of p2 x att2, for the inputs that control it) x
  * (max - min), clamped.
  */
-export const PIN_EXEMPT = new Set(['fm1', 'output']);
+export const PIN_EXEMPT = new Set(['fm1', 'output', 'alloc']);
 export const PIN_NAMES = ['p1', 'p2'] as const;
 for (const m of ALL)
   if (!PIN_EXEMPT.has(m.def.type) && m.def.params.length) {

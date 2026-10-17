@@ -1,27 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The flaws of a poly assembly's parts (patch.ts PartFlaw), set by hand: a floating card with one row per part and a
+// Voice control: the flaws of a poly assembly's voice cards (patch.ts PartFlaw), set by hand: a drop-down from the assembly's
+// header with one row per voice and a
 // slider per flaw. It lives outside the canvas (the editor rebuilds its cards on every change) and reads the settings
 // through the host each time, so undo and a changed part count show at the next sync().
-import { FLAW_KEYS, FLAW_NONE, FLAW_RANGE, flawOf, type PartFlaw, type PolyCfg } from './patch';
+import { FLAW_KEYS, FLAW_NONE, FLAW_RANGE, flawOf, type PartFlaw, type PolyCards } from './patch';
 
 export interface FlawHost {
   /** the assembly's label, for the header */
   title: string;
-  /** the poly settings now, null once the assembly or its Poly switch is gone */
-  cfg(): PolyCfg | null;
+  /** the cards' settings now and how many voices run them (`fed`: an allocator feeds them), null once the assembly or its Poly switch is gone */
+  cfg(): { cards: PolyCards; parts: number; fed: boolean } | null;
   /** a change while a slider moves: mutate, the host plays it at once */
-  edit(fn: (cfg: PolyCfg) => void): void;
+  edit(fn: (cards: PolyCards, parts: number) => void): void;
   /** the gesture ended: one undo step */
   commit(): void;
   closed(): void;
 }
 
 const COLS: Record<keyof PartFlaw, { label: string; unit: string; title: string }> = {
-  detune: { label: 'Detune', unit: 'ct', title: 'Tuning offset of the part, in cents (the Part module\'s pitch)' },
-  drift: { label: 'Drift', unit: '%', title: 'A slow random wander of the part\'s pitch: at 100 % up to 20 cents either way' },
-  bright: { label: 'Bright', unit: 'st', title: 'Moves the cutoff of every filter and ladder in the part, in semitones' },
-  env: { label: 'Env', unit: '%', title: 'Makes every ADSR and envelope in the part slower (+) or faster (−)' },
-  level: { label: 'Level', unit: '%', title: 'Scales the gain of every VCA in the part' },
+  detune: { label: 'Detune', unit: 'ct', title: 'Tuning offset of the voice, in cents' },
+  drift: { label: 'Drift', unit: '%', title: 'A slow random wander of the voice\'s pitch: at 100 % up to 20 cents either way' },
+  bright: { label: 'Bright', unit: 'st', title: 'Moves the cutoff of every filter and ladder on the card, in semitones' },
+  env: { label: 'Env', unit: '%', title: 'Makes every ADSR and envelope on the card slower (+) or faster (−)' },
+  level: { label: 'Level', unit: '%', title: 'Scales the gain of every VCA on the card' },
 };
 
 /** subtle flaws for every part, as an aged polysynth might have */
@@ -31,7 +32,7 @@ function randomFlaw(): PartFlaw {
 }
 
 /** part i's flaw `key` set to v; trailing flawless parts are dropped (patch.ts fixFlaws) */
-export function setFlaw(cfg: PolyCfg, i: number, key: keyof PartFlaw, v: number): void {
+export function setFlaw(cfg: PolyCards, i: number, key: keyof PartFlaw, v: number): void {
   const list = Array.from({ length: Math.max(cfg.flaws?.length ?? 0, i + 1) }, (_, k) => ({ ...flawOf(cfg, k) }));
   list[i][key] = v;
   while (list.length && FLAW_KEYS.every((k) => list[list.length - 1][k] === FLAW_NONE[k])) list.pop();
@@ -42,10 +43,12 @@ export function setFlaw(cfg: PolyCfg, i: number, key: keyof PartFlaw, v: number)
 export class FlawPanel {
   readonly el = document.createElement('div');
   private body = document.createElement('div');
+  /** how many voices run the cards (the allocator's), or that none does */
+  private note = document.createElement('div');
   private rows = 0;
   private cells = new Map<string, { input: HTMLInputElement; out: HTMLOutputElement }>();
   private onDown = (e: PointerEvent): void => {
-    if (!this.el.contains(e.target as Node) && !(e.target as Element).closest?.('.flaw-btn')) this.close();
+    if (!this.el.contains(e.target as Node) && !(e.target as Element).closest?.('.vc-btn')) this.close();
   };
   private onKey = (e: KeyboardEvent): void => {
     if (e.key !== 'Escape') return;
@@ -56,12 +59,12 @@ export class FlawPanel {
   constructor(private host: FlawHost, at: DOMRect) {
     this.el.className = 'flaw-panel';
     this.el.setAttribute('role', 'dialog');
-    this.el.setAttribute('aria-label', `Part flaws of ${host.title}`);
+    this.el.setAttribute('aria-label', `Voice control of ${host.title}`);
     const head = document.createElement('div');
     head.className = 'flaw-head';
     const tag = document.createElement('span');
     tag.className = 'mtag mod';
-    tag.textContent = 'FLAWS';
+    tag.textContent = 'VOICES';
     const title = document.createElement('span');
     title.className = 'flaw-title';
     title.textContent = host.title;
@@ -71,19 +74,20 @@ export class FlawPanel {
     x.title = 'Close (Esc)';
     x.onclick = () => this.close();
     head.append(tag, title, x);
+    this.note.className = 'flaw-note';
     const tools = document.createElement('div');
     tools.className = 'flaw-tools';
     const rnd = document.createElement('button');
     rnd.textContent = 'Randomize';
-    rnd.title = 'Give every part small flaws of its own';
-    rnd.onclick = () => this.all((cfg) => Array.from({ length: cfg.parts }, randomFlaw));
+    rnd.title = 'Give every voice card small flaws of its own';
+    rnd.onclick = () => this.all((parts) => Array.from({ length: parts }, randomFlaw));
     const reset = document.createElement('button');
     reset.textContent = 'Reset';
-    reset.title = 'No flaws: every part alike';
+    reset.title = 'No flaws: every voice card alike';
     reset.onclick = () => this.all(() => []);
     tools.append(rnd, reset);
     this.body.className = 'flaw-grid';
-    this.el.append(head, this.body, tools);
+    this.el.append(head, this.note, this.body, tools);
     document.body.append(this.el);
     this.sync();
     this.place(at);
@@ -101,9 +105,9 @@ export class FlawPanel {
   }
 
   /** replace every part's flaws at once (one undo step) */
-  private all(make: (cfg: PolyCfg) => PartFlaw[]): void {
-    this.host.edit((cfg) => {
-      const list = make(cfg);
+  private all(make: (parts: number) => PartFlaw[]): void {
+    this.host.edit((cfg, parts) => {
+      const list = make(parts);
       for (let i = 0; i < Math.max(cfg.flaws?.length ?? 0, list.length); i++)
         for (const k of FLAW_KEYS) setFlaw(cfg, i, k, (list[i] ?? FLAW_NONE)[k]);
     });
@@ -112,11 +116,12 @@ export class FlawPanel {
 
   /** show the settings as they are now (after undo, a part count change); close when the poly assembly is gone */
   sync(): void {
-    const cfg = this.host.cfg();
-    if (!cfg) return this.close();
-    if (cfg.parts !== this.rows) this.build(cfg.parts);
-    for (let i = 0; i < cfg.parts; i++) {
-      const f = flawOf(cfg, i);
+    const now = this.host.cfg();
+    if (!now) return this.close();
+    if (now.parts !== this.rows) this.build(now.parts);
+    this.note.textContent = now.fed ? `${now.parts} voice${now.parts === 1 ? '' : 's'}, set on the Voice allocator` : 'No Voice allocator feeds these cards: they run once.';
+    for (let i = 0; i < now.parts; i++) {
+      const f = flawOf(now.cards, i);
       for (const k of FLAW_KEYS) {
         const c = this.cells.get(`${i}:${k}`)!;
         if (document.activeElement !== c.input) c.input.value = String(f[k]);
@@ -144,7 +149,7 @@ export class FlawPanel {
     for (let i = 0; i < parts; i++) {
       const n = document.createElement('span');
       n.className = 'flaw-part';
-      n.textContent = `P${i + 1}`;
+      n.textContent = `V${i + 1}`;
       kids.push(n);
       for (const k of FLAW_KEYS) {
         const cell = document.createElement('label');
@@ -154,7 +159,7 @@ export class FlawPanel {
         input.type = 'range';
         [input.min, input.max] = FLAW_RANGE[k].map(String);
         input.step = '1';
-        input.setAttribute('aria-label', `Part ${i + 1} ${COLS[k].label}`);
+        input.setAttribute('aria-label', `Voice ${i + 1} ${COLS[k].label}`);
         const out = document.createElement('output');
         const c = { input, out };
         input.oninput = () => {

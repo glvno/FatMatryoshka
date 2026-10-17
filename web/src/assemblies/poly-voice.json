@@ -6,10 +6,16 @@
   "modules": [
     {
       "id": 1,
-      "type": "part",
+      "type": "alloc",
       "x": 0,
       "y": 560,
-      "params": {}
+      "params": {
+        "voices": 4,
+        "assign": 0,
+        "legato": 0,
+        "priority": 0,
+        "unison": 0
+      }
     },
     {
       "id": 2,
@@ -181,6 +187,11 @@
   ],
   "inputs": [
     {
+      "module": 1,
+      "port": "keys",
+      "label": "keys"
+    },
+    {
       "module": 3,
       "port": "cv",
       "label": "cutoff cv"
@@ -194,6 +205,11 @@
     }
   ],
   "params": [
+    {
+      "module": 1,
+      "param": "voices",
+      "label": "voices"
+    },
     {
       "module": 2,
       "param": "wave",
@@ -230,10 +246,5 @@
       "label": "r"
     }
   ],
-  "poly": {
-    "parts": 4,
-    "assign": 0,
-    "legato": 0,
-    "priority": 0
-  }
+  "poly": {}
 }

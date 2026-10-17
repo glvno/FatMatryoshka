@@ -240,10 +240,11 @@ export function partLabel(part: PartSpec, roles: Roles): string {
     case 'poly': {
       const names: Record<string, string[] | undefined> = { assign: ASSIGN_MODES, legato: LEGATO_MODES, priority: PRIORITIES };
       const t = (v = 0) => names[part.setting]?.[v] ?? String(v);
-      if (part.setting === 'parts' && part.op === 'ge') return `Make an assembly poly with ${part.value ?? 2} parts or more`;
-      if (part.op === 'changed') return `Change the poly assembly’s ${part.setting}`;
+      const name = part.setting === 'parts' ? 'voices' : part.setting;
+      if (part.setting === 'parts' && part.op === 'ge') return `Make an assembly poly with ${part.value ?? 2} voices or more`;
+      if (part.op === 'changed') return `Change the Voice allocator’s ${name}`;
       const op = { le: `to ${t(part.value)} or less`, ge: `to ${t(part.value)} or more`, eq: `to ${t(part.value)}`, ne: `off ${t(part.value)}`, between: `between ${t(part.value)} and ${t(part.max)}` }[part.op];
-      return `Set the poly assembly’s ${part.setting} ${op}`;
+      return `Set the Voice allocator’s ${name} ${op}`;
     }
     case 'event': {
       if (part.event === 'probe' && part.ref) return `Shift-click ${n(part.ref)}’s ${part.port ?? 'out'} jack`;
@@ -383,9 +384,10 @@ export function partTargets(part: PartSpec, s: S, roles: Roles): Target[] {
       }
     }
     case 'poly': {
-      // the setting's picker on a poly assembly; without one, the poly buttons of the outermost assemblies
+      // the setting on the Voice allocator that feeds a poly assembly; without one, the poly buttons of the outermost assemblies
       const g = polyGroups(p);
-      const asms = g.length ? g.map((x) => x.asm) : assembliesOf(p).filter((a) => !assembliesOf(p).some((b) => b.children?.includes(a.id)));
+      if (g.length) return g.flatMap((x) => T.param(x.alloc, part.setting === 'parts' ? 'voices' : part.setting));
+      const asms = assembliesOf(p).filter((a) => !assembliesOf(p).some((b) => b.children?.includes(a.id)));
       if (asms.length) return asms.map((a) => ({ kind: 'poly', id: a.id, setting: part.setting }));
       // nothing grouped yet: the modules Main plays, the ones to group
       const main = mod(p, 'fm1');

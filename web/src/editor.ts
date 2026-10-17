@@ -12,8 +12,7 @@ import { deviceBudget, DEVICE } from './patchbin';
 import { choiceName, formatValue, longName, moduleName, moduleTag } from './labels';
 import { picker } from './picker';
 import { selector } from './selector';
-import { copiesOf, makeRoom, polyOfModule, setPoly } from './poly';
-import { ASSIGN_MODES, LEGATO_MODES, PRIORITIES } from './modules';
+import { ALLOC, copiesOf, makeRoom, polyGroups, polyOfModule, setPoly } from './poly';
 import { dragControl } from './deck';
 import { isPin, PinsInUse, removeRoute } from './parameter-routing';
 import {
@@ -32,10 +31,9 @@ import {
   type Patch,
   type PortDef,
   type ParamDef,
-  EDITOR_MAX_PARTS,
   flawOf,
   isFlawless,
-  type PolyCfg,
+  type PolyCards,
   sameStructure,
   setMorphTarget,
   clearMorph,
@@ -98,8 +96,6 @@ function snapTo(pd: ParamDef, v: number): number {
 const FRAME_PAD = 12;
 const FRAME_HEAD = 30;
 /** a poly assembly's frame: the settings strip under the header, and the width it needs */
-const POLY_STRIP = 50;
-const POLY_MIN_W = 640;
 
 export interface EditorEvents {
   /** structure changed (modules or cables): the engine needs the whole patch */
@@ -424,11 +420,12 @@ export class Editor {
     const hidden = hiddenModules(this.patch);
     const hiddenAsm = hiddenAssemblies(this.patch);
     if (this.pickAsm !== null && !assembliesOf(this.patch).some((a) => a.id === this.pickAsm && a.open && !hiddenAsm.has(a.id))) this.pickAsm = null;
-    // an assembly's badge: the part count of the poly assembly it is (or is inside), else none
+    // an assembly's badge: the voice count of the poly assembly it is (or is inside), else none
+    const voicesOf = new Map(polyGroups(this.patch).map((g) => [g.asm.id, g.cfg.parts]));
     const perVoice = (a: AssemblyInst): number => {
       const first = allModules(this.patch, a)[0];
       const root = first === undefined ? undefined : polyOfModule(this.patch, first);
-      return root ? root.poly!.parts : 0;
+      return root ? voicesOf.get(root.id) ?? 0 : 0;
     };
     for (const id of this.selected) if (!this.patch.modules.some((m) => m.id === id) || hidden.has(id)) this.selected.delete(id);
     for (const id of this.selectedAsm) if (!assembliesOf(this.patch).some((a) => a.id === id) || hiddenAsm.has(id)) this.selectedAsm.delete(id);
@@ -507,7 +504,7 @@ export class Editor {
     const badge = document.createElement('span');
     badge.className = 'voices';
     badge.textContent = `×${n}`;
-    badge.title = `runs once per part (${n} parts)`;
+    badge.title = `runs once per voice (${n} voices)`;
     return badge;
   }
 
@@ -848,6 +845,7 @@ export class Editor {
       this.ev.onParam(m.id, pd.name, v);
       this.refreshKnobTicks(); // a knob moved, or a base a knob rests on
     };
+    if (m.type === ALLOC && pd.name === 'voices') input.addEventListener('change', () => this.rebuild()); // the ×N badges follow
     if (pd.toggle) {
       input.type = 'checkbox';
       input.checked = m.params[pd.name] >= 0.5;
@@ -968,7 +966,10 @@ export class Editor {
     const id = a.id;
     let before: string | null = null;
     let frame = 0;
-    const cfg = (): PolyCfg | null => assembliesOf(this.patch).find((x) => x.id === id)?.poly ?? null;
+    const cfg = (): { cards: PolyCards; parts: number; fed: boolean } | null => {
+      const x = assembliesOf(this.patch).find((y) => y.id === id);
+      return x?.poly ? { cards: x.poly, parts: this.voicesOfAsm(x), fed: polyGroups(this.patch).some((g) => g.asm.id === id) } : null;
+    };
     this.flawPanel = new FlawPanel(
       {
         title: a.label,
@@ -977,7 +978,7 @@ export class Editor {
           const c = cfg();
           if (!c) return;
           before ??= JSON.stringify(this.patch);
-          fn(c);
+          fn(c.cards, c.parts);
           if (!frame) frame = requestAnimationFrame(() => {
             frame = 0;
             this.ev.onStructure(this.patch);
@@ -1002,65 +1003,32 @@ export class Editor {
     );
   }
 
-  /**
-   * A poly assembly's settings: parts (with the FM-1's budget), how notes are assigned, legato, priority and the parts'
-   * flaws (a button that opens the flaws card). Every
-   * change goes through change() (undo, engine reload). `row`: one line (a frame's header strip), else a two-column grid.
-   */
-  private polySettings(a: AssemblyInst, row: boolean): HTMLElement {
-    const el = document.createElement('div');
-    el.className = 'poly-set' + (row ? ' row' : '');
-    const item = (label: string, names: (i: number) => string, count: number, key: 'parts' | 'assign' | 'legato' | 'priority', title: string, lo = 0): HTMLElement => {
-      const box = document.createElement('div');
-      box.className = 'poly-item';
-      box.title = title;
-      box.dataset.asm = String(a.id);
-      box.dataset.setting = key;
-      const name = document.createElement('span');
-      name.textContent = label;
-      const shown = document.createElement('span');
-      const cfg = (): PolyCfg => a.poly!;
-      shown.textContent = names(cfg()[key]);
-      const pick = picker({ label: `${a.label} ${label}`, value: shown, count: () => count, get: () => cfg()[key] - lo, set: (i) => this.change(() => (a.poly![key] = i + lo)) });
-      box.append(name, pick);
-      return box;
-    };
-    const b = deviceBudget(this.patch);
-    const parts = item('parts', String, EDITOR_MAX_PARTS, 'parts', `How many copies of the modules inside run: one per note that can sound at once. ${b.fits ? `On the FM-1 this patch takes ${b.buffers} of ${DEVICE.buffers} signal buffers, ${b.instances} of ${DEVICE.instances} module instances and about ${Math.round(b.cpu.use * 100)} % of the processor (an estimate).` : `Too big for the FM-1: ${b.over.map((i) => `${i.label} ${i.used} of ${i.max}`).join(', ')}.`}`, 1);
-    parts.querySelector('.picker')!.classList.toggle('over', !b.fits);
-    el.append(
-      parts,
-      item('assign', (i) => ASSIGN_MODES[i], ASSIGN_MODES.length, 'assign', "Which free part a new note takes: rotate (the next in turn, like a polysynth's voice cards), lowest (the lowest-numbered), reuse (a free part whose last note was that key, else the one free the longest)."),
-      item('legato', (i) => LEGATO_MODES[i], LEGATO_MODES.length, 'legato', 'auto: with one part, a new key while one is held only changes the pitch; a taken-over part restarts its envelopes. off: always restart. on: never.'),
-      item('priority', (i) => PRIORITIES[i], PRIORITIES.length, 'priority', 'With more keys held than parts: which notes sound (the last played, the lowest or the highest).'),
-      this.flawsItem(a),
-    );
-    return el;
+  /** how many voices run a poly assembly's cards: its allocator's (1 when no allocator feeds it) */
+  private voicesOfAsm(a: AssemblyInst): number {
+    return polyGroups(this.patch).find((g) => g.asm.id === a.id)?.cfg.parts ?? 1;
   }
 
-  /** the poly settings' flaws entry: how many parts have flaws; a click opens the card to set them */
-  private flawsItem(a: AssemblyInst): HTMLElement {
-    const box = document.createElement('div');
-    box.className = 'poly-item';
-    box.dataset.asm = String(a.id);
-    box.dataset.setting = 'flaws';
-    box.title = 'Each part\'s own flaws, set by hand: detune, drift, brightness (filter cutoffs), envelope time and level (VCA gain).';
-    const name = document.createElement('span');
-    name.textContent = 'flaws';
-    const b = document.createElement('button');
-    b.className = 'flaw-btn';
-    const cfg = a.poly!;
-    const n = Array.from({ length: cfg.parts }, (_, i) => flawOf(cfg, i)).filter((f) => !isFlawless(f)).length;
-    b.textContent = n ? `${n} of ${cfg.parts}` : 'none';
-    b.setAttribute('aria-label', `${a.label} flaws: ${b.textContent}`);
-    b.onclick = (e) => {
-      e.stopPropagation();
+  /**
+   * A poly assembly's voice control: a drop-down in its header that opens the voice cards' flaws (flaws-panel.ts), with how
+   * many voices run the cards (the Voice allocator's) at its top. Marked when no allocator feeds the cards (they run once).
+   */
+  private voiceControlButton(a: AssemblyInst): HTMLButtonElement {
+    const g = polyGroups(this.patch).find((x) => x.asm.id === a.id);
+    const parts = g?.cfg.parts ?? 1;
+    const n = Array.from({ length: parts }, (_, i) => flawOf(a.poly!, i)).filter((f) => !isFlawless(f)).length;
+    const b = this.button('voices ▾', g
+      ? `Voice control: each voice card's own detune, drift, brightness, envelope time and level (${n ? `${n} of ${parts} set` : 'all alike'})`
+      : `No ${DEFS[ALLOC].label} feeds these cards, so they run once. Patch an allocator's outputs (pitch, gate, …) into them, and Main's keys into the allocator.`,
+    () => {
       if (this.flawPanel?.el.isConnected) return this.flawPanel.close();
       this.openFlaws(a, b);
-    };
-    b.onpointerdown = (e) => e.stopPropagation(); // not a card drag
-    box.append(name, b);
-    return box;
+    }, 'sm vc-btn');
+    b.classList.toggle('over', !g);
+    b.classList.toggle('set', n > 0);
+    b.setAttribute('aria-haspopup', 'dialog');
+    b.dataset.asm = String(a.id);
+    b.dataset.setting = 'flaws';
+    return b;
   }
 
   /** the morph picker: the B side of the patch (another patch of the same structure); the `morph` slider above fades every parameter A -> B */
@@ -1264,7 +1232,7 @@ export class Editor {
     return {
       module: (id) => size(this.cards.get(id)),
       container: (id) => size(this.containers.get(id)),
-      frame: (a) => ({ pad: FRAME_PAD, head: FRAME_HEAD + (a.poly ? POLY_STRIP : 0), minW: a.poly ? POLY_MIN_W : 0 }),
+      frame: () => ({ pad: FRAME_PAD, head: FRAME_HEAD, minW: 0 }),
     };
   }
 
@@ -1278,7 +1246,7 @@ export class Editor {
       // the frame's header goes above the members: move them down when it would stick out of the canvas's top
       if (a.open) {
         const ys = allModules(this.patch, a).map((id) => this.patch.modules.find((m) => m.id === id)?.y ?? Infinity);
-        const room = FRAME_PAD + FRAME_HEAD + (a.poly ? POLY_STRIP : 0) + 8;
+        const room = FRAME_PAD + FRAME_HEAD + 8;
         if (Math.min(...ys) < room) moveAssembly(this.patch, a, 0, room - Math.min(...ys));
       }
     });
@@ -1873,21 +1841,28 @@ export class Editor {
   /** the Poly switch: the modules inside run once per part, with their own allocator (poly.ts setPoly) */
   private polyButton(a: AssemblyInst): HTMLButtonElement {
     const b = this.button('poly', a.poly
-      ? 'Poly is on: the modules inside run once per part. Click to turn it off (one copy, played by the shared keyboard).'
-      : 'Make it a poly assembly: the modules inside run once per part, each part playing its own note (a Part module inside gives each part its note).',
+      ? 'Poly is on: these are voice cards, one copy per voice of the Voice allocator that feeds them. Click to turn it off (one copy, played by Main).'
+      : 'Make it a rack of voice cards: a Voice allocator is put beside it (Main\'s keys in, its pitch / gate / velocity into the cards), and the modules inside run once per voice.',
     () => this.change(() => setPoly(this.patch, DEFS, a, !a.poly)), 'sm poly-btn');
     b.setAttribute('aria-pressed', String(!!a.poly));
     b.dataset.asm = String(a.id);
     return b;
   }
 
+  /** an assembly's title segment: the name, its ×N badge and, on a poly assembly, the voice control drop-down */
   private titleOf(a: AssemblyInst, perVoice: number): HTMLElement {
     const title = document.createElement('span');
-    title.className = 'rename';
-    title.textContent = a.label;
+    title.className = 'rename asm-title';
     title.title = `${a.name}: double-click to rename`;
-    title.ondblclick = () => this.rename(a);
+    const name = document.createElement('span');
+    name.className = 'asm-name';
+    name.textContent = a.label;
+    title.append(name);
+    title.ondblclick = (e) => {
+      if (!(e.target as HTMLElement).closest('button')) this.rename(a);
+    };
     if (perVoice) title.append(this.badge(perVoice));
+    if (a.poly) title.append(this.voiceControlButton(a));
     return title;
   }
 
@@ -1897,7 +1872,7 @@ export class Editor {
    */
   private container(a: AssemblyInst, perVoice: number, open?: AssemblyInst): HTMLElement {
     const el = document.createElement('div');
-    el.className = 'module assembly' + (open ? ' member' : '') + (a.bypass ? ' off' : '') + (this.picking(open) ? ' picking' : '') + (this.selectedAsm.has(a.id) ? ' selected' : '');
+    el.className = 'module assembly' + (a.poly ? ' poly' : '') + (open ? ' member' : '') + (a.bypass ? ' off' : '') + (this.picking(open) ? ' picking' : '') + (this.selectedAsm.has(a.id) ? ' selected' : '');
     el.style.left = `${a.x}px`;
     el.style.top = `${a.y}px`;
     el.dataset.asm = String(a.id);
@@ -1916,7 +1891,6 @@ export class Editor {
 
     const body = document.createElement('div');
     body.className = 'mbody';
-    if (a.poly) body.append(this.polySettings(a, false));
     const mod = (id: number): ModuleInst => this.patch.modules.find((m) => m.id === id)!;
     const ins: EdgePort[] = [];
     for (const r of a.inputs) {
@@ -1968,11 +1942,6 @@ export class Editor {
     head.append(this.chevron(a), title, tools);
     this.headMenu(head, (at) => this.assemblyMenu(a, at));
     el.append(head);
-    if (a.poly) {
-      const strip = this.polySettings(a, true);
-      strip.classList.add('fpoly');
-      el.append(strip);
-    }
     this.frames.set(a.id, el);
     const parent = parentOf(this.patch, a.id);
     if (parent) tools.prepend(this.outButton(parent, () => this.takeOutAssembly(parent, a)));
@@ -2012,9 +1981,8 @@ export class Editor {
       }
     }
     if (x0 === Infinity) return null;
-    const head = FRAME_HEAD + (a.poly ? POLY_STRIP : 0);
-    const minW = a.poly ? POLY_MIN_W : 0;
-    return { x: x0 - FRAME_PAD, y: y0 - FRAME_PAD - head, w: Math.max(x1 - x0 + 2 * FRAME_PAD, a.frameSize?.width ?? 0, minW), h: Math.max(y1 - y0 + 2 * FRAME_PAD + head, a.frameSize?.height ?? 0) };
+    const head = FRAME_HEAD;
+    return { x: x0 - FRAME_PAD, y: y0 - FRAME_PAD - head, w: Math.max(x1 - x0 + 2 * FRAME_PAD, a.frameSize?.width ?? 0), h: Math.max(y1 - y0 + 2 * FRAME_PAD + head, a.frameSize?.height ?? 0) };
   }
 
   private layoutFrames(exclude?: Set<number>, excludeAsm?: number): void {

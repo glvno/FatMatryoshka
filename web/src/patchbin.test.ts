@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFS } from './modules';
 import { addModule } from './patch';
-import { GROUP_REC, deviceBudget, DEVICE, encodePatch, MAX_CABLES, TYPE_ORDER, VERSION } from './patchbin';
+import { GROUP_REC, deviceBudget, DEVICE, encodePatch, MAX_CABLES, recordSize, TYPE_ORDER, VERSION } from './patchbin';
 import { PRESETS } from './presets';
 import { polyGroups } from './poly';
 import { polyCfg, withParts } from './test-poly';
@@ -29,7 +29,7 @@ describe('binary patch format', () => {
     filter.range = { p1: { cutoff: [.2, .8] } };
     filter.map!.p1 = ['cutoff'];
     const b = encodePatch(p);
-    expect(b[1]).toBe(VERSION);
+    expect(b[1]).toBe(21); // no unison: still format 21
     expect(b[6]).toBe(2);
     expect(b.length).toBe(before.length + 6);
     expect(b[before.length]).toBe(1); // macro range count
@@ -44,7 +44,7 @@ describe('binary patch format', () => {
     filter.inputMap = { cv: ['res', 'cvamt'], in: ['track'] };
     filter.range = { p1: { cutoff: [.2, .8] } }; filter.map!.p1 = ['cutoff'];
     const b = encodePatch(p);
-    expect(b[1]).toBe(VERSION); expect(b[6]).toBe(11);
+    expect(b[1]).toBe(21); // no unison: still format 21 expect(b[6]).toBe(11);
     expect(b.length).toBe(before.length + 9 + 6);
     expect(b[before.length]).toBe(2);
     const dv = new DataView(b.buffer);
@@ -74,7 +74,7 @@ describe('binary patch format', () => {
       const b = encodePatch(p);
       const dv = new DataView(b.buffer);
       expect(b[0], name).toBe(0xa1);
-      expect(b[1], name).toBe(VERSION);
+      expect(b[1], name).toBe(21);
       expect(b[2], name).toBe(p.modules.length);
       expect(b[3], name).toBe(0); // poly groups: the factory presets have none
       expect(dv.getUint16(4, true), name).toBe(p.cables.length);
@@ -96,6 +96,15 @@ describe('binary patch format', () => {
     expect(deviceBudget(p).instances).toBeLessThanOrEqual(DEVICE.instances);
   });
 
+  it('unison: bit 7 of the group\'s legato byte, and only then format 22', () => {
+    const p = withParts(PRESETS['Subtractive saw'](), 4, { legato: 1 });
+    expect(encodePatch(p)[1]).toBe(21);
+    polyCfg(p).unison = true;
+    const b = encodePatch(p);
+    expect(b[1]).toBe(VERSION);
+    expect(b[10]).toBe(0x80 | 1);
+  });
+
   it('writes the poly groups after the header: their settings, then every module\'s group', () => {
     const p = withParts(PRESETS['Subtractive saw'](), 4, { assign: 1, legato: 2, priority: 1, flaws: [{ detune: -7, drift: 40, bright: 5, env: -20, level: 80 }] });
     const b = encodePatch(p);
@@ -104,7 +113,9 @@ describe('binary patch format', () => {
     expect(Array.from(b.slice(12, 22))).toEqual([256 - 7, 40, 5, 256 - 20, 80, 0, 0, 0, 0, 100]); // part 1's flaws, part 2 has none
     const at = 8 + GROUP_REC;
     const members = polyGroups(p)[0].modules;
-    expect(Array.from(b.slice(at, at + p.modules.length))).toEqual(p.modules.map((m) => (members.has(m.id) ? 1 : 0)));
+    // the allocator is written in its place as the group's Part (poly.ts deviceView)
+    expect(Array.from(b.slice(at, at + p.modules.length))).toEqual(p.modules.map((m) => (members.has(m.id) || m.type === 'alloc' ? 1 : 0)));
+    expect(b[at + p.modules.length + p.modules.slice(0, p.modules.findIndex((m) => m.type === 'alloc')).reduce((n, m) => n + recordSize(m.type), 0)]).toBe(TYPE_ORDER.indexOf('part'));
     expect(b.slice(at, at + p.modules.length).some((g) => g === 0)).toBe(true); // Main and Output run once
     expect(b[at + p.modules.length]).toBe(TYPE_ORDER.indexOf(p.modules[0].type)); // the module records follow
   });

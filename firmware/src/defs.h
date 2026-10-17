@@ -3,7 +3,7 @@
 #pragma once
 #include <stdint.h>
 
-#define N_TYPES 39
+#define N_TYPES 40
 enum {
     T_FM1,
     T_OSC,
@@ -44,6 +44,7 @@ enum {
     T_SHIFT,
     T_PART,
     T_RANDOM,
+    T_ALLOC,
 };
 
 /* fm1: Main */
@@ -59,13 +60,14 @@ enum {
 #define FM1_O_BEND 8
 #define FM1_O_MOD 9
 #define FM1_O_AT 10
+#define FM1_O_KEYS 11
 #define FM1_P_K1 0
 #define FM1_P_K2 1
 #define FM1_P_K3 2
 #define FM1_P_K4 3
 #define FM1_P_MORPH 4
 #define FM1_NIN 1
-#define FM1_NOUT 11
+#define FM1_NOUT 12
 #define FM1_NPAR 5
 #define FM1_CVBASE -1
 
@@ -620,7 +622,7 @@ enum {
 #define SHIFT_NPAR 3
 #define SHIFT_CVBASE 2
 
-/* part: Part */
+/* part: Part (engine) */
 #define PART_O_PITCH 0
 #define PART_O_GATE 1
 #define PART_O_VEL 2
@@ -643,6 +645,24 @@ enum {
 #define RANDOM_NPAR 2
 #define RANDOM_CVBASE 0
 
+/* alloc: Voice allocator */
+#define ALLOC_I_KEYS 0
+#define ALLOC_O_PITCH 0
+#define ALLOC_O_GATE 1
+#define ALLOC_O_VEL 2
+#define ALLOC_O_INDEX 3
+#define ALLOC_O_LEGATO 4
+#define ALLOC_O_JUMP 5
+#define ALLOC_P_VOICES 0
+#define ALLOC_P_ASSIGN 1
+#define ALLOC_P_LEGATO 2
+#define ALLOC_P_PRIORITY 3
+#define ALLOC_P_UNISON 4
+#define ALLOC_NIN 1
+#define ALLOC_NOUT 6
+#define ALLOC_NPAR 5
+#define ALLOC_CVBASE -1
+
 #define DELAY_NDIV 11
 #define DELAY_CLK_PPQN 24
 static const uint8_t DELAY_DIV_NUM[DELAY_NDIV] = {1, 1, 1, 3, 1, 3, 1, 3, 2, 5, 4};
@@ -659,7 +679,7 @@ static const char *const POLY_LEGATO_NAME[3] = {"AUTO", "OFF", "ON"};
 static const char *const POLY_PRIORITY_NAME[3] = {"LAST", "LOW", "HIGH"};
 
 #define MAX_IN 6
-#define MAX_OUT 11
+#define MAX_OUT 12
 #define MAX_PAR 12
 
 typedef struct {
@@ -1040,6 +1060,19 @@ static const uint8_t RANDOM_LOG[] = {0, 1};
 static const char *const RANDOM_UNIT[] = {"", "HZ"};
 static const char *const RANDOM_CH0[] = {"FIXED", "WALK", 0};
 static const char *const *const RANDOM_CH[] = {RANDOM_CH0, 0};
+static const char *const ALLOC_INNAMES[] = {"KEYS"};
+static const int32_t ALLOC_MIN[] = {65536, 0, 0, 0, 0};
+static const int32_t ALLOC_MAX[] = {1048576, 131072, 131072, 131072, 65536};
+static const int32_t ALLOC_DEF[] = {262144, 0, 0, 0, 0};
+static const int32_t ALLOC_INC[] = {65536, 65536, 65536, 65536, 65536};
+static const char *const ALLOC_PN[] = {"VOICES", "ASSIGN", "LEGATO", "PRIORITY", "UNISON"};
+static const uint8_t ALLOC_LOG[] = {0, 0, 0, 0, 0};
+static const char *const ALLOC_UNIT[] = {"", "", "", "", ""};
+static const char *const ALLOC_CH1[] = {"ROTATE", "LOWEST", "REUSE", 0};
+static const char *const ALLOC_CH2[] = {"AUTO", "OFF", "ON", 0};
+static const char *const ALLOC_CH3[] = {"LAST", "LOW", "HIGH", 0};
+static const char *const ALLOC_CH4[] = {"OFF", "ON", 0};
+static const char *const *const ALLOC_CH[] = {0, ALLOC_CH1, ALLOC_CH2, ALLOC_CH3, ALLOC_CH4};
 
 static const def_t DEFS[N_TYPES] = {
     {FM1_NIN, FM1_NOUT, FM1_NPAR, 1, FM1_CVBASE, -1, FM1_MIN, FM1_MAX, FM1_DEF, FM1_INC, "MAIN", FM1_PN, FM1_INNAMES, FM1_LOG, FM1_UNIT, FM1_CH},   /* fm1 */
@@ -1079,6 +1112,7 @@ static const def_t DEFS[N_TYPES] = {
     {COMB_NIN, COMB_NOUT, COMB_NPAR, 0, COMB_CVBASE, 0, COMB_MIN, COMB_MAX, COMB_DEF, COMB_INC, "COMB", COMB_PN, COMB_INNAMES, COMB_LOG, COMB_UNIT, COMB_CH},   /* comb */
     {MODAL_NIN, MODAL_NOUT, MODAL_NPAR, 0, MODAL_CVBASE, 0, MODAL_MIN, MODAL_MAX, MODAL_DEF, MODAL_INC, "MODAL", MODAL_PN, MODAL_INNAMES, MODAL_LOG, MODAL_UNIT, MODAL_CH},   /* modal */
     {SHIFT_NIN, SHIFT_NOUT, SHIFT_NPAR, 2, SHIFT_CVBASE, 0, SHIFT_MIN, SHIFT_MAX, SHIFT_DEF, SHIFT_INC, "FREQ SHIFT", SHIFT_PN, SHIFT_INNAMES, SHIFT_LOG, SHIFT_UNIT, SHIFT_CH},   /* shift */
-    {PART_NIN, PART_NOUT, PART_NPAR, 0, PART_CVBASE, -1, 0, 0, 0, 0, "PART", 0, PART_INNAMES, 0, 0, 0},   /* part */
+    {PART_NIN, PART_NOUT, PART_NPAR, 0, PART_CVBASE, -1, 0, 0, 0, 0, "PART (ENGINE)", 0, PART_INNAMES, 0, 0, 0},   /* part */
     {RANDOM_NIN, RANDOM_NOUT, RANDOM_NPAR, 0, RANDOM_CVBASE, -1, RANDOM_MIN, RANDOM_MAX, RANDOM_DEF, RANDOM_INC, "RANDOM", RANDOM_PN, RANDOM_INNAMES, RANDOM_LOG, RANDOM_UNIT, RANDOM_CH},   /* random */
+    {ALLOC_NIN, ALLOC_NOUT, ALLOC_NPAR, 0, ALLOC_CVBASE, -1, ALLOC_MIN, ALLOC_MAX, ALLOC_DEF, ALLOC_INC, "VOICE ALLOCATOR", ALLOC_PN, ALLOC_INNAMES, ALLOC_LOG, ALLOC_UNIT, ALLOC_CH},   /* alloc */
 };

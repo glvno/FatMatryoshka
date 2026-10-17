@@ -332,6 +332,7 @@ typedef struct {
 #define ENG_NPV (1 + ENG_MAX_GROUPS * ENG_MAX_PARTS)
 typedef struct {
     uint8_t parts, assign, legato, priority;   /* patch.ts PolyCfg */
+    uint8_t unison;                  /* every part plays the one note the priority picks (patch.ts PolyCfg.unison) */
     int8_t detune[ENG_MAX_PARTS];    /* each part's flaws (patch.ts PartFlaw): cents, */
     uint8_t drift[ENG_MAX_PARTS];    /* % of +-20 cents of wander, */
     int8_t bright[ENG_MAX_PARTS];    /* semitones on the filter cutoffs, */
@@ -564,11 +565,12 @@ int eng_load(const uint8_t *p, uint32_t len)
     for (i = 0; i < p[3]; i++) {
         const uint8_t *q = p + 8u + ENG_GROUP_REC * i;
         grp_t *g = &E.grp[1u + i];
-        if (q[0] < 1u || q[0] > ENG_MAX_PARTS || q[1] > 2u || q[2] > 2u || q[3] > 2u)
+        if (q[0] < 1u || q[0] > ENG_MAX_PARTS || q[1] > 2u || (q[2] & 0x7Fu) > 2u || q[3] > 2u)
             return -3;
         g->parts = q[0];
         g->assign = q[1];
-        g->legato = q[2];
+        g->legato = q[2] & 0x7Fu;
+        g->unison = (q[2] >> 7) && q[0] > 1u;
         g->priority = q[3];
         for (v = 0; v < ENG_MAX_PARTS; v++) {
             const uint8_t *f = q + 4u + 5u * v;
@@ -1109,18 +1111,33 @@ static int32_t note_pitch(uint32_t note)
 
 /* one part: the gate stays up while any key is down; the sounding key is the last, lowest or highest held (priority). A
  * change of key while the gate is up is a legato transition: the legato output goes high and, with legato off (1), the
- * envelopes restart (one low gate sample); auto (0) and on (2) keep them running. (engine.ts monoUpdate) */
+ * envelopes restart (one low gate sample); auto (0) and on (2) keep them running. Unison: every part the same way, with the
+ * same stamps. (engine.ts monoUpdate / monoPart) */
+static void mono_part(const grp_t *g, pv_t *x, int k);
+
 static void mono_update(grp_t *g)
 {
-    pv_t *x = &E.pv[g->pv0];
+    int k = -1;
+    uint32_t i, n = g->unison ? g->parts : 1u, s0 = E.stamp, s1 = s0;
     if (g->nheld) {
-        uint32_t k = g->nheld - 1u, i;
-        int32_t p;
+        k = (int)g->nheld - 1;
         if (g->priority)
             for (i = 0; i < g->nheld; i++)
                 if (g->priority == 1 ? g->held_note[i] < g->held_note[k] : g->held_note[i] > g->held_note[k])
-                    k = i;
-        p = note_pitch(g->held_note[k]);
+                    k = (int)i;
+    }
+    for (i = 0; i < n; i++) {
+        E.stamp = s0;
+        mono_part(g, &E.pv[g->pv0 + i], k);
+        s1 = E.stamp;
+    }
+    E.stamp = s1;
+}
+
+static void mono_part(const grp_t *g, pv_t *x, int k)
+{
+    if (k >= 0) {
+        int32_t p = note_pitch(g->held_note[k]);
         if (!x->on || g->held_note[k] != x->note) {
             x->jump = p - x->pitch;
             x->legato = x->on;
@@ -1155,7 +1172,7 @@ static void held_drop(grp_t *g, uint32_t note)
 static void group_off(grp_t *g, uint32_t note)
 {
     uint32_t i;
-    if (g->parts == 1) {
+    if (g->parts == 1 || g->unison) {
         held_drop(g, note);
         mono_update(g);
         return;
@@ -1181,7 +1198,7 @@ static void group_on(grp_t *g, uint32_t note, int32_t vel_q16)
     uint32_t n = g->parts, i;
     int v = -1, nfree = 0;
     uint8_t over = 0;                            /* another key is down: this note overlaps it */
-    if (n == 1) {                                /* the key again: to the top (no update in between) */
+    if (n == 1 || g->unison) {                   /* the key again: to the top (no update in between) */
         held_drop(g, note);
         if (g->nheld == MAX_HELD) {
             for (i = 1; i < MAX_HELD; i++) {
@@ -1295,6 +1312,7 @@ static void m_fm1(const node_t *nd, inst_t *it, uint32_t n)
     fill(it->out[FM1_O_BEND], E.ctl[ENG_CTL_BEND], n);
     fill(it->out[FM1_O_MOD], E.ctl[ENG_CTL_MOD], n);
     fill(it->out[FM1_O_AT], E.ctl[ENG_CTL_AT], n);
+    fill(it->out[FM1_O_KEYS], x->gate, n);   /* the keys for Voice allocators (modules.ts): never patched in the binary, 1 while a key is down */
     fill(it->out[FM1_O_GATE], x->gate, n);
     fill(it->out[FM1_O_VEL], x->vel, n);
     if (x->retrig)
@@ -1364,6 +1382,7 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
     int32_t kind = round_q16(EF(it, OSC_P_WAVE)), lvl = EF(it, OSC_P_LEVEL), fb = EF(it, OSC_P_FB);
     int32_t idx = nd->conn & (1u << OSC_I_PM) ? EF(it, OSC_P_PM) : 0;
     int32_t y1, y2, pm1, xb, *ap = it->s.osc.ap, s1 = it->s.osc.s1;
+    uint32_t dt_fm = 0;
     if (idx <= 0 && fb <= 0) {                                             /* the plain oscillator: one wave per frame */
         int32_t ks = clampi(round_q16(EF(it, OSC_P_STACK)), 0, 4), nst = STACK_N[ks];
         int32_t nu = clampi(round_q16(EF(it, OSC_P_UNISON)), 1, 5), det = EF(it, OSC_P_DETUNE), doct[5], wq[5], j;
@@ -1385,12 +1404,21 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
             for (j = 0; j < nu; j++)
                 wq[j] = (int32_t)(((int64_t)w[j] << 16) / sum);
         }
+        uint32_t dts[5];
+        int32_t lastp = 0;
         for (i = 0; i < n; i++) {
             int rst = sync[i] >= 32768 && s1 < 32768;                      /* a rising edge on sync restarts the phases */
-            uint32_t dt = exp2_scale(INC_C4, pitch[i] + base + doct[0]);
+            uint32_t dt;
             int32_t y;
-            if (dt > DT_MAX)
-                dt = DT_MAX;
+            if (i == 0 || pitch[i] != lastp) {                             /* the increments only when the pitch moves (exactly the same values) */
+                lastp = pitch[i];
+                for (j = 0; j < nu; j++) {
+                    dts[j] = exp2_scale(INC_C4, lastp + base + doct[j]);
+                    if (dts[j] > DT_MAX)
+                        dts[j] = DT_MAX;
+                }
+            }
+            dt = dts[0];
             s1 = sync[i];
             if (rst)
                 phase = 0;
@@ -1402,9 +1430,7 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
             }
             y = mul16(y, wq[0]);
             for (j = 1; j < nu; j++) {
-                uint32_t dtj = exp2_scale(INC_C4, pitch[i] + base + doct[j]);
-                if (dtj > DT_MAX)
-                    dtj = DT_MAX;
+                uint32_t dtj = dts[j];
                 if (rst)
                     ph[j - 1] = 0;
                 ph[j - 1] += dtj;
@@ -1424,11 +1450,15 @@ static void m_osc(const node_t *nd, inst_t *it, uint32_t n)
     pm1 = it->s.osc.pm1;
     xb = it->s.osc.xb;
     for (i = 0; i < n; i++) {
-        uint32_t dt = exp2_scale(INC_C4, pitch[i] + base), sub;
+        uint32_t dt, sub;
         int32_t pm_now = idx > 0 ? pm[i] : 0, pm_mid = (pm1 + pm_now) >> 1, ya = 0;
-        if (dt > DT_MAX)
-            dt = DT_MAX;
-        dt >>= 1;
+        if (i == 0 || pitch[i] != pitch[i - 1]) {                        /* the increment only when the pitch moves */
+            dt_fm = exp2_scale(INC_C4, pitch[i] + base);
+            if (dt_fm > DT_MAX)
+                dt_fm = DT_MAX;
+            dt_fm >>= 1;
+        }
+        dt = dt_fm;
         if (sync[i] >= 32768 && s1 < 32768)
             phase = 0;
         s1 = sync[i];

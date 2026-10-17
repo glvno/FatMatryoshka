@@ -9,7 +9,7 @@ import { cpuEstimate } from '../src/cpu';
 import { DEFS } from '../src/modules';
 import { attFrame, chunkFrames, commitFrame, paramFrame, slotEraseFrame, slotFrame, slotInfoFrame } from '../src/protocol';
 import { make, PRESETS, type Build } from '../src/presets';
-import { addModule, emptyPatch, paramUnit, setMorphTarget, type Patch, type PolyCfg } from '../src/patch';
+import { addModule, defaultParams, emptyPatch, fixMatrix, paramUnit, setMorphTarget, type Patch, type PolyCfg } from '../src/patch';
 import { makeAssembly } from '../src/assembly';
 import { withParts } from '../src/test-poly';
 
@@ -73,8 +73,16 @@ const kit = (name: string, b: Build, voices = 1): void => {
   if (voices > 1) events[name] = POLY_EVENTS;
 };
 /** the modules `ids` as a poly assembly with these settings (the rest of the patch plays the shared keyboard) */
+// (the kits add a 'part' module where the allocator goes: it becomes a Voice allocator with these settings, Main's keys in,
+// as an old patch's Part does on load; the binary the firmware gets has the Part back in its place, poly.ts deviceView)
 const polyAsm = (p: Patch, ids: number[], cfg: Partial<PolyCfg>): void => {
-  makeAssembly(p, ids, `poly ${ids.join(' ')}`).poly = { parts: 4, assign: 0, legato: 0, priority: 0, ...cfg };
+  const alloc = p.modules.find((m) => ids.includes(m.id) && m.type === 'part')!;
+  alloc.type = 'alloc';
+  alloc.params = { ...defaultParams(DEFS.alloc), voices: cfg.parts ?? 4, assign: cfg.assign ?? 0, legato: cfg.legato ?? 0, priority: cfg.priority ?? 0, unison: cfg.unison ? 1 : 0 };
+  fixMatrix(alloc, DEFS.alloc);
+  const main = p.modules.find((m) => m.type === 'fm1')!;
+  p.cables.push({ from: { module: main.id, port: 'keys' }, to: { module: alloc.id, port: 'keys' } });
+  makeAssembly(p, ids, `poly ${ids.join(' ')}`).poly = cfg.flaws ? { flaws: cfg.flaws } : {};
 };
 kit('waves', (add, wire) => {
   const kb = add('fm1', 0, 0);
@@ -408,6 +416,29 @@ polyAsm(tests['part-flaws'], flawParts, {
   ],
 });
 events['part-flaws'] = POLY_EVENTS;
+// unison: four voices on the one note the priority picks (high), legato off so every change of key restarts the envelopes
+// of all four; the voices are told apart by their detune flaws and by the index into the pulse width
+const unisonParts: number[] = [];
+kit('alloc-unison', (add, wire) => {
+  add('fm1', 0, 0);
+  const pt = add('part', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 3, level: 0.2 }, { map: { p1: ['pw'] }, att: [0.3, 1] });
+  const env = add('adsr', 0, 0, { a: 0.02, d: 0.1, s: 0.5, r: 0.08 });
+  const vca = add('vca', 0, 0);
+  const out = add('output', 0, 0, { level: 0.6 });
+  wire(pt, 'pitch', osc, 'pitch');
+  wire(pt, 'index', osc, 'p1');
+  wire(pt, 'gate', env, 'gate');
+  wire(osc, 'out', vca, 'in');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', out, 'l');
+  unisonParts.push(pt, osc, env, vca);
+});
+polyAsm(tests['alloc-unison'], unisonParts, {
+  parts: 4, unison: true, priority: 2, legato: 1,
+  flaws: [{ detune: 12, drift: 0, bright: 0, env: 0, level: 100 }, { detune: -9, drift: 0, bright: 0, env: 0, level: 100 }, { detune: 4, drift: 30, bright: 0, env: 0, level: 100 }],
+});
+events['alloc-unison'] = POLY_EVENTS;
 ends['part-flaws'] = 128 * 400;
 kit('dyn', (add, wire) => {
   const kb = add('fm1', 0, 0);

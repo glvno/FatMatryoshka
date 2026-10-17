@@ -2,15 +2,15 @@
 // Block-based patch engine. Pure TypeScript with no DOM or Web Audio dependency, so it runs in
 // an AudioWorklet, in tests, and (as the reference) next to the firmware port.
 //
-// Polyphony: a poly assembly (poly.ts) runs its member modules once per part, each copy (instance) with its own state,
-// buffers and effective parameters; its allocator hands the notes to the parts, and its Part module outputs each part's
-// note. Everything else runs once and plays the shared keyboard (the Main module's pitch / gate / vel: one note, the last
+// Polyphony: a poly assembly (poly.ts) runs its member modules once per voice of the Voice allocator that feeds it, each
+// copy (instance) with its own state, buffers and effective parameters. The engine runs the patch's device form
+// (poly.ts deviceView): each allocator is a Part module in every group it drives, and each group allocates the notes. Everything else runs once and plays the shared keyboard (the Main module's pitch / gate / vel: one note, the last
 // held). A module reading another group's per-part output gets the sum over those parts; a per-part module reading a
 // shared output gets that one buffer.
 
 import { driftSeed, flawQ16, IMPLS, instSeed, walkHold, walkInit, walkStep, type Ctx, type ModuleImpl, type Voice, type Walk } from './modules';
 import { defaultMap, FLAW_TARGETS, flawOf, modulate, type ParamDef, type PartFlaw, morphValue, paramValue, processingOrder, SOURCES, type Cable, type Patch, type PolyCfg, type Range, type Source, thruInput } from './patch';
-import { polyGroups } from './poly';
+import { ALLOC, deviceView } from './poly';
 
 export const BLOCK = 128;
 
@@ -103,6 +103,8 @@ export class Engine {
   /** the poly assemblies' allocators, in polyGroups order */
   private groups: Group[] = [];
   private stamp = 0;
+  /** the patch as loaded (an allocator's setting changes the groups: setParam reloads it) */
+  private src: Patch | null = null;
   private ticks = 0;
   private clockOn = true;
   /** the performance controls (pitch bend -1..1, mod wheel 0..1, channel aftertouch 0..1): one set, every part sees it */
@@ -144,12 +146,12 @@ export class Engine {
   }
 
   /** Install a patch. Modules whose id, type and copy count are unchanged keep their running state; so do poly groups. */
-  load(patch: Patch): void {
-    const pg = polyGroups(patch);
+  load(source: Patch): void {
+    this.src = source;
+    const { patch, groups: pg } = deviceView(source);
     const oldGroups = new Map(this.groups.map((g) => [g.key, g]));
     this.groups = pg.map((x, i) => {
-      const key = `${x.asm.id}:${x.cfg.parts}`;
-      const g = oldGroups.get(key) ?? newGroup(key, x.cfg, i);
+      const g = oldGroups.get(x.key) ?? newGroup(x.key, x.cfg, i);
       g.cfg = { ...x.cfg };
       return g;
     });
@@ -258,6 +260,13 @@ export class Engine {
   }
 
   setParam(id: number, name: string, value: number): void {
+    const m = this.src?.modules.find((x) => x.id === id);
+    if (m?.type === ALLOC) {
+      // the voice count, assign, legato, priority, unison: the groups change, the patch loads again (running modules keep their state)
+      m.params[name] = value;
+      this.load(this.src!);
+      return;
+    }
     const n = this.nodes.get(id);
     if (n) n.params[name] = value;
   }
@@ -370,7 +379,7 @@ export class Engine {
    * key; otherwise the key does not sound). A taken-over part restarts its envelopes unless legato is on.
    */
   private groupOn(g: Group, note: number, velocity: number): void {
-    if (g.parts.length === 1) {
+    if (g.parts.length === 1 || g.cfg.unison) {
       g.held = g.held.filter((h) => h.note !== note);
       g.held.push({ note, vel: velocity });
       this.monoUpdate(g);
@@ -413,7 +422,7 @@ export class Engine {
   }
 
   private groupOff(g: Group, note: number): void {
-    if (g.parts.length === 1) {
+    if (g.parts.length === 1 || g.cfg.unison) {
       g.held = g.held.filter((h) => h.note !== note);
       this.monoUpdate(g);
       return;
@@ -472,7 +481,18 @@ export class Engine {
     const { legato, priority } = g.cfg;
     let top = g.held[g.held.length - 1];
     if (priority) for (const h of g.held) if (priority === 1 ? h.note < top.note : h.note > top.note) top = h;
-    const x = g.parts[0];
+    // unison: every part as the one part would be (the same stamps, so the display and the allocator see one note)
+    const stamp = this.stamp;
+    let after = stamp;
+    for (const x of g.parts) {
+      this.stamp = stamp;
+      this.monoPart(x, top, legato);
+      after = this.stamp;
+    }
+    this.stamp = after;
+  }
+
+  private monoPart(x: VoiceState, top: { note: number; vel: number } | undefined, legato: number): void {
     if (top) {
       const p = (top.note - 60) / 12;
       if (!x.on || top.note !== x.note) {

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Voicing (issue #22, now on poly assemblies): legato / priority of a poly assembly, its Part module's legato / jump
-// outputs, the oscillator's blend / stack, the glide curve, the Random walk, and the conversion of old patches.
+// Voicing (issue #22, now on Voice allocators): legato / priority of an allocator, its legato / jump outputs, the oscillator's blend / stack, the glide curve, the Random walk, and the conversion of old patches.
 import { describe, expect, it } from 'vitest';
 import { Engine } from './engine';
 import { blendWeights, DEFS, hash32, walkHold, walkInit, walkStep } from './modules';
-import { addModule, connect, emptyPatch, POLY_DEFAULT, validatePatch, type Patch, type PolyCfg } from './patch';
+import { addModule, connect, emptyPatch, validatePatch, type Patch, type PolyCfg } from './patch';
+import { addAlloc } from './test-poly';
 import { makeAssembly } from './assembly';
 import { polyGroups } from './poly';
 
@@ -22,11 +22,11 @@ const wire = (p: Patch, a: number, ap: string, b: number, bp: string): void => {
 };
 const rms = (a: Float32Array): number => Math.sqrt(a.reduce((s, v) => s + v * v, 0) / a.length);
 
-/** a poly assembly (one part unless `cfg` says) of Part gate -> ADSR -> output l, Part `port` -> output r */
+/** a poly assembly (one voice unless `cfg` says) of allocator gate -> ADSR -> output l, allocator `port` -> output r */
 function envPatch(port = 'pitch', cfg: Partial<PolyCfg> = {}): { p: Patch } {
   const p = emptyPatch();
   addModule(p, DEFS.fm1, 0, 0);
-  const part = addModule(p, DEFS.part, 0, 0);
+  const part = addAlloc(p, { parts: 1, ...cfg });
   const env = addModule(p, DEFS.adsr, 0, 0);
   Object.assign(env.params, { a: 0.005, d: 0.05, s: 0.3, r: 0.05 });
   const out = addModule(p, DEFS.output, 0, 0);
@@ -34,7 +34,7 @@ function envPatch(port = 'pitch', cfg: Partial<PolyCfg> = {}): { p: Patch } {
   wire(p, part.id, 'gate', env.id, 'gate');
   wire(p, env.id, 'env', out.id, 'l');
   wire(p, part.id, port, out.id, 'r');
-  makeAssembly(p, [part.id, env.id], 'voice').poly = { ...POLY_DEFAULT, parts: 1, ...cfg };
+  makeAssembly(p, [part.id, env.id], 'voice').poly = {};
   return { p };
 }
 
@@ -124,11 +124,11 @@ describe('voicing: legato and priority', () => {
   });
 });
 
-/** in a one-part poly assembly: Part pitch -> glide -> output l; the glide's p1 from Part `src` (through math abs for jump) sets its time */
+/** in a one-voice poly assembly: allocator pitch -> glide -> output l; the glide's p1 from the allocator's `src` (through math abs for jump) sets its time */
 function glidePatch(src: 'legato' | 'jump' | 'none', glide: Record<string, number>, range?: [number, number]): Patch {
   const p = emptyPatch();
   addModule(p, DEFS.fm1, 0, 0);
-  const kb = addModule(p, DEFS.part, 0, 0).id;
+  const kb = addAlloc(p, { parts: 1 }).id;
   const g = addModule(p, DEFS.glide, 0, 0);
   Object.assign(g.params, glide);
   g.map = { p1: ['time'], p2: [], k1: [], k2: [], k3: [], k4: [] };
@@ -141,11 +141,11 @@ function glidePatch(src: 'legato' | 'jump' | 'none', glide: Record<string, numbe
     const m = addModule(p, DEFS.math, 0, 0).id;
     wire(p, kb, 'jump', m, 'a');
     wire(p, m, 'abs', g.id, 'p1');
-    makeAssembly(p, [kb, g.id, m], 'voice').poly = { ...POLY_DEFAULT, parts: 1 };
+    makeAssembly(p, [kb, g.id, m], 'voice').poly = {};
     return p;
   }
   if (src === 'legato') wire(p, kb, 'legato', g.id, 'p1');
-  makeAssembly(p, [kb, g.id], 'voice').poly = { ...POLY_DEFAULT, parts: 1 };
+  makeAssembly(p, [kb, g.id], 'voice').poly = {};
   return p;
 }
 

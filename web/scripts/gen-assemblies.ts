@@ -4,8 +4,8 @@
 // `voice` and `echo` are kept as files. Run from web/:  npx vite-node scripts/gen-assemblies.ts
 import { writeFileSync } from 'node:fs';
 import { DEFS } from '../src/modules';
-import { defaultMap, defaultParams, POLY_DEFAULT, type ModuleInst, type PolyCfg, type Source } from '../src/patch';
-import { pinsToParams, type AssemblyDef, type PortRef, type ParamRef } from '../src/assembly';
+import { defaultMap, defaultParams, type ModuleInst, type PolyCards, type Source } from '../src/patch';
+import { pinsToParams, type AssemblyDef, type NestedDef, type PortRef, type ParamRef } from '../src/assembly';
 
 const OUT = new URL('../src/assemblies/', import.meta.url);
 const GX = 320;
@@ -18,14 +18,21 @@ interface B {
   input(label: string, module: number, port: string, ...also: [number, string][]): void;
   output(label: string, module: number, port: string): void;
   param(label: string, module: number, param: string): void;
+  /** a nested assembly (collapsed) of these modules at grid column / row; a top-level port or parameter of one of its
+   * modules is shown on it too (a parent only shows what its children show) */
+  nest(name: string, col: number, row: number, members: number[], poly?: PolyCards): void;
+  /** an input of a nested assembly only (fed from inside the top level) */
+  nestInput(label: string, module: number, port: string, ...also: [number, string][]): void;
 }
 
-function build(name: string, category: string, f: (b: B) => void, poly?: Partial<PolyCfg>): AssemblyDef {
+function build(name: string, category: string, f: (b: B) => void, poly?: PolyCards): AssemblyDef {
   const modules: ModuleInst[] = [];
   const cables: AssemblyDef['cables'] = [];
   const inputs: (PortRef & { also?: { module: number; port: string }[] })[] = [];
   const outputs: PortRef[] = [];
   const params: ParamRef[] = [];
+  const nested: NestedDef[] = [];
+  const nestOf = (module: number): NestedDef | undefined => nested.find((n) => n.modules.includes(module));
   const check = (id: number, port: string, dir: 'inputs' | 'outputs'): void => {
     const m = modules[id - 1];
     if (!m || !DEFS[m.type][dir].some((p) => p.name === port)) throw new Error(`${name}: no ${dir} ${port} on module ${id}`);
@@ -55,26 +62,48 @@ function build(name: string, category: string, f: (b: B) => void, poly?: Partial
     input(label, module, port, ...also) {
       check(module, port, 'inputs');
       for (const [m, p] of also) check(m, p, 'inputs');
-      inputs.push({ module, port, label, ...(also.length ? { also: also.map(([m, p]) => ({ module: m, port: p })) } : {}) });
+      const ref = { module, port, label, ...(also.length ? { also: also.map(([m, p]) => ({ module: m, port: p })) } : {}) };
+      inputs.push(ref);
+      for (const m of [module, ...also.map(([m]) => m)]) {
+        const n = nestOf(m);
+        if (n && !n.inputs.includes(ref)) n.inputs.push(ref);
+      }
     },
     output(label, module, port) {
       check(module, port, 'outputs');
       outputs.push({ module, port, label });
+      nestOf(module)?.outputs.push({ module, port, label });
     },
     param(label, module, param) {
       const m = modules[module - 1];
       if (!m || !DEFS[m.type].params.some((q) => q.name === param)) throw new Error(`${name}: no parameter ${param} on module ${module}`);
       params.push({ module, param, label });
+      nestOf(module)?.params.push({ module, param, label });
+    },
+    nest(label, col, row, members, poly) {
+      for (const m of members) if (!modules[m - 1] || nestOf(m)) throw new Error(`${name}: module ${m} cannot join ${label}`);
+      nested.push({ id: nested.length + 1, name: label, label, x: col * GX, y: row * GY, open: false, modules: members, inputs: [], outputs: [], params: [], ...(poly ? { poly: { ...poly } } : {}) });
+    },
+    nestInput(label, module, port, ...also) {
+      check(module, port, 'inputs');
+      for (const [m, p] of also) check(m, p, 'inputs');
+      const n = nestOf(module);
+      if (!n || also.some(([m]) => nestOf(m) !== n)) throw new Error(`${name}: ${label} is not on one nested assembly`);
+      n.inputs.push({ module, port, label, ...(also.length ? { also: also.map(([m, p]) => ({ module: m, port: p })) } : {}) });
     },
   };
   f(b);
-  return { format: 'modular-1-assembly', version: 1, name, category, modules, cables, inputs, outputs, params, ...(poly ? { poly: { ...POLY_DEFAULT, ...poly } } : {}) };
+  return {
+    format: 'modular-1-assembly', version: 1, name, category, modules, cables, inputs, outputs, params,
+    ...(nested.length ? { children: nested.map((n) => n.id), assemblies: nested } : {}),
+    ...(poly ? { poly: { ...poly } } : {}),
+  };
 }
 
 const defs: AssemblyDef[] = [];
 /** category: the shelf of the editor's assembly browser (CATEGORIES in src/assemblies.ts) */
-/** `poly`: a poly assembly (it plays its own Part module's notes, one per part) */
-const asm = (name: string, category: string, f: (b: B) => void, poly?: Partial<PolyCfg>): void => {
+/** `poly`: a poly assembly (voice cards: its modules run once per voice of the Voice allocator that feeds them), with its flaws */
+const asm = (name: string, category: string, f: (b: B) => void, poly?: PolyCards): void => {
   defs.push(build(name, category, f, poly));
 };
 
@@ -508,10 +537,12 @@ asm('stack voice', 'Voices', (b) => {
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
 });
 
-// a mono lead: a poly assembly of one part (so its legato and priority apply), whose portamento only acts on legato
-// playing: the Part's legato output lengthens the glide by `porta` of the time range while a note overlaps the one before
+// a mono lead: one voice card fed by an allocator of one voice (so its legato and priority apply), whose portamento only
+// acts on legato playing: the allocator's legato output lengthens the glide by `porta` of the time range while a note
+// overlaps the one before
 asm('mono lead', 'Voices', (b) => {
-  const part = b.add('part', 0, 1);
+  const part = b.add('alloc', 0, 1, { voices: 1 });
+  b.input('keys', part, 'keys');
   const gl = b.add('glide', 0, 0, { time: 0.001 }, { p1: 'time', att: [0.6, 1] });
   const osc = b.add('osc', 1, 0, { wave: 2, level: 0.8, unison: 2, detune: 6 });
   const flt = b.add('ladder', 2, 0, { cutoff: 1800, res: 0.35 });
@@ -530,13 +561,16 @@ asm('mono lead', 'Voices', (b) => {
   b.param('curve', gl, 'curve');
   b.param('cutoff', flt, 'cutoff');
   b.param('res', flt, 'res');
+  b.param('legato', part, 'legato');
+  b.param('priority', part, 'priority');
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
-}, { parts: 1 });
+}, {});
 
-// a supersaw pad of four parts: five detuned copies with the centre one held back (blend), an octave stacked on top, each
-// part panned by its index (spread across the stereo field by `width`)
+// a supersaw pad of four voices: five detuned copies with the centre one held back (blend), an octave stacked on top, each
+// voice panned by its index (spread across the stereo field by `width`)
 asm('supersaw stack', 'Voices', (b) => {
-  const part = b.add('part', 0, 2);
+  const part = b.add('alloc', 0, 2, { voices: 4 });
+  b.input('keys', part, 'keys');
   const osc = b.add('osc', 0, 0, { wave: 2, level: 0.9, unison: 5, detune: 22, blend: 0.65, stack: 1 });
   const flt = b.add('filter', 1, 0, { cutoff: 3500, res: 0.15 });
   const env = b.add('adsr', 0, 1, { a: 0.02, d: 0.4, s: 0.75, r: 0.5 });
@@ -556,14 +590,16 @@ asm('supersaw stack', 'Voices', (b) => {
   for (const q of ['unison', 'detune', 'blend', 'stack']) b.param(q, osc, q);
   b.param('cutoff', flt, 'cutoff');
   b.param('width', width, 'gain');
+  b.param('voices', part, 'voices');
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
-}, { parts: 4 });
+}, {});
 
-// an analog polysynth voice of four parts that has drifted out of spec: each oscillator's fine tune follows its own slow
-// Random walk (a few cents), a fixed Random per part (its tolerance) offsets the cutoff and the decay. The assembly's
-// flaws (set by hand per part) add to that.
+// an analog polysynth of four voices that has drifted out of spec: each oscillator's fine tune follows its own slow
+// Random walk (a few cents), a fixed Random per voice card (its tolerance) offsets the cutoff and the decay. The cards'
+// flaws (set by hand per card) add to that.
 asm('analog voice', 'Voices', (b) => {
-  const part = b.add('part', 0, 2);
+  const part = b.add('alloc', 0, 2, { voices: 4 });
+  b.input('keys', part, 'keys');
   const w1 = b.add('random', 1, 2, { mode: 1, rate: 0.7 });
   const w2 = b.add('random', 2, 2, { mode: 1, rate: 0.9 });
   const tol = b.add('random', 3, 2, { mode: 0 });
@@ -586,15 +622,17 @@ asm('analog voice', 'Voices', (b) => {
   b.wire(flt, 'lp24', vca, 'in');
   b.wire(env, 'env', vca, 'cv');
   b.output('out', vca, 'out');
+  b.param('voices', part, 'voices');
   b.param('drift rate', w1, 'rate');
   b.param('cutoff', flt, 'cutoff');
   b.param('res', flt, 'res');
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
-}, { parts: 4, flaws: [{ detune: 4, drift: 30, bright: 1, env: 5, level: 100 }, { detune: -6, drift: 45, bright: -2, env: -8, level: 95 }, { detune: 2, drift: 25, bright: 0, env: 12, level: 100 }, { detune: -3, drift: 35, bright: 3, env: -4, level: 92 }] });
+}, { flaws: [{ detune: 4, drift: 30, bright: 1, env: 5, level: 100 }, { detune: -6, drift: 45, bright: -2, env: -8, level: 95 }, { detune: 2, drift: 25, bright: 0, env: 12, level: 100 }, { detune: -3, drift: 35, bright: 3, env: -4, level: 92 }] });
 
-// the plainest polyphonic voice: a poly assembly of four parts (saw, low pass, ADSR, VCA), each playing its own note
+// the plainest polysynth: a Voice allocator of four voices and their cards (saw, low pass, ADSR, VCA), each playing its own note
 asm('poly voice', 'Voices', (b) => {
-  const part = b.add('part', 0, 1);
+  const part = b.add('alloc', 0, 1, { voices: 4 });
+  b.input('keys', part, 'keys');
   const osc = b.add('osc', 0, 0, { wave: 2, level: 0.8 });
   const flt = b.add('filter', 1, 0, { cutoff: 2000, res: 0.2 });
   const env = b.add('adsr', 1, 1, { a: 0.005, d: 0.3, s: 0.6, r: 0.3 });
@@ -606,11 +644,92 @@ asm('poly voice', 'Voices', (b) => {
   b.wire(env, 'env', vca, 'cv');
   b.input('cutoff cv', flt, 'cv');
   b.output('out', vca, 'out');
+  b.param('voices', part, 'voices');
   b.param('wave', osc, 'wave');
   b.param('cutoff', flt, 'cutoff');
   b.param('res', flt, 'res');
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
-}, { parts: 4 });
+}, {});
+
+// Sequential Prophet-5 (rev 3), built like the instrument: the keyboard's keys go into the Voice allocator (the Z80), which
+// plays five voice cards, a poly assembly (about 95 % of the FM-1's estimated CPU). A card: oscillator A (saw / pulse, sync to B) and B, the 24 dB
+// ladder low pass with its own ADSR (its cvamt is the envelope amount) and keyboard tracking, the amp ADSR, glide. The
+// oscillators' levels are the mixer: they and the noise sum at the filter input. Poly Mod (off by default): the filter
+// envelope into A's pitch, B into A's phase (FM). Outside the voices, once, as on the instrument: the noise source and
+// Wheel Mod, an LFO through a VCA whose cv is the `wheel` input (plug Main's mod into it) into both oscillators' fine tune
+// (per block: their pitch inputs stay still, which keeps the oscillators cheap; `vibrato` 0.24 = +-48 cents).
+// The flaws are a mild out-of-tune set as on a well-kept rev 3.
+asm('prophet 5', 'Voices', (b) => {
+  const lfo = b.add('lfo', 0, 0, { wave: 1, rate: 5, depth: 1 });
+  const wheel = b.add('vca', 0, 1);
+  const vib = b.add('scale', 0, 2, { gain: 0.24, offset: 0 });
+  const nz = b.add('noise', 1, 0, { level: 0 });
+  const part = b.add('alloc', 1, 2, { voices: 5 });
+  const gl = b.add('glide', 2, 1, { time: 0.001 });
+  const oscB = b.add('osc', 2, 0, { wave: 2, level: 0.45, fine: 7 }, { p1: 'fine' });
+  const oscA = b.add('osc', 3, 0, { wave: 2, level: 0.55 }, { p1: 'fine' });
+  const polyEnv = b.add('scale', 3, 1, { gain: 0, offset: 0 });
+  const sync = b.add('scale', 3, 2, { gain: 0, offset: 0 });
+  const fenv = b.add('adsr', 4, 1, { a: 0.01, d: 0.6, s: 0.35, r: 0.4 });
+  const flt = b.add('ladder', 5, 0, { cutoff: 600, res: 0.2, cvamt: 3.5 });
+  const aenv = b.add('adsr', 5, 1, { a: 0.01, d: 0.5, s: 0.8, r: 0.4 });
+  const vca = b.add('vca', 6, 0, { gain: 0.6 });
+  b.nest('voice', 1, 1, [gl, oscB, oscA, polyEnv, sync, fenv, flt, aenv, vca], {
+    flaws: [{ detune: 3, drift: 20, bright: 1, env: 4, level: 100 }, { detune: -4, drift: 25, bright: -1, env: -5, level: 97 }, { detune: 1, drift: 15, bright: 0, env: 6, level: 100 }, { detune: -2, drift: 20, bright: 2, env: -3, level: 95 }, { detune: 5, drift: 30, bright: -2, env: 2, level: 98 }],
+  });
+  b.wire(part, 'pitch', gl, 'in');
+  b.wire(gl, 'out', oscA, 'pitch');
+  b.wire(gl, 'out', oscB, 'pitch');
+  b.wire(part, 'gate', fenv, 'gate');
+  b.wire(part, 'gate', aenv, 'gate');
+  b.wire(oscA, 'out', flt, 'in');
+  b.wire(oscB, 'out', flt, 'in');
+  b.wire(nz, 'out', flt, 'in');
+  b.wire(fenv, 'env', flt, 'cv');
+  b.wire(flt, 'lp24', vca, 'in');
+  b.wire(aenv, 'env', vca, 'cv');
+  // poly mod
+  b.wire(fenv, 'env', polyEnv, 'in');
+  b.wire(polyEnv, 'out', oscA, 'pitch');
+  b.wire(oscB, 'out', oscA, 'pm');
+  b.wire(oscB, 'out', sync, 'in');
+  b.wire(sync, 'out', oscA, 'sync');
+  // wheel mod
+  b.wire(lfo, 'out', wheel, 'in');
+  b.wire(wheel, 'out', vib, 'in');
+  b.wire(vib, 'out', oscA, 'p1');
+  b.wire(vib, 'out', oscB, 'p1');
+  b.input('keys', part, 'keys');
+  b.input('wheel', wheel, 'cv');
+  b.nestInput('pitch', gl, 'in');
+  b.nestInput('gate', fenv, 'gate', [aenv, 'gate']);
+  b.nestInput('noise', flt, 'in');
+  b.nestInput('vibrato', oscA, 'p1', [oscB, 'p1']);
+  b.output('out', vca, 'out');
+  b.param('voices', part, 'voices');
+  b.param('unison', part, 'unison');
+  b.param('A wave', oscA, 'wave');
+  b.param('A pw', oscA, 'pw');
+  b.param('sync', sync, 'gain');
+  b.param('B wave', oscB, 'wave');
+  b.param('B freq', oscB, 'coarse');
+  b.param('B fine', oscB, 'fine');
+  b.param('A level', oscA, 'level');
+  b.param('B level', oscB, 'level');
+  b.param('noise', nz, 'level');
+  b.param('cutoff', flt, 'cutoff');
+  b.param('res', flt, 'res');
+  b.param('env amt', flt, 'cvamt');
+  b.param('kbd track', flt, 'track');
+  for (const q of ['a', 'd', 's', 'r']) b.param(`filter ${q}`, fenv, q);
+  for (const q of ['a', 'd', 's', 'r']) b.param(`amp ${q}`, aenv, q);
+  b.param('pmod env→A', polyEnv, 'gain');
+  b.param('pmod B→A', oscA, 'pm');
+  b.param('lfo rate', lfo, 'rate');
+  b.param('lfo wave', lfo, 'wave');
+  b.param('vibrato', vib, 'gain');
+  b.param('glide', gl, 'time');
+});
 
 // an LFO through a Scale: vibrato (into a pitch input), tremolo (into a VCA's cv with an offset), a filter sweep
 asm('vibrato', 'Utilities', (b) => {
@@ -1050,6 +1169,10 @@ asm('auto pan', 'Effects', (b) => {
 });
 
 // an exposed pin is offered as the sliders it routes to (the editor has no p1 / p2 jacks): the same migration as on load
-for (const d of defs) d.inputs = pinsToParams(d.inputs, d.params, (id) => d.modules.find((m) => m.id === id));
+for (const d of defs) {
+  const moduleOf = (id: number): ModuleInst | undefined => d.modules.find((m) => m.id === id);
+  d.inputs = pinsToParams(d.inputs, d.params, moduleOf);
+  for (const n of d.assemblies ?? []) n.inputs = pinsToParams(n.inputs, n.params, moduleOf);
+}
 for (const d of defs) writeFileSync(new URL(`${d.name.replace(/[^a-z0-9]+/g, '-')}.json`, OUT), JSON.stringify(d, null, 2) + '\n');
 console.log(`wrote ${defs.length} assemblies: ${defs.map((d) => d.name).join(', ')}`);

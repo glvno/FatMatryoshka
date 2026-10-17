@@ -278,7 +278,7 @@ describe('assemblies', () => {
 
   it('ships factory assemblies that load, insert and play', () => {
     expect(FACTORY.map((d) => d.name)).toEqual([
-      'adsr operator', 'analog voice', 'auto pan', 'barber pole', 'bowed glass', 'bowed string', 'clap', 'clock', 'cloud', 'cowbell', 'echo', 'filter voice', 'fm pair', 'gamelan', 'glass bell', 'hats', 'hihat', 'kalimba', 'kick', 'marimba', 'mono lead', 'noise voice', 'operator', 'pluck', 'poly voice', 'rain', 'random melody', 'resonator bank', 'reverse pad', 'rim', 'shimmer', 'sidechain pump', 'slicer', 'snare', 'stack voice', 'step sequencer', 'stutter', 'sub bass', 'supersaw stack', 'tabla', 'talking filter', 'time smear', 'tom', 'vibrato', 'voice', 'vowel voice', 'wavetable pad',
+      'adsr operator', 'analog voice', 'auto pan', 'barber pole', 'bowed glass', 'bowed string', 'clap', 'clock', 'cloud', 'cowbell', 'echo', 'filter voice', 'fm pair', 'gamelan', 'glass bell', 'hats', 'hihat', 'kalimba', 'kick', 'marimba', 'mono lead', 'noise voice', 'operator', 'pluck', 'poly voice', 'prophet 5', 'rain', 'random melody', 'resonator bank', 'reverse pad', 'rim', 'shimmer', 'sidechain pump', 'slicer', 'snare', 'stack voice', 'step sequencer', 'stutter', 'sub bass', 'supersaw stack', 'tabla', 'talking filter', 'time smear', 'tom', 'vibrato', 'voice', 'vowel voice', 'wavetable pad',
     ]);
     for (const d of FACTORY) {
       expect(d.modules.every((m) => m.map === undefined || ['k1', 'k2', 'k3', 'k4'].every((k) => m.map![k as 'k1'].length === 0)), d.name).toBe(true);
@@ -300,6 +300,7 @@ describe('assemblies', () => {
       };
       feed('pitch', 'pitch');
       feed('gate', 'gate');
+      feed('keys', 'keys');
       if (inp('in')) {
         // a held key is a steady signal to pan / smear / shift: at a quarter, so a dense granular cloud of it stays below the clamp
         const sc = addModule(p, DEFS.scale, 0, 0);
@@ -310,7 +311,7 @@ describe('assemblies', () => {
       const o = a.outputs.find((r) => ['out', 'l', 'pitch', 'clock'].includes(r.label))!;
       expect(connect(p, DEFS, o, { module: out, port: 'l' }), d.name).toBe(true);
       const l = render(p, 24000);
-      if (inp('gate') || o.label !== 'out') expect(Math.max(...Array.from(l).map(Math.abs)), d.name).toBeGreaterThan(0.05);
+      if (inp('gate') || inp('keys') || o.label !== 'out') expect(Math.max(...Array.from(l).map(Math.abs)), d.name).toBeGreaterThan(0.05);
       // all of them: a finite output, nothing stuck at the clamp
       expect(l.every((v) => Number.isFinite(v)), d.name).toBe(true);
       if (o.label === 'out' || o.label === 'l') expect(l.filter((v) => Math.abs(v) >= 1).length, d.name).toBeLessThan(l.length / 20); // a clock is a square at +-1 by design

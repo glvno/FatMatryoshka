@@ -541,7 +541,7 @@ export class Tutorial {
       // the button, else its output's jack (the output is hidden inside a closed assembly), else the card
       case 'probe': return document.querySelector(`.dot[data-mod="${t.id}"][data-port="${t.port}"][data-dir="out"]`) ?? card(t.id);
       case 'ui': return document.getElementById(t.id);
-      case 'poly': return document.querySelector(`.poly-item[data-asm="${t.id}"][data-setting="${t.setting}"]`) ?? document.querySelector(`.poly-btn[data-asm="${t.id}"]`)
+      case 'poly': return document.querySelector(`[data-asm="${t.id}"][data-setting="${t.setting}"]`) ?? document.querySelector(`.poly-btn[data-asm="${t.id}"]`)
         ?? document.querySelector(`.module[data-asm="${t.id}"], .frame[data-asm="${t.id}"]`);
     }
   }
