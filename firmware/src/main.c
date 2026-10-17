@@ -626,7 +626,7 @@ static void poly_set(int32_t n)
     char m[24], num[8], *q = m;
     if (m1_cur_len < 8u)
         return;
-    if (!m1_cur[3] || m1_cur_len < 13u) {
+    if (!m1_cur[3] || m1_cur_len < 8u + ENG_GROUP_REC) {
         ui_msg("NO POLY ASSEMBLY", 1500);
         return;
     }
@@ -673,7 +673,7 @@ static void morph_turn(int32_t clicks)
 static void poly_turn(uint32_t field, int32_t clicks)
 {
     int c = eng_poly_get(0, field);
-    if (c < 0 || m1_cur_len < 13u || !m1_cur[3]) {
+    if (c < 0 || m1_cur_len < 8u + ENG_GROUP_REC || !m1_cur[3]) {
         ui_msg("NO POLY ASSEMBLY", 1500);
         return;
     }

@@ -327,7 +327,6 @@
     "parts": 4,
     "assign": 0,
     "legato": 0,
-    "priority": 0,
-    "unit": 0
+    "priority": 0
   }
 }

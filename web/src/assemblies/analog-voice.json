@@ -440,6 +440,35 @@
     "assign": 0,
     "legato": 0,
     "priority": 0,
-    "unit": 0
+    "flaws": [
+      {
+        "detune": 4,
+        "drift": 30,
+        "bright": 1,
+        "env": 5,
+        "level": 100
+      },
+      {
+        "detune": -6,
+        "drift": 45,
+        "bright": -2,
+        "env": -8,
+        "level": 95
+      },
+      {
+        "detune": 2,
+        "drift": 25,
+        "bright": 0,
+        "env": 12,
+        "level": 100
+      },
+      {
+        "detune": -3,
+        "drift": 35,
+        "bright": 3,
+        "env": -4,
+        "level": 92
+      }
+    ]
   }
 }

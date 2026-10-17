@@ -6,7 +6,7 @@
 // once even inside one (their inputs sum the parts). Poly assemblies do not nest in each other; a patch may have
 // any number of them (the FM-1 plays MAX_POLY), and each gets every note (they layer).
 //
-// migrateVoicing converts patches from before (Patch.voices, the Main module's legato / priority / unit and its per-note
+// migrateVoicing converts patches from before (Patch.voices, the Main module's legato / priority / unit (dropped) and its per-note
 // outputs spread / legato / jump / tol / drift, the oscillator's drift setting) into poly assemblies, Part and Random modules.
 import {
   allModules,
@@ -17,6 +17,7 @@ import {
   moveAssembly,
   parentOf,
   reconcile,
+  targetsOf,
   type AssemblyInst,
   type Rect,
 } from './assembly';
@@ -134,13 +135,20 @@ export function setPoly(p: Patch, defs: Record<string, ModuleDef>, a: AssemblyIn
     }
     if (main)
       for (const c of p.cables)
-        if (c.from.module === main.id && KEY_PORTS.includes(c.from.port) && inside.has(c.to.module)) c.from = { module: part.id, port: c.from.port };
+        if (c.from.module === main.id && KEY_PORTS.includes(c.from.port) && inside.has(c.to.module)) {
+          c.from = { module: part.id, port: c.from.port }; // the input's jack on the card goes (reconcile: fed by the Part)
+        }
     makeRoom(p, a);
   } else {
     delete a.poly;
     const part = p.modules.find((m) => m.type === 'part' && inside.has(m.id));
     if (part && main) {
-      for (const c of p.cables) if (c.from.module === part.id && KEY_PORTS.includes(c.from.port)) c.from = { module: main.id, port: c.from.port };
+      for (const c of p.cables)
+        if (c.from.module === part.id && KEY_PORTS.includes(c.from.port)) {
+          c.from = { module: main.id, port: c.from.port };
+          // Main is outside: the cable crosses the frame again, so the jack shows on the card again
+          if (!a.inputs.some((r) => targetsOf(r).some((t) => sameEnd(t, c.to)))) a.inputs.push({ ...c.to, label: c.to.port });
+        }
       dedupe(p);
       if (!p.cables.some((c) => c.from.module === part.id)) {
         p.modules = p.modules.filter((m) => m.id !== part.id);
@@ -224,7 +232,7 @@ export function migrateVoicing(p: Patch, defs: Record<string, ModuleDef>): strin
   let group: RawAsm | null = null;
   let groupSet = new Set<number>();
 
-  if (main && (voices > 1 || old.legato || old.priority || old.unit || usesVoicePorts)) {
+  if (main && (voices > 1 || old.legato || old.priority || usesVoicePorts)) {
     const split = legacySplit(p, main.id);
     if (split.size) {
       const loose: number[] = [];
@@ -246,7 +254,7 @@ export function migrateVoicing(p: Patch, defs: Record<string, ModuleDef>): strin
         v: 1, id, name: 'poly voice', label: 'poly voice', open: true,
         x: Math.min(...members.map((m) => m.x), at.x), y: Math.min(...members.map((m) => m.y), at.y),
         modules: [...loose, part.id], inputs: [], outputs: [], params: [],
-        poly: { parts: voices, assign: 2, legato: old.legato, priority: old.priority, unit: old.unit },
+        poly: { parts: voices, assign: 2, legato: old.legato, priority: old.priority },
       };
       if (kids.size) group.children = [...kids];
       // room above for the expanded frame's header and settings

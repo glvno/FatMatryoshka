@@ -840,6 +840,9 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 input#patch-name { height: 24px; padding: 0 4px; margin-left: -4px; background: transparent; border: 1px solid transparent; border-radius: 4px; cursor: text; }
 input#patch-name:hover { border-color: var(--line); }
 input#patch-name:focus { border-color: var(--secondary); background: var(--bar); outline: none; }
+#save-patch-btn { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--muted); }
+#save-patch-btn:hover { color: var(--ink); border-color: var(--line); }
+#save-patch-btn.saved { color: var(--secondary); }
 .sbody { display: grid; gap: 6px; padding: 8px; }
 .sidebar button { min-height: 30px; padding: 4px 8px; border-radius: 5px; white-space: nowrap; }
 /* the plain buttons in the (muted) gate colour: a grey fill read as a slider's bar */
@@ -923,3 +926,26 @@ svg.slack-cable .cable.pending { pointer-events: none; }
 .sel-track .sel-jack.slider-thumb { color: var(--muted); pointer-events: none; }
 .picking .sel-track { pointer-events: none; }
 @media (pointer: coarse) { .param.bar.sel, .sel-track { height: 40px; } }
+
+/* ---- the flaws card of a poly assembly (flaws-panel.ts): a row per part, a slider per flaw ---- */
+.poly-item .flaw-btn { height: 26px; min-height: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bar); color: var(--ink);
+  font: 500 12px/1 'Barlow', system-ui, sans-serif; text-transform: none; cursor: pointer; }
+.poly-item .flaw-btn:hover { border-color: var(--secondary); }
+.flaw-panel { position: fixed; z-index: 30; width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--muted) 45%, var(--panel)); border-radius: 8px; background: var(--panel); box-shadow: 0 6px 20px var(--shadow); }
+.flaw-head { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 6px; border-bottom: 1px solid var(--line); background: var(--surface-tint); border-radius: 8px 8px 0 0; }
+.flaw-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 15px/1 'Barlow Condensed', 'Barlow Semi Condensed', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .07em; }
+.flaw-x { width: 24px; height: 24px; min-height: 0; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 16px; cursor: pointer; }
+.flaw-x:hover { color: var(--ink); }
+.flaw-grid { display: grid; grid-template-columns: 24px repeat(5, minmax(0, 1fr)); gap: 4px 8px; align-items: center; padding: 8px 10px 4px; }
+.flaw-col { font: 600 11px/1 'Barlow Condensed', system-ui, sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.flaw-col small { font-size: 9px; text-transform: none; }
+.flaw-part { font: 600 12px/1 'Barlow Condensed', system-ui, sans-serif; color: var(--muted); }
+.flaw-cell { display: grid; grid-template-columns: minmax(0, 1fr) 26px; align-items: center; gap: 3px; }
+.flaw-cell input { width: 100%; min-width: 0; margin: 0; accent-color: var(--secondary); }
+.flaw-cell output { font: 500 11px/1 'Barlow', system-ui, sans-serif; font-variant-numeric: tabular-nums; text-align: right; }
+.flaw-cell.off output { color: var(--muted); }
+.flaw-tools { display: flex; gap: 6px; justify-content: flex-end; padding: 4px 10px 10px; }
+.flaw-tools button { height: 26px; min-height: 0; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px; background: transparent; color: var(--ink); cursor: pointer; }
+.flaw-tools button:hover { border-color: var(--secondary); }

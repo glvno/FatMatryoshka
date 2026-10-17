@@ -36,7 +36,7 @@ export type RoleDef =
 
 export type SliderOp = 'le' | 'ge' | 'eq' | 'ne' | 'between' | 'changed';
 /** the settings of a poly assembly (patch.ts PolyCfg) */
-export const POLY_SETTINGS = ['parts', 'assign', 'legato', 'priority', 'unit'] as const;
+export const POLY_SETTINGS = ['parts', 'assign', 'legato', 'priority'] as const;
 export type PolySetting = (typeof POLY_SETTINGS)[number];
 export type Pin = 'p1' | 'p2';
 export type AssemblyFact = 'exists' | 'open' | 'collapsed' | 'promoted' | 'exposed' | 'merged' | 'contains' | 'resized' | 'saved';

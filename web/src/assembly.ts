@@ -371,8 +371,12 @@ export function reconcile(p: Patch, a: AssemblyInst, defs?: Record<string, Modul
     if (!a.bypass) delete a.kept;
   }
   const typeOf = (id: number): string => p.modules.find((m) => m.id === id)!.type;
+  // a poly assembly's own Part feeds an input inside: the note comes from within, so the jack on the card is dead (an
+  // outside cable into the same input still crosses the frame and exposes it again below)
+  const fedByPart = (t: Target): boolean =>
+    !!a.poly && p.cables.some((c) => sameEnd(c.to, t) && member.has(c.from.module) && typeOf(c.from.module) === 'part' && ['pitch', 'gate', 'vel'].includes(c.from.port));
   const portOk = (dir: 'in' | 'out', t: Target): boolean => {
-    if (!member.has(t.module)) return false;
+    if (!member.has(t.module) || (dir === 'in' && fedByPart(t))) return false;
     const def = defs?.[typeOf(t.module)];
     if (def && !(dir === 'in' ? def.inputs : def.outputs).some((q) => q.name === t.port)) return false;
     return reachable(p, a, dir, t.module, t.port);

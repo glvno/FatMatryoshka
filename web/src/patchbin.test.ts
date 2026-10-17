@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFS } from './modules';
 import { addModule } from './patch';
-import { deviceBudget, DEVICE, encodePatch, MAX_CABLES, TYPE_ORDER, VERSION } from './patchbin';
+import { GROUP_REC, deviceBudget, DEVICE, encodePatch, MAX_CABLES, TYPE_ORDER, VERSION } from './patchbin';
 import { PRESETS } from './presets';
 import { polyGroups } from './poly';
 import { polyCfg, withParts } from './test-poly';
@@ -97,14 +97,16 @@ describe('binary patch format', () => {
   });
 
   it('writes the poly groups after the header: their settings, then every module\'s group', () => {
-    const p = withParts(PRESETS['Subtractive saw'](), 4, { assign: 1, legato: 2, priority: 1, unit: 9 });
+    const p = withParts(PRESETS['Subtractive saw'](), 4, { assign: 1, legato: 2, priority: 1, flaws: [{ detune: -7, drift: 40, bright: 5, env: -20, level: 80 }] });
     const b = encodePatch(p);
     expect(b[3]).toBe(1);
-    expect(Array.from(b.slice(8, 13))).toEqual([4, 1, 2, 1, 9]);
+    expect(Array.from(b.slice(8, 12))).toEqual([4, 1, 2, 1]);
+    expect(Array.from(b.slice(12, 22))).toEqual([256 - 7, 40, 5, 256 - 20, 80, 0, 0, 0, 0, 100]); // part 1's flaws, part 2 has none
+    const at = 8 + GROUP_REC;
     const members = polyGroups(p)[0].modules;
-    expect(Array.from(b.slice(13, 13 + p.modules.length))).toEqual(p.modules.map((m) => (members.has(m.id) ? 1 : 0)));
-    expect(b.slice(13, 13 + p.modules.length).some((g) => g === 0)).toBe(true); // Main and Output run once
-    expect(b[13 + p.modules.length]).toBe(TYPE_ORDER.indexOf(p.modules[0].type)); // the module records follow
+    expect(Array.from(b.slice(at, at + p.modules.length))).toEqual(p.modules.map((m) => (members.has(m.id) ? 1 : 0)));
+    expect(b.slice(at, at + p.modules.length).some((g) => g === 0)).toBe(true); // Main and Output run once
+    expect(b[at + p.modules.length]).toBe(TYPE_ORDER.indexOf(p.modules[0].type)); // the module records follow
   });
 
   it('writes parameters as Q16.16 and cables as indices', () => {

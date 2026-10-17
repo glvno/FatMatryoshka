@@ -38,7 +38,7 @@
 #define ENG_NGRAIN 1                /* granular lines (a shared module): 1 s of int16 plus the grain records, 88 KB */
 #else
 #define ENG_MAX_INST 72             /* module instances, all voices: a shared module has one, a per-note module one per note */
-#define ENG_NBUF 108u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
+#define ENG_NBUF 104u               /* signal buffers of ENG_BLOCK samples, all voices (a connected output, a summed input) */
 #define ENG_NDELAY 4                /* delay lines, all voices (one each when every voice has a delay) */
 #define ENG_NREV 2                  /* reverb memories, all voices */
 #define ENG_NSTRING 6               /* string lines, all voices (a per-note module: one per note) */
@@ -101,6 +101,9 @@ static uint32_t walk_hold(int32_t rate)
     uint64_t r = rate < 655 ? 655u : (uint64_t)rate, h = ((((uint64_t)ENG_SR << 17) / (128u * r)) + 1u) >> 1;
     return h < 1u ? 1u : h > 65535u ? 65535u : (uint32_t)h;
 }
+
+/* blocks between a part drift's targets: walk_hold(0.5 Hz) (engine.ts DRIFT_RATE) */
+#define DRIFT_HOLD ((uint32_t)(((((uint64_t)ENG_SR << 17) / (128u * 32768u)) + 1u) >> 1))
 
 /* base * 2^(x / 65536), saturating at 2^32 - 1. base: a phase increment, x: octaves Q16.16 */
 static uint32_t exp2_scale(uint32_t base, int32_t x)
@@ -260,7 +263,7 @@ typedef struct {
     esig_t *out[MAX_OUT];
     union {
         struct { uint32_t phase; int32_t s1, y1, y2, pm1, xb, ap[8]; uint32_t ph[4]; } osc;   /* s1: last sync sample; FM mode: feedback history, pm interpolation, decimator; ph: unison voices 2..5 (plain path) */
-        struct { uint32_t seed; int32_t unit; walk_t w; } rnd;   /* seed: engine.ts instSeed; unit: the group's unit the walk was started for */
+        struct { uint32_t seed; walk_t w; } rnd;   /* seed: engine.ts instSeed */
         struct { uint32_t phase, seed; int32_t held; uint32_t since; int32_t interval; uint16_t ticks; uint8_t clk_hi, rst_hi; } lfo;   /* interval: clock edge distance in samples, Q8 */
         struct { int32_t y; } gld;         /* Q24 */
         struct { uint32_t seed; int32_t y; } noise;   /* y: the colour one-pole, Q24 */
@@ -319,6 +322,8 @@ typedef struct {
                                         while sounding, this block's gate starts with one low sample */
     uint8_t legato;                  /* the note began over a held one (the Part module's legato output) */
     uint32_t on_stamp, off_stamp;
+    walk_t dw;                       /* the drift's random walk (modules.ts driftSeed), stepped every block */
+    int32_t flaw;                    /* the pitch flaw, octaves Q16: detune + drift (modules.ts flawQ16); the Part module adds it */
 } pv_t;
 
 /* an allocator and its parts (engine.ts Group): grp[0] is the shared keyboard (one part, legato auto, last note), grp[1..]
@@ -326,7 +331,12 @@ typedef struct {
 #define ENG_MAX_GROUPS POLY_MAX_GROUPS
 #define ENG_NPV (1 + ENG_MAX_GROUPS * ENG_MAX_PARTS)
 typedef struct {
-    uint8_t parts, assign, legato, priority, unit;   /* patch.ts PolyCfg */
+    uint8_t parts, assign, legato, priority;   /* patch.ts PolyCfg */
+    int8_t detune[ENG_MAX_PARTS];    /* each part's flaws (patch.ts PartFlaw): cents, */
+    uint8_t drift[ENG_MAX_PARTS];    /* % of +-20 cents of wander, */
+    int8_t bright[ENG_MAX_PARTS];    /* semitones on the filter cutoffs, */
+    int8_t env[ENG_MAX_PARTS];       /* % on the envelope times, */
+    uint8_t level[ENG_MAX_PARTS];    /* % of the VCA gains */
     uint8_t rot;                     /* rotate: the part the next note tries first */
     uint8_t pv0;                     /* its first part in E.pv[] */
     uint8_t nheld;
@@ -512,6 +522,9 @@ static void groups_reset(void)
             z[j] = 0;
         E.pv[v].note = 255u;
     }
+    for (g = 1; g <= E.ngrp; g++)                /* the drift walks: modules.ts driftSeed(g, part) */
+        for (v = 0; v < E.grp[g].parts; v++)
+            walk_init(&E.pv[E.grp[g].pv0 + v].dw, (0x51edu + g * 16u + v) * 0x9e3779b9u);
 }
 
 int eng_load(const uint8_t *p, uint32_t len)
@@ -524,7 +537,7 @@ int eng_load(const uint8_t *p, uint32_t len)
     E.clk_pulse = 0;
     E.ngrp = 0;
     E.grp[0].parts = 1;                          /* the shared keyboard: one part, legato auto, last note */
-    E.grp[0].assign = E.grp[0].legato = E.grp[0].priority = E.grp[0].unit = 0;
+    E.grp[0].assign = E.grp[0].legato = E.grp[0].priority = 0;
     groups_reset();
     pool_free(inst_own, ENG_MAX_INST);           /* what this voice's old patch held */
     pool_free(buf_own, ENG_NBUF);
@@ -549,18 +562,29 @@ int eng_load(const uint8_t *p, uint32_t len)
     if (!at)
         return -3;
     for (i = 0; i < p[3]; i++) {
-        const uint8_t *q = p + 8u + 5u * i;
+        const uint8_t *q = p + 8u + ENG_GROUP_REC * i;
         grp_t *g = &E.grp[1u + i];
-        if (q[0] < 1u || q[0] > ENG_MAX_PARTS || q[1] > 2u || q[2] > 2u || q[3] > 2u || q[4] > POLY_MAX_UNIT)
+        if (q[0] < 1u || q[0] > ENG_MAX_PARTS || q[1] > 2u || q[2] > 2u || q[3] > 2u)
             return -3;
         g->parts = q[0];
         g->assign = q[1];
         g->legato = q[2];
         g->priority = q[3];
-        g->unit = q[4];
+        for (v = 0; v < ENG_MAX_PARTS; v++) {
+            const uint8_t *f = q + 4u + 5u * v;
+            int32_t det = (int8_t)f[0], bri = (int8_t)f[2], env = (int8_t)f[3];
+            if (det < -POLY_FLAW_DETUNE || det > POLY_FLAW_DETUNE || f[1] > 100u || bri < -POLY_FLAW_BRIGHT || bri > POLY_FLAW_BRIGHT
+                || env < -POLY_FLAW_ENV || env > POLY_FLAW_ENV || f[4] > 100u)
+                return -3;
+            g->detune[v] = (int8_t)det;
+            g->drift[v] = f[1];
+            g->bright[v] = (int8_t)bri;
+            g->env[v] = (int8_t)env;
+            g->level[v] = f[4];
+        }
     }
     for (i = 0; i < E.nmod; i++) {
-        member[i] = p[3] ? p[8u + 5u * p[3] + i] : 0u;
+        member[i] = p[3] ? p[8u + ENG_GROUP_REC * p[3] + i] : 0u;
         if (member[i] > p[3])
             return -3;
     }
@@ -836,19 +860,18 @@ int eng_poly_get(uint32_t g, uint32_t field)
     if (!E.loaded || g >= E.ngrp || field >= ENG_NPOLY)
         return -1;
     x = &E.grp[1u + g];
-    return field == ENG_POLY_PARTS ? x->parts : field == ENG_POLY_ASSIGN ? x->assign : field == ENG_POLY_LEGATO ? x->legato : field == ENG_POLY_PRIORITY ? x->priority : x->unit;
+    return field == ENG_POLY_PARTS ? x->parts : field == ENG_POLY_ASSIGN ? x->assign : field == ENG_POLY_LEGATO ? x->legato : x->priority;
 }
 
 int eng_poly_set(uint32_t g, uint32_t field, uint32_t v)
 {
     grp_t *x;
-    if (!E.loaded || g >= E.ngrp || field == ENG_POLY_PARTS || field >= ENG_NPOLY || v > (field == ENG_POLY_UNIT ? POLY_MAX_UNIT : 2u))
+    if (!E.loaded || g >= E.ngrp || field == ENG_POLY_PARTS || field >= ENG_NPOLY || v > 2u)
         return 0;
     x = &E.grp[1u + g];
     if (field == ENG_POLY_ASSIGN) x->assign = (uint8_t)v;
     else if (field == ENG_POLY_LEGATO) x->legato = (uint8_t)v;
-    else if (field == ENG_POLY_PRIORITY) x->priority = (uint8_t)v;
-    else x->unit = (uint8_t)v;
+    else x->priority = (uint8_t)v;
     return 1;
 }
 
@@ -1288,13 +1311,13 @@ static void m_fm1(const node_t *nd, inst_t *it, uint32_t n)
     }
 }
 
-/* the Part module (modules.ts part): its part's note, the part's place among the parts (index -1 .. 1, 0 with one part),
+/* the Part module (modules.ts part): its part's note (with its detune / drift flaw), the part's place among the parts (index -1 .. 1, 0 with one part),
  * legato (the note began over a held one) and jump (the pitch step in octaves) */
 static void m_part(const node_t *nd, inst_t *it, uint32_t n)
 {
     const pv_t *x = cur_pv;
     int32_t np = cur_g->parts;
-    fill(it->out[PART_O_PITCH], x->pitch + mulq(E.ctl[ENG_CTL_BEND], 10923, 16), n);
+    fill(it->out[PART_O_PITCH], x->pitch + mulq(E.ctl[ENG_CTL_BEND], 10923, 16) + x->flaw, n);
     fill(it->out[PART_O_GATE], x->gate, n);
     if (x->retrig)
         it->out[PART_O_GATE][0] = 0;
@@ -1304,16 +1327,12 @@ static void m_part(const node_t *nd, inst_t *it, uint32_t n)
     fill(it->out[PART_O_JUMP], x->jump, n);
 }
 
-/* the Random module (modules.ts random): fixed (a hash of its seed and the group's unit) or a walk, Q15 -> Q16 */
+/* the Random module (modules.ts random): fixed (a hash of its seed) or a walk, Q15 -> Q16 */
 static void m_random(const node_t *nd, inst_t *it, uint32_t n)
 {
-    int32_t unit = cur_g->unit, q;
-    if (it->s.rnd.unit != unit) {
-        it->s.rnd.unit = unit;
-        walk_init(&it->s.rnd.w, (it->s.rnd.seed ^ 0x2545f491u) + (uint32_t)unit * 0x9e3779b9u);
-    }
+    int32_t q;
     walk_step(&it->s.rnd.w, walk_hold(EF(it, RANDOM_P_RATE)));   /* every block, so the wander does not depend on the mode */
-    q = round_q16(EF(it, RANDOM_P_MODE)) ? it->s.rnd.w.y : q15(hash32(it->s.rnd.seed + (uint32_t)unit * 0x9e3779b9u));
+    q = round_q16(EF(it, RANDOM_P_MODE)) ? it->s.rnd.w.y : q15(hash32(it->s.rnd.seed));
     fill(it->out[RANDOM_O_OUT], 2 * q, n);
 }
 
@@ -2917,6 +2936,43 @@ static void apply_cv(const node_t *nd, inst_t *it, uint32_t n)
     }
 }
 
+/* a part's flaws on its copy's effective parameters (engine.ts applyFlaws): bright x 2^(st / 12) on the filter / ladder
+ * cutoff, env x (100 + %) / 100 on the ADSR / envelope times, level x % / 100 on the VCA gain; clamped to the range */
+static void flaw_scale(const def_t *d, inst_t *it, uint32_t j, int64_t k_q16)
+{
+    if (k_q16 != ENG_ONE)
+        it->eff[j] = clampi((int32_t)(((int64_t)it->eff[j] * k_q16) >> 16), d->pmin[j], d->pmax[j]);
+}
+static void apply_flaws(const node_t *nd, inst_t *it)
+{
+    const def_t *d = &DEFS[nd->type];
+    int32_t b = cur_g->bright[cur_v], e = cur_g->env[cur_v], l = cur_g->level[cur_v];
+    int64_t ke = ((int64_t)(100 + e) << 16) / 100, kl = ((int64_t)l << 16) / 100;
+    switch (nd->type) {
+    case T_FILTER:
+    case T_LADDER:
+        if (b)
+            flaw_scale(d, it, nd->type == T_FILTER ? FILTER_P_CUTOFF : LADDER_P_CUTOFF, (int64_t)exp2_q16(b * 65536 / 12 + (16 << 16)));
+        break;
+    case T_ADSR:
+        flaw_scale(d, it, ADSR_P_A, ke);
+        flaw_scale(d, it, ADSR_P_D, ke);
+        flaw_scale(d, it, ADSR_P_R, ke);
+        break;
+    case T_ENV:
+        flaw_scale(d, it, ENV_P_R1, ke);
+        flaw_scale(d, it, ENV_P_R2, ke);
+        flaw_scale(d, it, ENV_P_R3, ke);
+        flaw_scale(d, it, ENV_P_R4, ke);
+        break;
+    case T_VCA:
+        flaw_scale(d, it, VCA_P_GAIN, kl);
+        break;
+    default:
+        break;
+    }
+}
+
 /* a bypassed module: every output carries the through input (the definition's `thru`, e.g. the filter's `in`), or silence
  * for a module without one (an oscillator or envelope is muted). Its state is untouched, so it resumes where it stopped. */
 static void m_bypass(const node_t *nd, inst_t *it, uint32_t n)
@@ -2997,6 +3053,14 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
         E.morph = E.has_b ? morph_position(n) : 0;
         E.clk_pulse = E.clk_seen != clk_ticks ? (n + 1u) / 2u : 0u;   /* the Main clock: half a block per block that saw a tick */
         E.clk_seen = clk_ticks;
+        for (k = 1; k <= E.ngrp; k++) {                 /* the parts' pitch flaws: detune + drift (engine.ts render) */
+            const grp_t *g = &E.grp[k];
+            for (v = 0; v < g->parts; v++) {
+                pv_t *x = &E.pv[g->pv0 + v];
+                walk_step(&x->dw, DRIFT_HOLD);           /* every block, so the wander does not depend on the amount */
+                x->flaw = (int32_t)(((int64_t)g->detune[v] * 65536) / 1200) + (int32_t)(((int64_t)x->dw.y * g->drift[v] * 1092) / 3276800);
+            }
+        }
         for (k = 0; k < E.norder; k++) {
             const node_t *nd = &E.node[E.order[k]];
             cur_g = &E.grp[nd->grp];
@@ -3018,6 +3082,8 @@ static void render_voice(int32_t *left, int32_t *right, uint32_t total)   /* the
                 }
                 ENG_PROF(1, E.order[k], v);
                 apply_cv(nd, it, n);
+                if (nd->grp)
+                    apply_flaws(nd, it);
                 ENG_PROF(2, E.order[k], v);
                 if (nd->bypass)
                     m_bypass(nd, it, n);

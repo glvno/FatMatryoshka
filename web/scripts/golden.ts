@@ -74,7 +74,7 @@ const kit = (name: string, b: Build, voices = 1): void => {
 };
 /** the modules `ids` as a poly assembly with these settings (the rest of the patch plays the shared keyboard) */
 const polyAsm = (p: Patch, ids: number[], cfg: Partial<PolyCfg>): void => {
-  makeAssembly(p, ids, `poly ${ids.join(' ')}`).poly = { parts: 4, assign: 0, legato: 0, priority: 0, unit: 0, ...cfg };
+  makeAssembly(p, ids, `poly ${ids.join(' ')}`).poly = { parts: 4, assign: 0, legato: 0, priority: 0, ...cfg };
 };
 kit('waves', (add, wire) => {
   const kb = add('fm1', 0, 0);
@@ -225,7 +225,7 @@ events['legato-glide'] = [
   [128 * 150, 'off', 72],
 ];
 // analog drift: drifting unison copies, the Main tol on the filter and its drift walk on a second oscillator, three
-// notes (each with its own tolerance and walk), a non-zero unit
+// notes (each with its own tolerance and walk), a unit (dropped since the flaws replaced it)
 kit('drift', (add, wire) => {
   const kb = add('fm1', 0, 0, { unit: 7 });
   const o1 = add('osc', 0, 0, { wave: 2, level: 0.6, unison: 3, detune: 8, drift: 30 });
@@ -335,8 +335,8 @@ events['poly-layers'] = [
   [128 * 108, 'off', 55],
   [128 * 112, 'off', 72],
 ];
-// four parts, lowest free, unit 5: a fixed Random (tolerance) on each part's cutoff, a walking one (drift, its rate swept
-// by a shared LFO) on its pitch, the Part's index on the pan; a walking Random outside (the shared keyboard's, unit 0)
+// four parts, lowest free, every part with its own flaws: a fixed Random (tolerance) on each part's cutoff, a walking one (drift, its rate swept
+// by a shared LFO) on its pitch, the Part's index on the pan; a walking Random outside (the shared keyboard's)
 // on every part's resonance
 const randomParts: number[] = [];
 kit('part-random', (add, wire) => {
@@ -367,9 +367,48 @@ kit('part-random', (add, wire) => {
   wire(pan, 'r', out, 'r');
   randomParts.push(pt, rf, rw, osc, flt, env, vca, pan);
 });
-polyAsm(tests['part-random'], randomParts, { parts: 4, assign: 1, unit: 5 });
+polyAsm(tests['part-random'], randomParts, {
+  parts: 4, assign: 1,
+  flaws: [{ detune: 12, drift: 60, bright: -5, env: 30, level: 90 }, { detune: -20, drift: 100, bright: 7, env: -40, level: 100 }, { detune: 0, drift: 0, bright: 0, env: 0, level: 70 }],
+});
 events['part-random'] = POLY_EVENTS;
 ends['part-random'] = 128 * 400;
+// the part flaws alone, every kind at its ends: detune and drift on the Part's pitch, bright on a filter and a ladder,
+// env on an ADSR and an envelope, level on the VCA; four parts, a chord
+const flawParts: number[] = [];
+kit('part-flaws', (add, wire) => {
+  add('fm1', 0, 0);
+  const pt = add('part', 0, 0);
+  const osc = add('osc', 0, 0, { wave: 2, level: 0.5 });
+  const flt = add('filter', 0, 0, { cutoff: 900, res: 0.3 });
+  const lad = add('ladder', 0, 0, { cutoff: 2500, res: 0.2 });
+  const env = add('adsr', 0, 0, { a: 0.01, d: 0.15, s: 0.5, r: 0.08 });
+  const lr = add('env', 0, 0, { r1: 0.02, r2: 0.1, r3: 0.3, r4: 0.05 });
+  const vca = add('vca', 0, 0);
+  const vca2 = add('vca', 0, 0);
+  const out = add('output', 0, 0, { level: 0.6 });
+  wire(pt, 'pitch', osc, 'pitch');
+  wire(osc, 'out', flt, 'in');
+  wire(flt, 'lp12', lad, 'in');
+  wire(lad, 'lp24', vca, 'in');
+  wire(pt, 'gate', env, 'gate');
+  wire(pt, 'gate', lr, 'gate');
+  wire(env, 'env', vca, 'cv');
+  wire(vca, 'out', vca2, 'in');
+  wire(lr, 'env', vca2, 'cv');
+  wire(vca2, 'out', out, 'l');
+  flawParts.push(pt, osc, flt, lad, env, lr, vca, vca2);
+});
+polyAsm(tests['part-flaws'], flawParts, {
+  parts: 4,
+  flaws: [
+    { detune: 50, drift: 100, bright: 24, env: 50, level: 100 },
+    { detune: -50, drift: 0, bright: -24, env: -50, level: 50 },
+    { detune: 7, drift: 40, bright: 3, env: 10, level: 0 },
+  ],
+});
+events['part-flaws'] = POLY_EVENTS;
+ends['part-flaws'] = 128 * 400;
 kit('dyn', (add, wire) => {
   const kb = add('fm1', 0, 0);
   const osc = add('osc', 0, 0, { wave: 2, level: 0.9 });

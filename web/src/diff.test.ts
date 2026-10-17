@@ -19,7 +19,7 @@ describe('patch diff', () => {
     const dly = b.modules.find((m) => m.type === 'delay')!;
     removeModule(b, dly.id);
     const grouped = makeAssembly(b, [lfo.id], 'wobble');
-    grouped.poly = { parts: 4, assign: 0, legato: 0, priority: 0, unit: 0 };
+    grouped.poly = { parts: 4, assign: 0, legato: 0, priority: 0 };
     b.arp = { ...(a.arp ?? { mode: 0, scale: 5, root: 60, octaves: 1, chaos: 0, vchaos: 0, rchaos: 0, steps: 16, pulses: 16, rot: 0, rate: 6, bpm: 120 }), bpm: 140 };
     const d = diffPatches(a, b, DEFS);
     expect(d.params).toHaveLength(1);

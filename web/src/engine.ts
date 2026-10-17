@@ -8,8 +8,8 @@
 // held). A module reading another group's per-part output gets the sum over those parts; a per-part module reading a
 // shared output gets that one buffer.
 
-import { IMPLS, instSeed, type Ctx, type ModuleImpl, type Voice } from './modules';
-import { defaultMap, modulate, morphValue, paramValue, processingOrder, SOURCES, type Cable, type Patch, type PolyCfg, type Range, type Source, thruInput } from './patch';
+import { driftSeed, flawQ16, IMPLS, instSeed, walkHold, walkInit, walkStep, type Ctx, type ModuleImpl, type Voice, type Walk } from './modules';
+import { defaultMap, FLAW_TARGETS, flawOf, modulate, type ParamDef, type PartFlaw, morphValue, paramValue, processingOrder, SOURCES, type Cable, type Patch, type PolyCfg, type Range, type Source, thruInput } from './patch';
 import { polyGroups } from './poly';
 
 export const BLOCK = 128;
@@ -52,6 +52,8 @@ interface Node {
   /** macro ranges per pin (patch.ts ModuleInst.range) */
   range: [Record<string, Range>, Record<string, Range>];
   inst: Inst[];
+  /** the parameters the part flaws move (FLAW_TARGETS), with their definitions */
+  flawParams: { key: 'bright' | 'env' | 'level'; pd: ParamDef }[];
 }
 
 /** a part: what its Part module outputs plus what the allocator needs */
@@ -63,6 +65,8 @@ interface VoiceState extends Voice {
   offStamp: number;
   /** the part was taken over while sounding: this block's gate starts with one low sample so envelopes restart */
   retrig: boolean;
+  /** the drift's random walk (driftSeed), stepped every block */
+  walk: Walk;
 }
 
 /** an allocator and its parts: a poly assembly's, or the shared keyboard (one part, legato auto, last note) */
@@ -77,21 +81,25 @@ interface Group {
   rot: number;
 }
 
-const newVoice = (index: number, parts: number): VoiceState => ({
-  pitch: 0, gate: 0, velocity: 0, clock: false, bend: 0, mod: 0, at: 0, index, parts, legato: 0, jump: 0, unit: 0,
-  note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false,
+const newVoice = (index: number, parts: number, seed: number): VoiceState => ({
+  pitch: 0, gate: 0, velocity: 0, clock: false, bend: 0, mod: 0, at: 0, index, parts, legato: 0, jump: 0, flaw: 0,
+  note: -1, on: false, onStamp: 0, offStamp: 0, retrig: false, walk: walkInit(seed),
 });
-const KEYBOARD: PolyCfg = { parts: 1, assign: 0, legato: 0, priority: 0, unit: 0 };
-const newGroup = (key: string, cfg: PolyCfg): Group => ({
-  key, cfg: { ...cfg }, parts: Array.from({ length: cfg.parts }, (_, i) => newVoice(i, cfg.parts)), held: [], rot: 0,
+const KEYBOARD: PolyCfg = { parts: 1, assign: 0, legato: 0, priority: 0 };
+/** g: the poly group's index (its parts' drift seeds), -1 for the shared keyboard */
+const newGroup = (key: string, cfg: PolyCfg, g: number): Group => ({
+  key, cfg: { ...cfg }, parts: Array.from({ length: cfg.parts }, (_, i) => newVoice(i, cfg.parts, driftSeed(g + 1, i))), held: [], rot: 0,
 });
+/** how often a part's drift picks a new target (Hz) */
+export const DRIFT_RATE = 0.5;
+const FLAW_KEYS3 = Object.keys(FLAW_TARGETS) as ('bright' | 'env' | 'level')[];
 
 export class Engine {
   private nodes = new Map<number, Node>();
   private order: Node[] = [];
   private outputs: Node[] = [];
   /** the shared keyboard (the Main module, Part modules outside poly assemblies) */
-  private kb: Group = newGroup('kb', KEYBOARD);
+  private kb: Group = newGroup('kb', KEYBOARD, -1);
   /** the poly assemblies' allocators, in polyGroups order */
   private groups: Group[] = [];
   private stamp = 0;
@@ -139,9 +147,9 @@ export class Engine {
   load(patch: Patch): void {
     const pg = polyGroups(patch);
     const oldGroups = new Map(this.groups.map((g) => [g.key, g]));
-    this.groups = pg.map((x) => {
+    this.groups = pg.map((x, i) => {
       const key = `${x.asm.id}:${x.cfg.parts}`;
-      const g = oldGroups.get(key) ?? newGroup(key, x.cfg);
+      const g = oldGroups.get(key) ?? newGroup(key, x.cfg, i);
       g.cfg = { ...x.cfg };
       return g;
     });
@@ -173,6 +181,7 @@ export class Engine {
             paramsB: null,
             range: [{}, {}],
             inst: Array.from({ length: ninst }, (_, v) => this.newInst(impl, instSeed(mi, v))),
+            flawParams: FLAW_KEYS3.flatMap((key) => (FLAW_TARGETS[key][m.type] ?? []).map((name) => ({ key, pd: impl.def.params.find((q) => q.name === name)! }))),
           };
       node.group = group;
       node.params = { ...m.params };
@@ -333,6 +342,15 @@ export class Engine {
         base = paramValue(pd, lo + Math.min(1, Math.max(0, rv)) * (hi - lo));
       }
       inst.eff[pd.name] = touched ? modulate(pd, base, mod) : base;
+    }
+  }
+
+  /** a part's flaws on its copy's effective parameters (after the modulation): the cutoffs, envelope times, VCA gains */
+  private applyFlaws(node: Node, inst: Inst, f: PartFlaw): void {
+    for (const { key, pd } of node.flawParams) {
+      const v = inst.eff[pd.name];
+      const k = key === 'bright' ? (f.bright ? Math.pow(2, f.bright / 12) : 1) : key === 'env' ? (100 + f.env) / 100 : f.level / 100;
+      if (k !== 1) inst.eff[pd.name] = Math.min(pd.max, Math.max(pd.min, v * k));
     }
   }
 
@@ -516,9 +534,15 @@ export class Engine {
       const clock = this.ticks > 0; // the Main module's clock output: one pulse per block that saw a tick
       this.ticks = 0;
       this.morphT = this.hasB ? this.morphPosition(n) : 0;
+      const hold = walkHold(this.sampleRate, DRIFT_RATE);
+      for (const g of this.groups)
+        g.parts.forEach((x, v) => {
+          const f = flawOf(g.cfg, v);
+          walkStep(x.walk, hold); // every block, so the wander does not depend on the amount
+          x.flaw = flawQ16(f.detune, f.drift, x.walk.y) / 65536;
+        });
       for (const g of all)
         for (const x of g.parts) {
-          x.unit = g.cfg.unit;
           x.clock = clock;
           x.bend = this.ctl.bend;
           x.mod = this.ctl.mod;
@@ -531,6 +555,7 @@ export class Engine {
           const inst = node.inst[v];
           this.gather(node, inst, v, n);
           this.applyCv(node, inst, n);
+          if (parts && node.flawParams.length) this.applyFlaws(node, inst, flawOf(this.groups[node.group].cfg, v));
           this.run(node, inst, parts ? parts[v] : kb, inst.out, n);
           this.guard(node, inst, n);
         }

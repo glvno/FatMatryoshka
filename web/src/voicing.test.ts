@@ -276,9 +276,9 @@ describe('patches from before poly assemblies', () => {
     return validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
   }
 
-  it('Main legato / priority / unit move to a one-part poly assembly; a plain mono patch stays as it is', () => {
+  it('Main legato / priority move to a one-part poly assembly (unit is dropped); a plain mono patch stays as it is', () => {
     const q = old((p, { kb }) => Object.assign(p.modules.find((m) => m.id === kb)!.params, { legato: 2, priority: 1, unit: 9 }));
-    expect(polyGroups(q)[0].cfg).toEqual({ parts: 1, assign: 2, legato: 2, priority: 1, unit: 9 });
+    expect(polyGroups(q)[0].cfg).toEqual({ parts: 1, assign: 2, legato: 2, priority: 1 }); // the unit is gone (the flaws replaced it)
     expect(q.modules.find((m) => m.type === 'fm1')!.params).not.toHaveProperty('legato');
     const plain = old(() => {});
     expect(plain.assemblies).toBeUndefined();

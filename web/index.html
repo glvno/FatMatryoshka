@@ -24,7 +24,7 @@
       <div class="patch-controls">
         <!-- sidebar panels in the cards' style: a header strip with a tag and a condensed title, a body of controls -->
         <section class="spanel" aria-label="Patch">
-          <div class="shead"><span class="mtag util">PATCH</span><input id="patch-name" aria-label="Patch name" title="Rename patch" /></div>
+          <div class="shead"><span class="mtag util">PATCH</span><input id="patch-name" aria-label="Patch name" title="Rename patch" /><button id="save-patch-btn" class="icon-btn" title="Save patch to Your patches (Ctrl/Cmd+S)" aria-label="Save patch"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 1.5h8.6l2.4 2.4v10.6h-11z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.8 1.5v3.8h5.6V1.5M4.5 14.5V9.3h7v5.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button></div>
           <div class="sbody">
             <button id="new-patch-btn">New patch</button>
             <button id="add-btn" class="primary">+ Add module</button>
@@ -43,7 +43,7 @@
           <div class="shead"><span class="mtag mod">LEARN</span><span class="stitle">Get started</span></div>
           <div class="sbody">
             <button id="tour-btn">Tutorial ↗</button>
-            <label class="example-picker"><span>Examples</span><select id="preset" aria-label="Load an example"></select></label>
+            <label class="example-picker"><span>Open</span><select id="preset" aria-label="Open a saved patch or an example"></select></label>
           </div>
         </section>
       </div>

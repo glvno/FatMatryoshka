@@ -4,7 +4,7 @@
 import { writeFileSync } from 'node:fs';
 import { ASSIGN_MODES, DEFS, DELAY_DIVS, DELAY_CLK_PPQN, LEGATO_MODES, PRIORITIES } from '../src/modules';
 import { encodePatch, TYPE_ORDER, toQ16 } from '../src/patchbin';
-import { MAX_PARTS, MAX_UNIT, thruInput } from '../src/patch';
+import { FLAW_RANGE, MAX_PARTS, thruInput } from '../src/patch';
 import { MAX_POLY } from '../src/poly';
 import { PRESETS } from '../src/presets';
 
@@ -45,7 +45,9 @@ w();
 const names = (a: string[]): string => `{${a.map((c) => `"${c.toUpperCase()}"`).join(', ')}}`;
 w(`#define POLY_MAX_GROUPS ${MAX_POLY}`);
 w(`#define POLY_MAX_PARTS ${MAX_PARTS}`);
-w(`#define POLY_MAX_UNIT ${MAX_UNIT}`);
+w(`#define POLY_FLAW_DETUNE ${FLAW_RANGE.detune[1]}  /* a part's flaws (patch.ts PartFlaw): detune -n..n cents, bright -n..n semitones, env -n..n % */`);
+w(`#define POLY_FLAW_BRIGHT ${FLAW_RANGE.bright[1]}`);
+w(`#define POLY_FLAW_ENV ${FLAW_RANGE.env[1]}`);
 w(`static const char *const POLY_ASSIGN_NAME[${ASSIGN_MODES.length}] = ${names(ASSIGN_MODES)};`);
 w(`static const char *const POLY_LEGATO_NAME[${LEGATO_MODES.length}] = ${names(LEGATO_MODES)};`);
 w(`static const char *const POLY_PRIORITY_NAME[${PRIORITIES.length}] = ${names(PRIORITIES)};`);

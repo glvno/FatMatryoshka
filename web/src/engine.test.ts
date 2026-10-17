@@ -1324,10 +1324,10 @@ describe('polyphony', () => {
     fixAssemblies(q, DEFS);
     expect(polyCfg(q)).toEqual(polyCfg(p));
     const raw = JSON.parse(JSON.stringify(p));
-    raw.assemblies.find((a: { poly?: unknown }) => a.poly).poly = { parts: 99, assign: 7, legato: -1, priority: 'x', unit: 64 };
+    raw.assemblies.find((a: { poly?: unknown }) => a.poly).poly = { parts: 99, assign: 7, legato: -1, priority: 'x', unit: 64, flaws: [{ detune: 99, drift: -5, bright: 2.4, env: 'x', level: 300 }, {}] };
     const r = validatePatch(raw, DEFS);
     fixAssemblies(r, DEFS);
-    expect(polyCfg(r)).toEqual({ parts: EDITOR_MAX_PARTS, assign: 2, legato: 0, priority: 0, unit: 63 });
+    expect(polyCfg(r)).toEqual({ parts: EDITOR_MAX_PARTS, assign: 2, legato: 0, priority: 0, flaws: [{ detune: 50, drift: 0, bright: 2, env: 0, level: 100 }] });
   });
 
   it('two poly assemblies layer: each plays every note on its own parts; a cable out of one sums its parts', () => {
@@ -1357,6 +1357,44 @@ describe('polyphony', () => {
 });
 
 describe('Part and Random', () => {
+  it('part flaws: detune and drift on the Part pitch, bright on the cutoff, env on the ADSR times, level on the VCA gain', () => {
+    const p = emptyPatch();
+    const part = addModule(p, DEFS.part, 0, 0);
+    const flt = addModule(p, DEFS.filter, 0, 0);
+    const env = addModule(p, DEFS.adsr, 0, 0);
+    const vca = addModule(p, DEFS.vca, 0, 0);
+    flt.params.cutoff = 1000;
+    env.params.a = 0.1;
+    vca.params.gain = 1;
+    makeAssembly(p, [part.id, flt.id, env.id, vca.id], 'v').poly = {
+      ...POLY_DEFAULT, parts: 3, assign: 1,
+      flaws: [{ detune: 30, drift: 0, bright: 12, env: 50, level: 40 }, { detune: 0, drift: 100, bright: 0, env: 0, level: 100 }],
+    };
+    const e = new Engine(SR);
+    e.load(p);
+    for (const n of [60, 62, 64]) e.noteOn(n);
+    type Nodes = Map<number, { inst: { out: Record<string, Float32Array>; eff: Record<string, number> }[] }>;
+    const nodes = (): Nodes => (e as unknown as { nodes: Nodes }).nodes;
+    const pitch = (v: number): number => nodes().get(part.id)!.inst[v].out.pitch[0];
+    render(e, BLOCK);
+    expect(pitch(0)).toBeCloseTo(30 / 1200, 4); // C4 + 30 cents
+    expect(pitch(2)).toBeCloseTo(4 / 12, 6); // E4, no flaws
+    const eff = (id: number, v: number, name: string): number => nodes().get(id)!.inst[v].eff[name];
+    expect(eff(flt.id, 0, 'cutoff')).toBeCloseTo(2000, 3);
+    expect(eff(flt.id, 1, 'cutoff')).toBeCloseTo(1000, 6);
+    expect(eff(env.id, 0, 'a')).toBeCloseTo(0.15, 6);
+    expect(eff(vca.id, 0, 'gain')).toBeCloseTo(0.4, 6);
+    expect(eff(vca.id, 2, 'gain')).toBeCloseTo(1, 6);
+    // part 2 drifts: within +-20 cents of D4, and it moves
+    const seen: number[] = [];
+    for (let i = 0; i < 2000; i++) {
+      render(e, BLOCK);
+      seen.push(pitch(1) - 2 / 12);
+    }
+    expect(Math.max(...seen.map(Math.abs))).toBeLessThanOrEqual(20 / 1200 + 1e-9);
+    expect(Math.max(...seen) - Math.min(...seen)).toBeGreaterThan(5 / 1200);
+  });
+
   it('Part: index is -1..1 across the parts (0 with one), legato and jump per part', () => {
     const p = emptyPatch();
     const part = addModule(p, DEFS.part, 0, 0);
@@ -1374,12 +1412,12 @@ describe('Part and Random', () => {
     expect(out('pitch', 1)).toBeCloseTo(1, 6);
   });
 
-  it('Random fixed: a value per part that differs between parts and units and never moves; walk wanders within -1..1', () => {
-    const build = (mode: number, unit: number): { e: Engine; id: number } => {
+  it('Random fixed: a value per part that differs between parts and never moves; walk wanders within -1..1', () => {
+    const build = (mode: number): { e: Engine; id: number } => {
       const p = emptyPatch();
       const r = addModule(p, DEFS.random, 0, 0);
       r.params.mode = mode;
-      makeAssembly(p, [r.id], 'v').poly = { ...POLY_DEFAULT, parts: 2, unit };
+      makeAssembly(p, [r.id], 'v').poly = { ...POLY_DEFAULT, parts: 2 };
       const e = new Engine(SR);
       e.load(p);
       return { e, id: r.id };
@@ -1388,13 +1426,12 @@ describe('Part and Random', () => {
       render(x.e, BLOCK);
       return (x.e as unknown as { nodes: Map<number, { inst: { out: Record<string, Float32Array> }[] }> }).nodes.get(x.id)!.inst.map((i) => i.out.out[0]);
     };
-    const a = build(0, 3);
+    const a = build(0);
     const first = vals(a);
     render(a.e, SR);
     expect(vals(a)).toEqual(first);
     expect(first[0]).not.toBe(first[1]);
-    expect(vals(build(0, 4))).not.toEqual(first);
-    const w = build(1, 0);
+    const w = build(1);
     const seen: number[] = [];
     for (let i = 0; i < 400; i++) seen.push(vals(w)[0]);
     expect(seen.every((v) => v >= -1 && v <= 1)).toBe(true);

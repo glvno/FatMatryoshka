@@ -22,8 +22,8 @@ export interface Voice {
   legato: number;
   /** the last pitch step of this voice in octaves, signed, kept until the next note */
   jump: number;
-  /** the poly assembly's `unit` (which instrument of the model): reseeds the Random modules inside it; 0 outside */
-  unit: number;
+  /** the part's pitch flaw in octaves (its detune plus its drift's wander, PolyCfg.flaws): the Part module adds it; 0 outside */
+  flaw: number;
 }
 
 /** the pitch bend range: +-2 semitones on the Main module's pitch output */
@@ -138,8 +138,13 @@ export function walkStep(w: Walk, hold: number): void {
 export const walkHold = (sr: number, rate: number): number => Math.max(1, Math.min(65535, Math.round(sr / (128 * Math.max(0.01, rate)))));
 /** the seed of a module instance: module index in the patch, part */
 export const instSeed = (mod: number, v: number): number => Math.imul(mod * 8 + v + 1, 0x9e3779b9) >>> 0;
-/** a Random module's fixed value (Q15): its instance seed and the unit of its poly assembly */
-export const randomFixed = (seed: number, unit: number): number => q15(hash32((seed + Math.imul(Math.round(unit), 0x9e3779b9)) >>> 0));
+/** a Random module's fixed value (Q15) from its instance seed */
+export const randomFixed = (seed: number): number => q15(hash32(seed >>> 0));
+/** the seed of part v's drift walk in poly group g (engine.c group_seed) */
+export const driftSeed = (g: number, v: number): number => Math.imul(0x51ed + g * 16 + v, 0x9e3779b9) >>> 0;
+/** a part's pitch flaw, Q16 octaves: detune (cents) plus the drift walk (Q15) scaled by drift % (engine.c the same) */
+export const flawQ16 = (detune: number, drift: number, walkY: number): number =>
+  Math.trunc((detune * 65536) / 1200) + Math.trunc((walkY * drift * 1092) / 3276800); // 1092 = DRIFT_CENTS (20) / 1200 in Q16
 
 export const LEGATO_MODES = ['auto', 'off', 'on'];
 export const PRIORITIES = ['last', 'low', 'high'];
@@ -2074,7 +2079,7 @@ const crush: ModuleImpl<{ held: number; cnt: number } & OsState> = {
 };
 
 /**
- * A poly assembly's own keyboard: the note its part plays (pitch with the bend, gate, velocity), the part's place among
+ * A poly assembly's own keyboard: the note its part plays (pitch with the bend and the part's detune / drift flaw, gate, velocity), the part's place among
  * the parts (index -1 first .. 1 last, 0 with one part), whether the note began over a held one (legato) and its pitch
  * step from the previous note in octaves (jump; the first from C4). Outside a poly assembly it is the shared keyboard.
  */
@@ -2089,7 +2094,7 @@ const part: ModuleImpl<null> = {
   init: () => null,
   process(c) {
     const v = c.voice;
-    c.out.pitch.fill(v.pitch + v.bend * BEND_OCT, 0, c.n);
+    c.out.pitch.fill(v.pitch + v.bend * BEND_OCT + v.flaw, 0, c.n);
     c.out.gate.fill(v.gate, 0, c.n);
     c.out.vel.fill(v.velocity, 0, c.n);
     c.out.index.fill(v.parts > 1 ? (2 * v.index - (v.parts - 1)) / (v.parts - 1) : 0, 0, c.n);
@@ -2101,13 +2106,11 @@ const part: ModuleImpl<null> = {
 export const RANDOM_MODES = ['fixed', 'walk'];
 interface RandomState {
   seed: number;
-  unit: number;
   walk: Walk;
 }
 /**
  * A random value per copy, -1..1: `fixed` never changes (an analog part's tolerance), `walk` wanders slowly, a new target
- * every 1 / rate seconds (drift). Each copy has its own: the seed mixes the module's place in the patch, its part and its
- * poly assembly's unit (a different unit is a different instrument of the same model).
+ * every 1 / rate seconds (drift). Each copy has its own: the seed mixes the module's place in the patch and its part.
  */
 const random: ModuleImpl<RandomState> = {
   def: {
@@ -2117,18 +2120,14 @@ const random: ModuleImpl<RandomState> = {
     outputs: [control('out')],
     params: [param('mode', 0, 1, 0, { step: 1, choices: RANDOM_MODES }), param('rate', 0.05, 20, 1.5, { unit: 'Hz', step: 0.01, log: true })],
   },
-  init: () => ({ seed: 0, unit: 0, walk: walkInit(0) }),
+  init: () => ({ seed: 0, walk: walkInit(0) }),
   seed(s, seed) {
     s.seed = seed;
     s.walk = walkInit(seed ^ 0x2545f491);
   },
   process(c, s) {
-    if (s.unit !== c.voice.unit) {
-      s.unit = c.voice.unit;
-      s.walk = walkInit((s.seed ^ 0x2545f491) + Math.imul(s.unit, 0x9e3779b9));
-    }
     walkStep(s.walk, walkHold(c.sr, c.p.rate ?? 1.5)); // every block, so the wander does not depend on the mode
-    const q = Math.round(c.p.mode ?? 0) ? s.walk.y : randomFixed(s.seed, s.unit);
+    const q = Math.round(c.p.mode ?? 0) ? s.walk.y : randomFixed(s.seed);
     c.out.out.fill(q / 32768, 0, c.n);
   },
 };

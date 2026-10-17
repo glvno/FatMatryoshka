@@ -2859,7 +2859,7 @@
             "kind": "module",
             "ref": { "type": "part" }
           },
-          "text": "This voice is a *poly assembly* with one part, so it is **mono**: one note at a time. Its settings sit in the strip under the frame’s header: `parts`, `assign`, `legato`, `priority` and `unit`. Hold a key, then press a second one without letting go of the first, and release it again. The pitch jumps, but the envelope does not start over: the gate stays up while any key is down. That is **legato**, what `legato` `auto` does with one part.",
+          "text": "This voice is a *poly assembly* with one part, so it is **mono**: one note at a time. Its settings sit in the strip under the frame’s header: `parts`, `assign`, `legato`, `priority` and `flaws`. Hold a key, then press a second one without letting go of the first, and release it again. The pitch jumps, but the envelope does not start over: the gate stays up while any key is down. That is **legato**, what `legato` `auto` does with one part.",
           "why": "Every analog monosynth had to decide what a second key does. Most of them (a Minimoog, an SH-101 in its default) simply re-pitch the oscillator: the filter and amplitude envelopes keep going. The **Part** module inside is the voice’s own keyboard: it gives the modules around it their `pitch` and `gate`."
         },
         {
@@ -3108,16 +3108,12 @@
           ]
         },
         {
-          "id": "unit",
+          "id": "flaws",
           "kind": "continue",
-          "title": "Another instrument",
+          "title": "Flaws by hand",
           "playback": true,
-          "pointer": {
-            "kind": "module",
-            "ref": { "type": "part" }
-          },
-          "text": "Turn the voice’s `unit`. Each value gives every **Random** inside a different set of values: another instrument of the same model, drifted differently. Pick the one you like.",
-          "why": "The values are fixed per unit, so a patch sounds the same every time it loads, on the FM-1 too."
+          "text": "The Randoms pick their values for you. Each part also has flaws you set yourself: click `flaws` in the strip and give every part its own detune, drift, brightness, envelope time and level. Make one part a little flat and slow, another bright, and play a chord.",
+          "why": "The flaws are stored with the patch, so it sounds the same every time it loads, on the FM-1 too."
         }
       ]
     },

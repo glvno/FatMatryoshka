@@ -651,7 +651,9 @@ static const char *const DELAY_DIV_NAME[DELAY_NDIV] = {"1/16T", "1/16", "1/8T", 
 
 #define POLY_MAX_GROUPS 4
 #define POLY_MAX_PARTS 8
-#define POLY_MAX_UNIT 63
+#define POLY_FLAW_DETUNE 50  /* a part's flaws (patch.ts PartFlaw): detune -n..n cents, bright -n..n semitones, env -n..n % */
+#define POLY_FLAW_BRIGHT 24
+#define POLY_FLAW_ENV 50
 static const char *const POLY_ASSIGN_NAME[3] = {"ROTATE", "LOWEST", "REUSE"};
 static const char *const POLY_LEGATO_NAME[3] = {"AUTO", "OFF", "ON"};
 static const char *const POLY_PRIORITY_NAME[3] = {"LAST", "LOW", "HIGH"};

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Compact binary patch format, read by firmware/src/engine.c (eng_load).
 //
-//   u8  magic 0xA1, u8 version 20, u8 module count, u8 poly group count G (0..MAX_POLY), u16 LE cable count, u16 LE flags
+//   u8  magic 0xA1, u8 version 21, u8 module count, u8 poly group count G (0..MAX_POLY), u16 LE cable count, u16 LE flags
 //       (bit 0: a morph B set follows the cables; bit 2: disabled-input masks follow it; bit 3: additional input routes follow masks; bit 1: macro ranges are last)
-//   per poly group (poly.ts polyGroups order): u8 parts (1..8), u8 assign, u8 legato, u8 priority, u8 unit (patch.ts PolyCfg)
+//   per poly group (poly.ts polyGroups order, GROUP_REC bytes): u8 parts (1..8), u8 assign, u8 legato, u8 priority, then for
+//                each of MAX_PARTS parts its flaws (patch.ts PartFlaw): i8 detune, u8 drift, i8 bright, i8 env, u8 level
 //   with G > 0: one u8 per module, its poly group (0: it runs once, 1..G); delay, reverb, chorus, granular and output are always 0
 //   per module:  u8 type index (bit 7 set: the module is bypassed), then one i32 LE per parameter (Q16.16), in the order of the definition;
 //                modules with parameter inputs (paramInputs) then add i32 att1, i32 att2 (Q16.16, -1..1) and
@@ -20,13 +21,15 @@
 // Port indices are positions in ModuleDef.outputs / inputs (explicit ports first, then the `<param>_cv` inputs).
 
 import { DEFS } from './modules';
-import { hasMorph, MAX_MODULES, MAX_PARTS, SOURCES, type Patch } from './patch';
+import { flawOf, hasMorph, MAX_MODULES, MAX_PARTS, SOURCES, type Patch } from './patch';
 import { copiesOf, MAX_POLY, polyGroups } from './poly';
 import { cpuEstimate, type CpuEstimate } from './cpu';
 
 export const TYPE_ORDER: string[] = Object.keys(DEFS);
+/** bytes of a poly group record: parts, assign, legato, priority, then five flaw bytes per part (engine.h ENG_GROUP_REC) */
+export const GROUP_REC = 4 + 5 * MAX_PARTS;
 export const MAX_CABLES = 192;
-export const VERSION = 20; // 20: poly assemblies (the group section after the header; the Main module lost legato, priority, unit and the spread, legato, jump, tol, drift outputs, the oscillator its drift; part and random modules); 19: voicing and drift: the Main module got legato, priority, unit (and the legato, jump, tol, drift outputs), the oscillator blend, stack, drift, the glide curve; 18: arbitrary side-input fan-out (flag bit 3); 17: switchable fixed input links (flag bit 2); unmodified patches still encode as 16; 16: the shaper got the sym and stages parameters; 15: macro ranges (flag bit 1); 14: the Main module got the morph input and parameter, header flag bit 0 = a morph B set follows the cables; 13: the shaper and the digitizer got the os (oversampling) parameter, the sequencer glide and gate; 12: bit 7 of the type byte marks a bypassed module; 11: the oscillator got the unison and detune parameters; 10: the merge of the two lines below: the Main module's clock output comes before spread, the lfo's inputs are clk, reset (the restart input was sync), the delay as in 8b, modules of the second and third batch; 9: the matrix masks are u16 (modules with more than 8 parameters), the modules of the second module batch; 8a: osc and lfo got the sync input (p1 / p2 moved), glide and shape modules, the panel's spread output; 8b: the delay has the clk input, r output and sync, pingpong parameters, the lfo got the clk and reset inputs and the sync, div, bpm parameters, the Main module's clock output; 7: the oscillator got the fb parameter; 6: the filter's outputs are lp24, lp12, bp, hp, mix; 5: the filter got the morph input (ports after cv moved), track and morph parameters; 4: the reverb module was added before the output
+export const VERSION = 21; // 21: per-part flaws in the group record (GROUP_REC), the unit is gone; 20: poly assemblies (the group section after the header; the Main module lost legato, priority, unit and the spread, legato, jump, tol, drift outputs, the oscillator its drift; part and random modules); 19: voicing and drift: the Main module got legato, priority, unit (and the legato, jump, tol, drift outputs), the oscillator blend, stack, drift, the glide curve; 18: arbitrary side-input fan-out (flag bit 3); 17: switchable fixed input links (flag bit 2); unmodified patches still encode as 16; 16: the shaper got the sym and stages parameters; 15: macro ranges (flag bit 1); 14: the Main module got the morph input and parameter, header flag bit 0 = a morph B set follows the cables; 13: the shaper and the digitizer got the os (oversampling) parameter, the sequencer glide and gate; 12: bit 7 of the type byte marks a bypassed module; 11: the oscillator got the unison and detune parameters; 10: the merge of the two lines below: the Main module's clock output comes before spread, the lfo's inputs are clk, reset (the restart input was sync), the delay as in 8b, modules of the second and third batch; 9: the matrix masks are u16 (modules with more than 8 parameters), the modules of the second module batch; 8a: osc and lfo got the sync input (p1 / p2 moved), glide and shape modules, the panel's spread output; 8b: the delay has the clk input, r output and sync, pingpong parameters, the lfo got the clk and reset inputs and the sync, div, bpm parameters, the Main module's clock output; 7: the oscillator got the fb parameter; 6: the filter's outputs are lp24, lp12, bp, hp, mix; 5: the filter got the morph input (ports after cv moved), track and morph parameters; 4: the reverb module was added before the output
 /** bytes of a module record */
 export const recordSize = (type: string): number => 1 + 4 * DEFS[type].params.length + (DEFS[type].paramInputs ? 20 : 0);
 export const Q = 65536;
@@ -69,7 +72,7 @@ export function encodedSize(p: Patch): number {
   const groups = polyGroups(p).length;
   const routes = routesOf(p).length;
   const ranges = rangeList(p).length;
-  let size = 8 + 5 * groups + (groups ? p.modules.length : 0);
+  let size = 8 + GROUP_REC * groups + (groups ? p.modules.length : 0);
   for (const m of p.modules) size += recordSize(m.type);
   size += 4 * p.cables.length;
   if (hasMorph(p)) for (const m of p.modules) size += 4 * DEFS[m.type].params.length;
@@ -99,7 +102,14 @@ export function encodePatch(p: Patch, anyway = false): Uint8Array {
   dv.setUint16(4, p.cables.length, true);
   dv.setUint16(6, (morph ? FLAG_MORPH : 0) | (ranges.length ? FLAG_RANGE : 0) | (routes.length ? FLAG_INPUT_MAP : 0), true);
   let at = 8;
-  for (const { cfg } of groups) out.set([cfg.parts, cfg.assign, cfg.legato, cfg.priority, cfg.unit], (at += 5) - 5);
+  for (const { cfg } of groups) {
+    out.set([cfg.parts, cfg.assign, cfg.legato, cfg.priority], at);
+    for (let v = 0; v < MAX_PARTS; v++) {
+      const f = flawOf(cfg, v);
+      out.set([f.detune & 0xff, f.drift, f.bright & 0xff, f.env & 0xff, f.level], at + 4 + 5 * v);
+    }
+    at += GROUP_REC;
+  }
   if (groups.length) for (const m of p.modules) out[at++] = groups.findIndex((g) => g.modules.has(m.id)) + 1;
   for (const m of p.modules) {
     const def = DEFS[m.type];

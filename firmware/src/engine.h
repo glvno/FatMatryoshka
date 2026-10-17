@@ -10,18 +10,19 @@
 #define ENG_SR 44100u
 #define ENG_BLOCK 128u
 #define ENG_ONE 65536
-#define ENG_PATCH_VERSION 20
-#define ENG_PATCH_COMPAT_VERSION 20
+#define ENG_PATCH_VERSION 21
+#define ENG_PATCH_COMPAT_VERSION 21
 #define ENG_MAX_PARTS 8               /* parts of a poly group (notes it plays at once) */
+#define ENG_GROUP_REC (4u + 5u * ENG_MAX_PARTS)   /* a poly group record: parts, assign, legato, priority, five flaw bytes per part (patchbin.ts GROUP_REC) */
 
-/* where the module records of a patch binary start: after the 8 header bytes, the poly groups' settings (5 bytes each,
+/* where the module records of a patch binary start: after the 8 header bytes, the poly groups' records (ENG_GROUP_REC each,
  * header byte 3 = their count) and, with any group, one membership byte per module. 0 if the binary is too short. */
 static inline uint32_t eng_records_at(const uint8_t *p, uint32_t len)
 {
     uint32_t at;
     if (len < 8u)
         return 0;
-    at = 8u + 5u * p[3] + (p[3] ? p[2] : 0u);
+    at = 8u + ENG_GROUP_REC * p[3] + (p[3] ? p[2] : 0u);
     return at <= len ? at : 0;
 }
 
@@ -62,9 +63,9 @@ int eng_find(uint32_t type);
 /* the parts of the patch's first poly group (1 without one: everything plays the shared keyboard), 0 if none is loaded */
 int eng_parts(void);
 int eng_groups(void);                                                /* the poly groups of the loaded patch */
-/* a setting of poly group g (0 = the first): ENG_POLY_* (assign, legato, priority 0..2, unit 0..POLY_MAX_UNIT), -1 if none.
+/* a setting of poly group g (0 = the first): ENG_POLY_* (assign, legato, priority 0..2), -1 if none.
  * eng_poly_set changes all but the parts at once (0 = refused); the parts need a reload (the binary's group record). */
-enum { ENG_POLY_PARTS, ENG_POLY_ASSIGN, ENG_POLY_LEGATO, ENG_POLY_PRIORITY, ENG_POLY_UNIT, ENG_NPOLY };
+enum { ENG_POLY_PARTS, ENG_POLY_ASSIGN, ENG_POLY_LEGATO, ENG_POLY_PRIORITY, ENG_NPOLY };
 int eng_poly_get(uint32_t g, uint32_t field);
 int eng_poly_set(uint32_t g, uint32_t field, uint32_t v);
 void eng_note_on(uint32_t note, int32_t vel_q16);

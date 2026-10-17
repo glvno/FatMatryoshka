@@ -200,23 +200,77 @@ export interface PolyCfg {
   legato: number;
   /** which held notes sound when there are more than parts: 0 last, 1 low, 2 high */
   priority: number;
-  /** 0 .. MAX_UNIT: which instrument of the model; reseeds the Random modules inside */
-  unit: number;
+  /**
+   * Each part's own flaws, set by hand (an analog polysynth's voice cards are never quite alike): flaws[i] is part i's,
+   * a missing entry is FLAW_NONE. Kept for every part number up to EDITOR_MAX_PARTS, so fewer parts and back keeps them.
+   */
+  flaws?: PartFlaw[];
 }
+
+/**
+ * One part's flaws, all integers (the binary stores them as bytes, patchbin.ts). The engines apply them per part:
+ * detune and drift move the Part module's pitch; bright moves the cutoff of every filter / ladder inside, env scales the
+ * times of every ADSR / envelope inside, level scales the gain of every VCA inside (FLAW_TARGETS).
+ */
+export interface PartFlaw {
+  /** cents, -50 .. 50 */
+  detune: number;
+  /** 0 .. 100 %: a slow random wander of the pitch, up to +-DRIFT_CENTS at 100 */
+  drift: number;
+  /** semitones on the filter cutoffs, -24 .. 24 */
+  bright: number;
+  /** % on the envelope times, -50 .. 50 (+50 = half as long again) */
+  env: number;
+  /** % of the VCA gain, 0 .. 100 */
+  level: number;
+}
+export const FLAW_NONE: PartFlaw = { detune: 0, drift: 0, bright: 0, env: 0, level: 100 };
+export const FLAW_RANGE: Record<keyof PartFlaw, [number, number]> = { detune: [-50, 50], drift: [0, 100], bright: [-24, 24], env: [-50, 50], level: [0, 100] };
+export const FLAW_KEYS = Object.keys(FLAW_NONE) as (keyof PartFlaw)[];
+/** the pitch wander of a part at drift 100 %, in cents either way */
+export const DRIFT_CENTS = 20;
+/** the parameters each flaw moves, by module type (engine.ts applyFlaws, engine.c apply_flaws) */
+export const FLAW_TARGETS: Record<'bright' | 'env' | 'level', Record<string, string[]>> = {
+  bright: { filter: ['cutoff'], ladder: ['cutoff'] },
+  env: { adsr: ['a', 'd', 'r'], env: ['r1', 'r2', 'r3', 'r4'] },
+  level: { vca: ['gain'] },
+};
 /** the FM-1's part limit (POLY_MAX_PARTS in defs.h); the editor and the browser engine go up to EDITOR_MAX_PARTS */
 export const MAX_PARTS = 8;
 export const EDITOR_MAX_PARTS = 16;
-export const MAX_UNIT = 63;
-export const POLY_DEFAULT: PolyCfg = { parts: 4, assign: 0, legato: 0, priority: 0, unit: 0 };
+export const POLY_DEFAULT: PolyCfg = { parts: 4, assign: 0, legato: 0, priority: 0 };
 
-/** a poly setting from a file or an older editor, every field in range */
+/** part i's flaws (FLAW_NONE when it has none) */
+export const flawOf = (cfg: PolyCfg, i: number): PartFlaw => cfg.flaws?.[i] ?? FLAW_NONE;
+export const isFlawless = (f: PartFlaw): boolean => FLAW_KEYS.every((k) => f[k] === FLAW_NONE[k]);
+
+/** flaws from a file, every field an integer in range; trailing flawless parts are dropped, none at all = undefined */
+export function fixFlaws(raw: unknown): PartFlaw[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out = raw.slice(0, EDITOR_MAX_PARTS).map((e): PartFlaw => {
+    const r = (e && typeof e === 'object' ? e : {}) as Record<string, unknown>;
+    const f = { ...FLAW_NONE };
+    for (const k of FLAW_KEYS) {
+      const v = Math.round(Number(r[k]));
+      if (Number.isFinite(v)) f[k] = Math.max(FLAW_RANGE[k][0], Math.min(FLAW_RANGE[k][1], v));
+    }
+    return f;
+  });
+  while (out.length && isFlawless(out[out.length - 1])) out.pop();
+  return out.length ? out : undefined;
+}
+
+/** a poly setting from a file or an older editor, every field in range (an old `unit` is dropped) */
 export function fixPoly(raw: unknown): PolyCfg {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const int = (k: keyof PolyCfg, lo: number, hi: number): number => {
+  const int = (k: 'parts' | 'assign' | 'legato' | 'priority', lo: number, hi: number): number => {
     const v = Math.round(Number(r[k]));
     return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : POLY_DEFAULT[k];
   };
-  return { parts: int('parts', 1, EDITOR_MAX_PARTS), assign: int('assign', 0, 2), legato: int('legato', 0, 2), priority: int('priority', 0, 2), unit: int('unit', 0, MAX_UNIT) };
+  const cfg: PolyCfg = { parts: int('parts', 1, EDITOR_MAX_PARTS), assign: int('assign', 0, 2), legato: int('legato', 0, 2), priority: int('priority', 0, 2) };
+  const flaws = fixFlaws(r.flaws);
+  if (flaws) cfg.flaws = flaws;
+  return cfg;
 }
 
 export function emptyPatch(name = 'init'): Patch {

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { addChild, makeAssembly, memberProblem, toDef, insertAssembly, validateAssemblyDef } from './assembly';
+import { addChild, fixAssemblies, makeAssembly, memberProblem, toDef, insertAssembly, validateAssemblyDef } from './assembly';
 import { DEFS } from './modules';
-import { addModule, connect, emptyPatch, POLY_DEFAULT, type Patch } from './patch';
+import { addModule, connect, emptyPatch, POLY_DEFAULT, validatePatch, type Patch } from './patch';
 import { makeRoom, MAX_POLY, polyGroups, POLY_TOP, setPoly } from './poly';
 import { deviceBudget } from './patchbin';
 
@@ -47,6 +47,26 @@ describe('the Poly switch', () => {
     expect(asm(p, ids.asm).poly).toBeUndefined();
     expect(p.modules.some((m) => m.type === 'part')).toBe(false);
     expect(JSON.stringify(p.cables)).toBe(before);
+  });
+
+  it('the inputs the Part now feeds stop being exposed, and come back when Poly goes off', () => {
+    const { p, ids } = rig();
+    const ins = (): string[] => asm(p, ids.asm).inputs.map((r) => `${r.module}.${r.port}`).sort();
+    const before = ins();
+    expect(before).toEqual([`${ids.env}.gate`, `${ids.osc}.pitch`].sort());
+    setPoly(p, DEFS, asm(p, ids.asm), true);
+    expect(ins()).toEqual([]);
+    setPoly(p, DEFS, asm(p, ids.asm), false);
+    expect(ins()).toEqual(before);
+  });
+
+  it('a saved poly assembly that still exposes inputs its Part feeds loses those jacks on load', () => {
+    const { p, ids } = rig();
+    setPoly(p, DEFS, asm(p, ids.asm), true);
+    asm(p, ids.asm).inputs.push({ module: ids.osc, port: 'pitch', label: 'pitch' }, { module: ids.env, port: 'gate', label: 'gate' });
+    const q = validatePatch(JSON.parse(JSON.stringify(p)), DEFS);
+    fixAssemblies(q, DEFS);
+    expect(q.assemblies!.find((a) => a.id === ids.asm)!.inputs).toEqual([]);
   });
 
   it('a Part with other cables stays when Poly goes off', () => {

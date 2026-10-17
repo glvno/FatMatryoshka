@@ -6,6 +6,7 @@ import type { HostMsg } from './worklet';
 import { DeviceLink } from './device';
 import { Editor, probeKey, ZOOM_MAX, ZOOM_MIN } from './editor';
 import { addToBank, bankPatches, buildBankTab } from './bank';
+import { onSavedChange, savedPatches, savePatch as keepPatch } from './saved';
 import { buildAssembliesTab, storeAssembly, storeTutorialAssembly } from './assemblies';
 import { AssemblyBrowser } from './browser';
 import { searchCommands, type Command } from './commands';
@@ -141,7 +142,7 @@ let snapshotCandidates: () => { name: string; patch: Patch }[] = () => [];
 const patchCandidates = (): { name: string; patch: Patch }[] => {
   const seen = new Set<string>();
   const out: { name: string; patch: Patch }[] = [];
-  for (const c of [...snapshotCandidates(), ...bankPatches(), ...Object.entries(PRESETS).map(([name, make]) => ({ name, patch: make() }))])
+  for (const c of [...snapshotCandidates(), ...savedPatches(), ...bankPatches(), ...Object.entries(PRESETS).map(([name, make]) => ({ name, patch: make() }))])
     if (!seen.has(c.name)) {
       seen.add(c.name);
       out.push(c);
@@ -285,17 +286,30 @@ host.onValues = (values) => {
 // Sidebar
 setupPopoverPositioning();
 const presetSel = $<HTMLSelectElement>('preset');
-presetSel.append(new Option('Choose an example…', ''), ...Object.keys(PRESETS).map((n) => new Option(n, n)));
-{
-  const group = document.createElement('optgroup');
-  group.label = 'Tutorial';
-  group.append(...LISTED.map((i, n) => new Option(`${n + 1}. ${CHAPTERS[i].title}${CHAPTERS[i].published ? '' : ' (unpublished)'}`, `tutorial:${i}`)));
-  presetSel.append(group);
-}
+/** the Open picker: the user's saved patches (rebuilt on every save), the examples, the tutorial chapters' ends */
+const fillPicker = (): void => {
+  const group = (label: string, opts: HTMLOptionElement[]): HTMLOptGroupElement => {
+    const g = document.createElement('optgroup');
+    g.label = label;
+    g.append(...opts);
+    return g;
+  };
+  const mine = savedPatches();
+  presetSel.replaceChildren(
+    new Option('Open a patch…', ''),
+    ...(mine.length ? [group('Your patches', mine.map((e) => new Option(e.name, `saved:${e.name}`)))] : []),
+    group('Examples', Object.keys(PRESETS).map((n) => new Option(n, n))),
+    group('Tutorial', LISTED.map((i, n) => new Option(`${n + 1}. ${CHAPTERS[i].title}${CHAPTERS[i].published ? '' : ' (unpublished)'}`, `tutorial:${i}`))),
+  );
+};
+fillPicker();
+onSavedChange(fillPicker);
 presetSel.onchange = () => {
   const v = presetSel.value;
-  if (v.startsWith('tutorial:')) { editor.setPatch(chapterEnd(Number(v.slice(9)))); closeSidebar(); }
-  else if (v) { editor.setPatch(PRESETS[v]()); closeSidebar(); }
+  const mine = v.startsWith('saved:') ? savedPatches().find((e) => e.name === v.slice(6)) : undefined;
+  if (mine) { editor.setPatch(mine.patch); closeSidebar(); }
+  else if (v.startsWith('tutorial:')) { editor.setPatch(chapterEnd(Number(v.slice(9)))); closeSidebar(); }
+  else if (v && PRESETS[v]) { editor.setPatch(PRESETS[v]()); closeSidebar(); }
   setBaseline();
   presetSel.value = '';
   $<HTMLInputElement>('patch-name').value = editor.patch.name;
@@ -306,6 +320,19 @@ nameInput.oninput = () => {
   editor.patch.name = nameInput.value;
   queueSave(editor.patch);
 };
+const saveBtn = $<HTMLButtonElement>('save-patch-btn');
+/** keep the open patch in Your patches (saved.ts) under its name */
+const saveCurrent = (): void => {
+  if (!editor.patch.name.trim()) {
+    nameInput.focus();
+    status.textContent = 'name the patch first, then save';
+    return;
+  }
+  status.textContent = keepPatch(editor.patch);
+  saveBtn.classList.add('saved');
+  setTimeout(() => saveBtn.classList.remove('saved'), 900);
+};
+saveBtn.onclick = saveCurrent;
 /** the FM-1 budget meter in the Main dock: memory (the fullest limit) and CPU as bars; open, a card above the deck with every limit and the costliest modules */
 /** a meter row: name, bar, percent; `near` / `over` colour it */
 function meterRow(row: Element, name: string, frac: number, text: string): void {
@@ -451,6 +478,7 @@ const commands = (): Command[] => {
     run: () => editor.insert(d),
   });
   return [
+    { kind: 'command', label: 'Save patch', keywords: 'keep store your patches', run: saveCurrent },
     { kind: 'command', label: 'Save patch as .json', keywords: 'export download file', run: savePatch },
     { kind: 'command', label: 'Load patch from .json', keywords: 'import open file', run: () => $('load-file').click() },
     { kind: 'command', label: 'Share patch link', keywords: 'copy url clipboard', run: () => void sharePatch() },
@@ -590,6 +618,9 @@ window.addEventListener('keydown', (e) => {
   }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) {
     e.preventDefault(); e.stopImmediatePropagation(); openPalette(); return;
+  }
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's' && currentTab === 'patch' && !document.querySelector('dialog[open]')) {
+    e.preventDefault(); e.stopImmediatePropagation(); saveCurrent(); return;
   }
   if (currentTab !== 'patch') return;
   const t = e.target as HTMLElement | null;

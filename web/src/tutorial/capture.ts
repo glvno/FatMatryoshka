@@ -138,7 +138,7 @@ export function capture(rec: Recorded, roles: Roles): Capture {
     // the first poly assembly's settings: a new one asks for its part count, a changed setting for its new value
     const was = polyGroups(before)[0]?.cfg, now = polyGroups(after)[0]?.cfg;
     if (now && (!was || now.parts !== was.parts)) add({ kind: 'poly', setting: 'parts', op: 'ge', value: now.parts });
-    if (now) for (const k of ['assign', 'legato', 'priority', 'unit'] as const) if ((was?.[k] ?? 0) !== now[k]) add({ kind: 'poly', setting: k, op: 'eq', value: now[k] });
+    if (now) for (const k of ['assign', 'legato', 'priority'] as const) if ((was?.[k] ?? 0) !== now[k]) add({ kind: 'poly', setting: k, op: 'eq', value: now[k] });
   }
 
   // assemblies, through the roles that name them

@@ -560,8 +560,8 @@ asm('supersaw stack', 'Voices', (b) => {
 }, { parts: 4 });
 
 // an analog polysynth voice of four parts that has drifted out of spec: each oscillator's fine tune follows its own slow
-// Random walk (a few cents), a fixed Random per part (its tolerance) offsets the cutoff and the decay. `unit` of the
-// assembly picks another set of values: another instrument of the same model.
+// Random walk (a few cents), a fixed Random per part (its tolerance) offsets the cutoff and the decay. The assembly's
+// flaws (set by hand per part) add to that.
 asm('analog voice', 'Voices', (b) => {
   const part = b.add('part', 0, 2);
   const w1 = b.add('random', 1, 2, { mode: 1, rate: 0.7 });
@@ -590,7 +590,7 @@ asm('analog voice', 'Voices', (b) => {
   b.param('cutoff', flt, 'cutoff');
   b.param('res', flt, 'res');
   for (const q of ['a', 'd', 's', 'r']) b.param(q, env, q);
-}, { parts: 4 });
+}, { parts: 4, flaws: [{ detune: 4, drift: 30, bright: 1, env: 5, level: 100 }, { detune: -6, drift: 45, bright: -2, env: -8, level: 95 }, { detune: 2, drift: 25, bright: 0, env: 12, level: 100 }, { detune: -3, drift: 35, bright: 3, env: -4, level: 92 }] });
 
 // the plainest polyphonic voice: a poly assembly of four parts (saw, low pass, ADSR, VCA), each playing its own note
 asm('poly voice', 'Voices', (b) => {

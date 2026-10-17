@@ -33,7 +33,8 @@ import {
   type PortDef,
   type ParamDef,
   EDITOR_MAX_PARTS,
-  MAX_UNIT,
+  flawOf,
+  isFlawless,
   type PolyCfg,
   sameStructure,
   setMorphTarget,
@@ -41,6 +42,7 @@ import {
   hasMorph,
   ensureMain,
 } from './patch';
+import { FlawPanel } from './flaws-panel';
 import { ARP_DEFAULT, ARP_MODES, ARP_RATES, ARP_SCALES, ARP_MAX_STEPS, fixArp, noteName, type ArpCfg } from './arp';
 import { EXCLUDED_TYPES,
   addChild,
@@ -443,6 +445,7 @@ export class Editor {
     }
     for (const a of visible) if (!a.open) this.modulesEl.append(this.container(a, perVoice(a), parentOf(this.patch, a.id)));
     this.applyStack();
+    this.flawPanel?.sync();
     this.sizeCanvas();
     requestAnimationFrame(() => {
       this.layoutFrames();
@@ -955,14 +958,59 @@ export class Editor {
     return row;
   }
 
+  /** the open flaws card (flaws-panel.ts), if any */
+  private flawPanel: FlawPanel | null = null;
+
+  /** open the flaws card of poly assembly `a` under `anchor`: slider moves play at once, a release is one undo step */
+  private openFlaws(a: AssemblyInst, anchor: HTMLElement): void {
+    const was = this.flawPanel;
+    was?.close();
+    const id = a.id;
+    let before: string | null = null;
+    let frame = 0;
+    const cfg = (): PolyCfg | null => assembliesOf(this.patch).find((x) => x.id === id)?.poly ?? null;
+    this.flawPanel = new FlawPanel(
+      {
+        title: a.label,
+        cfg,
+        edit: (fn) => {
+          const c = cfg();
+          if (!c) return;
+          before ??= JSON.stringify(this.patch);
+          fn(c);
+          if (!frame) frame = requestAnimationFrame(() => {
+            frame = 0;
+            this.ev.onStructure(this.patch);
+          });
+        },
+        commit: () => {
+          if (before === null) return;
+          if (JSON.stringify(this.patch) !== before) {
+            this.history.push(before);
+            if (this.history.length > HISTORY) this.history.shift();
+            this.future = [];
+          }
+          before = null;
+          this.rebuild();
+          this.ev.onStructure(this.patch);
+        },
+        closed: () => {
+          if (this.flawPanel?.el.isConnected === false) this.flawPanel = null;
+        },
+      },
+      anchor.getBoundingClientRect(),
+    );
+  }
+
   /**
-   * A poly assembly's settings: parts (with the FM-1's budget), how notes are assigned, legato, priority and unit. Every
+   * A poly assembly's settings: parts (with the FM-1's budget), how notes are assigned, legato, priority and the parts'
+   * flaws (a button that opens the flaws card). Every
    * change goes through change() (undo, engine reload). `row`: one line (a frame's header strip), else a two-column grid.
    */
   private polySettings(a: AssemblyInst, row: boolean): HTMLElement {
     const el = document.createElement('div');
     el.className = 'poly-set' + (row ? ' row' : '');
-    const item = (label: string, names: (i: number) => string, count: number, key: keyof PolyCfg, title: string, lo = 0): HTMLElement => {
+    const item = (label: string, names: (i: number) => string, count: number, key: 'parts' | 'assign' | 'legato' | 'priority', title: string, lo = 0): HTMLElement => {
       const box = document.createElement('div');
       box.className = 'poly-item';
       box.title = title;
@@ -985,9 +1033,34 @@ export class Editor {
       item('assign', (i) => ASSIGN_MODES[i], ASSIGN_MODES.length, 'assign', "Which free part a new note takes: rotate (the next in turn, like a polysynth's voice cards), lowest (the lowest-numbered), reuse (a free part whose last note was that key, else the one free the longest)."),
       item('legato', (i) => LEGATO_MODES[i], LEGATO_MODES.length, 'legato', 'auto: with one part, a new key while one is held only changes the pitch; a taken-over part restarts its envelopes. off: always restart. on: never.'),
       item('priority', (i) => PRIORITIES[i], PRIORITIES.length, 'priority', 'With more keys held than parts: which notes sound (the last played, the lowest or the highest).'),
-      item('unit', String, MAX_UNIT + 1, 'unit', 'Which instrument of the model: every Random module inside gets a different set of values (tolerances, drift).'),
+      this.flawsItem(a),
     );
     return el;
+  }
+
+  /** the poly settings' flaws entry: how many parts have flaws; a click opens the card to set them */
+  private flawsItem(a: AssemblyInst): HTMLElement {
+    const box = document.createElement('div');
+    box.className = 'poly-item';
+    box.dataset.asm = String(a.id);
+    box.dataset.setting = 'flaws';
+    box.title = 'Each part\'s own flaws, set by hand: detune, drift, brightness (filter cutoffs), envelope time and level (VCA gain).';
+    const name = document.createElement('span');
+    name.textContent = 'flaws';
+    const b = document.createElement('button');
+    b.className = 'flaw-btn';
+    const cfg = a.poly!;
+    const n = Array.from({ length: cfg.parts }, (_, i) => flawOf(cfg, i)).filter((f) => !isFlawless(f)).length;
+    b.textContent = n ? `${n} of ${cfg.parts}` : 'none';
+    b.setAttribute('aria-label', `${a.label} flaws: ${b.textContent}`);
+    b.onclick = (e) => {
+      e.stopPropagation();
+      if (this.flawPanel?.el.isConnected) return this.flawPanel.close();
+      this.openFlaws(a, b);
+    };
+    b.onpointerdown = (e) => e.stopPropagation(); // not a card drag
+    box.append(name, b);
+    return box;
   }
 
   /** the morph picker: the B side of the patch (another patch of the same structure); the `morph` slider above fades every parameter A -> B */

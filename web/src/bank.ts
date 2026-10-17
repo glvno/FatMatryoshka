@@ -8,6 +8,7 @@ import { validatePatch, type Patch } from './patch';
 import { deviceBudget } from './patchbin';
 import { PRESETS } from './presets';
 import { SLOTS } from './protocol';
+import { removeSaved, savedPatches, onSavedChange } from './saved';
 import { decodeShare, shareCodeOf } from './share';
 
 interface Entry {
@@ -120,6 +121,7 @@ export function buildBankTab(root: HTMLElement, device: DeviceLink, currentPatch
     saveOver(over);
   };
   reread();
+  const mineEl = el('div', { class: 'bank-list' });
   const overEl = el('div', { class: 'bank-list' });
   const libEl = el('div', { class: 'bank-list' });
   const bankEl = el('div', { class: 'bank-list' });
@@ -153,6 +155,16 @@ export function buildBankTab(root: HTMLElement, device: DeviceLink, currentPatch
           el('button', { textContent: '×', title: 'remove', onclick: () => { list.splice(i, 1); changed(); } }),
         ),
       ),
+    );
+    const mine = savedPatches();
+    mineEl.replaceChildren(
+      ...(mine.length ? mine.map((e) => el('div', { class: 'bank-row' },
+        el('span', { class: 'grow', textContent: e.name }),
+        el('span', { class: 'muted', textContent: e.saved ? new Date(e.saved).toLocaleDateString() : '' }),
+        el('button', { textContent: 'Open', title: 'open in the editor', onclick: () => open(JSON.parse(JSON.stringify(e.patch)) as Patch) }),
+        el('button', { textContent: '+ bank', title: 'put a copy in the bank to upload to the FM-1', onclick: () => { status.textContent = addToBank(e.patch); reread(); refresh(); } }),
+        el('button', { textContent: '×', title: 'delete this saved patch', onclick: () => removeSaved(e.name) }),
+      )) : [el('p', { class: 'muted', textContent: 'None yet. Click the save icon next to the patch name (or Ctrl/Cmd+S) to keep the open patch here.' })]),
     );
     overEl.replaceChildren(
       ...(over.length ? over.map((e, i) => el('div', { class: 'bank-row' },
@@ -270,7 +282,9 @@ export function buildBankTab(root: HTMLElement, device: DeviceLink, currentPatch
   const reset = el('button', { textContent: 'All 32 factory patches', title: 'Replace the list with the factory patches', onclick: () => { list = Object.keys(PRESETS).slice(0, SLOTS).map((name) => ({ name })); changed(); } });
   const empty = el('button', { textContent: 'Empty the list', onclick: () => { list = []; changed(); } });
 
+  onSavedChange(refresh);
   root.append(
+    el('div', { class: 'card' }, el('h2', {}, el('span', { class: 'mtag src', textContent: 'MINE' }), 'Your patches'), el('p', { class: 'muted', textContent: 'Patches you saved, kept in this browser. Saving under the same name replaces the copy.' }), mineEl),
     el('div', { class: 'card' }, el('h2', {}, el('span', { class: 'mtag util', textContent: 'FM-1' }), 'Patch bank'), el('p', { textContent: 'Choose up to 32 patches and send them to the FM-1. They are written to its flash: the PRESET knob steps through them, a program change selects one, and they stay when the power is off. Uploading replaces the whole bank.' }), el('div', { class: 'toolbar' }, connect, upload, read, clear), bar, status),
     el(
       'div',
