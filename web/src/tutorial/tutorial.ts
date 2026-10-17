@@ -424,7 +424,6 @@ export class Tutorial {
     if (this.error) parts.push(el('p', { class: 'tutorial-warn', textContent: this.error }));
     if (this.page === 'intro') {
       parts.push(lessonProse(ch.intro));
-      parts.push(el('p', { textContent: 'Your previous patch was saved in Tutorial → Your saved variations. Each chapter starts from a prepared patch; your own sketches remain recoverable.' }));
       parts.push(this.button(this.previewing ? 'Stop preview' : 'Preview the finished sound', () => this.preview()));
       parts.push(el('div', { class: 'tour-actions' }, this.button('Begin', () => { this.endPreview(); void this.host.startAudio(); this.page = 'steps'; this.enterStep(); this.saveProgress(); this.render(true); }, true), this.button('Chapters', () => this.open())));
     } else if (this.page === 'steps' && st) {
