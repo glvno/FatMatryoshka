@@ -1789,7 +1789,9 @@ export class Editor {
 
   /** ▸ / ▾ before an assembly's title: expand or collapse */
   private chevron(a: AssemblyInst): HTMLButtonElement {
-    const b = this.button(a.open ? '▾' : '▸', a.open ? 'Collapse to one card' : 'Expand: show and edit the modules inside', () => this.toggleOpen(a), 'chev');
+    const b = this.button('', a.open ? 'Collapse to one card' : 'Expand: show and edit the modules inside', () => this.toggleOpen(a), 'chev');
+    // a drawn triangle (▸, turned down when open): the text glyph is tiny in the card fonts
+    b.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 1.5 L10 6 L3.5 10.5 Z"/></svg>';
     b.setAttribute('aria-expanded', String(!!a.open));
     b.dataset.asm = String(a.id);
     return b;

@@ -823,7 +823,9 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 /* a jack's row takes clicks (pick mode, Cmd / Ctrl-click put it on the assembly card); the card body otherwise lets them through */
 .module .mbody .port, .module .mbody .port > span { pointer-events: auto; }
 /* the ▸ / ▾ of an assembly: bright enough to find */
-:is(.mhead, .fhead) button.chev { width: 18px; font-size: 13px; color: var(--ink); }
+:is(.mhead, .fhead) button.chev { width: 24px; height: 24px; margin-left: -4px; color: var(--ink); }
+:is(.mhead, .fhead) button.chev svg { width: 13px; height: 13px; fill: currentColor; transition: transform .12s; }
+:is(.mhead, .fhead) button.chev[aria-expanded="true"] svg { transform: rotate(90deg); }
 
 /* ---- Sidebar in the cards' style: panels with a tinted header strip (family tag + condensed title), bodies of controls in
    condensed capitals, cable slack as a value bar, the examples as a picker field. Button texts stay as written (the
