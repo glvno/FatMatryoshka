@@ -345,7 +345,7 @@ function showBudget(): void {
   const fullest = memOver[0] ?? b.fullest;
   const [mem, cpu] = el.querySelectorAll('.budget-row');
   meterRow(mem, 'MEM', memOver.length ? 1.01 : b.memory, memOver.length ? 'over' : `${Math.round(b.memory * 100)} %`);
-  meterRow(cpu, 'CPU', b.cpu.use, `~${Math.round(b.cpu.use * 100)} %`);
+  meterRow(cpu, 'CPU', b.cpu.use, `${Math.round(b.cpu.use * 100)} %`);
   el.querySelector('summary')!.title = b.fits
     ? `Fits the FM-1. Memory: the fullest limit (${fullest?.label ?? 'none'}) is ${Math.round(b.memory * 100)} % used. CPU: about ${Math.round(b.cpu.use * 100)} % of the audio time, an estimate. Open for the details.`
     : `Over the FM-1 budget (${b.over.map((i) => i.label).join(', ')}): it plays here in the browser, the FM-1 cannot ${b.over.some((i) => i.key === 'cpu') ? 'keep up with' : 'load'} it.`;

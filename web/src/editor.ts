@@ -2407,8 +2407,22 @@ export class Editor {
     this.dockCables?.replaceChildren();
     this.overPaths.clear();
     for (const svg of this.modulesEl.querySelectorAll('.internal-cables, .entry-cables')) svg.remove();
-    const internalLayers = new Map<HTMLElement, SVGSVGElement>();
-    const entryLayers = new Map<HTMLElement, SVGSVGElement>();
+    // a card's cables are drawn over its thumbs (a layer that takes no pointer events), while their click areas lie
+    // under the thumbs, so a thumb under a cable still drags and patches
+    const cardLayers = new Map<HTMLElement, Map<string, SVGSVGElement>>();
+    const cardLayer = (card: HTMLElement, cls: 'internal-cables' | 'entry-cables', hits = false): SVGSVGElement => {
+      const key = `${cls}${hits ? ' hits' : ''}`;
+      let byKey = cardLayers.get(card);
+      if (!byKey) cardLayers.set(card, (byKey = new Map()));
+      let svg = byKey.get(key);
+      if (!svg) {
+        svg = document.createElementNS(SVGNS, 'svg') as SVGSVGElement;
+        svg.setAttribute('class', `cables ${key}`);
+        card.append(svg);
+        byKey.set(key, svg);
+      }
+      return svg;
+    };
     for (const dot of [...this.ports.values(), ...this.sliderPorts.map((p) => p.jack)]) dot.classList.remove('connected');
     const add = (from: HTMLElement, to: HTMLElement, kind: string, remove: (() => void) | null, title: string, internal = false, cable?: Cable): void => {
       const path = document.createElementNS(SVGNS, 'path');
@@ -2430,13 +2444,7 @@ export class Editor {
         const card = to.closest<HTMLElement>('.module');
         if (card && from.closest('.module') === card) {
           origin = card;
-          let local = internalLayers.get(card);
-          if (!local) {
-            local = document.createElementNS(SVGNS, 'svg');
-            local.setAttribute('class', 'cables internal-cables');
-            card.append(local); internalLayers.set(card, local);
-          }
-          layer = local;
+          layer = cardLayer(card, 'internal-cables');
         }
       }
       layer.prepend(path);
@@ -2460,31 +2468,32 @@ export class Editor {
       // a copy on the card, clipped to it, draws the stretch over the card up to the jack
       const card = !internal && origin === this.world ? to.closest<HTMLElement>('.module') : null;
       if (card && to.classList.contains('slider-port')) {
-        let entry = entryLayers.get(card);
-        if (!entry) {
-          entry = document.createElementNS(SVGNS, 'svg');
-          entry.setAttribute('class', 'cables entry-cables');
-          card.append(entry); entryLayers.set(card, entry);
-        }
         const copy = document.createElementNS(SVGNS, 'path');
         copy.setAttribute('class', path.getAttribute('class')!);
-        if (remove) {
-          copy.addEventListener('pointerdown', (e) => e.stopPropagation());
-          copy.addEventListener('click', (e) => { e.stopPropagation(); remove(); });
-          const t = document.createElementNS(SVGNS, 'title'); t.textContent = title; copy.append(t);
-        }
-        entry.append(copy);
+        cardLayer(card, 'entry-cables').append(copy);
         this.cablePaths.push({ path: copy, from, to, origin: card, cable });
+        if (remove) {
+          const hit = document.createElementNS(SVGNS, 'path');
+          hit.setAttribute('class', 'cable-hit');
+          hit.addEventListener('pointerdown', (e) => e.stopPropagation());
+          hit.addEventListener('click', (e) => { e.stopPropagation(); remove(); });
+          hit.addEventListener('pointerenter', () => copy.classList.add('hover'));
+          hit.addEventListener('pointerleave', () => copy.classList.remove('hover'));
+          const t = document.createElementNS(SVGNS, 'title'); t.textContent = title; hit.append(t);
+          cardLayer(card, 'entry-cables', true).append(hit);
+          this.cablePaths.push({ path: hit, from, to, origin: card });
+        }
       }
       if (internal && remove) {
-        // a thin route is hard to hit: an invisible path 1.5x as wide takes the clicks, above the card's controls
+        // a thin route is hard to hit: an invisible path 1.5x as wide takes the clicks, above the card's controls but
+        // under its thumbs
         const hit = document.createElementNS(SVGNS, 'path');
         hit.setAttribute('class', 'cable-hit');
         hit.addEventListener('pointerdown', (e) => e.stopPropagation());
         hit.addEventListener('click', (e) => { e.stopPropagation(); remove(); });
         hit.addEventListener('pointerenter', () => path.classList.add('hover'));
         hit.addEventListener('pointerleave', () => path.classList.remove('hover'));
-        layer.append(hit);
+        (origin === this.world ? layer : cardLayer(origin, 'internal-cables', true)).append(hit);
         this.cablePaths.push({ path: hit, from, to, origin });
       }
     };

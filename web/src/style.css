@@ -351,9 +351,15 @@ select.merge { font-size: 10px; padding: 0 2px; max-width: 70px; }
 .ports .dot { position: relative; z-index: 2; }
 .cables { z-index: 1; }
 .patch-preview { z-index: 4; }
-.internal-cables { z-index: 3; pointer-events: none; }
-/* the stretch of an outside cable over its card, up to the thumb it ends on: clipped to the card, under the thumb */
-.entry-cables { z-index: 3; overflow: hidden; border-radius: 8px; pointer-events: none; }
+.internal-cables { z-index: 5; pointer-events: none; }
+/* the stretch of an outside cable over its card, up to the thumb it ends on: clipped to the card */
+.entry-cables { z-index: 5; overflow: hidden; border-radius: 8px; pointer-events: none; }
+/* a card's cables are drawn over its thumbs and take no clicks there; their click areas (.hits) lie under the thumbs */
+:is(.internal-cables, .entry-cables):not(.hits) .cable { pointer-events: none; }
+:is(.internal-cables, .entry-cables).hits { z-index: 3; }
+.entry-cables .cable-hit { stroke-width: 6px; }
+.cable.hover { stroke-width: 6; }
+.module .sel-track, .tog-switch .tog-jack { z-index: 4; }
 .module .port > span:not(.dot), .module .param > input { position: relative; z-index: 2; }
 .module:has(.parameter-routing[open]) { z-index: 3; }
 .module .mhead, .module .param > span:not(.slider-jack), .module .param > output, .module .parameter-routing, .module .tog, .module .voices-row, .module .morph-row { position: relative; z-index: 2; }
